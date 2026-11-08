@@ -58,6 +58,7 @@ check(server.includes("registerBoardTools") && server.includes("TOOL_COUNT = 4")
 check(server.includes('name: "doodle-mcp"'), "MCP server identity is not Doodle");
 check(!buildScript.includes('fs.rm(path.join(root, "dist")'), "build.mjs deletes tsc output");
 check(buildScript.includes("pruneCompiledFiles"), "build.mjs does not prune stale compiled artifacts");
+check(buildScript.indexOf("await pruneCompiledFiles(distDir, expected);") < buildScript.indexOf("await fs.mkdir(targetDir, { recursive: true });"), "build.mjs creates the template target before pruning empty dist directories");
 check(instructions.includes("Start with get_board") && instructions.includes("scan_project is optional"), "MCP instructions do not describe the agent-first board loop");
 check(instructions.includes("Doodle is"), "MCP instructions do not introduce Doodle");
 check(sourceFiles.length === 7, `src/board has ${sourceFiles.length} TypeScript modules; expected the focused seven-module structure`);

@@ -40,13 +40,13 @@ async function pruneCompiledFiles(directory, expected, prefix = "") {
 const expected = await expectedCompiledFiles(sourceRoot);
 for (const name of ["board.html"]) expected.add(`infra/templates/${name}`);
 await fs.mkdir(distDir, { recursive: true });
+await pruneCompiledFiles(distDir, expected);
 await fs.mkdir(targetDir, { recursive: true });
 for (const name of await fs.readdir(targetDir)) {
   if (!expected.has(`infra/templates/${name}`)) {
     await fs.rm(path.join(targetDir, name), { recursive: true, force: true });
   }
 }
-await pruneCompiledFiles(distDir, expected);
 for (const name of await fs.readdir(sourceDir)) {
   await fs.copyFile(path.join(sourceDir, name), path.join(targetDir, name));
 }

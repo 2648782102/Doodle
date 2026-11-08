@@ -16,6 +16,7 @@ All notable changes are documented here. Versions follow `VERSIONING.md`.
 - Replaced the human surface with one restrained infinite canvas: toolbar, free placement, directed SVG arrows, short notes, and local viewport state.
 - Rewrote `AGENTS.md`, architecture, product direction, decisions, troubleshooting, governance, launch copy, contribution docs, and offline repository guards around the simplified product.
 - Reduced runtime dependencies to the MCP SDK, Express, WebSocket, and Zod.
+- Made a clean-checkout build recreate the template directory after pruning stale compiled files.
 
 ### Removed
 
