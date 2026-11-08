@@ -37,6 +37,7 @@ Start with the [main README](../README.md) for installation and the product over
 | [ADR/0023-board-modules-and-library-boundary.md](ADR/0023-board-modules-and-library-boundary.md) | Contributors, reviewers | Why one board header, canvas, and object inspector replace the legacy status layers |
 | [ADR/0024-agent-first-mcp-surface.md](ADR/0024-agent-first-mcp-surface.md) | AI agents, maintainers | Why MCP tools/resources/instructions are the default agent surface and panel opening is opt-in |
 | [ADR/0025-simple-infinite-board-is-the-product.md](ADR/0025-simple-infinite-board-is-the-product.md) | Everyone | Why the product is a simple shared infinite board, with project tools kept in `/workbench` |
+| [ADR/0026-board-lines-are-directed-arrows.md](ADR/0026-board-lines-are-directed-arrows.md) | AI agents, reviewers | Why board lines are signed directed arrows and how agents should lay them out |
 | [../ROADMAP.md](../ROADMAP.md) | Everyone | Shipped direction, upcoming work, and explicit non-goals |
 | [../CONTRIBUTING.md](../CONTRIBUTING.md) | Contributors | Local setup, verification, PR expectations |
 | [../SECURITY.md](../SECURITY.md) | Security reviewers | Threat model, supported versions, vulnerability reporting |

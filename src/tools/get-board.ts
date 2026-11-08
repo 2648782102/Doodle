@@ -24,6 +24,18 @@ function boardJson(board: SimpleBoard) {
   };
 }
 
+function boardGuidance(): string {
+  return [
+    "Drawing guide:",
+    "- Read BOARD_JSON first; reuse item IDs to update or remove existing objects.",
+    "- Use a strict grid with short labels. Put author at the draw_board top level, not inside items.",
+    "- A line is an arrow from (x,y) to (x+w,y+h); w/h represent direction, not a box size. It may be negative.",
+    "- Place line endpoints just outside the source and target shapes; use text for a label instead of crowding the arrow.",
+    "- Prefer a clean replace when redrawing a whole diagram: remove_ids for the old objects, then add the new ones.",
+    "- Board tools do not open a browser and never grant project-write authority.",
+  ].join("\n");
+}
+
 export function registerGetBoard(server: McpServer, ctx: ToolContext) {
   server.tool(
     "get_board",
@@ -49,6 +61,8 @@ export function registerGetBoard(server: McpServer, ctx: ToolContext) {
               "BOARD_JSON:",
               JSON.stringify(payload, null, 2),
               ``,
+              boardGuidance(),
+              ``,
               "BOARD_JSON is a read-only projection. Use draw_board to add or edit visual objects, and reply_on_board to answer a note.",
             ].join("\n"),
           }],
@@ -65,8 +79,8 @@ const itemInput = z.object({
   type: z.enum(["note", "text", "rect", "ellipse", "line"]).describe("Simple visual object type"),
   x: z.number().finite().describe("Canvas X coordinate"),
   y: z.number().finite().describe("Canvas Y coordinate"),
-  w: z.number().finite().optional().describe("Width in canvas units"),
-  h: z.number().finite().optional().describe("Height in canvas units"),
+  w: z.number().finite().optional().describe("Shape width, or line endpoint delta X; negative values are allowed for lines"),
+  h: z.number().finite().optional().describe("Shape height, or line endpoint delta Y; negative values are allowed for lines"),
   text: z.string().max(1200).optional().describe("Visible text on the object"),
   color: z.string().regex(/^#[0-9a-fA-F]{6}$/).optional().describe("Hex fill color"),
 });
@@ -74,7 +88,7 @@ const itemInput = z.object({
 export function registerDrawBoard(server: McpServer, ctx: ToolContext) {
   server.tool(
     "draw_board",
-    "让 AI 直接在共享无限画布上画或改：批量新增/更新便签、文字、矩形、椭圆或简单线条，也可按 ID 删除对象。适合把结构化想法画给人看、补充标注或整理布局；不打开浏览器，不写项目文件，不签发批准凭据。",
+    "让 AI 直接在共享无限画布上画或改：批量新增/更新便签、文字、矩形、椭圆或有方向箭头，也可按 ID 删除对象。line 的 (x,y) 是起点，(x+w,y+h) 是终点，w/h 可为负数；其他对象是左上角与宽高。先用 get_board 读取现有 ID 和坐标，按整齐网格布局；不打开浏览器，不写项目文件，不签发批准凭据。",
     {
       items: z.array(itemInput).max(100).optional().describe("Objects to create (without id) or update (with id)"),
       remove_ids: z.array(z.string()).max(100).optional().describe("Existing object IDs to remove"),

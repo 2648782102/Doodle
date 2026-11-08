@@ -123,6 +123,7 @@ const roadmap = await read("ROADMAP.md");
 const research = await read("docs/COMPETITIVE_RESEARCH.md");
 const productDirection = await read("docs/PRODUCT_DIRECTION.md");
 const sharedBoardAdr = await read("docs/ADR/0022-shared-visual-board-is-the-product.md");
+const boardLinesAdr = await read("docs/ADR/0026-board-lines-are-directed-arrows.md");
 const englishReadme = englishQuickstart;
 const ci = await read(".github/workflows/ci.yml");
 const metadataWorkflow = await read(".github/workflows/maintain-github-metadata.yml");
@@ -164,6 +165,13 @@ check(productDirection.includes("simple, practical shared infinite board"), "PRO
 check(englishQuickstart.includes("without opening a browser") || englishQuickstart.includes("tools do not open a browser by default"), "README.en.md does not document the headless MCP default");
 check(readme.includes("这些工具都不主动打开浏览器"), "README.md does not document the headless MCP default");
 check(roadmap.includes("get_board"), "ROADMAP.md does not document the simple-board MCP defaults");
+check(agents.includes("AI 用 get_board 读取共享画板"), "AGENTS.md does not document the simple-board default loop");
+check(agents.includes("| 默认共享画板 | `get_board`、`draw_board`、`reply_on_board` |"), "AGENTS.md tool table is missing the board trio");
+check(agents.includes("(x+w,y+h)"), "AGENTS.md is missing the directed-arrow coordinate contract");
+check(!agents.includes("读取 26 个工具"), "AGENTS.md still advertises the stale 26-tool count");
+check(architecture.includes("注册 29 个工具"), "ARCHITECTURE.md still advertises the stale 26-tool count");
+check(adrIndex.includes("0026-board-lines-are-directed-arrows.md"), "ADR index is missing ADR 0026");
+check(boardLinesAdr.includes("signed endpoint deltas"), "ADR 0026 is missing the directed-arrow contract");
 check(documentationMap.includes("0024-agent-first-mcp-surface.md"), "docs/README.md does not link ADR 0024");
 check(documentationMap.includes("0025-simple-infinite-board-is-the-product.md"), "docs/README.md does not link ADR 0025");
 check(agentFirstAdr.includes("MCP stdio is the default AI-facing product surface"), "ADR 0024 is missing the historical agent-first decision");
@@ -1477,6 +1485,21 @@ check(serverSource.includes("registerGetBoard(mcp, ctx)"), "server.ts does not r
 check(simpleBoardTest.includes("independent of project state"), "simple-board.test.mjs is missing the independent-state regression");
 check(boardUiTest.includes("dense workbench out of the first screen"), "board-ui.test.mjs is missing the simple first-screen regression");
 check(packageJson.scripts?.["ui:shots"] === "npm run build && node scripts/capture-panel.mjs", "ui:shots script is missing the reproducible simple-board capture");
+check(boardTool.includes("Drawing guide"), "get-board.ts is missing the board drawing guide");
+check(boardTool.includes("(x+w,y+h)"), "get-board.ts is missing the directed-arrow coordinate contract");
+check(boardTemplate.includes('data-tool="line"') && boardTemplate.includes("箭头"), "board.html is missing the human arrow tool");
+check(boardTemplate.includes('createElementNS("http://www.w3.org/2000/svg", "svg")'), "board.html does not render arrows as SVG");
+check(boardTemplate.includes("Math.min(item.x, item.x + item.w)"), "board.html does not fit signed arrow endpoints");
+check(simpleBoard.includes("signedWidth") && simpleBoard.includes("signedHeight"), "simple-board.ts is missing signed line deltas");
+check(mcpTest.includes("directed-arrow drawing guide"), "mcp.test.mjs is missing the board drawing-guide regression");
+check(simpleBoardTest.includes("keeps signed line deltas"), "simple-board.test.mjs is missing the signed-line regression");
+check(boardUiTest.includes('board-item[data-type="line"] svg > path'), "board-ui.test.mjs is missing the SVG arrow regression");
+check(agentContext.includes("w/h are signed endpoint deltas"), "MCP instructions are missing the directed-arrow rule");
+check(agentContextTest.includes("w/h are signed endpoint deltas"), "agent-context.test.mjs is missing the directed-arrow instruction regression");
+check(productDirection.includes("directed arrow lines"), "PRODUCT_DIRECTION.md is missing the directed-arrow product model");
+check(readme.includes("真正的有方向箭头"), "README.md is missing the directed-arrow product copy");
+check(englishQuickstart.includes("directed arrow lines"), "README.en.md is missing the directed-arrow product copy");
+check(changelog.includes("默认画板指引与有方向箭头"), "CHANGELOG.md is missing the directed-arrow entry");
 
 if (failures.length) {
   console.error("❌ Offline repository checks failed:");

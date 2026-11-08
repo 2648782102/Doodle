@@ -13,10 +13,12 @@ AI 的默认工作位置是 agent 内部：先调用 `get_board`，需要时用 
 AI 主循环：
 
 ```text
-AI 经 MCP 扫描并更新共享画布 → 人在图上纠错、选择范围或添加上下文 → AI 读取同一会话并回应 → 需要改代码时 AI 建提案 → 人审完整 diff 并批准 → AI 凭一次性确认号安全写入 → 再扫描并更新画布
+AI 用 get_board 读取共享画板 → 用 draw_board / reply_on_board 画或回应 → 人继续画、改字或写留言 → AI 再读同一张画板
 ```
 
-沟通应锚定在图节点、关系、选区或画布范围，并保留作者与修订上下文。面板主输入把人的留言写入现有 annotation 契约：有焦点时绑定节点，没有焦点时留在画布范围；每条线程都可就地续答。AI 用 `get_visual_context` / `reply_to_visual_context` 读取并在同一线程回应。剪贴板只读投影是辅助工具，不是沟通主路径。优先复用 version 1 会话、消息、批注与图形修订契约，避免为同一意图增加重复状态或强制工作流。
+沟通就是共享画布上的对象、坐标、文字、作者与短留言；默认不依赖节点、选区、annotation 线程或工作流状态。画板状态是独立 version 1 `SimpleBoard`，保存在 `output/.ai-draw/board.json`；`/api/board/*` 与 MCP 画板三工具读写同一份状态。AI 不主动打开浏览器；只有人明确想看效果时才用 `open_preview` 或本地 URL。`scan_project` / `get_visual_context` / `reply_to_visual_context` / 提案 / 批准属于 `/workbench` 的可选兼容能力，不是默认画板主循环。
+
+画图规范：先用 `get_board` 读取现有对象 ID 与坐标；重画整张图时用 `draw_board.remove_ids` 清理旧对象再批量新增；`author` 放在 `draw_board` 顶层参数，不放进 item。结构化图使用严格网格、短标签和一致尺寸；`line` 是真正有方向的箭头，`(x,y)` 是起点，`(x+w,y+h)` 是终点，`w` / `h` 可为负数，端点贴着源对象与目标对象的外缘，不要把 `line` 当方框底部的装饰横线，也不要用 `text` 假扮连接线。`reply_on_board` 只放一句轻量回应，不另做聊天主体。详见 [ADR 0026](docs/ADR/0026-board-lines-are-directed-arrows.md)。
 
 安全底线：**画布沟通和 AI 回复都不构成项目写入授权**。AI 不得绕过提案、人工批准与一次性确认号直接修改项目文件。所有项目写入都经过 `src/domain/path-safety.ts` 和 `SessionStore.applyProposal()`。
 
@@ -30,6 +32,7 @@ src/
 ├── server.ts                 组装根：创建实例，注册全部工具与 TOOL_COUNT
 ├── domain/
 │   ├── types.ts              版本化协作协议：VisualGraph / SessionSnapshot / ChangeProposal
+│   ├── simple-board.ts       独立 version 1 简单画板对象、留言与坐标契约
 │   ├── ids.ts                统一 ID 与时间戳
 │   ├── approval.ts           一次性批准凭据
 │   ├── session-bundle.ts     可移植会话快照的创建与解析
@@ -58,6 +61,7 @@ src/
 │   ├── workspace.ts          AI_DRAW_WORKSPACE_ROOT / 包根目录解析
 │   ├── store.ts              DiagramStore：旧图清单持久化
 │   ├── session-store.ts      SessionStore：图、消息、批注、提案、批准凭据、应用与回滚
+│   ├── simple-board-store.ts SimpleBoardStore：独立画板状态与跨进程修订同步
 │   ├── project-scanner.ts    只读扫描项目结构与 import 关系
 │   ├── visual-sync-service.ts AI 扫描与人类重新扫描共用的同步、渲染和广播服务
 │   ├── renderer.ts           mmdc / sharp 渲染，SVG 包装
@@ -65,9 +69,11 @@ src/
 │   ├── ide-opener.ts         在 IDE 中打开 Simple Browser
 │   ├── agent-context.ts      MCP instructions 与 ai-draw://board/* 只读资源投影
 │   ├── logger.ts             stderr logger
-│   └── templates/index.html  薄辅助面板：查看/纠错/审阅/批准
+│   ├── templates/index.html  薄辅助面板：查看/纠错/审阅/批准
+│   └── templates/board.html  默认共享无限画布：工具栏、画布、轻量留言区
 └── tools/
     ├── _shared.ts            ToolContext、渲染管道、响应格式
+    ├── get-board.ts          get_board / draw_board / reply_on_board 三个默认画板工具
     ├── render-*.ts           7 个绘图工具
     ├── update/delete/list/open-preview.ts 旧图管理
     ├── scan-project.ts       稳定路径只读扫描、保留人工视觉状态并生成/刷新协作图
@@ -96,6 +102,7 @@ docs/DEPENDENCY_MAINTENANCE.md 依赖升级、CI 验证与重大版本决策记�
 docs/LAUNCH_KIT.md            GitHub/Release/社区宣发模板
 docs/GOVERNANCE.md             开源治理、维护清单与元数据漂移证据
 docs/ADR/README.md             架构决策记录索引
+docs/ADR/0026-board-lines-are-directed-arrows.md 画板线条是有方向的箭头
 docs/ADR/0005-human-focus-is-read-only-context.md 当前焦点只读上下文决策
 docs/ADR/0006-stable-scan-preserves-human-visual-state.md 稳定扫描保留人工视觉状态决策
 docs/ADR/0007-agent-workflow-is-a-read-only-contract.md 只读工作流契约决策
@@ -131,6 +138,7 @@ ROADMAP.md                   产品路线图与非目标
 
 | 分组 | 工具 |
 |------|------|
+| 默认共享画板 | `get_board`、`draw_board`、`reply_on_board` |
 | Mermaid / SVG 绘图 | `render_diagram`、`render_flowchart`、`render_sequence`、`render_architecture`、`render_class_diagram`、`render_mindmap`、`render_svg` |
 | 图管理 | `update_diagram`、`delete_diagram`、`list_diagrams`、`open_preview`（按需打开人用面板） |
 | 双向协作 | `scan_project`、`get_visual_context`、`reply_to_visual_context`、`create_visual_proposal`、`apply_visual_proposal` |
@@ -140,7 +148,7 @@ ROADMAP.md                   产品路线图与非目标
 | 只读多选范围 | `get_selection_scope` |
 | 只读预提案工作单 | `get_selection_workorder` |
 
-协作工作流：新 agent 可先调用 `get_capabilities` 一次读取 26 个工具、`CAPABILITIES_JSON` 契约、安全边界与下一步建议；随后 `scan_project`，人改图或勾选多个节点、在节点批注线程里回复或重开讨论后，AI 可先调用 `get_agent_workflow` 读取八步 `WORKFLOW_JSON`、`blocked` 与紧凑只读 `reviewReadiness`，用 `get_shared_brief` 读取紧凑 `BRIEF_JSON` 交接，再调用 `get_visual_context` 读取 `annotationThreads.nextActor`、`pendingMessages`、`unresolvedAnnotations` 与完整 `REVIEW_READINESS_JSON`；针对焦点节点可调用 `get_node_context` 获取紧凑 `NODE_CONTEXT_JSON`，针对「这几个模块」可调用 `get_selection_scope` 获取 `SELECTION_SCOPE_JSON`，用 `get_selection_workorder` 把范围、候选路径、意图、证据与缺口收束成只读 `SELECTION_WORKORDER_JSON`，用 `get_source_navigation` 复制相对 `file:line` 跳转提示，复盘「为什么做这个改动」时可调用 `get_decision_trail` 读取只读 `DECISION_TRAIL_JSON`。`nextActor` 为 AI 时用 `reply_to_visual_context` 回信/内联回复并标记已处理，`nextActor` 为 human 时等待。常见意图可用 `list_change_templates` 展开只读草稿，创建提案前用 `preflight_visual_proposal` 只读检查路径、文件存在性、create/update 与重复内容，再 `create_visual_proposal`；人在面板查看逐行差异、批准并复制一次性确认号，AI 最后调用 `apply_visual_proposal(proposal_id, approval_id, approval_grant, approval_expires_at, approved_by="human")`。
+默认画板工作流：新 agent 先调用 `get_board` 读取 `BOARD_JSON` 与内置画图规范；用 `draw_board` 批量新增、更新或删除有作者标记的画布对象，用 `reply_on_board` 留一句短回应；人继续画、改字或留言后，AI 再读同一张画板。需要能力清单时可调用 `get_capabilities` 读取 29 个工具、`CAPABILITIES_JSON` 契约、安全边界与下一步建议。下面从 `scan_project` 开始的段落只描述 `/workbench` 兼容工作流，不是默认画板流程：AI 可先调用 `get_agent_workflow` 读取八步 `WORKFLOW_JSON`、`blocked` 与紧凑只读 `reviewReadiness`，用 `get_shared_brief` 读取紧凑 `BRIEF_JSON` 交接，再调用 `get_visual_context` 读取 `annotationThreads.nextActor`、`pendingMessages`、`unresolvedAnnotations` 与完整 `REVIEW_READINESS_JSON`；针对焦点节点可调用 `get_node_context` 获取紧凑 `NODE_CONTEXT_JSON`，针对「这几个模块」可调用 `get_selection_scope` 获取 `SELECTION_SCOPE_JSON`，用 `get_selection_workorder` 把范围、候选路径、意图、证据与缺口收束成只读 `SELECTION_WORKORDER_JSON`，用 `get_source_navigation` 复制相对 `file:line` 跳转提示，复盘「为什么做这个改动」时可调用 `get_decision_trail` 读取只读 `DECISION_TRAIL_JSON`。`nextActor` 为 AI 时用 `reply_to_visual_context` 回信/内联回复并标记已处理，`nextActor` 为 human 时等待。常见意图可用 `list_change_templates` 展开只读草稿，创建提案前用 `preflight_visual_proposal` 只读检查路径、文件存在性、create/update 与重复内容，再 `create_visual_proposal`；人在面板查看逐行差异、批准并复制一次性确认号，AI 最后调用 `apply_visual_proposal(proposal_id, approval_id, approval_grant, approval_expires_at, approved_by="human")`。
 
 `get_visual_context` 的 `intentSummary` 会按节点聚合未解决批注（包含线程回复）、待处理消息与连线标签，并返回 `annotationThreads` / `nextActor`；`focus` 记录人当前选中的节点；`activityTimeline` 把消息、`graph_diff` 图形修订、线程与提案生命周期合并为只读派生事件。生成提案时优先引用 `focus`、`intentByNode` 和活动顺序，不要只复述扁平消息列表。`nextActor` 为 `human` 时应等待人继续回复，不要抢先创建提案；焦点与活动时间线都不授权项目写入。
 
@@ -156,7 +164,7 @@ ROADMAP.md                   产品路线图与非目标
 
 `get_source_navigation` 与 `GET /api/collab/source-navigation` 是 `src/domain/source-navigation.ts` 的 version 1 只读派生投影：从当前 `VisualGraph` 的 `GraphSourceEvidence` 生成有界的相对 `file:line`、`vscode://` / `cursor://` URI 文本、`code --goto` 提示与可复制清单。`SOURCE_NAVIGATION_JSON` 固定 `readOnly: true` 与 `projectWritesRequireHumanApproval: true`，过滤绝对路径、目录穿越、受保护目录和 `.env`-like 名称；不重复读取项目文件、不打开编辑器、不启动进程/执行命令、不写会话/项目文件、不签发凭据、不进入 bundle，也不扩大提案允许路径；面板显示并可复制同一视图，详见 [ADR 0016](docs/ADR/0016-source-navigation-is-copyable-context.md)。
 
-`get_capabilities` 与 `GET /api/collab/capabilities` 是 `src/domain/capabilities.ts` 的 version 1 只读发现清单：从类型化常量、`SERVER_TOOL_COUNT` 与当前 `SessionSnapshot` 派生 26 个工具、JSON 契约、八步工作流就绪状态、`REVIEW_READINESS_JSON` 状态、下一步安全动作和唯一 `writes: "project"` 工具。`CAPABILITIES_JSON` 是应用层发现契约，与 MCP 原生 `tools/list` 互补；不调用其他工具、不重复读取项目文件、不写会话/项目文件、不创建提案、不签发凭据、不暴露工作区绝对路径；面板显示并可复制同一份清单，详见 [ADR 0017](docs/ADR/0017-capability-catalogue-is-read-only-discovery.md)。
+`get_capabilities` 与 `GET /api/collab/capabilities` 是 `src/domain/capabilities.ts` 的 version 1 只读发现清单：从类型化常量、`SERVER_TOOL_COUNT` 与当前 `SessionSnapshot` 派生 29 个工具、JSON 契约、八步工作流就绪状态、`REVIEW_READINESS_JSON` 状态、下一步安全动作和唯一 `writes: "project"` 工具。`CAPABILITIES_JSON` 是应用层发现契约，与 MCP 原生 `tools/list` 互补；不调用其他工具、不重复读取项目文件、不写会话/项目文件、不创建提案、不签发凭据、不暴露工作区绝对路径；面板显示并可复制同一份清单，详见 [ADR 0017](docs/ADR/0017-capability-catalogue-is-read-only-discovery.md)。
 
 `SessionSelection` 是 `src/domain/selection.ts` 校验的 version 1 有界人类多选状态。只有本机面板可通过 `POST /api/collab/selection` 以 `PANEL_TOKEN` 与 `confirmedBy: "human"` 发布最多 24 个唯一节点 ID；服务端拒绝未知/重复/超限 ID、非人类来源、未知属性和非有限修订。`get_selection_scope`、`GET /api/collab/selection-scope`、`CONTEXT_JSON.selectionScope`、`BRIEF_JSON.selection`、`WORKFLOW_JSON.selection`、诊断和面板只读显示 `SELECTION_SCOPE_JSON`：选中节点、两端都在范围内的连线、工作区相对安全 `file:line` 证据与固定只读标记。它不重读项目文件、不改 `graphRevision`、不产生消息/时间线/`graphDiffs`/批准凭据、不进入 bundle、不写项目文件；图修订会移除失锚节点但不改写原 `selectionRevision`，导入会话会清空选择，详见 [ADR 0018](docs/ADR/0018-human-selection-is-read-only-scope.md)。
 
@@ -225,6 +233,12 @@ server.tool(
 
 | Endpoint | 用途 |
 |----------|------|
+| `GET /api/board` | 读取独立 version 1 共享画板 |
+| `POST /api/board/items` | 人确认后新增画布对象；需要 `X-AI-Draw-Token` |
+| `PATCH /api/board/items/:id` | 人确认后更新对象坐标、尺寸或文字；需要 `X-AI-Draw-Token` |
+| `DELETE /api/board/items/:id` | 人确认后删除画布对象；需要 `X-AI-Draw-Token` |
+| `POST /api/board/notes` | 人确认后写一句短留言；需要 `X-AI-Draw-Token` |
+| `WS /ws` | `board_updated` 同步默认画板；其余事件见下表 |
 | `GET /api/collab/session` | 完整会话快照 |
 | `GET /api/collab/activity` | 只读紧凑活动时间线；`limit` 默认 60、最大 200 |
 | `GET /api/collab/diagnostics` | 只读会话诊断：图/线程/提案计数、信号、下一步与安全不变量 |
@@ -257,7 +271,7 @@ server.tool(
 | `GET /api/collab/proposals/:id/impact` | 查看批准前的文件/行数/字节数影响摘要 |
 | `POST /api/collab/proposals/:id/approve` | 人类批准，返回一次性确认号；**不写项目文件** |
 | `POST /api/collab/proposals/:id/reject` | 人类拒绝提案 |
-| `WS /ws` | `diagram_update`、`graph_updated`、`chat_message`、`proposal_created`、`proposal_updated`、`session_updated` |
+| `WS /ws` | `/workbench` 事件：`diagram_update`、`graph_updated`、`chat_message`、`proposal_created`、`proposal_updated`、`session_updated` |
 
 ---
 

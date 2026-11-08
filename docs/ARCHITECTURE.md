@@ -1,10 +1,10 @@
 # Architecture
 
-AI Draw MCP 是一个本机优先的**人与 AI 共享无限画板**。默认产品是简单画布：人和 AI 都能画便签、文字、形状与线条，并在旁边写短留言；AI 通过 MCP stdio 的 `get_board` / `draw_board` / `reply_on_board` 自然使用，普通工具调用不打开浏览器。独立 version 1 画板状态保存在 `output/.ai-draw/board.json`，由 `/api/board/*` 读写并经过 WebSocket 广播。项目扫描、源码证据、提案与写入闸门保留在 `/workbench` 和兼容工具中，作为可选能力。产品定义见 [PRODUCT_DIRECTION.md](PRODUCT_DIRECTION.md) 与 [ADR 0025](ADR/0025-simple-infinite-board-is-the-product.md)。
+AI Draw MCP 是一个本机优先的**人与 AI 共享无限画板**。默认产品是简单画布：人和 AI 都能画便签、文字、形状与有方向的箭头线，并在旁边写短留言；AI 通过 MCP stdio 的 `get_board` / `draw_board` / `reply_on_board` 自然使用，普通工具调用不打开浏览器。独立 version 1 画板状态保存在 `output/.ai-draw/board.json`，由 `/api/board/*` 读写并经过 WebSocket 广播。`line` 的 `(x,y)` 是起点，`(x+w,y+h)` 是有符号终点，详见 [ADR 0026](ADR/0026-board-lines-are-directed-arrows.md)。项目扫描、源码证据、提案与写入闸门保留在 `/workbench` 和兼容工具中，作为可选能力。产品定义见 [PRODUCT_DIRECTION.md](PRODUCT_DIRECTION.md) 与 [ADR 0025](ADR/0025-simple-infinite-board-is-the-product.md)。
 
 当前 `0.3.x` 默认打开共享画布：首用可直接只读扫描项目，节点对象卡显示人与 AI 的有序留言并支持就地续答；项目工作台作为次级入口保留图形编辑、只读投影、变更 diff 与人工批准。可复制只读投影作为辅助工具独立存在。后续阶段继续补强证据可信度与从视觉意图到安全提案的追踪。无论任何交互路径，项目文件写入仍须经过提案、完整 diff、人工批准和一次性确认号。系统由四层组成：
 
-AI 侧的默认入口是 MCP stdio：`src/server.ts` 注册 26 个工具、MCP 初始化指令与 5 个只读 `ai-draw://board/*` 资源。资源由 `src/infra/agent-context.ts` 从现有 `SessionSnapshot` 派生，清理一次性凭据、凭据式 metadata 与临时本机状态，并复用 `createSessionBundle()` / `buildExportManifest()` / `BRIEF_JSON` / `CAPABILITIES_JSON` / 诊断投影。`open_preview` 与 `AI_DRAW_AUTO_OPEN_PANEL=1` 只是人想看画布时的显式兼容入口；生成图或 `scan_project` 默认不会打开浏览器。官方 OpenAI 文档把 MCP 的自定义 UI 资源列为可选能力，并说明 Codex CLI 与 IDE 共用 MCP 配置；因此本项目优先提供工具、资源和指令，而不是把网页变成 agent 的必经入口。详见 [ADR 0024](ADR/0024-agent-first-mcp-surface.md)。
+AI 侧的默认入口是 MCP stdio：`src/server.ts` 注册 29 个工具、MCP 初始化指令与 5 个只读 `ai-draw://board/*` 资源。默认画板三工具由 `src/tools/get-board.ts` 提供；`get_board` 返回 `BOARD_JSON` 与一段画图规范，`draw_board` 批量新增 / 更新 / 删除对象，`reply_on_board` 放一句短回应。资源由 `src/infra/agent-context.ts` 从现有 `SessionSnapshot` 派生，清理一次性凭据、凭据式 metadata 与临时本机状态，并复用 `createSessionBundle()` / `buildExportManifest()` / `BRIEF_JSON` / `CAPABILITIES_JSON` / 诊断投影。`open_preview` 与 `AI_DRAW_AUTO_OPEN_PANEL=1` 只是人想看画布时的显式兼容入口；生成图或 `scan_project` 默认不会打开浏览器。官方 OpenAI 文档把 MCP 的自定义 UI 资源列为可选能力，并说明 Codex CLI 与 IDE 共用 MCP 配置；因此本项目优先提供工具、资源和指令，而不是把网页变成 agent 的必经入口。详见 [ADR 0024](ADR/0024-agent-first-mcp-surface.md)。
 
 ```text
 IDE / human browser

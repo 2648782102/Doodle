@@ -134,16 +134,32 @@
     .board-item[data-type="rect"] { background: var(--item-color, #c7d8ff); }
     .board-item[data-type="ellipse"] { background: var(--item-color, #b8e0d2); border-radius: 50%; }
     .board-item[data-type="line"] {
-      align-items: flex-end;
-      padding: 0 0 4px;
+      display: block;
+      padding: 0;
       border: 0;
-      border-bottom: 3px solid var(--item-color, #334155);
       border-radius: 0;
       background: transparent;
-      font-size: 12px;
-      color: var(--muted);
+      overflow: visible;
+      pointer-events: auto;
     }
-    .board-item[data-type="line"]::after { content: "›"; font-size: 20px; line-height: 0.5; }
+    .board-item[data-type="line"] svg { display: block; width: 100%; height: 100%; overflow: visible; pointer-events: none; }
+    .board-item[data-type="line"] .item-text {
+      position: absolute;
+      left: 50%;
+      top: 50%;
+      transform: translate(-50%, -50%);
+      max-width: 160px;
+      padding: 2px 6px;
+      border-radius: 5px;
+      background: rgba(255, 255, 255, 0.94);
+      color: var(--muted);
+      font-size: 11px;
+      line-height: 1.35;
+      text-align: center;
+      white-space: pre;
+      pointer-events: none;
+    }
+    .board-item[data-type="line"] .item-text:empty { display: none; }
     .item-author { position: absolute; right: 5px; bottom: 3px; color: rgba(31, 41, 55, 0.55); font-size: 10px; }
     .board-item[data-type="text"] .item-author, .board-item[data-type="line"] .item-author { display: none; }
     .side {
@@ -200,7 +216,7 @@
         <button class="tool" data-tool="text" aria-pressed="false" title="文字 (T)">文字</button>
         <button class="tool" data-tool="rect" aria-pressed="false" title="矩形 (R)">矩形</button>
         <button class="tool" data-tool="ellipse" aria-pressed="false" title="椭圆 (E)">椭圆</button>
-        <button class="tool" data-tool="line" aria-pressed="false" title="线条 (L)">线条</button>
+        <button class="tool" data-tool="line" aria-pressed="false" title="箭头 (L)">箭头</button>
         <button class="tool danger" id="btnDelete" title="删除选中对象 (Delete)">删除</button>
       </div>
       <div id="canvas" tabindex="0" aria-label="可平移缩放的无限画布">
@@ -252,7 +268,7 @@
     const defaultText = { note: "写点什么", text: "文字", rect: "", ellipse: "", line: "" };
     const defaultSize = {
       note: { w: 180, h: 120 }, text: { w: 220, h: 44 },
-      rect: { w: 180, h: 110 }, ellipse: { w: 180, h: 110 }, line: { w: 180, h: 28 },
+      rect: { w: 180, h: 110 }, ellipse: { w: 180, h: 110 }, line: { w: 180, h: 0 },
     };
     const colorCycle = ["#f6d365", "#b8e0d2", "#c7d8ff", "#ffd1dc", "#e8e8e8", "#ffffff"];
     let board = { version: 1, title: "和 AI 一起画", revision: 0, items: [], notes: [] };
@@ -330,18 +346,68 @@
       setStatus(`已保存 · rev ${board.revision}`);
       emptyState.classList.toggle("hidden", board.items.length > 0);
       world.replaceChildren();
-      for (const item of board.items) {
+      for (const [index, item] of board.items.entries()) {
         const element = document.createElement("div");
         element.className = "board-item";
         element.dataset.id = item.id;
         element.dataset.type = item.type;
         element.classList.toggle("selected", item.id === selectedId);
-        element.style.left = `${item.x}px`;
-        element.style.top = `${item.y}px`;
-        element.style.width = `${item.w}px`;
-        element.style.height = `${item.h}px`;
+        let lineGeometry = null;
+        if (item.type === "line") {
+          const left = Math.min(item.x, item.x + item.w);
+          const top = Math.min(item.y, item.y + item.h);
+          const width = Math.max(1, Math.abs(item.w));
+          const height = Math.max(1, Math.abs(item.h));
+          lineGeometry = {
+            width,
+            height,
+            startX: item.x - left,
+            startY: item.y - top,
+            endX: item.x + item.w - left,
+            endY: item.y + item.h - top,
+          };
+          element.style.left = `${left}px`;
+          element.style.top = `${top}px`;
+          element.style.width = `${width}px`;
+          element.style.height = `${height}px`;
+        } else {
+          element.style.left = `${item.x}px`;
+          element.style.top = `${item.y}px`;
+          element.style.width = `${item.w}px`;
+          element.style.height = `${item.h}px`;
+        }
         element.style.setProperty("--item-color", item.color);
         if (item.type !== "line") element.style.background = item.color;
+        if (item.type === "line") {
+          const { width, height, startX, startY, endX, endY } = lineGeometry;
+          const markerId = `board-arrow-${index}`;
+          const svg = document.createElementNS("http://www.w3.org/2000/svg", "svg");
+          svg.setAttribute("viewBox", `0 0 ${width} ${height}`);
+          svg.setAttribute("preserveAspectRatio", "none");
+          const path = document.createElementNS("http://www.w3.org/2000/svg", "path");
+          path.setAttribute("d", `M ${startX} ${startY} L ${endX} ${endY}`);
+          path.setAttribute("stroke", item.color);
+          path.setAttribute("stroke-width", "3");
+          path.setAttribute("stroke-linecap", "round");
+          path.setAttribute("fill", "none");
+          path.setAttribute("marker-end", `url(#${markerId})`);
+          const defs = document.createElementNS("http://www.w3.org/2000/svg", "defs");
+          const marker = document.createElementNS("http://www.w3.org/2000/svg", "marker");
+          marker.setAttribute("id", markerId);
+          marker.setAttribute("viewBox", "0 0 10 10");
+          marker.setAttribute("refX", "9");
+          marker.setAttribute("refY", "5");
+          marker.setAttribute("markerWidth", "7");
+          marker.setAttribute("markerHeight", "7");
+          marker.setAttribute("orient", "auto-start-reverse");
+          const arrowHead = document.createElementNS("http://www.w3.org/2000/svg", "path");
+          arrowHead.setAttribute("d", "M 0 0 L 10 5 L 0 10 z");
+          arrowHead.setAttribute("fill", item.color);
+          marker.append(arrowHead);
+          defs.append(marker);
+          svg.append(defs, path);
+          element.append(svg);
+        }
         const textElement = document.createElement("div");
         textElement.className = "item-text";
         textElement.textContent = item.text;
@@ -488,10 +554,16 @@
         applyViewport();
         return;
       }
-      const left = Math.min(...board.items.map((item) => item.x));
-      const top = Math.min(...board.items.map((item) => item.y));
-      const right = Math.max(...board.items.map((item) => item.x + item.w));
-      const bottom = Math.max(...board.items.map((item) => item.y + item.h));
+      const bounds = board.items.map((item) => item.type === "line" ? {
+        left: Math.min(item.x, item.x + item.w),
+        top: Math.min(item.y, item.y + item.h),
+        right: Math.max(item.x, item.x + item.w),
+        bottom: Math.max(item.y, item.y + item.h),
+      } : { left: item.x, top: item.y, right: item.x + item.w, bottom: item.y + item.h });
+      const left = Math.min(...bounds.map((bound) => bound.left));
+      const top = Math.min(...bounds.map((bound) => bound.top));
+      const right = Math.max(...bounds.map((bound) => bound.right));
+      const bottom = Math.max(...bounds.map((bound) => bound.bottom));
       const padding = 80;
       const scale = Math.max(0.25, Math.min(1.4,
         Math.min(canvas.clientWidth / Math.max(1, right - left + padding * 2),

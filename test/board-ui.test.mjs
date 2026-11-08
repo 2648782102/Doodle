@@ -71,11 +71,27 @@ describe("simple board UI", () => {
       await page.mouse.click(420, 300);
       await page.waitForSelector(".board-item");
       expect(await page.$$eval(".board-item", (elements) => elements.length)).toBe(1);
+      await page.click('[data-tool="line"]');
+      await page.mouse.click(650, 300);
+      await page.waitForFunction(() => document.querySelectorAll('.board-item[data-type="line"]').length === 1);
+      expect(await page.$eval('.board-item[data-type="line"] svg > path', (element) => {
+        const path = element.getAttribute("d");
+        return {
+          path,
+          marker: element.getAttribute("marker-end"),
+          stroke: element.getAttribute("stroke"),
+        };
+      })).toMatchObject({
+        path: expect.stringMatching(/^M 0 0 L 180 0$/),
+        marker: expect.stringMatching(/^url\(#board-arrow-\d+\)$/),
+        stroke: expect.stringMatching(/^#[0-9a-fA-F]{6}$/),
+      });
       await page.type("#noteInput", "这块画给 AI 看");
       await page.click("#btnSend");
       await page.waitForFunction(() => document.querySelectorAll(".note.human").length === 1);
       const board = await fetch(`${base}/api/board`).then((response) => response.json());
-      expect(board.items).toHaveLength(1);
+      expect(board.items).toHaveLength(2);
+      expect(board.items[1]).toMatchObject({ type: "line", w: 180, h: 0 });
       expect(board.notes[0].body).toBe("这块画给 AI 看");
       expect(pageErrors).toEqual([]);
     } finally {

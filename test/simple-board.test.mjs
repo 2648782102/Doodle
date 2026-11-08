@@ -48,6 +48,23 @@ describe("simple shared board", () => {
     }
   });
 
+  it("keeps signed line deltas as directed endpoints", () => {
+    let board = createEmptyBoard();
+    board = addBoardItem(board, {
+      type: "line",
+      x: 320,
+      y: 120,
+      w: -180,
+      h: 40,
+      text: "返回",
+      color: "#64748b",
+      author: "ai",
+    });
+    expect(board.items[0]).toMatchObject({ w: -180, h: 40, author: "ai" });
+    expect(parseBoard(JSON.parse(JSON.stringify(board))).items[0].w).toBe(-180);
+    expect(() => addBoardItem(board, { type: "line", x: 0, y: 0, w: 0, h: 0 })).toThrow();
+  });
+
   it("reloads a newer board written by another process", async () => {
     const outputDir = await fs.mkdtemp(path.join(os.tmpdir(), "ai-draw-board-sync-"));
     try {

@@ -42,7 +42,7 @@ const seedItems = [
   { type: "note", x: -260, y: -110, w: 190, h: 130, text: "想法：一个很简单的共享画板", color: "#f6d365" },
   { type: "rect", x: 10, y: -120, w: 190, h: 110, text: "人：点一下就能画", color: "#c7d8ff" },
   { type: "ellipse", x: -90, y: 80, w: 190, h: 110, text: "AI：读懂后补图", color: "#b8e0d2" },
-  { type: "line", x: -50, y: -10, w: 200, h: 28, text: "一起改", color: "#64748b" },
+  { type: "line", x: -70, y: 10, w: 220, h: 0, text: "一起改", color: "#64748b" },
   { type: "text", x: -250, y: 230, w: 420, h: 44, text: "少一点界面，多一点画布", color: "#ffffff" },
 ];
 for (const item of seedItems) {

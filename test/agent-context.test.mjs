@@ -49,6 +49,7 @@ describe("agent-first MCP context", () => {
     expect(MCP_INSTRUCTIONS).toContain("Prefer MCP tools and resources directly inside the agent");
     expect(MCP_INSTRUCTIONS).toContain("do not open a browser unless the human explicitly asks");
     expect(MCP_INSTRUCTIONS).toContain("Start with get_board");
+    expect(MCP_INSTRUCTIONS).toContain("w/h are signed endpoint deltas");
   });
 
   it("projects credential-free bundles and derived resources without mutating session state", () => {

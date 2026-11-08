@@ -27,7 +27,7 @@ The loop can pause or repeat at any point. Project scanning, source evidence, an
 
 ## Product model
 
-- **Canvas:** an infinite surface with bounded simple objects: notes, text, rectangles, ellipses, and lines.
+- **Canvas:** an infinite surface with bounded simple objects: notes, text, rectangles, ellipses, and directed arrow lines. A line runs from `(x,y)` to `(x+w,y+h)`; see [ADR 0026](ADR/0026-board-lines-are-directed-arrows.md).
 - **Human input:** clicking, dragging, editing text, deleting objects, and short notes that may refer to a selected object.
 - **AI input:** `get_board` reads the canvas; `draw_board` adds, edits, or removes objects; `reply_on_board` adds a short response.
 - **Optional workbench:** project scans, source evidence, graph context, proposals, and approval-gated writes remain compatible secondary capabilities.
@@ -36,7 +36,7 @@ The loop can pause or repeat at any point. Project scanning, source evidence, an
 ## Experience principles
 
 1. **Open on an empty canvas.** A person should know where to click and how to draw immediately.
-2. **Keep the tools few.** Selection, note, text, rectangle, ellipse, line, and delete are enough for the first screen.
+2. **Keep the tools few.** Selection, note, text, rectangle, ellipse, directed arrow, and delete are enough for the first screen.
 3. **Keep communication beside the canvas.** Short notes are attached to the shared board, not a separate chat product.
 4. **Make both authors visible.** Every object and note records whether a person or AI created it.
 5. **Keep the surface small.** No default project scan, source evidence, workflow dashboard, diagnostics, or proposal cards.

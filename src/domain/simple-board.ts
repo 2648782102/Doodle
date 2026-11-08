@@ -144,17 +144,24 @@ function normalizeItem(input: BoardItemInput): Omit<BoardItem, "createdAt" | "up
   if (input.h !== undefined && !isFiniteNumber(input.h)) throw new Error("Item height must be finite");
   const width = Math.max(16, Math.min(2000, input.w ?? (input.type === "line" ? 180 : 180)));
   const height = Math.max(16, Math.min(1200, input.h ?? (input.type === "line" ? 24 : 120)));
+  const signedWidth = input.type === "line" && input.w !== undefined
+    ? Math.max(-2000, Math.min(2000, input.w))
+    : width;
+  const signedHeight = input.type === "line" && input.h !== undefined
+    ? Math.max(-1200, Math.min(1200, input.h))
+    : height;
   const text = (input.text ?? "").slice(0, MAX_TEXT);
   if (text.length > MAX_TEXT) throw new Error("Item text is too long");
   const color = input.color && /^#[0-9a-fA-F]{6}$/.test(input.color) ? input.color : COLORS[0];
   const author = isAuthor(input.author) ? input.author : "human";
+  if (input.type === "line" && signedWidth === 0 && signedHeight === 0) throw new Error("Line needs a direction");
   return {
     id: input.id?.trim() || makeId("item"),
     type: input.type,
     x: Math.max(-100000, Math.min(100000, input.x)),
     y: Math.max(-100000, Math.min(100000, input.y)),
-    w: width,
-    h: height,
+    w: signedWidth,
+    h: signedHeight,
     text,
     color,
     author,

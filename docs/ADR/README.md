@@ -29,5 +29,6 @@ ADRs capture product and protocol decisions that contributors and AI coding agen
 | [0023-board-modules-and-library-boundary.md](0023-board-modules-and-library-boundary.md) | Accepted | One board header, canvas, and object inspector form the default panel; legacy status layers are hidden and the diagram library is an on-demand local preview drawer. |
 | [0024-agent-first-mcp-surface.md](0024-agent-first-mcp-surface.md) | Accepted | MCP tools/resources/instructions are the default agent surface; browser or IDE panel opening is an explicit human-facing opt-in. |
 | [0025-simple-infinite-board-is-the-product.md](0025-simple-infinite-board-is-the-product.md) | Accepted | A simple shared infinite canvas is the product; project scanning and proposal workflows are optional workbench capabilities. |
+| [0026-board-lines-are-directed-arrows.md](0026-board-lines-are-directed-arrows.md) | Accepted | A simple-board line is a signed directed arrow from `(x,y)` to `(x+w,y+h)`. |
 
 Add a new ADR when a change affects the human/AI protocol, persisted state, tool surface, approval boundary, or public product direction. Keep the decision, alternatives, and safety consequence in one file.

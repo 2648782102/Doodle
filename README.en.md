@@ -1,10 +1,10 @@
 # AI Draw MCP (English Quickstart)
 
-AI Draw MCP is a very simple shared infinite board for people and AI. Both sides can draw notes, text, shapes, and lines, and leave short messages beside the canvas. AI uses `get_board`, `draw_board`, and `reply_on_board` through MCP inside the agent; project tools are optional and live at `/workbench`.
+AI Draw MCP is a very simple shared infinite board for people and AI. Both sides can draw notes, text, shapes, and directed arrow lines, and leave short messages beside the canvas. AI uses `get_board`, `draw_board`, and `reply_on_board` through MCP inside the agent; project tools are optional and live at `/workbench`.
 
 The canvas is the shared context, MCP is the AI access channel, and the repository remains the source of truth for code. The default page is one small toolbar, an infinite canvas, and a lightweight note area; no project scan or workflow dashboard is shown first. Project writes still require a proposal, full diff review, explicit human approval, and a one-time receipt. See the [product direction](docs/PRODUCT_DIRECTION.md) and [ADR 0025](docs/ADR/0025-simple-infinite-board-is-the-product.md).
 
-The current `0.3.4` implementation supports a bounded version 1 board, simple drawing tools, human and AI notes, and the compatible project workbench. Board communication never authorizes project writes.
+The current `0.3.4` implementation supports a bounded version 1 board, simple drawing tools, human and AI notes, and the compatible project workbench. A board line is an SVG arrow from `(x,y)` to `(x+w,y+h)`, with signed endpoint deltas; `get_board` supplies the same drawing guide to AI agents. Board communication never authorizes project writes.
 
 ![Collaboration loop](https://raw.githubusercontent.com/2648782102/ai-draw-mcp/master/docs/collaboration-loop.svg)
 

@@ -8,6 +8,8 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 
 ### Added
 
+- 默认画板指引与有方向箭头（2026-11-08）：`get_board` 返回简短画图规范，MCP instructions、`draw_board` 参数说明与 `AGENTS.md` 统一强调「先读画板、严格网格、重画先 remove_ids、`author` 放顶层」；`line` 从 CSS 底边伪箭头改为从 `(x,y)` 指向 `(x+w,y+h)` 的 SVG 箭头，`w` / `h` 可为负数，标签居中、适应窗口同时考虑两个端点。新增 [ADR 0026](docs/ADR/0026-board-lines-are-directed-arrows.md)、领域与 UI 回归；独立 version 1 画板协议与项目写入闸门不变。
+
 - 画板跨进程同步与自动适应（2026-11-08）：`SimpleBoardStore.snapshot()` / `mutate()` 在每次 MCP 读取与 `/api/board` 请求时核对磁盘上的更高修订，避免常驻面板与不同 MCP 进程各持旧内存状态；AI 画完图后，未手动调整过视图的浏览器会自动适应内容。新增独立回归，不改变项目写入闸门。
 
 - 简单无限画板成为默认产品（2026-11-08）：`/` 改为极简画板，只有工具栏、可平移缩放的无限画布与一块轻量留言区；人和 AI 都可以用便签、文字、矩形、椭圆和线条表达想法。AI 通过 `get_board` / `draw_board` / `reply_on_board` 直接在 agent 内读写同一张画板，普通工具调用不打开浏览器。旧项目扫描、源码证据、图形批注、提案审阅与人工批准保留在 `/workbench` 和既有 MCP 工具中，但不再是首屏主体。新增独立 version 1 画板状态、带 `PANEL_TOKEN` 的 `/api/board/*` 路由、[ADR 0025](docs/ADR/0025-simple-infinite-board-is-the-product.md)、可复现截图与浏览器回归；项目写入闸门不变。

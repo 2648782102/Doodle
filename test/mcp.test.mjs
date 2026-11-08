@@ -91,6 +91,7 @@ describe("MCP server", () => {
       expect(instructions).toContain("Prefer MCP tools and resources directly inside the agent");
       expect(instructions).toContain("do not open a browser unless the human explicitly asks");
       expect(instructions).toContain("Start with get_board");
+      expect(instructions).toContain("w/h are signed endpoint deltas");
       const { resources } = await client.listResources();
       expect(resources.map((resource) => resource.uri)).toEqual(expect.arrayContaining([
         "ai-draw://board/session",
@@ -107,6 +108,20 @@ describe("MCP server", () => {
       expect(text).not.toContain('"approvalId":');
       const panel = await client.readResource({ uri: "ai-draw://board/panel" });
       expect(panel.contents[0].text).toContain("http://127.0.0.1:3440/");
+    });
+  }, 30_000);
+
+  it("returns a shared board with the directed-arrow drawing guide", async () => {
+    await withClient(3441, async (client) => {
+      const result = await client.callTool({ name: "get_board", arguments: {} });
+      const text = textOf(result);
+      expect(text).toContain("BOARD_JSON:");
+      expect(text).toContain("Drawing guide:");
+      expect(text).toContain("(x,y) to (x+w,y+h)");
+      const board = jsonAfter(text, "BOARD_JSON:");
+      expect(board).toMatchObject({ version: 1, readOnly: true });
+      expect(Array.isArray(board.items)).toBe(true);
+      expect(board.safety).toMatchObject({ projectWritesRequireHumanApproval: true });
     });
   }, 30_000);
 

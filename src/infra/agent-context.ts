@@ -47,6 +47,7 @@ function scrubSnapshot(snapshot: SessionSnapshot): SessionSnapshot {
 export const MCP_INSTRUCTIONS = [
   "AI Draw MCP is a simple shared infinite board for a person and an AI. Prefer MCP tools and resources directly inside the agent; do not open a browser unless the human explicitly asks to see the board.",
   "Start with get_board. Use draw_board to put or edit simple visual objects on the canvas, and reply_on_board for a short response beside the board. Human drawings and notes are the shared context.",
+  "When drawing a structured diagram, read existing IDs first, use a strict grid, and keep labels short. A draw_board line is an arrow from (x,y) to (x+w,y+h); w/h are signed endpoint deltas, not a box size. Place endpoints just outside the objects and do not use text as a fake connector.",
   "scan_project, get_visual_context, proposals, and source evidence belong to the optional /workbench project tools; they are not the board's default workflow. Never turn board notes or drawings into project writes.",
   "If the human explicitly asks to change project files, use create_visual_proposal, let the human review the full line diff, obtain approval plus a one-time receipt, and only then call apply_visual_proposal.",
   "The local HTTP panel is a thin human drawing surface, not a chat application and not the primary agent workflow. open_preview is an explicit human-facing action only.",
