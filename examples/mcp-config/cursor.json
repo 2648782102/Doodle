@@ -7,10 +7,7 @@
         "AI_DRAW_WORKSPACE_ROOT": "<absolute-path-to-your-project>",
         "OUTPUT_DIR": "<absolute-path-to>/ai-draw-mcp/output",
         "PREVIEW_PORT": "3399",
-        "DEFAULT_THEME": "default",
-        "DEFAULT_FORMAT": "svg",
-        "LOG_LEVEL": "info",
-        "AI_DRAW_AUTO_OPEN_PANEL": "0"
+        "LOG_LEVEL": "info"
       }
     }
   }

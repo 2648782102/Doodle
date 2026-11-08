@@ -1,0 +1,99 @@
+import fs from "node:fs/promises";
+import path from "node:path";
+import { fileURLToPath } from "node:url";
+import { describe, expect, it } from "vitest";
+import { parseBoard } from "../dist/board/types.js";
+
+const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
+
+async function listFiles(directory) {
+  return (await fs.readdir(directory, { recursive: true }))
+    .filter((name) => typeof name === "string")
+    .map((name) => path.join(directory, name).slice(root.length + 1));
+}
+
+describe("post-cleanup repository shape", () => {
+  it("keeps the current human board state compatible with strict parsing", async () => {
+    const statePath = path.join(root, "output", ".ai-draw", "board.json");
+    let raw;
+    try {
+      raw = await fs.readFile(statePath, "utf8");
+    } catch (error) {
+      if (error.code === "ENOENT") return;
+      throw error;
+    }
+    const board = parseBoard(JSON.parse(raw));
+    expect(board.version).toBe(1);
+    expect(board.items.length).toBeGreaterThan(0);
+    expect(board.notes.every((note) => !note.itemId || board.items.some((item) => item.id === note.itemId))).toBe(true);
+    expect(board.revision).toBe(JSON.parse(raw).revision);
+    expect((await fs.stat(statePath)).size).toBeGreaterThan(0);
+  });
+
+  it("does not retain legacy source, extension, generated asset, or screenshot modules", async () => {
+    const [source, scripts, tests, examples, docs, extensions] = await Promise.all([
+      listFiles(path.join(root, "src")),
+      listFiles(path.join(root, "scripts")),
+      listFiles(path.join(root, "test")),
+      listFiles(path.join(root, "examples")),
+      listFiles(path.join(root, "docs")),
+      fs.access(path.join(root, "extensions")).then(() => true).catch(() => false),
+    ]);
+    const current = [...source, ...scripts, ...tests, ...examples, ...docs.filter((name) => !name.includes("docs/archive/"))];
+    const forbidden = [
+      /src\/domain\//, /src\/tools\//, /session-store/, /preview-server/, /renderer/,
+      /render-/, /capture-panel/, /generate-doc-assets/, /github-maintenance/,
+      /\.vsix$/, /\.svg$/, /\.png$/, /\.mmd$/, /collaboration-workflow/,
+    ];
+    for (const pattern of forbidden) {
+      expect(current.some((name) => pattern.test(name)), `unexpected legacy path matching ${pattern}`).toBe(false);
+    }
+    expect(extensions).toBe(false);
+    expect(source.filter((name) => name.endsWith(".ts"))).toHaveLength(13);
+    expect(scripts.filter((name) => name.endsWith(".mjs"))).toHaveLength(3);
+    expect(tests.filter((name) => name.endsWith(".test.mjs"))).toHaveLength(4);
+    const compiled = await listFiles(path.join(root, "dist"));
+    expect(compiled.some((name) => /^dist\/(domain|tools)\//.test(name))).toBe(false);
+    expect(compiled.some((name) => name === "dist/infra/templates/index.html")).toBe(false);
+    expect(compiled.some((name) => /^dist\/infra\/(agent-context|ide-opener|preview-server|project-scanner|renderer|session-store|simple-board-store|store|visual-sync-service)\./.test(name))).toBe(false);
+  });
+
+  it("keeps current docs free of deleted tool catalogues and stale active paths", async () => {
+    const files = [
+      "README.md", "README.en.md", "AGENTS.md", "CHANGELOG.md", "CONTRIBUTING.md",
+      "SECURITY.md", "ROADMAP.md", "docs/PRODUCT_DIRECTION.md", "docs/ARCHITECTURE.md",
+      "docs/DECISIONS.md", "docs/README.md", "docs/TROUBLESHOOTING.md",
+    ];
+    for (const relative of files) {
+      const text = await fs.readFile(path.join(root, relative), "utf8");
+      expect(text, relative).not.toMatch(/29 个 MCP 工具|26 个 MCP 工具|29 tools|26 tools/);
+      expect(text, relative).not.toContain("/workbench");
+      expect(text, relative).not.toContain("/api/collab");
+      expect(text, relative).not.toContain("open_preview");
+      expect(text, relative).not.toContain("apply_visual_proposal");
+      expect(text, relative).not.toContain("SessionStore.applyProposal");
+    }
+  });
+
+  it("links only existing current documentation targets", async () => {
+    const files = [
+      "README.md", "README.en.md", "AGENTS.md", "CONTRIBUTING.md", "SECURITY.md",
+      "ROADMAP.md", "RELEASING.md", "VERSIONING.md", "CHANGELOG.md",
+      "docs/README.md", "docs/PRODUCT_DIRECTION.md", "docs/ARCHITECTURE.md",
+      "docs/DECISIONS.md", "docs/TROUBLESHOOTING.md", "docs/GOAL_MODE.md",
+      "docs/GOVERNANCE.md", "docs/COMPETITIVE_RESEARCH.md",
+      "docs/DEPENDENCY_MAINTENANCE.md", "docs/LAUNCH_KIT.md",
+    ];
+    const missing = [];
+    for (const relative of files) {
+      const text = await fs.readFile(path.join(root, relative), "utf8");
+      for (const match of text.matchAll(/\]\(([^)#]+)(?:#[^)]*)?\)/g)) {
+        const target = match[1].trim();
+        if (/^(https?:|mailto:)/.test(target)) continue;
+        const resolved = path.resolve(path.dirname(path.join(root, relative)), target);
+        await fs.access(resolved).catch(() => missing.push(`${relative} → ${target}`));
+      }
+    }
+    expect(missing).toEqual([]);
+  });
+});

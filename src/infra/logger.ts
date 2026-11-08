@@ -6,7 +6,9 @@
 type LogLevel = "debug" | "info" | "warn" | "error";
 
 const LEVEL_PRIORITY: Record<LogLevel, number> = { debug: 0, info: 1, warn: 2, error: 3 };
-const currentLevel: LogLevel = (process.env.LOG_LEVEL as LogLevel) ?? "info";
+const VALID_LEVELS = new Set<LogLevel>(["debug", "info", "warn", "error"]);
+const requestedLevel = process.env.LOG_LEVEL as LogLevel | undefined;
+const currentLevel: LogLevel = requestedLevel && VALID_LEVELS.has(requestedLevel) ? requestedLevel : "info";
 
 function fmt(level: LogLevel, msg: string): string {
   return `[${new Date().toISOString()}] [${level.toUpperCase()}] ${msg}`;

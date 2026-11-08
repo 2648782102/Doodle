@@ -32,7 +32,7 @@ This Code of Conduct applies within all community spaces, and also applies when 
 
 ## Enforcement
 
-Instances of abusive, harassing, or otherwise unacceptable behavior may be reported to the project maintainers through the repository's security contact in `SECURITY.md`. All complaints will be reviewed and investigated promptly and fairly.
+Instances of abusive, harassing, or otherwise unacceptable behavior may be reported to the project maintainers through the private contact described in `SECURITY.md`. All complaints will be reviewed and investigated promptly and fairly.
 
 ## Attribution
 

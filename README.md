@@ -1,320 +1,98 @@
 # AI Draw MCP
 
-> 一个很简单但实用的共享无限画板：人和 AI 都能直接在画布上画图、改图、写一句，AI 通过 MCP 在 agent 内自然使用；项目扫描与代码提案只是可选的 `/workbench` 能力。
+> 一个很简单但实用的共享无限画板：人和 AI 都能在画布上画对象、箭头和短留言，AI 通过 MCP 在 agent 内自然使用。
 
-打开 `http://127.0.0.1:3399/` 就是一张无限画布：选工具、点一下、拖动、双击改字，右侧写一句给 AI。AI 用 `get_board` 读取画板及画图规范，用 `draw_board` 画便签、形状和真正的有方向箭头，用 `reply_on_board` 把回应放在画板旁；这些工具都不主动打开浏览器。默认界面刻意保持少、清楚、直接，项目工作台留在 `/workbench`。
+AI Draw MCP 不是项目工作台、静态图生成器、聊天产品或批准系统。它只保留人和 AI 沟通最有用的一层：**同一张画布**。项目结构可以画，但不是产品主体。
 
-产品定义见 [产品方向](docs/PRODUCT_DIRECTION.md) 和 [ADR 0025](docs/ADR/0025-simple-infinite-board-is-the-product.md)。画板沟通本身不授权写入：**只有人类审阅完整 diff、明确批准并签发一次性确认号后，AI 才能应用提案修改项目文件**。
+打开 `http://127.0.0.1:3399/` 是一张无限画布：选工具、点一下、拖动、双击改字，右侧写一句给 AI。AI 用 `get_board` 读取 `BOARD_JSON` 和画图规范，用 `draw_board` 画便签 / 形状 / 有方向箭头，用 `reply_on_board` 把一句回应放在画板旁；普通 MCP 调用不打开浏览器，也不写项目文件。
 
-> **30 秒阅读**：[快速开始](#快速开始) · [工具列表](#工具列表) · [安全模型与完整文档](docs/ARCHITECTURE.md)。仓库当前源码与 GitHub Release 为 `0.3.4`；npm `ai-draw-mcp` 仍为 `0.2.0`，体验当前版本请优先从源码安装，详见下方版本说明。
+产品定义见 [docs/PRODUCT_DIRECTION.md](docs/PRODUCT_DIRECTION.md)，架构见 [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md)，AI 操作手册见 [AGENTS.md](AGENTS.md)。
 
-<p align="center">
-  <a href="https://www.npmjs.com/package/ai-draw-mcp">
-    <img src="https://img.shields.io/npm/v/ai-draw-mcp?style=flat-square" alt="npm">
-  </a>
-  <a href="https://www.npmjs.com/package/ai-draw-mcp">
-    <img src="https://img.shields.io/npm/dm/ai-draw-mcp?style=flat-square" alt="downloads">
-  </a>
-  <a href="https://github.com/2648782102/ai-draw-mcp">
-    <img src="https://img.shields.io/github/stars/2648782102/ai-draw-mcp?style=social" alt="stars">
-  </a>
-</p>
+## 四个 MCP 工具
 
----
+| 工具 | 用途 |
+|---|---|
+| `get_board` | 读取共享画板：对象 ID、坐标、作者、最近留言、`BOARD_JSON` 与画图规范；默认第一步，只读 |
+| `draw_board` | 批量新增 / 更新 / 删除便签、文字、矩形、椭圆和有方向箭头 |
+| `reply_on_board` | 把 AI 的一句短回应放到画板旁，可关联一个画布对象 |
+| `scan_project` | 可选只读扫描当前项目结构，返回有界相对路径和 `file:line` 证据文本；不写文件、不自动画图 |
 
-## 预览
+默认闭环：
 
-### 共享画布闭环
+```text
+人画 / 写一句 → AI get_board → AI draw_board / reply_on_board → 人继续画
+```
 
-![AI Draw MCP 双向协作闭环](https://raw.githubusercontent.com/2648782102/ai-draw-mcp/master/docs/collaboration-loop.svg)
+`scan_project` 只是「项目结构」这个主题的能力之一。AI 决定是否需要它，并用 `draw_board` 把结果画到同一张画板；它不创建图库、不改会话、不授权代码变更。
 
-### 当前共享画板（0.3.x）
+## 快速开始
 
-![AI Draw MCP 共享画板](https://raw.githubusercontent.com/2648782102/ai-draw-mcp/master/docs/shared-board-panel.png)
+```bash
+npm install
+npm run build
+npm run check
+npm run doctor
+```
 
-这是可复现的当前默认界面：一条顶栏、一个小工具栏、无限画布和右侧轻量交流区。项目扫描、源码证据与 diff 审阅都从 `/workbench` 进入，不占据首屏。仓库只保留这一张可复现界面截图，避免旧面板被误解为并行产品入口。
+在 MCP 宿主里加入 stdio server，配置示例见 [examples/mcp-config/](examples/mcp-config/)。常用环境变量：
 
----
+| 变量 | 默认值 | 说明 |
+|---|---|---|
+| `PREVIEW_PORT` | `3399` | 本地画板 HTTP 端口 |
+| `PREVIEW_HOST` | `127.0.0.1` | 本地监听地址 |
+| `OUTPUT_DIR` | `./output` | 画板状态目录 |
+| `AI_DRAW_WORKSPACE_ROOT` | 包根目录 | `scan_project` 的目标工作区 |
+| `LOG_LEVEL` | `info` | stderr 日志级别 |
 
-## 功能
+`output/.ai-draw/board.json` 是独立 version 1 状态文件，应加入忽略，不提交到仓库。
 
-- **29 个 MCP 工具 + 5 个只读资源** — 新增 `get_board`、`draw_board`、`reply_on_board` 作为 AI 使用无限画板的默认入口；旧项目工具仍兼容可用，MCP 初始化指令明确「先读画板，不主动开浏览器」
-- **简单无限画布** — 便签、文字、矩形、椭圆与有方向箭头；箭头从 `(x,y)` 指向 `(x+w,y+h)`，AI 按整齐网格画图；点击创建、拖动移动、双击改字、滚轮缩放、空白处拖拽平移；人和 AI 的对象都带作者与修订信息
-- **画板旁的轻量交流** — 人写一句放到共享画板，可关联当前选中对象；AI 读取同一份 `BOARD_JSON` 并把回应放回画板旁，不另做聊天主体
-- **有界图形撤销 / 重做** — 12 步视觉状态历史，人类确认后恢复节点/连线/批注为一次新图形修订；不回退项目文件、提案状态或一次性批准凭据
-- **只读源码证据** — 扫描时为源码/文档节点记录少量 `file:line` 定义、导入或标题线索，AI 与面板可引用代码位置；证据不自动改代码、不扩大提案路径，也不签发批准凭据
-- **有界多选范围** — 面板复选框最多选择 24 个节点；`get_selection_scope` 与 `SELECTION_SCOPE_JSON` 把「这几个模块」投影成节点、内部连线和安全相对 `file:line` 证据。选择范围只表达意图，不签发凭据、不改变图修订或授权项目写入，详见 [ADR 0018](docs/ADR/0018-human-selection-is-read-only-scope.md)
-- **只读预提案工作单** — `get_selection_workorder` 与 `SELECTION_WORKORDER_JSON` 把选中范围、候选路径、范围内意图、证据、审阅缺口和下一步收束成可复制清单；纯派生 `freshness` 在图修订变化后提示重新选择，但不自动刷新/清空选择。不含文件内容/逐行 diff/提案/凭据，仍需预检、人工审阅完整 diff 与一次性确认号，详见 [ADR 0019](docs/ADR/0019-selection-workorder-is-read-only-preflight.md)
-- **可复制源码跳转** — `get_source_navigation` 与面板「复制源码跳转」返回 version 1 `SOURCE_NAVIGATION_JSON`：有界、工作区相对 `file:line`、`vscode://` / `cursor://` URI 文本和 `code --goto` 提示；只复制，不打开文件、启动 IDE、执行命令或授权项目写入，详见 [ADR 0016](docs/ADR/0016-source-navigation-is-copyable-context.md)
-- **单节点上下文** — `get_node_context` 把焦点节点的源码证据、批注线程、入/出连线、相关图形差异与焦点聚合成 version 1 只读投影；面板显示同一视图，AI 不必从完整会话里手工拼装
-- **共享简报** — `get_shared_brief` 与面板「复制共享简报」使用同一份 version 1 `BRIEF_JSON`：紧凑列出焦点、就绪阻塞、待处理意图、失锚讨论、最近图形修订、源码证据和下一步；不含批准凭据，也不授权写入
-- **可审计决策链** — `get_decision_trail` 与面板「复制决策链」使用同一份 version 1 `DECISION_TRAIL_JSON`：把人的意图、有效/失锚批注、字段级图修订、提案变更摘要、批准/应用状态与时间线按证据类型串联；提案变更行只是有界投影，批准仍需查看完整逐行 diff，输出永不含确认号
-- **人类视口注意力** — 面板的缩放/平移状态以有限值只读同步给 AI，帮助它判断人正在看整张图还是某个区域；不产生图修订、对话事件、差异或批准凭据
-- **人工确认的安全变更** — 面板批准只生成一次性凭据；AI 凭凭据应用提案，拒绝危险路径，写入失败自动回滚
-- **可复核导出清单** — 面板导出会话 bundle 时附带 version 1 `EXPORT_MANIFEST_JSON`：列出资产计数、建议文件名、被排除的一次性凭据/图形历史/视口与只读安全标记；导入仍严格校验原 `session`，清单不授权写入
-- **审阅就绪诊断** — `REVIEW_READINESS_JSON` 把共享简报阻塞与决策链证据缺口汇总成 `ready` / `review` / `blocked`；诊断、面板与工作流示例共用同一只读投影，不签发凭据、不替代逐行 diff
-- **实时双向面板** — AI 绘图后通过 WebSocket 推送到面板；面板里也可手动编辑源码、实时预览、保存回磁盘
-- **双模式编辑器** — Mermaid DSL 模式 / SVG 全文本模式（`render_svg` 生成的图自动切换到 SVG 模式）
-- **小地图导航** — 右下角缩略图，支持点击/拖拽直接跳转视口
-- **流畅缩放平移** — 滚轮缩放（以鼠标为锚点）、左键拖拽平移、不卡顿不模糊（纯矢量渲染）
-- **离线 Mermaid** — 面板从本包 `node_modules/mermaid/dist` 加载，不依赖 CDN
-- **SVG & PNG 输出** — 渲染结果同时落盘为 `.svg`；配置 `DEFAULT_FORMAT=png` 或工具参数 `output_format: png` 也输出 PNG（Mermaid 走 mmdc，SVG 走 sharp）
+## 画图规范
 
----
+- 先调用 `get_board` 读取现有对象 ID 和坐标。
+- 重画整张图时先用 `draw_board.remove_ids` 清理旧对象，再批量新增。
+- `author` 放在 `draw_board` 顶层参数，不放进 item。
+- 结构化图用严格网格、短标签、一致尺寸。
+- `line` 是箭头：`(x,y)` 为起点，`(x+w,y+h)` 为终点；`w` / `h` 可为负数。
+- 箭头端点贴着源对象和目标对象的外缘，标签保持短。
+- 工具调用不主动打开浏览器，画布沟通不构成项目写入授权。
+
+## 安全边界
+
+- stdout 只用于 MCP JSON-RPC；所有日志写 stderr。
+- 本地 HTTP 默认只监听 `127.0.0.1`。
+- 非 GET `/api/board/*` 需要页面随机 `X-AI-Draw-Token` 和 `confirmedBy: "human"`。
+- `scan_project` 跳过常见生成目录、dot-private 文件、`.env`-like 文件和大文件；只返回工作区相对路径与短证据。
+- 画板对象和留言只是沟通上下文，不签发凭据，不写项目文件。
+
+## 开发
+
+```bash
+npm run lint
+npm run build
+npm test
+npm run repo:check
+npm run doctor
+```
+
+完整验收用 `npm run check`。新增 MCP 工具、协议字段或安全边界时，必须同步 `AGENTS.md`、架构、决策、测试、示例和 `scripts/repo-check.mjs`。
 
 ## 文档
 
 | 文档 | 内容 |
-|------|------|
-| [README.en.md](README.en.md) | English quickstart：最短安装、协作闭环与安全边界 |
-| [docs/PRODUCT_DIRECTION.md](docs/PRODUCT_DIRECTION.md) | 产品定义、当前差距、分阶段计划与验收标准 |
-| [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) | 架构、状态模型、活动时间线、REST/WebSocket 协议、安全边界 |
-| [docs/README.md](docs/README.md) | 文档地图：按读者与用途查找全部资料 |
-| [docs/TROUBLESHOOTING.md](docs/TROUBLESHOOTING.md) | 首用自检、常见故障与 FAQ（含一次性确认号失效） |
-| [docs/TROUBLESHOOTING.md](docs/TROUBLESHOOTING.md#多选后重新扫描工作单显示-stale-怎么办what-does-a-stale-selection-workorder-mean) | 30 秒 FAQ：重新扫描后的 stale 多选工作单该怎么处理 |
-| [ROADMAP.md](ROADMAP.md) | 产品方向、阶段目标与明确的非目标 |
-| [docs/COMPETITIVE_RESEARCH.md](docs/COMPETITIVE_RESEARCH.md) | Mermaid/白板/MCP 同类产品调研与定位 |
-| [docs/DEPENDENCY_MAINTENANCE.md](docs/DEPENDENCY_MAINTENANCE.md) | 依赖升级与 CI 维护策略 |
-| [docs/LAUNCH_KIT.md](docs/LAUNCH_KIT.md) | GitHub About、Release notes、Show HN 与社区宣发模板 |
-| [docs/GOVERNANCE.md](docs/GOVERNANCE.md) | 开源治理、公开入口、维护检查与元数据漂移证据 |
-| [docs/GOAL_MODE.md](docs/GOAL_MODE.md) | 目标模式：如何给 AI 设自治目标、时间边界、安全红线与验收证据 |
-| [docs/ADR/README.md](docs/ADR/README.md) | 架构决策记录：人工批准、对话状态、失锚线程与只读预检 |
-| [AGENTS.md](AGENTS.md) | AI coding agent 操作手册 |
-| [CONTRIBUTING.md](CONTRIBUTING.md) | 开发、验证与 PR 约定 |
-| [SECURITY.md](SECURITY.md) | 威胁模型、支持版本与漏洞报告 |
-| [CHANGELOG.md](CHANGELOG.md) | 变更记录 |
-| [VERSIONING.md](VERSIONING.md) / [RELEASING.md](RELEASING.md) | 版本与发布策略 |
-| [examples/](examples/README.md) | MCP 配置、Mermaid/SVG、端到端协作演示 |
-
-> 本项目是本机优先的 AI 画板：简单、实用、人和 AI 都能画。项目结构只是可选能力，不是产品定义；项目文件变更仍须人类审阅与一次性批准。非目标与未来方向见 [ROADMAP.md](ROADMAP.md)。
-
----
-
-## 双向协作流程
-
-```text
-AI: scan_project → 生成项目结构图
-人: 在共享画布上改名 / 选择范围 / 添加对象批注
-AI: get_agent_workflow → 读取八步顺序契约与 blocked 就绪提示
-AI: get_visual_context → 理解意图与活动时间线
-AI: reply_to_visual_context → 在同一对象批注线程回复
-AI: list_change_templates → 可选：把常见意图展开成只读候选草稿
-AI: preflight_visual_proposal → 只读检查路径/文件状态/重复内容
-AI: create_visual_proposal → 生成变更提案
-人: 查看逐行差异并点击「批准」→ 复制一次性确认号
-AI: apply_visual_proposal(确认号) → 安全写入工作区 → 失败自动回滚
-AI: 再次 scan_project → 保留人工布局/批注/焦点并让图与代码保持一致
-```
-
-> 示例：AI 根据项目结构画出现有模块；人在图上把 `utils` 改名为 `shared` 并批注「抽成公共层」，随后可在同一线程继续追问或重开讨论；AI 读取修订与 `annotationThreads.nextActor` 后提出目录迁移与 import 更新提案；人批准后项目真正变化。
-
-> **节点批注线程**：每个批注形成独立线程，保存根批注、人与 AI 的有序回复、解决/重开状态、关联节点标签/路径与图形修订。节点改名或路径变化会标记为 `outdated`，节点删除会标记为 `detached`；`get_visual_context.staleThreads` 会提醒 AI 不要把旧讨论当成当前意图。过期线程可由人确认重锚，失锚线程保留原 `nodeId` 供审计。解决线程只是对话状态，**不等于批准变更**；项目文件仍须由人查看逐行 diff、批准并提供一次性确认号。
-
-> **紧凑活动时间线**：面板和 `get_visual_context.activityTimeline` 把消息、图形修订、节点批注回复、线程状态、提案创建与批准/应用/拒绝按时间合并成只读派生事件，帮助人和 AI 快速回顾「刚刚发生了什么」。时间线不替代原文、不签发批准凭据，也不授权项目写入。
-
-> **只读会话诊断**：面板、`/api/collab/diagnostics` 与 `get_visual_context.diagnostics` 汇总图/线程/提案状态、图形修订差异、待处理信号、下一步动作和安全不变量，帮助人和 AI 快速判断「现在该谁做什么」。诊断不写会话、不签发凭据、不授权项目写入。
-
-> **只读决策链**：`get_decision_trail`、`GET /api/collab/decision-trail` 与面板「复制决策链」返回同一份 version 1 `DECISION_TRAIL_JSON`：按时间把待处理消息、有效批注线程、失锚讨论、字段级图修订、提案变更摘要、批准/应用阶段和活动时间线串联起来，帮助人和 AI 复盘「为什么做这个改动」。失锚讨论只作为历史证据，提案变更行是有界投影而非完整逐行 diff，输出不含确认号、不持久化、不改会话、不批准变更、不授权项目写入；详见 [ADR 0013](docs/ADR/0013-decision-trail-is-a-read-only-projection.md)。
-
-> **可复核导出清单**：`GET /api/collab/bundle/manifest` 与面板下载的 `exportManifest` 返回从同一会话 bundle 派生的 version 1 `EXPORT_MANIFEST_JSON`：列出格式/版本、建议文件名、图/批注/证据/消息/提案计数、已降级的批准状态，以及刻意排除的一次性批准凭据、图形历史和视口。清单是只读清单，不持久化、不充当导入真源、不签发凭据、不批准变更、不写项目文件；详见 [ADR 0014](docs/ADR/0014-export-manifest-is-a-derived-inventory.md)。
-
-> **审阅就绪诊断**：`GET /api/collab/review-readiness`、`CONTEXT_JSON.diagnostics.reviewReadiness` 与面板「审阅就绪」返回同一份 version 1 `REVIEW_READINESS_JSON`：把 `BRIEF_JSON` 的就绪阻塞和 `DECISION_TRAIL_JSON` 的证据缺口汇总为 `ready` / `review` / `blocked`，并给出对应的诊断信号与下一步提示。它是派生只读投影，不批准变更、不签发凭据、不写会话或项目文件；工作流示例实际读取它，批准前仍须查看完整逐行 diff。详见 [ADR 0015](docs/ADR/0015-review-readiness-is-a-derived-diagnostic.md)。
-
-> **只读源码跳转**：`get_source_navigation`、`GET /api/collab/source-navigation` 与面板「复制源码跳转」返回同一份 version 1 `SOURCE_NAVIGATION_JSON`：把已有 `GraphSourceEvidence` 投影成有界的相对 `file:line` 清单、编辑器 URI 文本和命令行提示。它过滤绝对路径、目录穿越、受保护目录与 `.env`-like 名称，不重复读项目文件、不打开文件、不启动 IDE/执行命令、不改会话/焦点/线程/提案、不进入 bundle、不签发凭据，也不授权项目写入；详见 [ADR 0016](docs/ADR/0016-source-navigation-is-copyable-context.md)。
-
-> **当前焦点**：人在面板选中节点后，服务端会记录 version 1 `SessionFocus`，把节点 ID、当前标签/路径/分组与图形修订交给 `get_visual_context.focus`、诊断和会话 bundle。AI 能据此理解「这个模块」「这里」指的是哪个对象；节点删除后焦点自动清除。焦点只是注意力上下文，不签发批准凭据、不解决线程、不创建提案，也不授权项目写入。
-
-> **复制给 AI 的上下文**：面板的「复制给 AI 的上下文」按钮会生成包含会话 ID、工作区、图形修订、当前焦点、最近图形差异的字段级摘要、诊断信号与下一步的只读提示，并明确要求 AI 先 `get_visual_context`、先预检、等人批准后再应用。按钮只复制到剪贴板；剪贴板不可用时，文本只进入独立的只读复制框，不写会话、不发送消息、不签发确认号。
-
-> **图形修订差异**：每次保存图形会记录字段级 `graphDiffs`（节点/连线增删、`label` / `kind` / `path` / `group` / 连线端点变化）；AI 通过 `get_visual_context.graphDiffs` 精确读取人改了哪张图，而不是从聊天文本猜测。面板可展开最近修订逐项查看字段前后值，活动时间线也会合并 `graph_diff` 派生事件。差异只是审计上下文，不自动生成或批准项目变更。
-
-> **只读变更模板**：`list_change_templates` 列出「更新文档 / 添加测试 / 创建模块」三个常见意图，并可把它们展开成带路径、完整 UTF-8 内容、`graphRevision` 与引用节点的候选草稿。模板只生成文本，不创建提案、不写文件、不签发确认号；AI 仍需先 `preflight_visual_proposal`，再由 `create_visual_proposal` 交给人类审阅。
-
-> **可复现 Agent 工作流**：`get_agent_workflow` 从当前会话派生 version 1 `WORKFLOW_JSON`：八步顺序、每步 `requires` / `produces` / `readOnly` / `writes` / `grantsWriteAuthority`、陈旧线程与人类回合的 `blocked` 提示，以及与诊断一致的紧凑 `reviewReadiness` 字段。它只是描述性契约，不创建提案、不写会话或项目文件、不签发确认号；`ready` 不跳过完整逐行 diff，唯一 `writes: "project"` 的步骤是 `apply_visual_proposal`，仍须人工批准与一次性确认号。只读示例见 [examples/agent-workflow.mjs](examples/agent-workflow.mjs)，设计边界见 [ADR 0007](docs/ADR/0007-agent-workflow-is-a-read-only-contract.md)。
-
-> **重新扫描不丢人工状态**：扫描器按工作区相对路径生成确定性节点/连线 ID；`VisualSyncService` 与 `mergeScannedGraph()` 会按稳定 ID 或路径迁移人工坐标、自定义名称、批注线程与 `SessionFocus`，新增节点才自动排布，删掉的文件会让相关讨论显式 `detached`。AI 的 `scan_project` 返回 `PRESERVATION_JSON`；面板「重新扫描项目」要求本机令牌与 `confirmedBy: "human"`。两者都只读项目文件，图形同步不等于批准或写入，详见 [ADR 0006](docs/ADR/0006-stable-scan-preserves-human-visual-state.md)。
-
-> **图形撤销不是代码撤销**：面板「↶ 撤销 / ↷ 重做」只切换有界 `VisualGraph` 快照，每次恢复都产生新 `graphRevision` 和字段级 `graphDiffs`，需要本机令牌与 `confirmedBy: "human"`。它不写工作区文件、不恢复/撤销已批准提案、不签发或复活一次性确认号；bundle 不携带历史。详见 [ADR 0008](docs/ADR/0008-visual-undo-is-not-project-undo.md)。
-
-> **源码证据只是只读引用**：`scan_project` 对 1 MiB 以下的源码/Markdown 文本提取最多 5 条 version 1 `GraphSourceEvidence`（`definition` / `import` / `heading`），含工作区相对路径、正整数行号和 160 字摘要。`get_visual_context.sourceEvidence`、面板「源码证据」列表与 `GET /api/collab/source-evidence` 让 AI 和人从图追溯到 `file:line`；bundle 严格校验字段，证据不签发确认号、不扩大批准路径，也不授权写入。详见 [ADR 0009](docs/ADR/0009-source-evidence-is-read-only-context.md)。
-
-详细架构与安全模型见 [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md)，贡献方式见 [CONTRIBUTING.md](CONTRIBUTING.md)。
-
-想在临时工作区里完整体验闭环，可运行：
-
-```bash
-npm run build
-node examples/collab-demo.mjs
-```
-
-只查看 AI 应遵守的只读工作流（到 preflight 自动停止，不创建提案或写文件）：
-
-```bash
-npm run test:examples:workflow
-```
-
----
-
-## 快速开始
-
-最短体验路径：从源码安装 → 在 IDE 配置 MCP → 让 AI 调用 `get_capabilities` / `scan_project` 并直接消费结构化结果 → 只有需要人看画布时才调用 `open_preview` → 必要时审阅完整 diff 并授权写入。完整闭环可运行 `node examples/collab-demo.mjs`。
-
-> **版本说明（2026-11-07）**：仓库源码与 GitHub Release 为 `0.3.4`，但 npm registry 的 `ai-draw-mcp` 仍是 `0.2.0`。`npm install -g ai-draw-mcp` 与 `npx ai-draw-mcp` 当前只会装到旧版本；想使用本仓库当前功能，请按「方式一：从源码安装」。等 npm 发布同步后，再恢复 npm / npx 安装路径。
-
-### 方式一：从源码安装（体验当前 `0.3.4`）
-
-```bash
-git clone https://github.com/2648782102/ai-draw-mcp.git
-cd ai-draw-mcp
-npm ci
-npm run build
-```
-
-可选自检（验证 Node 版本、mmdc、端口、输出目录）：
-
-```bash
-npm run doctor
-```
-
-配置到 Cursor（或其他 IDE）：
-
-```json
-{
-  "mcpServers": {
-    "ai-draw": {
-      "command": "node",
-      "args": ["D:/path/to/ai-draw-mcp/dist/index.js"],
-      "env": {
-        "PREVIEW_PORT": "3399",
-        "OUTPUT_DIR": "D:/path/to/output"
-      }
-    }
-  }
-}
-```
-
-> 将 `args[0]` 和 `OUTPUT_DIR` 替换为你本机的**绝对路径**。Windows 路径用正斜杠或双反斜杠均可。
-
-### 方式二：通过 npm 安装（仅旧版 `0.2.0`）
-
-```bash
-npm install -g ai-draw-mcp
-```
-
-然后直接在 MCP 配置里使用：
-
-```json
-{
-  "mcpServers": {
-    "ai-draw": {
-      "command": "npx",
-      "args": ["ai-draw-mcp"],
-      "env": {
-        "OUTPUT_DIR": "./output"
-      }
-    }
-  }
-}
-```
-
-> 这一路径对应 npm 已发布的 `0.2.0`，不代表仓库当前的 `0.3.4` 功能集。任何使用 `npx ai-draw-mcp` 的旧配置同样只适用于 `0.2.0`，直到 npm 发布同步。
-
----
-
-## 工具列表
-
-> 当前版本 `0.3.4` 共 29 个工具；工具名与数量同步受 `src/server.ts` 的 `TOOL_COUNT`、`SERVER_TOOL_COUNT`、离线检查与 MCP 测试保护。
-
-| 工具 | 用途 |
-|------|------|
-| `get_board` | 读取独立共享画板 `BOARD_JSON`、现有对象 ID 与坐标、最近留言和画图规范；默认第一步，只读 |
-| `draw_board` | 批量新增 / 更新 / 删除便签、文字、形状和有方向箭头；`line` 用有符号 `w` / `h` 指向终点 |
-| `reply_on_board` | 把 AI 的一句短回应放到画板旁，可关联一个画布对象；不开启独立聊天 |
-| `render_diagram` | 任意 Mermaid DSL 直接渲染 |
-| `render_flowchart` | 流程图（自动生成 `flowchart TD` DSL）|
-| `render_sequence` | 时序图（自动生成 `sequenceDiagram` DSL）|
-| `render_architecture` | 架构 / 组件图（`graph TB` + `subgraph` DSL）|
-| `render_class_diagram` | UML 类图（`classDiagram` DSL）|
-| `render_mindmap` | 思维导图（`mindmap` DSL）|
-| `render_svg` | 自由 SVG — 直接传入 SVG 源码，面板进入 SVG 编辑模式 |
-| `update_diagram` | 按 ID 更新已有图（重新渲染 + 推送） |
-| `delete_diagram` | 按 ID 删除磁盘文件 + 通知面板 |
-| `list_diagrams` | 列出全部已生成图表（含 ID、类型、路径） |
-| `open_preview` | 仅当人明确想查看画板时，IDE / 浏览器按需打开预览面板；AI 正常读取上下文不调用 |
-| `scan_project` | 只读扫描工作区，生成/刷新项目结构图；稳定路径 ID 保留人工布局、批注与焦点，返回 `PRESERVATION_JSON`；`render: false` 可供无头状态检查 |
-| `get_capabilities` | 一次读取 `CAPABILITIES_JSON`：全部工具、JSON 契约、工作流/审阅就绪、下一步安全动作与唯一项目写入边界；只读，不调用其他工具、不签发凭据 |
-| `get_selection_workorder` | 读取 `SELECTION_WORKORDER_JSON`：把有界选择范围收束为只读预提案工作单，含选择新鲜度提示；不含文件内容/逐行 diff/提案/凭据，不授权写入 |
-| `get_selection_scope` | 读取 `SELECTION_SCOPE_JSON`：有界多选节点、范围内内部连线、安全相对 `file:line` 证据与焦点包含状态；只读，不改选择、不授权写入 |
-| `get_selection_workorder` | 读取 `SELECTION_WORKORDER_JSON`：有界选中范围、安全相对候选路径、范围内意图、`file:line` 证据、选择新鲜度、审阅缺口与下一步；只读，不含文件内容/逐行 diff/提案/凭据 |
-| `get_visual_context` | 读取图形修订、批注线程、对话、意图摘要与 `activityTimeline`，供 AI 修改代码前理解上下文 |
-| `get_agent_workflow` | 读取当前会话的八步 `WORKFLOW_JSON`、前后条件、就绪阻塞与写入边界；只读，不签发凭据或授权写入 |
-| `get_shared_brief` | 读取紧凑 `BRIEF_JSON` 交接视图：状态、焦点、阻塞、有效/失锚意图、最近修订、证据与下一步；只读，不含批准凭据 |
-| `get_decision_trail` | 读取 `DECISION_TRAIL_JSON` 只读决策链：意图 → 图形修订 → 有界提案变更摘要 → 批准/应用状态；不含确认号，不替代完整逐行 diff |
-| `get_node_context` | 读取单个节点的 `NODE_CONTEXT_JSON`：源码证据、批注线程、相邻连线、相关图形差异与焦点；默认取人类选中节点，只读 |
-| `get_source_navigation` | 读取 `SOURCE_NAVIGATION_JSON` 只读源码跳转清单：有界相对 `file:line`、可复制 VS Code/Cursor URI 与 CLI 文本；不打开文件、不启动 IDE、不执行命令、不授权写入 |
-| `reply_to_visual_context` | AI 在面板里回复人类、回复节点批注线程，并可把消息/批注标记为已回答、已解决 |
-| `create_visual_proposal` | 创建待确认的项目变更提案，不直接写项目文件 |
-| `preflight_visual_proposal` | 创建提案前只读检查候选变更的路径、文件状态、重复内容与阻断项 |
-| `list_change_templates` | 列出或展开常用变更模板草稿；只读，不创建提案、不写文件、不签发确认号 |
-| `apply_visual_proposal` | 应用经人类批准的提案；拒绝危险路径，失败自动回滚 |
-
----
-
-## 环境变量
-
-| 变量 | 默认值 | 说明 |
-|------|--------|------|
-| `PREVIEW_PORT` | `3399` | 预览服务端口 |
-| `PREVIEW_HOST` | `127.0.0.1` | 面板地址主机名 |
-| `OUTPUT_DIR` | `./output` | 图表输出目录（**建议绝对路径**） |
-| `DEFAULT_THEME` | `default` | Mermaid 主题：`default` / `dark` / `forest` / `neutral` |
-| `DEFAULT_FORMAT` | `svg` | 默认输出格式：`svg` / `png` |
-| `LOG_LEVEL` | `info` | 日志级别：`debug` / `info` / `warn` / `error` |
-| `AI_DRAW_WORKSPACE_ROOT` | 包根目录 | 协作扫描与提案应用的目标工作区；MCP 宿主应设为当前项目根目录 |
-| `AI_DRAW_AUTO_OPEN_PANEL` | `false` | 兼容旧行为的宿主级开关；设为 `1` / `true` 时生成工具会尝试自动打开面板。默认不弹浏览器 |
-| `PUPPETEER_EXECUTABLE_PATH` | 自动检测 | 本机 Chrome/Chromium 路径，用于 `mmdc` 在没有缓存浏览器时渲染 |
-
----
-
-## 面板快捷操作
-
-| 操作 | 效果 |
 |---|---|
-| 滚轮 | 以鼠标为中心缩放 |
-| 左键拖拽 | 平移画布 |
-| 双击画布 | 重置为 1:1 |
-| `F` 键 | 适应窗口 |
-| `0` 键 | 重置为 100% |
-| `⊡` 按钮 | 适应窗口 |
-| 右下角小地图 | 点击/拖拽跳转视口 |
-| `Ctrl+Enter` | 手动触发重新渲染 |
-| `Ctrl+S` | 保存当前编辑到磁盘 |
-| `◫ 工作台` | 打开次级工作台：编辑结构图、查看完整对象线程、审阅 diff、批准提案 |
-
----
-
-## 故障排除
-
-完整首用清单、端口/Chrome/扫描根目录/批注线程/一次性凭据 FAQ 见 [docs/TROUBLESHOOTING.md](docs/TROUBLESHOOTING.md)。
-
-**端口被占用**：改 `PREVIEW_PORT`，例如 `3400`。
-
-**`mmdc` 渲染失败**：执行 `npm run doctor` 自检；Windows 下需要 Puppeteer 能拉起 Chromium。
-
-**面板空白 / JS 报错**：重启 MCP（Cursor 设置里把 `ai-draw` 关掉再开启），再刷新面板页。
-
-**项目工作台没有图**：点击首屏「扫描当前项目」，或检查 `AI_DRAW_WORKSPACE_ROOT` 是否指向正确项目。
-
-**提案无法应用**：确认由人类点击批准；检查目标路径是否属于 `.git`、`node_modules`、`dist`、`.env*` 或锁文件等受保护范围。
-
-**PNG 中文方块**：需系统有中文字体；或改用 `DEFAULT_FORMAT=svg` 避免 mmdc 栅格化。
-
-**AI 过早抢答批注线程**：检查 `get_visual_context.annotationThreads.nextActor`；为 `human` 时应等待人继续回复，不要创建或应用提案。
-
-**一次性确认号失效**：提案被改动、确认号已使用或已过期都会让旧凭据失效；重新查看逐行 diff，点击「批准」生成新的确认号，不要把旧确认号粘贴到 Issue 或会话 bundle。
-
----
+| [English quickstart](README.en.md) | 英文安装和产品概览 |
+| [AGENTS.md](AGENTS.md) | 给 AI coding agent 的短操作手册 |
+| [产品方向](docs/PRODUCT_DIRECTION.md) | 定义、边界与验收 |
+| [架构](docs/ARCHITECTURE.md) | 源码结构、协议、HTTP 与安全模型 |
+| [当前决策](docs/DECISIONS.md) | 0.4.0 收束决策与历史 ADR 状态 |
+| [文档地图](docs/README.md) | 全部文档入口 |
+| [故障排查](docs/TROUBLESHOOTING.md) | 首用自检与常见问题 |
+| [贡献指南](CONTRIBUTING.md) | 本地验证与 PR 规范 |
+| [安全政策](SECURITY.md) | 威胁模型与漏洞报告 |
+| [行为准则](CODE_OF_CONDUCT.md) | 社区参与规则 |
+| [路线图](ROADMAP.md) | 当前基线与非目标 |
+| [更新日志](CHANGELOG.md) | 版本记录 |
 
 ## License
 
-MIT
+MIT. See [LICENSE](LICENSE).

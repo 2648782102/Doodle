@@ -1,239 +1,25 @@
 # Launch Kit
 
-Versioned copy for GitHub, releases, and community posts. Keep claims tied to what the current version actually does. Never paste tokens into this file.
+## Canonical description
 
-## GitHub About
+> A simple shared infinite canvas where people and AI draw objects, arrows, and short notes through MCP.
 
-Description:
+Recommended homepage: `https://github.com/2648782102/ai-draw-mcp#readme`
 
-```text
-A simple shared infinite canvas where people and AI draw, annotate, and communicate through MCP; project tools stay optional and code changes remain human-approved.
-```
+Recommended topics: `mcp`, `model-context-protocol`, `ai`, `canvas`, `whiteboard`, `drawing`, `visualization`, `developer-tools`, `local-first`, `typescript`.
 
-Homepage:
+## Short post
 
-```text
-https://github.com/2648782102/ai-draw-mcp#readme
-```
+AI Draw MCP is a tiny local MCP server that gives a person and a coding agent one shared infinite canvas. The agent uses `get_board`, `draw_board`, and `reply_on_board` inside its normal workflow; project structure is an optional read-only scan. Draw a note, an arrow, or a whole architecture sketch without opening a browser from the agent or giving the canvas authority to edit code.
 
-Topics:
+## Longer post
 
-```text
-mcp, model-context-protocol, ai, diagram, mermaid, visualization, developer-tools, human-in-the-loop, cursor, vscode, typescript, local-first
-```
+Most visual tools for agents are either static diagram generators or full dashboards. AI Draw MCP keeps the useful part: one canvas where both sides can place simple objects and short messages. Four MCP tools, one versioned board state file, one small local web surface, and no mandatory workflow. `scan_project` can read bounded project structure, but the AI decides whether and how to draw it. The board never writes project files.
 
-Apply them with a fine-grained token that has repository administration scope:
-
-```bash
-export GH_TOKEN='github_pat_...'
-npm run github:sync
-```
-
-`scripts/github-maintenance.mjs` also supports `--check` (read-only drift report) and can create a GitHub Release with `--release v0.3.1` if `CHANGELOG.md` has a matching section.
-
-The versioned tag workflow now creates the GitHub Release automatically after verification. It uses the built-in `GITHUB_TOKEN` in a dedicated `contents: write` job, derives the body from the matching `CHANGELOG.md` section, checks for an existing Release by tag first, and never publishes to npm. The local `--release` path remains a maintainer fallback; do not use it after a tag workflow has already created the Release.
-
-Verified outcome for `v0.3.2`: Release [v0.3.2 — Human ↔ AI visual collaboration](https://github.com/2648782102/ai-draw-mcp/releases/tag/v0.3.2) is published, Release workflow run [42124996768](https://github.com/2648782102/ai-draw-mcp/actions/runs/42124996768) is green, and CI run [42124987808](https://github.com/2648782102/ai-draw-mcp/actions/runs/42124987808) is green. GitHub About/topics still require the administration-capable secret described above; the read-only metadata drift check is recorded in [`GOVERNANCE.md`](GOVERNANCE.md).
-
-Verified outcome for `v0.3.3`: Release [v0.3.3 — Human ↔ AI visual collaboration](https://github.com/2648782102/ai-draw-mcp/releases/tag/v0.3.3) is published, CI run [42127902178](https://github.com/2648782102/ai-draw-mcp/actions/runs/42127902178) and Release run [42128152064](https://github.com/2648782102/ai-draw-mcp/actions/runs/42128152064) are green. The release was created from the matching `CHANGELOG.md` section; `v0.3.2` remains published and unchanged. The published title uses the workflow's stable generic name, and neither the Release nor its tag is rewritten. About/topics still require the administration-capable secret described above.
-
-Verified outcome for `v0.3.4`: Release [v0.3.4 — Human ↔ AI visual collaboration](https://github.com/2648782102/ai-draw-mcp/releases/tag/v0.3.4) is published at `2026-11-05T23:43:07Z`; CI run [42131331089](https://github.com/2648782102/ai-draw-mcp/actions/runs/42131331089) and Release run [42131352599](https://github.com/2648782102/ai-draw-mcp/actions/runs/42131352599) are green on `3551b2b`. The release was created from the matching `CHANGELOG.md` section; `v0.3.2` and `v0.3.3` remain published and unchanged, and no existing tag is moved or rewritten. Full verification evidence is in [`GOVERNANCE.md`](GOVERNANCE.md); npm publishing still awaits human approval. About/topics still require the administration-capable secret described above.
-
-**Maintain GitHub metadata** runs its read-only drift check on every master/main push and on manual dispatch. Set repository secret `GH_TOKEN` to a fine-grained token with `Administration: read and write` and push a metadata-relevant file to apply the versioned copy automatically; a manual `dry_run=false` dispatch also applies it, while `dry_run=true` only reports drift. Without the secret, the check may report drift but does not make CI red. The default `GITHUB_TOKEN` cannot change repository description or topics because those endpoints require repository administration permissions.
-
-## Published release notes — 0.3.3
-
-Title: `v0.3.3 — Human ↔ AI visual collaboration`
-
-```markdown
-AI Draw MCP is no longer just a diagram renderer. It is a local-first visual workspace where an AI scans a project, a human edits the graph and leaves annotations, and the pair reviews a file-change proposal before anything is written.
-
-Highlights:
-- 25 MCP tools, including scan, a read-only capability catalogue, visual context, a read-only shared handoff brief, a read-only decision trail, a read-only single-node context projection, a read-only bounded multi-node selection scope, a read-only copyable source-navigation projection, a read-only agent workflow contract, AI reply, read-only change templates, proposal preflight, proposal creation, and receipt-gated apply.
-- `SELECTION_SCOPE_JSON`: a version 1 read-only projection of at most 24 human-selected graph nodes, internal edges, safe relative `file:line` evidence, and focus membership. Selection stays ephemeral panel attention, is excluded from session bundles, and never grants write authority; see [ADR 0018](docs/ADR/0018-human-selection-is-read-only-scope.md).
-- `CAPABILITIES_JSON`: one bounded, read-only discovery view of the tool/JSON surface, workflow readiness, suggested next action, and the unique receipt-gated project-write boundary; native MCP `tools/list` remains authoritative for tool names and schemas; see [ADR 0017](docs/ADR/0017-capability-catalogue-is-read-only-discovery.md).
-- `get_agent_workflow` and `WORKFLOW_JSON`: eight ordered steps with prerequisites, readiness blockers, and explicit `none` / `session` / `project` write boundaries, plus a reproducible read-only CI example.
-- Bounded, human-confirmed visual undo/redo with field-level graph diffs; visual history never reverses project files, approved proposals, or one-time receipts.
-- Bounded `file:line` source evidence on source/Markdown nodes, exposed through MCP context, diagnostics, a read-only endpoint, and the panel; evidence never grants write authority.
-- `get_node_context` returns a read-only version 1 `NODE_CONTEXT_JSON` for one focused node: source evidence, linked annotation threads, adjacent edges, related graph diffs, and focus state; it never changes focus or grants write authority.
-- `get_shared_brief` returns a read-only version 1 `BRIEF_JSON` for compact handoffs: readiness blockers, current intent, stale threads, the latest graph diff, bounded source evidence, and next actions. The panel displays and can copy the same view; approval grants are absent by construction.
-- `get_decision_trail` returns a read-only version 1 `DECISION_TRAIL_JSON` linking human intent, anchored and stale threads, graph diffs, bounded proposal change summaries, proposal stages, activity events, and evidence gaps. The panel displays and can copy the same chronology; it is a derived projection, excludes approval grants, and never replaces the full line diff or human approval; see [ADR 0013](docs/ADR/0013-decision-trail-is-a-read-only-projection.md).
-- Portable session bundle downloads include a derived, credential-free version 1 `EXPORT_MANIFEST_JSON` inventory with bounded counts, excluded credential/history/viewport fields, and a suggested filename; strict import validation remains unchanged; see [ADR 0014](docs/ADR/0014-export-manifest-is-a-derived-inventory.md).
-- `REVIEW_READINESS_JSON` gives agents and humans one bounded, read-only readiness signal by aggregating `BRIEF_JSON` blockers and `DECISION_TRAIL_JSON` evidence gaps; diagnostics, the panel, and the reproducible workflow example use the same projection without granting writes; see [ADR 0015](docs/ADR/0015-review-readiness-is-a-derived-diagnostic.md).
-- `SOURCE_NAVIGATION_JSON` turns existing bounded `file:line` evidence into workspace-relative, copyable VS Code/Cursor URI and `code --goto` text for humans and agents. The panel displays and copies the same view; the server never opens files, launches an IDE, executes commands, exposes absolute paths, or grants writes; see [ADR 0016](docs/ADR/0016-source-navigation-is-copyable-context.md).
-- Human viewport attention is a bounded, throttled read-only zoom/pan hint for AI; the panel publishes it with an authenticated `keepalive fetch`, and it never changes graph revisions, timelines, bundles, approval grants, or project files; see [ADR 0012](docs/ADR/0012-viewport-is-read-only-attention-context.md).
-- A read-only change-template catalogue for common intents: drafts cite the current graph revision and must still pass preflight and human review.
-- A shared human focus: select a node and the AI sees exactly which object the conversation is about, without that selection granting write authority.
-- Layout-preserving rescans: deterministic path IDs keep human coordinates, custom labels, annotation threads, and focus while new files are incrementally placed; scans remain read-only.
-- A collaboration panel with node edits, annotations, chat, line-by-line diffs, and one-time approval receipts.
-- Field-level graph revision diffs in the panel and derived `graph_diff` timeline events, with strict validation for portable session bundles.
-- Path safety, content hashes, atomic writes, and rollback for approved proposals.
-- Offline Mermaid assets, local preview server, WebSocket updates, and an end-to-end example.
-- CI, security policy, issue/PR templates, changelog, roadmap, and contribution docs.
-
-Quickstart: https://github.com/2648782102/ai-draw-mcp#readme
-```
-
-## Published release notes — 0.3.4
-
-Title: `v0.3.4 — Human ↔ AI visual collaboration`
-
-Status: verified published at `2026-11-05T23:43:07Z` from tag `v0.3.4` / commit `3551b2b`, with green CI run `#79` and Release run `#4`. The tag workflow used the matching `CHANGELOG.md` section; no earlier Release or tag was rewritten.
-
-Highlights in the current release:
-
-- 26 MCP tools and 19 ADRs, with a new `get_selection_workorder` tool and `GET /api/collab/selection-workorder`.
-- `SELECTION_WORKORDER_JSON`: a bounded, read-only pre-proposal checklist derived from human multi-node selection, in-scope intent, safe relative candidate paths, `file:line` evidence, review-readiness gaps, descriptive selection freshness, and next actions. It contains no `ProjectChange` content, line diff, proposal, approval grant, absolute workspace path, or new persisted state; `preflight_visual_proposal`, a human-reviewed full line diff, and a one-time receipt remain mandatory. See [ADR 0019](docs/ADR/0019-selection-workorder-is-read-only-preflight.md).
-- The panel displays the same derived workorder and can copy it into a prompt that tells an AI to read the full session, resolve gaps with the human, then explicitly draft changes rather than treating selected paths as write permissions.
-- Full local verification: 23 test files / 78 tests, a reproducible read-only workflow example, offline repository checks, and an `ai-draw-mcp-0.3.4.tgz` dry-run package of 275 files.
-
-## Release notes — 0.3.2
-
-The 0.3.2 patch introduced the 24th tool `get_capabilities`, `CAPABILITIES_JSON`, ADR 0017, and the idempotent tag-driven GitHub Release publisher. Its [published Release](https://github.com/2648782102/ai-draw-mcp/releases/tag/v0.3.2) and green CI/Release evidence are recorded in [`GOVERNANCE.md`](GOVERNANCE.md); the tag is never moved or rewritten.
-
-## Release notes — 0.3.1
-
-The 0.3.1 patch captured the 23-tool collaboration surface, `SOURCE_NAVIGATION_JSON`, `REVIEW_READINESS_JSON`, 16 ADRs, and the reproducible CI workflow. Its tag verification workflow was green, but the original workflow did not create a GitHub Release. The 0.3.2 tag first exercised the idempotent Release publisher added in `.github/workflows/release.yml`; the existing `v0.3.1` tag is never moved or rewritten.
-
-## Show HN / Hacker News
-
-Title:
+## Release notes starter
 
 ```text
-Show HN: AI Draw MCP – edit a project diagram and have an AI apply approved changes
+0.4.0 removes the legacy workbench, Mermaid library, proposal/session state, IDE launcher, and extension code. The product is now one simple shared board with four MCP tools, a bounded read-only project scan, and a smaller dependency set.
 ```
 
-Body:
-
-```text
-I wanted the diagram between a codebase and an AI coding agent to be a two-way interface, not a screenshot. AI Draw MCP is a local MCP server + browser panel: the agent scans a workspace into a structured graph, a human edits nodes, leaves comments, and asks for a change; the agent returns a proposal with a line diff; only after the human approves and passes back a one-time receipt can the agent apply the files. Rescans use stable path IDs so the human's layout and conversation are not thrown away after each iteration.
-
-It is MIT-licensed, runs locally, and does not require an account. The safety boundary is important to me: no deletes, no binary writes, no path escapes, content-hash-bound approval, and rollback on partial failure.
-
-The current version is still early. I would love feedback on the agent-facing tool shape, the approval UX, and whether graph edits should map to source ranges next.
-
-Repo: https://github.com/2648782102/ai-draw-mcp
-```
-
-## X / Mastodon / 中文短帖
-
-```text
-把「图」变成人和 AI 的双向接口：AI 扫描项目 → 人改节点/批注 → AI 生成带 diff 的提案 → 人批准后一次性确认号才允许写文件。
-
-AI Draw MCP 0.3 已开源，本地运行、MIT、无需账号。欢迎来拍砖：https://github.com/2648782102/ai-draw-mcp
-```
-
-### 前端迭代短帖（可单独发，不改写已发布 Release notes）
-
-```text
-AI Draw MCP 的预览面板现在有两套视觉系统：默认 Aurora 是带渐变光带、青紫光晕和实时状态胶囊的共享画布；按 V 切到 Studio，则变成高可读浅色审阅工作台。按 I 展开的上下文速览把当前对象、源码证据、开放讨论和审阅就绪放在同一处，所有按钮仍然只读。
-
-配合「对象焦点 → 绑定批注 → 对话工作台」桥接和按 Z 进入的沉浸工作区，外观变化现在一眼可见，但偏好只存在本机；隐藏界面不会隐藏批准门槛，也不会授权 AI 写文件。
-
-截图、README 与可复现截图脚本都在仓库：https://github.com/2648782102/ai-draw-mcp
-```
-
-### 协作可见性短帖（可单独发，不改写已发布 Release notes）
-
-```text
-这一轮把「谁该接棒、哪些材料已核对、讨论挂在哪个节点」直接画进 AI Draw MCP 的面板：画布显示人 ⇄ AI 交接航线和节点级讨论徽标；提案卡显示逐行 diff → 影响范围 → 人工确认的审阅轨道；工作台四步流程有连续进度条。
-
-这些变化都只是既有只读会话的可视化：不会替人批准、不会签发额外凭据，也不会让 UI 偏好变成项目写入许可。写入仍要完整 diff、人工批准、一次性确认号与 apply_visual_proposal。
-
-每个增量都有真实浏览器回归、可复现截图和 Node 20/22/24 CI：https://github.com/2648782102/ai-draw-mcp
-```
-
-### 克制视觉系统短帖（可单独发，不改写已发布 Release notes）
-
-```text
-AI Draw MCP 的本地面板做了一次减法：收起三套并列皮肤、重复状态条和装饰浮层，只保留一套扁平语义视觉系统——单一主色、统一圆角/间距、清晰焦点描边，以及浅色/深色共用令牌。
-
-首屏现在只有品牌、一条上下文状态、结构画布、首用动作、缩放条和审阅台入口；低频偏好仍由命令面板和快捷键到达。所有呈现偏好只存 localStorage，不改 26 个 MCP 工具、version 1 协议、完整 diff、一次性确认号或项目写入闸门：https://github.com/2648782102/ai-draw-mcp
-```
-
-### Flow 工作台短帖（可单独发，不改写已发布 Release notes）
-
-```text
-这次让 AI Draw MCP 的默认外观真的变了：Flow 工作台把结构图变成全幅主舞台，图表库收成窄图标轨，顶部是「AI 生成图 → 人改图 / 批注 → 共享上下文 → 人工批准」四步流程带，Mermaid / SVG 源码变成按 E 展开的伴随抽屉。
-
-按 B 可回到 Classic 经典分栏。流程带的状态只从既有只读会话派生，点击只切换本机视图或打开已有工作台；不发送消息、不批准提案、不签发凭据，也不写项目文件。
-
-Flow 截图、浏览器回归与 Node 20/22/24 CI 证据都在仓库：https://github.com/2648782102/ai-draw-mcp
-```
-
-## 中文社区长帖提纲
-
-### 发布后维护更新（不改写 0.3.4 Release notes）
-
-- Agent-first 短帖（2026-11-07）：AI Draw MCP 现在把 MCP 工具、初始化指令和 `ai-draw://board/*` 只读资源作为 agent 默认入口：Codex / Cursor 里的 AI 可直接扫描项目、读取共享图形上下文、交接简报和诊断，不必把浏览器面板当成必经步骤，普通工具调用也不再自动弹窗口。人要看画布时仍可通过 `open_preview` 或 `http://127.0.0.1:3399/` 打开，审 diff 与一次性批准边界不变。新增 [ADR 0024](ADR/0024-agent-first-mcp-surface.md) 与 MCP 资源回归；不改 26 个工具名/参数、version 1 协议或已发布 Release notes。
-
-- 主题：开源项目在发布之后如何继续被信任——每个维护增量都留下测试、CI、公开 Issue 与治理证据，而不是悄悄改历史。
-- 一句话：`132f90e` 增加了「目标模式」契约，把时间边界、自治范围、安全红线、验收证据与最终审计写进仓库；同时用真实「人类多选 → 重新扫描 → stale 工作单」回归证明旧 UI 选择不会被 AI 偷偷当成当前写入许可。
-- 证据：本地 23 个测试文件 / 79 个测试、275 文件 dry-run；CI `42135660499` / #82 在 Node 20/22/24 全绿；Issue #8 与 `GOVERNANCE.md` 同步记录 About/topics 漂移和未提供的管理型 API 凭据。
-- 边界：这是 post-release maintenance，不 retag `v0.3.4`、不改写已发布 Release notes、不自动发布 npm 包、不合并高风险依赖升级；`GH_TOKEN`、npm 凭据与人工发布决定仍属于维护者。
-- 追加证据（08:29 CST）：CI #83 `42136060410`、#84 `42136310033`、#85 `42136720779` 均在 Node 20/22/24 全绿；metadata workflow #12 `42136060175` 完成只读漂移检查，但 apply 因缺少管理型 `GH_TOKEN` 被跳过，About/topics 仍未修复。中英文 README 与故障排除新增 30 秒 stale 工作单 FAQ，面板用高对比警示行强调「旧选择不是当前授权」；已发布的 `v0.3.2` / `v0.3.3` / `v0.3.4` Release 均未改写。
-- 维护闭环（08:35 CST）：`0aba259` 的 CI #86 `42137519829` 在 Node 20/22/24 全绿、metadata #13 `42137519789` 只读检查完成；`259790d` 把 FAQ 补成「清空选择范围 → 重新勾选 → 读取新工作单 → 不沿用旧候选路径」的可执行步骤。两个提交均通过 23 个测试文件 / 79 个测试与 275 文件 dry-run，不改 26 个工具、version 1 协议、写入闸门、已发布标签或 Release。
-- 最终验证（08:49 CST）：`259790d` / `b4ffbf2` / `5d6114c` / `734ad6f` 的 CI #87 `42137916943`、#88 `42138152753`、#89 `42138459195`、#90 `42138738900` 均在 Node 20/22/24 全绿；#90 的 job ID 为 `127633381248` / `127633381672` / `127633381836`。metadata #14 `42138152985` 只做只读漂移检查，apply 被跳过；workflow 的 path filter 只监听 `docs/LAUNCH_KIT.md`、`scripts/github-maintenance.mjs` 与 workflow 文件，因此 `5d6114c` / `734ad6f` 没有 #15 run。About/topics 仍为 `description: null` / `homepage: null` / `topics: []`，等待维护者提供管理型 `GH_TOKEN`；不 retag、不改 published Release、不自动发 npm 包。最终公开 HEAD 仍是 23 个测试文件 / 79 个测试与 275 文件 dry-run 全过。
-- CTA：想参与的话，优先反馈 stale 选择应该「阻止 AI 继续」还是「允许讨论但显眼提示风险」，以及 `GOAL_MODE.md` 的目标模板是否覆盖你自己的自治任务。
-- 前端维护增量（14:20 CST）：对象焦点卡现在显示绑定批注、开放讨论与失锚状态，并能一键定位到对话工作台；按 `Z` 可进入沉浸工作区，让顶栏/图表库/状态栏退场，只留下结构图、对象上下文、浮动操作条与人工确认边界。外观可在「鲜明 / 静谧」间切换，尊重系统「减少动态效果」与「更高对比度」偏好。这些都是本机只读视图偏好，不新增 MCP 工具、不改 version 1 协议、不签发凭据、不授权项目写入；全部截图由 `npm run ui:shots` 用临时会话可复现生成。短帖文案见「前端迭代短帖」，不改写已发布 Release notes。
-- 双视觉维护增量（14:45 CST）：新增默认 Aurora 与可切换 Studio，`V` / 顶栏分段控件 / 外观面板 / 命令面板统一切换；`I` 打开只读上下文速览，汇总焦点对象、证据、对话、图修订与审阅就绪。`npm run ui:shots` 现在同时产出 Aurora 与 `docs/studio-workspace-panel.png` 两张可对比截图，浏览器回归覆盖 class、活动态、快捷键和速览动作数量。预览服务优先读取源码模板且禁用 HTML 缓存，避免开发态改动被旧 `dist` 副本遮住；仍不新增工具、不改协议、不签发凭据或写入项目文件。
-- 双视觉验证证据（14:52 CST）：`415d817` 的本地 `npm run check` 全过（25 个测试文件 / 81 个测试、276 文件 dry-run）；CI `42176894532` / #125 在 Node 20/22/24 全绿，`Maintain GitHub metadata` `42176894528` / #17 成功。公开 GitHub description/topics 仍为漂移状态，apply 步骤继续等待管理型 `GH_TOKEN`；不 retag、不改写已发布 Release、不自动发布 npm 包。
-- 审阅闸门与 CI 恢复证据（16:05 CST）：`ad61a1c` 把待审提案重做成带「逐行 diff → 影响范围 → 人工确认」进度轨道、写入闸门提示、状态渐变顶边与就绪光晕的审阅卡；后台刷新按提案签名复用 DOM，并在交互/弹层期间延后，修复 Node 24 批准按钮 detached-node 竞态。CI `42185011140` / #130 在 Node 20/22/24 全绿（jobs `127783169454` / `127783169129` / `127783169479`），本地 25 个测试文件 / 81 个测试、276 文件 dry-run 与八张可复现截图全部通过。公开 GitHub description/topics 仍为漂移状态，继续等待管理型 `GH_TOKEN`；不 retag、不改写已发布 Release、不自动发布 npm 包。
-- 交接航线与刷新一致性证据（16:28 CST）：`f9db238` 新增画布左下角只读「人 ⇄ AI」交接航线；`6125ffe` 统一项目图/消息/批注/提案写操作后的安全刷新入口，并让确认号弹层关闭不再安排延迟补拉。CI `42187638417` / #132 在 Node 20/22/24 全绿（jobs `127791657138` / `127791657643` / `127791657392`），本地 25 个测试文件 / 81 个测试、276 文件 dry-run 与八张可复现截图通过；metadata #19 `42186081327` 仍只做只读漂移检查。公开 GitHub description/topics 仍为漂移状态，继续等待管理型 `GH_TOKEN`；不 retag、不改写已发布 Release、不自动发布 npm 包。
-- 阶段轨道与节点讨论证据（16:50 CST）：`534d868` 为工作台四步流程新增连续进度轨道；`f68ab1f` 把绑定讨论以只读徽标投影到真实图形节点上方，并区分开放 / 已解决 / 需重锚。CI `42188634194` / #133 与 `42190267479` / #134 均在 Node 20/22/24 全绿；本地 `npm run check` 保持 25 个测试文件 / 81 个测试、276 文件 dry-run，八张截图可复现。新增「协作可见性短帖」供公开发布；About/topics 漂移仍等待管理型 `GH_TOKEN`，不 retag、不改写已发布 Release、不自动发布 npm 包。
-- 三套视觉系统证据（17:20 CST）：`5770f41` 新增 Atlas 工程蓝图视觉、聚焦式顶栏上下文带与本机「⋯」低频操作菜单；`V`、分段控件、外观面板与命令面板循环切换 Aurora / Studio / Atlas。CI `42193671562` / #136 在 Node 20/22/24 全绿（jobs `127811500934` / `127811501390` / `127811501219`），metadata #22 `42193671506` 完成只读漂移检查；本地 `npm run check` 全过，九张截图可复现。新增「三套视觉系统短帖」；About/topics 漂移仍等待管理型 `GH_TOKEN`，不 retag、不改写已发布 Release、不自动发布 npm 包。
-- 阶段卡交互证据（17:30 CST）：`ebd088b` 把工作台四步流程卡做成状态着色、悬停/聚焦导航提示与 `n / 4 READY · n%` 只读进度标签；CI `42194826679` / #138 在 Node 20/22/24 全绿（jobs `127815339753` / `127815339185` / `127815339504`），`2d88120` 的 CI `42194010429` / #137 与 metadata #23 `42194010386` 也完成绿色只读检查；本地 `npm run check` 全过，九张截图可复现。About/topics 漂移仍等待管理型 `GH_TOKEN`，不 retag、不改写已发布 Release、不自动发布 npm 包。
-- 命令面板稳定性证据（17:40 CST）：`c25f43a` 的 CI `42196201085` / #140 在 Node 20/22/24 全绿（jobs `127819940490` / `127819940574` / `127819940275`），确认每次打开命令面板都重置首项选中状态，修复 #139 的 Node 20 偶发断言失败。没有 force push、没有改写已发布 Release、没有自动 npm 发布；About/topics 仍等待管理型 `GH_TOKEN`。
-- Flow 工作台增量（17:45 CST）：默认预览面板改为画布优先，新增四步只读流程带、窄图标图表库、按 `E` 展开的源码伴随抽屉与 `B` 布局切换；新增 `docs/flow-workspace-panel.png` 可复现截图和「Flow 工作台短帖」。布局只改变本机 CSS/视图，不改 26 个工具、version 1 协议、批准凭据或项目写入闸门；不 retag、不改写已发布 Release、不自动发布 npm 包。
-- Flow 焦点镜头增量（18:00 CST）：画布顶部新增只读焦点胶囊，把当前对象、相对候选路径、关联数、开放讨论与对象序号收成一处，并提供本机 `← / →` 导航；不改服务端 focus/viewport、不签发凭据、不写项目文件。浏览器回归与 `npm run ui:shots` 同步覆盖。
-- Flow 工作台 CI 证据（18:00 CST）：`618b737` 的 CI `42199110872` / #141 在 Node 20/22/24 全绿（jobs `127829704899` / `127829705218` / `127829705186`），metadata #25 `42199111045` 完成只读漂移检查。本地 `npm run check` 为 25 个测试文件 / 81 个测试、276 文件 dry-run，十张截图可复现；About/topics 仍等待管理型 `GH_TOKEN`，不 retag、不改写已发布 Release、不自动发布 npm 包。
-- Flow 首用航线与调研增量（18:10 CST）：空白首用卡放大成「共同上下文航线」，标出 AI 只读扫描、结构图、逐行 diff 与人工确认；`docs/COMPETITIVE_RESEARCH.md` 新增画布优先布局调研，明确借鉴主画布/对象焦点/可见审批语言，但不借用账号体系、自动执行或隐藏写入权限。新增浏览器回归、离线守卫与可复现首用截图。
-- 增强图形皮肤增量（18:25 CST）：Flow 主画布加入「共享上下文画框」，节点、连线、标签与焦点高亮开始随 Aurora / Studio / Atlas 真正换肤；按 `G` 或在 ⚙ 外观面板里可切回 Mermaid 原色。图形皮肤只改本机预览 CSS，不改写源图、会话 focus/viewport、批准凭据或项目文件；浏览器回归、离线守卫、竞品调研与 `npm run ui:shots` 同步覆盖。
-- 命令面板指针稳定性修复（18:30 CST）：CI `42202978563` / #144 的 Node 22 面板回归发现新增图形皮肤命令让列表变长后，Linux headless runner 的残留鼠标位置会触发第二项悬停，把默认活动项从 `0` 抬到 `1`；现在只有命令列表内出现真实指针移动才允许悬停改选。键盘导航、搜索、命令执行与只读边界不变，Node 20/24 作业因矩阵失败取消，待修复提交重新验证三档。
-- 前端图形皮肤 CI 证据（18:40 CST）：修复提交 `72b6801` 的 CI `42204154394` / #145 在 Node 20/22/24 三档全绿（jobs `127846471614` / `127846471868` / `127846471877`），metadata #29 `42204154470` 完成只读漂移检查；本地完整 `npm run check` 为 25 个测试文件 / 81 个测试、276 文件 dry-run，十张截图可复现。公开 GitHub About/topics 仍等待管理型 `GH_TOKEN`，不 retag、不改写已发布 Release、不自动发布 npm 包。
-- 对象悬停速览增量（19:10 CST）：Flow 画布里悬停真实 Mermaid 节点，即可在对象旁只读查看名称、相对路径、关联数、源码证据与开放讨论；当前对象和沿真实边相连的节点会短暂描边。`← / →` 继续预览，`Enter` 才设为只读焦点；按 `P` 或在 ⚙ 外观面板里隐藏。卡片跟随缩放 / 平移并按帧节流，欢迎态、源码抽屉、沉浸态与重叠面板自动收起，纯预览不会发布会话状态；操作提示移到画布操作条上方，不遮挡四步流程带或缩放 / 协作按钮。不写项目文件。浏览器回归与 `npm run ui:shots` 同步覆盖。
-- 关系路径速览增量（19:30 CST）：悬停节点时，真实 Mermaid 连线与边标签会随相邻对象一起点亮，速览卡显示「已点亮 N 条真实关系」。Aurora / Studio / Atlas、浅色主题和原色图形皮肤都有对应样式；移开或关闭速览立即恢复。路径高亮只是本机 DOM/CSS，不改写图数据、导出 SVG、会话 focus/viewport 或写入闸门。`d3b3606` 的 CI #148 在 Node 24 暴露了缩放过渡后讨论徽标读取旧坐标的问题（job `127862747864`），本轮把焦点环、徽标和速览卡统一按帧对齐，并修复 Flow 沉浸态提示条被旧 Zen 规则压回左上角；可复现截图现在会明确展示底部居中提示。未重跑掩盖失败记录，等待下一轮三档 CI 核验。
-- 触屏速览增量（19:45 CST）：窄屏不再隐藏对象速览，而是改成画布底部紧凑条；轻点节点先看只读上下文与关系路径，再点同一对象才设为既有只读焦点，点其他对象只切换预览。文案会随屏幕尺寸从「悬停 / Enter」切到「轻点 / 再点一次」，预览仍不发布会话状态，也不授权写入。浏览器回归覆盖 560px 布局、速览可见性和横向不溢出。
-- 可见状态层增量（20:05 CST）：左上角协作脉搏变成带状态灯、Ready / Review / Blocked 标签和消息 / 提案 / 批注三条微型计数条的宽卡；焦点镜头、对象卡与手势提示同步获得渐变玻璃层次，Aurora / Studio / Atlas 和浅色主题都保留对应表面。数值仍全部派生自既有只读会话，不新增工具、不写会话或项目文件。`10a2336` 的 CI #150 `42213116363` 在 Node 24 job `127876384815` 暴露缩放过渡后讨论徽标偶发错位，本轮用变换窗口内持续按帧同步、悬停类优先排序与原子对齐断言修复；metadata #34 `42213116381` 为 success，失败记录不靠 rerun 掩盖，等待下一轮三档 CI 核验。
-- 焦点关系路径增量（20:45 CST）：当前焦点用紫色真实 Mermaid 边常亮直接关系，对象卡关联计数旁显示「◆」；悬停速览叠加青色路径，两类高亮互不覆盖。切换焦点、隐藏速览或切回原色皮肤时立即恢复，数据仍只来自既有只读边集合，不写会话、图数据或项目文件。
-- 对象关系轨道增量（20:55 CST）：右侧对象卡新增入向 / 出向两条方向带、真实边总数与相邻对象短条；点击短条沿既有连线同步只读 focus。Aurora / Studio / Atlas、浅色主题与窄屏都有对应样式，轨道只是 `collabGraph.edges` 的派生视图，不新增工具、协议、凭据或写入动作。浏览器回归会验证入/出向计数、点击后的 focus 同步，以及消息 / 提案 / 图修订不被修改。
-- 关系路径 CI 证据（20:50 CST）：`ba5573a` 的 CI `42219993142` / #152 在 Node 20/22/24 三档全绿（jobs `127899359633` / `127899359423` / `127899359687`），metadata #36 `42219993237` success；紫色焦点路径、独立悬停路径、三套视觉系统与原色皮肤规则均通过完整矩阵。公开 GitHub About/topics 仍等待管理型 `GH_TOKEN`，未 rerun 掩盖、未 force push、未 retag、未改写已发布 Release、未自动发布 npm 包。
-- 画布焦点航线控制台增量（21:10 CST）：底部 dock 升级为渐变分组控制台，状态区持续显示「结构 → 焦点 → 闸门」只读航线、进度带、当前对象名与 `n / N` 序号；`VIEW` / `SHARED` 拆分缩放和协作动作，窄屏自动收紧。航线只是既有节点序列与只读焦点的派生视图，不改 focus / viewport、不签发凭据、不批准提案或写项目文件。
-- 关系轨道 CI 证据（21:05 CST）：`1786c28` 的 CI `42221965847` / #153 在 Node 20/22/24 三档全绿（jobs `127905972830` / `127905973009` / `127905972980`），metadata #37 `42221965852` success；入向 / 出向关系轨道、方向计数、相邻对象短条与只读焦点复用均通过完整矩阵。公开 GitHub About/topics 仍等待管理型 `GH_TOKEN`，未 rerun 掩盖、未 force push、未 retag、未改写已发布 Release、未自动发布 npm 包。
-- 焦点镜头关系脉冲增量（21:20 CST）：顶部 Focus Lens 新增真实边计数、全图边占比进度带、入向数量与开放讨论 / 需重锚状态灯；所有数值都是既有图边与批注状态的派生视图，不新增会话状态、不改 focus / viewport、不签发凭据、不批准提案或写项目文件。窄屏只保留计数与进度带，避免遮挡画布。
-- 焦点航线 CI 证据（21:15 CST）：`aa4161d` 的 CI `42223805073` / #154 在 Node 20/22/24 三档全绿（jobs `127912081820` / `127912081935` / `127912081463`），metadata #38 `42223804669` success；底部焦点航线、分组操作、关系轨道按帧同步与窄屏适配通过完整矩阵。公开 GitHub About/topics 仍等待管理型 `GH_TOKEN`，未 rerun 掩盖、未 force push、未 retag、未改写已发布 Release、未自动发布 npm 包。
-- 协作压力仪表增量（21:30 CST）：左上角协作脉搏升级成带径向压力环、中心待关注数、状态色环带与下一步胶囊的只读仪表；所有数值仍来自既有 session / proposals / annotations / diagnostics，不改变写入闸门。CI `42224818394` / #155 的 Node 24 job `127915529861` 暴露画布讨论徽标打开工作台的偶发超时，本轮给画布→工作台入口增加按帧重开保护；失败记录保留，等待下一轮三档 CI 核验。
-- 压力仪表 CI 证据与动效边界（21:35 CST）：`60ad5b8` 的 CI `42225889980` / #156 在 Node 20/22/24 三档全绿（jobs `127919168899` / `127919168569` / `127919168427`），metadata #39 `42225890033` success；按帧重开保护、径向压力环与下一步胶囊通过完整矩阵。新增 `prefers-reduced-motion` 规则停掉压力环脉冲并收敛派生进度带过渡，不改变任何写入或批准语义。公开 GitHub About/topics 仍等待管理型 `GH_TOKEN`，未 rerun 掩盖、未 force push、未 retag、未改写已发布 Release、未自动发布 npm 包。
-- 压力仪表收尾 CI 证据（21:40 CST）：`c6be554` 的 CI `42226703679` / #157 在 Node 20/22/24 三档全绿（jobs `127921902758` / `127921902880` / `127921902213`），metadata `42226703677` success；冷静动效规则与派生仪表通过完整矩阵。公开 GitHub About/topics 仍等待管理型 `GH_TOKEN`，未 rerun 掩盖、未 force push、未 retag、未改写已发布 Release、未自动发布 npm 包。
-- 双向对话星轨增量（21:45 CST）：首用卡右侧、画布左下交接航线与协作速览新增发光「双向对话星轨」。最近 5–7 条人 / AI 消息变成按作者着色、对待回复消息点亮状态环、对最新消息放大的星点；点击只打开既有对话工作台，不发送消息、不改会话、不批准提案或写项目文件。数值仍是 `session.messages` / 提案 / 批注的只读派生，三套视觉系统、浅色主题、窄屏与减少动态效果均已适配，浏览器回归会验证会话快照不变。
-- 双向对话星轨 CI 证据（21:55 CST）：`cfff30d` 的 CI `42229629131` / #158 在 Node 20/22/24 三档全绿（jobs `127931881476` / `127931881473` / `127931881114`），metadata #42 `42229628944` success；派生星轨、只读点击入口、三档浏览器回归与可复现截图通过完整矩阵。公开 GitHub About/topics 仍等待管理型 `GH_TOKEN`，未 rerun 掩盖、未 force push、未 retag、未改写已发布 Release、未自动发布 npm 包。
-- 实时协作航线增量（21:50 CST）：首用卡右侧示意图顶部加入三段「实时协作航线」，结构对象数、双向消息数、待审提案与闸门关闭状态随时间同步亮起；它和星轨共用既有只读快照，不新增状态机、不发送消息、不批准提案或写项目文件。浏览器回归与可复现截图同步覆盖。
-- 实时协作航线 CI 证据（22:00 CST）：`65b8b73` 的 CI `42230659858` / #159 在 Node 20/22/24 三档全绿（jobs `127935394088` / `127935394051` / `127935393616`），metadata #43 `42230659820` success；实时状态灯、派生计数、浏览器回归与可复现截图通过完整矩阵。公开 GitHub About/topics 仍等待管理型 `GH_TOKEN`，未 rerun 掩盖、未 force push、未 retag、未改写已发布 Release、未自动发布 npm 包。
-- 焦点上下文胶囊增量（22:05 CST）：真实画布节点的「当前焦点」标签变成可交互只读胶囊；悬停展开真实边数、开放讨论与源码证据，点击只打开既有双向对话工作台。卡片跟随缩放 / 平移，适配三套视觉系统、浅色主题与减少动态效果，并在画布离开或滚轮时收起；不发布焦点、不发送消息、不批准提案或写项目文件。浏览器回归会验证只读点击路径与会话快照不变。
-- Aurora 光场画布增量（22:25 CST）：默认画布升级为多层冷暖渐变、遮罩工程网格、跟随指针的柔光和发光取景框；真实结构节点增加玻璃质感、双层阴影和悬停抬升，首用卡增加彩色顶边与环境光晕，四步流程带增加发光进度轨。三套视觉系统、浅色 / 静谧氛围与「原色」皮肤边界保持，所有变化只在本机 CSS/DOM 呈现层，不改导出图、会话快照、批准凭据或项目文件；浏览器回归与 `npm run ui:shots` 可复现截图同步覆盖。
-- 克制视觉系统增量（2026-11-07）：依据前端 skill 做减法，把面板收敛为一套扁平语义视觉系统；隐藏图表库、重复状态条、装饰浮层与旧皮肤切换，只保留品牌、一条状态栏、画布、首用动作、缩放条和审阅台入口。低频偏好仍由命令面板/快捷键到达，`npm run ui:shots` 改为产出 `docs/restrained-workspace-panel.png`；新增 [ADR 0021](ADR/0021-restrained-visual-system.md)，不改变 MCP 工具、version 1 协议、批准凭据或项目写入闸门。
-- 关系路径 CI 证据（19:40 CST）：`ae6789e` 的 CI `42211512696` / #149 在 Node 20/22/24 三档全绿（jobs `127871005568` / `127871005818` / `127871006012`），metadata #33 `42211512621` 完成只读漂移检查。此前 `d3b3606` 的 Node 24 对齐失败按帧同步修复后重新验证；未重跑掩盖失败、未 retag、未改写已发布 Release、未自动发布 npm 包。公开 GitHub About/topics 仍等待管理型 `GH_TOKEN`。
-- 前端 CI 证据（19:05 CST）：`3e0bcec` 的 CI `42206963393` / #147 在 Node 20/22/24 三档全绿（jobs `127855933878` / `127855934262` / `127855934292`），metadata #31 `42206963331` 完成只读漂移检查；`5fd671d` 的 CI #146 `42204590856` 与 metadata #30 `42204590827` 也均成功。公开 GitHub About/topics 仍等待管理型 `GH_TOKEN`，不 retag、不改写已发布 Release、不自动发布 npm 包。
-
-- 开头：展示「AI 画架构图」之后的真实痛点——图不能把人的意图安全带回代码。
-- 演示：用 `examples/collab-demo.mjs` 录一个 60 秒闭环，重点拍节点改名、批注、diff、批准确认号、文件变化。
-- 设计：本地优先、MCP 工具面向 LLM、结构化 `VisualGraph` 与 `ChangeProposal`、人工批准不可绕过。
-- 差异化：与「AI 生成一张图」和「云端白板账号」相比，这里强调无需账号、本地会话可导出且带只读清单、重复扫描保留人工布局/批注/焦点、有界视觉撤销/重做、只读 `file:line` 源码证据与无副作用可复制源码跳转、单节点只读上下文、共享简报、可审计决策链与有界视口注意力、选中节点可作为 AI 上下文、字段级图修订可展开、只读 agent 工作流/变更模板/预检、逐行 diff 与一次性批准凭据；不与 Miro/Excalidraw 比拼自由画布形状库。详见 [COMPETITIVE_RESEARCH.md 的「2026-11-06 增量调研」](COMPETITIVE_RESEARCH.md#2026-11-06-增量调研)。
-- 边界：不是 Miro/Excalidraw 替代品，不做托管服务，不做自动写库，不做删除/二进制写入。
-- 邀请：最需要反馈的是扫描器、图形编辑体验、提案模板和 MCP 客户端适配。
-
-## Distribution checklist
-
-- [ ] README value proposition, screenshot, Quickstart, and non-goals reviewed.
-- [ ] Chinese README, English quickstart, troubleshooting FAQ, and concept diagrams reviewed together.
-- [ ] `npm run docs:assets:check` confirms concept diagrams are reproducible from versioned source.
-- [ ] `npm run repo:check` passes locally and in CI across the supported Node matrix.
-- [ ] `npm run check`, `npm run test:examples:workflow`, and `node examples/collab-demo.mjs` pass locally.
-- [ ] `npm run doctor` passes with the same Chrome setup users will have.
-- [ ] GitHub description, homepage, and topics match `scripts/github-maintenance.mjs`.
-- [ ] Release notes created from the CHANGELOG section.
-- [ ] Verified tag workflow published exactly one GitHub Release; npm publishing still awaits human approval.
-- [ ] ADR index, governance checklist, and feedback Issue #8 reviewed for the same release.
-- [ ] Discussion/Issue pinned for feedback; response window stated publicly.
-- [ ] Links use the repository URL, not a personal cache or temporary screenshot host.
-- [ ] Run **Maintain GitHub metadata** with `dry_run=true`; if drift is reported and `GH_TOKEN` is configured, run again with `dry_run=false`.
+Do not claim hosted collaboration, approval workflows, static diagram export, or automatic code changes.

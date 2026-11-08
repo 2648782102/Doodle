@@ -1,116 +1,45 @@
-# AI Draw MCP (English Quickstart)
+# AI Draw MCP
 
-AI Draw MCP is a very simple shared infinite board for people and AI. Both sides can draw notes, text, shapes, and directed arrow lines, and leave short messages beside the canvas. AI uses `get_board`, `draw_board`, and `reply_on_board` through MCP inside the agent; project tools are optional and live at `/workbench`.
+> A simple shared infinite canvas where people and AI draw objects, arrows, and short notes through MCP.
 
-The canvas is the shared context, MCP is the AI access channel, and the repository remains the source of truth for code. The default page is one small toolbar, an infinite canvas, and a lightweight note area; no project scan or workflow dashboard is shown first. Project writes still require a proposal, full diff review, explicit human approval, and a one-time receipt. See the [product direction](docs/PRODUCT_DIRECTION.md) and [ADR 0025](docs/ADR/0025-simple-infinite-board-is-the-product.md).
+AI Draw MCP is a small local MCP server, not a hosted whiteboard, static diagram generator, chat product, or code-change approval system. It keeps only the shared canvas: a person can draw, move, edit, and leave a short note; an AI can read and draw on the same canvas from inside its coding agent.
 
-The current `0.3.4` implementation supports a bounded version 1 board, simple drawing tools, human and AI notes, and the compatible project workbench. A board line is an SVG arrow from `(x,y)` to `(x+w,y+h)`, with signed endpoint deltas; `get_board` supplies the same drawing guide to AI agents. Board communication never authorizes project writes.
+## Four tools
 
-![Collaboration loop](https://raw.githubusercontent.com/2648782102/ai-draw-mcp/master/docs/collaboration-loop.svg)
+| Tool | Purpose |
+|---|---|
+| `get_board` | Read `BOARD_JSON`, object IDs and coordinates, recent notes, and the drawing guide. Start here. |
+| `draw_board` | Add, update, or remove notes, text, rectangles, ellipses, and directed arrows. |
+| `reply_on_board` | Leave one short AI response beside the board, optionally linked to an object. |
+| `scan_project` | Optional read-only project paths and bounded `file:line` evidence. It does not draw or write files. |
 
-The detailed Chinese README is [`README.md`](README.md). The full documentation map is [`docs/README.md`](docs/README.md).
+The default loop is `get_board → draw_board / reply_on_board → person edits the canvas → AI reads it again`. Project structure is only one possible subject; `scan_project` is optional and must be visualized with `draw_board` if needed.
 
-## 30-second loop
-
-```text
-AI: scan_project → editable VisualGraph
-Human: edit graph structure / select scope / attach an object note
-AI: get_agent_workflow → eight ordered steps, readiness blockers, and explicit write boundaries
-AI: get_visual_context → intentByNode + annotationThreads.nextActor + staleThreads + graphDiffs + activityTimeline + diagnostics
-AI: reply_to_visual_context → answer in the existing anchored annotation thread
-AI: get_decision_trail → optional bounded chronology of human intent, graph revisions, proposal stages, and evidence gaps
-AI: list_change_templates → optional read-only draft for common intents
-AI: preflight_visual_proposal → safe paths + existing/new files + duplicate/no-op content
-AI: create_visual_proposal → line-by-line diff + impact summary
-Human: review diff → approve → copy the one-time receipt
-AI: apply_visual_proposal(receipt) → safe write → automatic rollback on failure
-AI or human: rescan → stable path IDs preserve human coordinates, labels, threads, and focus
-```
-
-![Collaboration workbench](https://raw.githubusercontent.com/2648782102/ai-draw-mcp/master/docs/collaboration-workbench.svg)
-
-## Install
-
-> **Version note (2026-11-07):** the repository source and GitHub Release are `0.3.4`, while npm registry `ai-draw-mcp` is still `0.2.0`. To try the current version, install from source first. The npm/npx path below installs the older published package only.
-
-### From source (current `0.3.4`)
+## Quick start
 
 ```bash
-git clone https://github.com/2648782102/ai-draw-mcp.git
-cd ai-draw-mcp
-npm ci
+npm install
 npm run build
+npm run check
 npm run doctor
-node examples/collab-demo.mjs
 ```
 
-Point your MCP stdio host at `dist/index.js` and set `OUTPUT_DIR` to an absolute path. The agent starts with `get_board`, draws with `draw_board`, and answers beside the canvas with `reply_on_board`; tools do not open a browser by default. Open `http://127.0.0.1:3399/` for the simple shared infinite board. Project scanning, source evidence, and proposal review remain available at `/workbench`.
+Add `dist/index.js` as a stdio MCP server in your MCP host. Config snippets are in `examples/mcp-config/`. Use `AI_DRAW_WORKSPACE_ROOT` for the project that `scan_project` should inspect and `OUTPUT_DIR` for the board state directory. The default local panel is `http://127.0.0.1:3399/`; normal MCP calls do not open a browser.
 
-### npm / npx (older published `0.2.0`)
+## Drawing contract
 
-```bash
-npm install -g ai-draw-mcp
-```
+- Call `get_board` first and reuse object IDs for updates and removals.
+- Put `author` at the `draw_board` top level.
+- Use a strict grid, short labels, and consistent sizes for structured diagrams.
+- A `line` is a directed arrow from `(x,y)` to `(x+w,y+h)`; `w` and `h` may be negative. Other objects use `(x,y)` as the top-left corner.
+- Use `remove_ids` before redrawing a whole diagram.
 
-```text
-command: npx
-args: ai-draw-mcp
-```
+## Safety
 
-This path does not yet include the current repository feature set; restore it as the recommended install after npm publishing is synchronized.
+stdout carries only MCP JSON-RPC; logs go to stderr. The HTTP server binds to `127.0.0.1` by default. Non-GET `/api/board/*` requests require the random `X-AI-Draw-Token` and `confirmedBy: "human"`. Project scans return bounded workspace-relative paths and short evidence text only. Board communication never authorizes project writes.
 
-Run the read-only agent workflow example, which stops after preflight and verifies that no proposal or project write occurred:
+See `SECURITY.md`, `docs/ARCHITECTURE.md`, and `AGENTS.md` for details.
 
-```bash
-npm run test:examples:workflow
-```
+## License
 
-If Chrome is outside Puppeteer's cache, set `PUPPETEER_EXECUTABLE_PATH`. CI and hardened Linux environments may also need `MERMAID_CHROME_NO_SANDBOX=1`.
-
-## Panel direction and current baseline
-
-The current local panel opens on a full shared canvas. Its contextual inspector shows the focused object's ordered human/AI thread and accepts a note or reply in place; the project workbench remains a secondary surface for graph editing, derived projections, and proposal review. The target interaction diagrams above are concepts, not screenshots of shipped UI. See [product direction](docs/PRODUCT_DIRECTION.md), [ADR 0021](docs/ADR/0021-restrained-visual-system.md), and [ADR 0022](docs/ADR/0022-shared-visual-board-is-the-product.md).
-
-![Current shared board](https://raw.githubusercontent.com/2648782102/ai-draw-mcp/master/docs/shared-board-panel.png)
-
-This is the reproducible canonical shared-board capture. It is the only UI screenshot kept in the repository; legacy layout captures were removed so old panels cannot read as parallel product definitions.
-
-## Safety model
-
-- No account, no cloud service, and no public network binding by default.
-- Proposal approval is a human panel action; it does not write files.
-- `get_agent_workflow` returns a version 1 `WORKFLOW_JSON` with ordered steps, prerequisites, `blocked` readiness hints, a compact `reviewReadiness` diagnostic, and `writes: "none" | "session" | "project"` boundaries. It is descriptive only: no proposal, receipt, session write, or project write. `ready` never replaces full line-diff review; only `apply_visual_proposal` is marked as a project write and still requires the human receipt; see [ADR 0007](docs/ADR/0007-agent-workflow-is-a-read-only-contract.md) and [ADR 0015](docs/ADR/0015-review-readiness-is-a-derived-diagnostic.md).
-- `get_shared_brief` returns a compact version 1 `BRIEF_JSON` for handoffs: focus, readiness blockers, pending and stale intent, the latest graph diff, bounded source evidence, and suggested next actions. It excludes approval grants and never grants write authority; see [ADR 0011](docs/ADR/0011-shared-brief-is-a-read-only-projection.md).
-- `get_decision_trail` returns a version 1 `DECISION_TRAIL_JSON` chronology of pending intent, anchored and stale threads, graph diffs, bounded proposal change summaries, proposal stages, gaps, and activity events. It is a derived read-only projection: proposal lines are not a complete diff, stale threads are historical evidence only, approval grants are excluded, and project writes still require human review plus a one-time receipt; see [ADR 0013](docs/ADR/0013-decision-trail-is-a-read-only-projection.md).
-- Session bundle downloads include a derived version 1 `EXPORT_MANIFEST_JSON` inventory: bounded content counts, a suggested filename, intentionally excluded credential/history/viewport fields, downgraded approval state, and fixed read-only safety flags. Strict bundle import still trusts only the versioned `session` object; the manifest never grants writes; see [ADR 0014](docs/ADR/0014-export-manifest-is-a-derived-inventory.md).
-- `REVIEW_READINESS_JSON` aggregates `BRIEF_JSON` blockers and `DECISION_TRAIL_JSON` evidence gaps into a bounded `ready` / `review` / `blocked` diagnostic. Diagnostics, the panel, and the reproducible workflow example read the same read-only projection; it never grants write authority or replaces the full line diff; see [ADR 0015](docs/ADR/0015-review-readiness-is-a-derived-diagnostic.md).
-- Human zoom/pan state is a bounded, read-only `SessionViewport`: it tells AI which diagram region is being inspected, but never increments the graph revision, emits a timeline event, enters a bundle, or grants write authority; see [ADR 0012](docs/ADR/0012-viewport-is-read-only-attention-context.md).
-- `preflight_visual_proposal` is a read-only check before `create_visual_proposal`; it never writes files, creates proposals, or issues grants.
-- `list_change_templates` lists or expands common proposal drafts; it is read-only and must be followed by preflight and human review.
-- `apply_visual_proposal` requires a one-time receipt bound to a SHA-256 content hash.
-- Protected paths, binary writes, deletes, path escapes, and workspace-root writes are rejected.
-- Atomic UTF-8 writes roll back on partial failure.
-- Session bundles omit approval grants and require explicit human confirmation to import.
-- `diagnostics` is a read-only health/next-action summary; it never grants write authority or replaces full visual context.
-- `graphDiffs` records exact node/edge field changes between graph revisions; AI should use it instead of guessing visual edits from prose.
-- `activityTimeline` derives graph revision events alongside messages, annotation threads, and proposal lifecycle events; this read-only projection never grants write authority.
-- `focus` records the human-selected node as versioned attention context; it is cleared when the node disappears and never grants write authority.
-- `selection` records at most 24 human-selected node IDs as versioned attention context. `get_selection_scope` returns a bounded `SELECTION_SCOPE_JSON` with selected nodes, internal edges, safe relative `file:line` evidence, and focus membership; it is read-only, excluded from bundles, and never grants write authority. See [ADR 0018](docs/ADR/0018-human-selection-is-read-only-scope.md).
-- `get_selection_workorder` returns a version 1 `SELECTION_WORKORDER_JSON` pre-proposal checklist: selected scope, safe relative candidate paths, in-scope intent, bounded evidence, derived selection freshness, readiness gaps, and next actions. A stale selection only asks the human to reselect; it is never auto-refreshed or cleared. It contains no file content, line diff, proposal, approval grant, or absolute path; preflight, a human-reviewed full diff, and a one-time receipt remain mandatory. See [ADR 0019](docs/ADR/0019-selection-workorder-is-read-only-preflight.md).
-- `scan_project` and the human-confirmed panel rescan read project files only. Deterministic path-based IDs preserve human layout, custom labels, annotation anchors, and focus; new nodes are auto-placed and removed nodes detach stale threads. A `PRESERVATION_JSON` summary explains what was retained. Visual synchronization never grants project-write authority; see [ADR 0006](docs/ADR/0006-stable-scan-preserves-human-visual-state.md).
-- Bounded visual undo/redo restores `VisualGraph` snapshots as new graph revisions with field-level diffs and human confirmation. It never writes project files, reverses approved proposals, or restores one-time receipts; history is excluded from bundles. See [ADR 0008](docs/ADR/0008-visual-undo-is-not-project-undo.md).
-- `scan_project` attaches at most five bounded version 1 `file:line` evidence entries per source/Markdown node. `get_visual_context.sourceEvidence`, diagnostics, `GET /api/collab/source-evidence`, and the panel expose them read-only; bundles strictly validate fields. Evidence never approves a change or expands a proposal's permitted paths. See [ADR 0009](docs/ADR/0009-source-evidence-is-read-only-context.md).
-- `get_source_navigation` returns a bounded version 1 `SOURCE_NAVIGATION_JSON` derived from existing evidence: workspace-relative `file:line` references, copyable `vscode://` / `cursor://` URI text, and `code --goto` hints. The panel can copy the same view through `GET /api/collab/source-navigation`; the server never opens files, launches an IDE, executes commands, exposes absolute paths, or grants project-write authority. See [ADR 0016](docs/ADR/0016-source-navigation-is-copyable-context.md).
-- `get_node_context` returns a version 1 `NODE_CONTEXT_JSON` projection for one node (defaulting to human focus): source evidence, linked annotation threads, adjacent edges, related graph diffs, and focus state. It is read-only, never changes focus, and never grants write authority; see [ADR 0010](docs/ADR/0010-node-context-is-a-read-only-projection.md).
-- Stale annotation threads are explicitly `outdated` or `detached`; AI must ask a human to review or re-anchor them before treating old discussion as current intent.
-- A stale selection workorder (`freshness.status: "stale"`) means the graph changed after the human selected nodes. Ask the human to reselect; the hint never refreshes or clears the selection, issues a grant, creates a proposal, or writes files. See the 30-second [troubleshooting FAQ](docs/TROUBLESHOOTING.md#多选后重新扫描工作单显示-stale-怎么办what-does-a-stale-selection-workorder-mean).
-
-See [`SECURITY.md`](SECURITY.md), [`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md), and [`docs/TROUBLESHOOTING.md`](docs/TROUBLESHOOTING.md).
-
-For autonomous, time-boxed maintenance, see [`docs/GOAL_MODE.md`](docs/GOAL_MODE.md): it defines the objective, authority, red lines, evidence, optional credentials, final audit, and a reusable goal template.
-
-## Open-source project
-
-MIT licensed. Contributions, roadmap feedback, and reproducible bug reports are welcome via [`CONTRIBUTING.md`](CONTRIBUTING.md), [`ROADMAP.md`](ROADMAP.md), and the issue templates. Public launch copy is versioned in [`docs/LAUNCH_KIT.md`](docs/LAUNCH_KIT.md); product research is in [`docs/COMPETITIVE_RESEARCH.md`](docs/COMPETITIVE_RESEARCH.md).
-
-`get_capabilities` returns a version 1 `CAPABILITIES_JSON` catalogue of all 29 tools, their JSON markers, the optional project-workbench workflow, a bounded next action, and the fixed write boundary. It is read-only application-level discovery that complements MCP's native `tools/list`; it never invokes tools, exports approval grants, exposes absolute workspace paths, or authorizes project writes. See [ADR 0017](docs/ADR/0017-capability-catalogue-is-read-only-discovery.md).
+MIT. See `LICENSE`.

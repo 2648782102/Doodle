@@ -1,61 +1,46 @@
-# Contributing to AI Draw MCP
+# Contributing
 
-感谢你参与 AI Draw MCP。项目以 AI 可直接调用的 MCP 工具、资源和初始化指令为主体：AI 在 agent 内部生成并消费结构化可视化上下文，人只在需要时通过薄面板做轻量纠错、审阅 diff 并确认变更提案；面板不应扩展成聊天或协作应用，也不应成为普通工具调用的自动窗口副作用。
+Thanks for helping keep AI Draw MCP small, predictable, and useful inside an agent.
 
-## 开发环境
+## Ground rules
 
-- Node.js >= 20
-- npm >= 10
-- 本地可用的 Chromium/Chrome；`mmdc` 依赖 Puppeteer 渲染 Mermaid
+- The shared infinite canvas is the product. Do not make project structure, a dashboard, a chat app, or an approval workflow the main subject again.
+- Keep the MCP tool surface at four tools unless `docs/DECISIONS.md` records an explicit change.
+- Keep normal MCP calls free of browser, IDE, editor, and project-write side effects.
+- Keep `SimpleBoard` versioned, bounded, and independent of project files.
+- stdout is reserved for MCP JSON-RPC; logs go to stderr.
+
+## Setup
+
+Requires Node.js 20 or newer.
 
 ```bash
 npm install
 npm run build
-npm test
-npm run doctor
+npm run check
 ```
 
-完整双向协作闭环可用临时工作区演示，不会修改仓库：
+`npm run check` runs TypeScript lint, build, Vitest, example syntax checks, offline repository guards, `doctor`, and `npm pack --dry-run`. To inspect the human canvas, start `node dist/index.js` with a free `PREVIEW_PORT` and open `http://127.0.0.1:<port>/`.
 
-```bash
-npm run build
-node examples/collab-demo.mjs
-```
+## Protocol and safety changes
 
-如果本机 Chrome 不在 Puppeteer 缓存中：
+A change to an MCP tool schema, the version 1 board state, the HTTP API, project scanning, or a security boundary must update all of these together:
 
-```bash
-export PUPPETEER_EXECUTABLE_PATH="/Applications/Google Chrome.app/Contents/MacOS/Google Chrome"
-```
+- `AGENTS.md`, `README.md`, and `README.en.md`
+- `docs/PRODUCT_DIRECTION.md`, `docs/ARCHITECTURE.md`, and `docs/DECISIONS.md`
+- `CHANGELOG.md`, `SECURITY.md`, and relevant maintenance docs
+- `test/board.test.mjs`, `test/http.test.mjs`, and `test/mcp.test.mjs`
+- `examples/` and `scripts/repo-check.mjs`
 
-## 开发约定
+Add a regression test before changing behavior. Do not reintroduce a second state model, a browser-launching dependency, or a project-write grant.
 
-- 所有日志必须写 `stderr`，不能写 `stdout`：MCP 的 stdio 是 JSON-RPC 通道。
-- 工具名用 `snake_case`，注册函数用 `registerXxx`，文件名用 `kebab-case`。
-- 公共类型放在 `src/domain/types.ts`，配置类型放在 `src/infra/config.ts`，MCP 资源投影放在 `src/infra/agent-context.ts`。
-- 普通生成/扫描工具默认不打开浏览器；只有 `open_preview`、显式 `open_panel: true` 或 `AI_DRAW_AUTO_OPEN_PANEL=1` 才允许窗口副作用。
-- 工具通过 `src/tools/_shared.ts` 访问基础设施，不直接散落引用。
-- 涉及项目文件写入的能力必须先形成提案、再由人类确认；禁止绕过 `src/domain/path-safety.ts`。
-- 新增工具必须同步更新 `src/server.ts` 的 `TOOL_COUNT`、README、AGENTS.md 和测试。
+## Pull requests
 
-## 提交 PR 前
+- Keep changes focused and explain the human and AI sides of the experience.
+- Run `npm run check` and paste the relevant result.
+- Do not commit `dist/`, `output/.ai-draw/`, `.env`, credentials, generated images, or tarballs.
+- Use the PR template and link an issue when the change affects product direction.
 
-1. `npm run lint`（当前等价于 TypeScript 严格检查）
-2. `npm run build`
-3. `npm test`（含领域契约测试：bundle、影响摘要、路径安全、内容哈希与一次性批准凭据）
-4. `npm run test:examples:workflow`（CI 中的只读工作流示例）
-5. `npm run repo:check`（文档、工具数量、端点与宣发文案防漂移）
-6. `npm run doctor`
-7. 更新文档与 `CHANGELOG.md`；可直接运行 `npm run check` 覆盖以上检查与 `npm pack --dry-run`
+## Community
 
-提交信息建议使用 Conventional Commits：`feat:`, `fix:`, `docs:`, `test:`, `chore:`, `refactor:`。
-
-## AI Agent 协作
-
-本仓库的 `AGENTS.md` 是给 AI coding agent 看的操作手册。修改架构或工具集后必须同步更新它，避免文档漂移。
-
-## 安全边界
-
-提案应用器只接受 UTF-8 文本文件的 `create`/`update`/`mkdir`，禁止删除、路径逃逸、`.git`、`node_modules`、`dist`、`.env*` 和锁文件。任何放宽边界的改动都需要在 PR 中说明威胁模型和测试。
-
-只读投影（如 `SELECTION_SCOPE_JSON` 与 `SELECTION_WORKORDER_JSON`）不得携带项目文件内容、逐行 diff、可用批准凭据或工作区绝对路径；候选路径不是写入许可。`freshness` 等派生状态只可用于提示，不得悄悄刷新/清空选择或绕过人工确认。新增工具或 JSON 契约时，需同步更新 `SERVER_TOOL_COUNT`、能力清单、AGENTS、架构、安全、测试、示例和离线检查。
+Please follow `CODE_OF_CONDUCT.md`. Report security issues privately as described in `SECURITY.md`.
