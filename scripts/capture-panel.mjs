@@ -64,7 +64,7 @@ for (const body of [
   });
   if (!response.ok) throw new Error(`Unable to seed board note: HTTP ${response.status}`);
 }
-const currentBoard = board.get();
+const currentBoard = await board.snapshot();
 const noteIndex = currentBoard.notes.findIndex((note) => note.body === "我已经看到这些对象；需要时我会继续补在画布上。");
 if (noteIndex < 0) throw new Error("Unable to locate the AI demo note");
 currentBoard.notes[noteIndex] = { ...currentBoard.notes[noteIndex], author: "ai" };

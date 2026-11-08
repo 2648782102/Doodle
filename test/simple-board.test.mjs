@@ -47,4 +47,25 @@ describe("simple shared board", () => {
       await fs.rm(outputDir, { recursive: true, force: true });
     }
   });
+
+  it("reloads a newer board written by another process", async () => {
+    const outputDir = await fs.mkdtemp(path.join(os.tmpdir(), "ai-draw-board-sync-"));
+    try {
+      const writer = new SimpleBoardStore(outputDir);
+      const reader = new SimpleBoardStore(outputDir);
+      await writer.init();
+      await reader.init();
+      const written = await writer.mutate((current) => addBoardItem(current, {
+        type: "note",
+        x: 10,
+        y: 20,
+        text: "from another agent",
+      }));
+      const observed = await reader.snapshot();
+      expect(observed.revision).toBe(written.revision);
+      expect(observed.items[0]?.text).toBe("from another agent");
+    } finally {
+      await fs.rm(outputDir, { recursive: true, force: true });
+    }
+  });
 });

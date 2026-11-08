@@ -259,8 +259,14 @@
     let tool = "select";
     let selectedId = null;
     let viewport = { x: 0, y: 0, scale: 1 };
+    let userAdjustedViewport = localStorage.getItem("aiDrawBoardUserViewport") === "1";
     let pointerState = null;
     let toastTimer = 0;
+
+    function markUserViewport() {
+      userAdjustedViewport = true;
+      localStorage.setItem("aiDrawBoardUserViewport", "1");
+    }
 
     function showToast(message) {
       toastElement.textContent = message;
@@ -301,6 +307,7 @@
     }
 
     function zoomAt(clientX, clientY, nextScale) {
+      markUserViewport();
       const rect = canvas.getBoundingClientRect();
       const screenX = clientX - rect.left;
       const screenY = clientY - rect.top;
@@ -501,10 +508,15 @@
     document.querySelector("#btnZoomOut").addEventListener("click", () => zoomAt(canvas.getBoundingClientRect().left + canvas.clientWidth / 2, canvas.getBoundingClientRect().top + canvas.clientHeight / 2, viewport.scale / 1.2));
     document.querySelector("#btnZoomIn").addEventListener("click", () => zoomAt(canvas.getBoundingClientRect().left + canvas.clientWidth / 2, canvas.getBoundingClientRect().top + canvas.clientHeight / 2, viewport.scale * 1.2));
     document.querySelector("#btnZoomReset").addEventListener("click", () => {
+      markUserViewport();
       viewport = { x: 0, y: 0, scale: 1 };
       applyViewport();
     });
-    document.querySelector("#btnFit").addEventListener("click", fitToContent);
+    document.querySelector("#btnFit").addEventListener("click", () => {
+      userAdjustedViewport = false;
+      localStorage.removeItem("aiDrawBoardUserViewport");
+      fitToContent();
+    });
 
     noteInput.addEventListener("keydown", (event) => {
       if (event.key === "Enter" && !event.shiftKey) {
@@ -553,6 +565,7 @@
       const deltaY = event.clientY - pointerState.startY;
       if (Math.abs(deltaX) + Math.abs(deltaY) > 3) pointerState.moved = true;
       if (pointerState.kind === "pan") {
+        if (pointerState.moved) markUserViewport();
         viewport.x = pointerState.originX + deltaX;
         viewport.y = pointerState.originY + deltaY;
         applyViewport();
@@ -607,9 +620,11 @@
 
     restoreViewport();
     loadBoard().then(() => {
-      if (board.items.length === 0) {
+      if (board.items.length === 0 && !userAdjustedViewport) {
         viewport = { x: canvas.clientWidth / 2, y: canvas.clientHeight / 2, scale: 1 };
         applyViewport();
+      } else if (board.items.length > 0 && !userAdjustedViewport) {
+        fitToContent();
       }
       connectUpdates();
     }).catch((error) => setStatus(`连接失败：${error.message}`));

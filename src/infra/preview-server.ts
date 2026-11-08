@@ -139,12 +139,12 @@ export class PreviewServer {
       next();
     });
 
-    this.app.get("/api/board", (_req, res) => {
-      res.json(this.board.get());
+    this.app.get("/api/board", async (_req, res) => {
+      res.json(await this.board.snapshot());
     });
 
-    const commit = async (res: express.Response, board: ReturnType<SimpleBoardStore["get"]>) => {
-      await this.board.replace(board);
+    const commit = async (res: express.Response, change: (board: ReturnType<SimpleBoardStore["get"]>) => ReturnType<SimpleBoardStore["get"]>) => {
+      const board = await this.board.mutate(change);
       this.broadcast({ type: "board_updated", revision: board.revision });
       res.json({ ok: true, board });
     };
@@ -153,8 +153,9 @@ export class PreviewServer {
       const body = req.body as { item?: BoardItemInput; confirmedBy?: string };
       if (body.confirmedBy !== "human") return res.status(403).json({ error: "Human confirmation is required" });
       if (!body.item) return res.status(400).json({ error: "item is required" });
+      const item = body.item;
       try {
-        await commit(res, addBoardItem(this.board.get(), { ...body.item, author: "human" }));
+        await commit(res, (current) => addBoardItem(current, { ...item, author: "human" }));
       } catch (error) {
         res.status(400).json({ error: error instanceof Error ? error.message : String(error) });
       }
@@ -164,8 +165,9 @@ export class PreviewServer {
       const body = req.body as { patch?: Partial<BoardItemInput>; confirmedBy?: string };
       if (body.confirmedBy !== "human") return res.status(403).json({ error: "Human confirmation is required" });
       if (!body.patch) return res.status(400).json({ error: "patch is required" });
+      const patch = body.patch;
       try {
-        await commit(res, updateBoardItem(this.board.get(), req.params.id, body.patch));
+        await commit(res, (current) => updateBoardItem(current, req.params.id, patch));
       } catch (error) {
         res.status(400).json({ error: error instanceof Error ? error.message : String(error) });
       }
@@ -175,7 +177,7 @@ export class PreviewServer {
       const body = req.body as { confirmedBy?: string };
       if (body.confirmedBy !== "human") return res.status(403).json({ error: "Human confirmation is required" });
       try {
-        await commit(res, removeBoardItem(this.board.get(), req.params.id));
+        await commit(res, (current) => removeBoardItem(current, req.params.id));
       } catch (error) {
         res.status(400).json({ error: error instanceof Error ? error.message : String(error) });
       }
@@ -185,9 +187,10 @@ export class PreviewServer {
       const body = req.body as { body?: string; itemId?: string; confirmedBy?: string };
       if (body.confirmedBy !== "human") return res.status(403).json({ error: "Human confirmation is required" });
       if (typeof body.body !== "string") return res.status(400).json({ error: "body is required" });
+      const noteBody = body.body;
       try {
-        await commit(res, addBoardNote(this.board.get(), {
-          body: body.body,
+        await commit(res, (current) => addBoardNote(current, {
+          body: noteBody,
           author: "human",
           itemId: body.itemId,
         }));

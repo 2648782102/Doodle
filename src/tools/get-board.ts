@@ -31,7 +31,7 @@ export function registerGetBoard(server: McpServer, ctx: ToolContext) {
     {},
     async () => {
       try {
-        const payload = boardJson(ctx.board.get());
+        const payload = boardJson(await ctx.board.snapshot());
         return {
           content: [{
             type: "text" as const,
@@ -83,7 +83,7 @@ export function registerDrawBoard(server: McpServer, ctx: ToolContext) {
     async ({ items, remove_ids, author }) => {
       try {
         const { addBoardItem, updateBoardItem, removeBoardItem } = await import("../domain/simple-board.js");
-        let board = ctx.board.get();
+        let board = await ctx.board.snapshot();
         let created = 0;
         let updated = 0;
         for (const raw of items ?? []) {
@@ -138,7 +138,7 @@ export function registerReplyOnBoard(server: McpServer, ctx: ToolContext) {
     async ({ body, item_id }) => {
       try {
         const { addBoardNote } = await import("../domain/simple-board.js");
-        let board = ctx.board.get();
+        let board = await ctx.board.snapshot();
         board = addBoardNote(board, { body, author: "ai", itemId: item_id });
         await ctx.board.replace(board);
         ctx.preview.broadcast({ type: "board_updated", revision: board.revision });
