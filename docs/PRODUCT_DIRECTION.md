@@ -1,6 +1,6 @@
 # Product Direction
 
-**AI Draw MCP is a simple, practical shared infinite board.** A person and an AI draw and write on the same canvas to communicate. The AI connects through MCP and uses the board directly inside its coding agent; the person uses a small local drawing surface. Project structure is only one optional thing to draw or inspect, not the definition of the product.
+**Doodle is a simple, practical shared infinite board.** A person and an AI draw and write on the same canvas to communicate. The AI connects through MCP and uses the board directly inside its coding agent; the person uses a small local drawing surface. Project structure is only one optional thing to draw or inspect, not the definition of the product.
 
 The canvas is the shared context. MCP is the AI access channel. The default interface is deliberately small, direct, and easy to use. The source repository remains the source of truth for code.
 

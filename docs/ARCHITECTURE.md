@@ -1,6 +1,6 @@
 # Architecture
 
-AI Draw MCP is a local-first shared infinite board. The AI uses MCP stdio inside its coding agent; the human uses one small HTTP canvas. Both sides read and write one independent version 1 board state file. The project source remains the source of truth for code.
+Doodle is a local-first shared infinite board. The AI uses MCP stdio inside its coding agent; the human uses one small HTTP canvas. Both sides read and write one independent version 1 board state file. The project source remains the source of truth for code.
 
 ## Source layout
 
@@ -19,7 +19,7 @@ src/
 ├── infra/
 │   ├── config.ts               PREVIEW_HOST / PREVIEW_PORT / OUTPUT_DIR / workspace
 │   ├── logger.ts               stderr-only logger
-│   ├── workspace.ts            AI_DRAW_WORKSPACE_ROOT resolution
+│   ├── workspace.ts            DOODLE_WORKSPACE_ROOT resolution
 │   ├── version.ts              version read from package.json
 │   └── templates/board.html    one human-facing infinite canvas
 ```
@@ -41,7 +41,7 @@ No tool opens a browser, writes a project file, launches an IDE, or emits approv
 
 ## Board state
 
-`BoardStore` persists `output/.ai-draw/board.json` through a temporary file and atomic rename. Every read compares the on-disk revision with the in-memory revision, so a long-lived HTTP process and short-lived MCP clients stay synchronized.
+`BoardStore` persists `output/.doodle/board.json` through a temporary file and atomic rename. It can read the legacy `output/.ai-draw/board.json` once when the new file does not exist. Every read compares the on-disk revision with the in-memory revision, so a long-lived HTTP process and short-lived MCP clients stay synchronized.
 
 `SimpleBoard` is version 1 and contains bounded `items` and `notes`. Items have finite coordinates, one of five simple types, a hex color, a `human` / `ai` author, and timestamps. For `line`, `(x,y)` is the start point and `(x+w,y+h)` is the end point; `w` and `h` are signed endpoint deltas. Other types use `(x,y)` as the top-left corner and positive width/height.
 
@@ -82,4 +82,4 @@ Project scanning does not modify the board. If the AI wants to show structure, i
 
 ## Compatibility
 
-Existing `output/.ai-draw/board.json` version 1 files remain compatible. The removed `0.3.x` workbench, 29-tool catalogue, session proposals, Mermaid diagram library, and VS Code extension are intentionally not part of `0.4.0`; their ADRs are historical records under `docs/archive/adr-legacy/`.
+Existing `output/.ai-draw/board.json` version 1 files remain readable. `AI_DRAW_WORKSPACE_ROOT` is a legacy alias for `DOODLE_WORKSPACE_ROOT`. The removed `0.3.x` workbench, 29-tool catalogue, session proposals, Mermaid diagram library, and VS Code extension are intentionally not part of `0.4.0`; their ADRs are historical records under `docs/archive/adr-legacy/`.

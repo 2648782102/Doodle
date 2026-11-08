@@ -14,6 +14,8 @@ The `0.4.0` cleanup removed Mermaid CLI, Mermaid, sharp, open, nanoid, the VS Co
 
 `npm audit` may report two moderate advisories in Vitest 3's mock runner. Vitest 5 requires Node.js 22.12+, while this package supports Node.js 20; upgrading would break the supported runtime. Other transitive advisories are constrained with npm `overrides` without raising the Node.js floor. Review this note when the minimum Node.js version changes.
 
+The npm package name is `doodle-mcp`; the bare `doodle` name on npm belongs to another project and is not used here.
+
 ## Decision rules
 
 - Prefer no new runtime dependency for a small pure function.

@@ -1,8 +1,8 @@
-# AI Draw MCP
+# Doodle
 
-> 一个很简单但实用的共享无限画板：人和 AI 都能在画布上画对象、箭头和短留言，AI 通过 MCP 在 agent 内自然使用。
+> 一个很简单但实用的共享无限画板：人和 AI 都能在画布上随手画对象、箭头和短留言，AI 通过 MCP 在 agent 内自然使用。
 
-AI Draw MCP 不是项目工作台、静态图生成器、聊天产品或批准系统。它只保留人和 AI 沟通最有用的一层：**同一张画布**。项目结构可以画，但不是产品主体。
+Doodle 不是项目工作台、静态图生成器、聊天产品或批准系统。它只保留人和 AI 沟通最有用的一层：**同一张画布**。项目结构可以画，但不是产品主体。
 
 打开 `http://127.0.0.1:3399/` 是一张无限画布：选工具、点一下、拖动、双击改字，右侧写一句给 AI。AI 用 `get_board` 读取 `BOARD_JSON` 和画图规范，用 `draw_board` 画便签 / 形状 / 有方向箭头，用 `reply_on_board` 把一句回应放在画板旁；普通 MCP 调用不打开浏览器，也不写项目文件。
 
@@ -41,10 +41,12 @@ npm run doctor
 | `PREVIEW_PORT` | `3399` | 本地画板 HTTP 端口 |
 | `PREVIEW_HOST` | `127.0.0.1` | 本地监听地址 |
 | `OUTPUT_DIR` | `./output` | 画板状态目录 |
-| `AI_DRAW_WORKSPACE_ROOT` | 包根目录 | `scan_project` 的目标工作区 |
+| `DOODLE_WORKSPACE_ROOT` | 包根目录 | `scan_project` 的目标工作区 |
 | `LOG_LEVEL` | `info` | stderr 日志级别 |
 
-`output/.ai-draw/board.json` 是独立 version 1 状态文件，应加入忽略，不提交到仓库。
+`output/.doodle/board.json` 是独立 version 1 状态文件，应加入忽略，不提交到仓库。
+
+`AI_DRAW_WORKSPACE_ROOT` 和旧的 `output/.ai-draw/board.json` 仍作为只读兼容入口保留；新配置请使用 `DOODLE_WORKSPACE_ROOT`。
 
 ## 画图规范
 

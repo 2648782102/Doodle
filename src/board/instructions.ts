@@ -1,5 +1,5 @@
 export const MCP_INSTRUCTIONS = [
-  "AI Draw MCP is a simple shared infinite board for people and AI. Use it directly inside the agent; normal tool calls never open a browser or write project files.",
+  "Doodle is a simple shared infinite board for people and AI. Use it directly inside the agent; normal tool calls never open a browser or write project files.",
   "Start with get_board. It returns BOARD_JSON with existing object IDs, coordinates, recent short messages, and a compact drawing guide.",
   "Use draw_board to add, update, or remove notes, text, rectangles, ellipses, and directed arrows. Use reply_on_board for one short response beside the canvas.",
   "Drawing contract: a line is an arrow from (x,y) to (x+w,y+h); w/h are signed endpoint deltas and may be negative. Other items use (x,y) as the top-left corner with positive width/height.",

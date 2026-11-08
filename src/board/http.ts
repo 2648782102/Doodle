@@ -119,6 +119,7 @@ export class BoardHttpServer {
     for (const candidate of templateCandidates) {
       try {
         const html = (await fs.readFile(candidate, "utf8"))
+          .replace("__DOODLE_PANEL_TOKEN__", this.panelToken)
           .replace("__AI_DRAW_PANEL_TOKEN__", this.panelToken);
         res.type("html").send(html);
         return;

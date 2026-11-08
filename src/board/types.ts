@@ -264,7 +264,7 @@ export function boardCopyText(board: SimpleBoard): string {
   const items = board.items.map((item) => `- ${item.type} · ${item.text || "(空)"} · ${item.author} · ${Math.round(item.x)},${Math.round(item.y)}`);
   const notes = board.notes.slice(-12).map((note) => `- ${note.author}: ${note.body}`);
   return [
-    `AI Draw Board · ${board.title} · revision ${board.revision}`,
+    `Doodle · ${board.title} · revision ${board.revision}`,
     `画布对象 ${board.items.length}`,
     ...items,
     `最近留言 ${Math.min(board.notes.length, 12)}`,

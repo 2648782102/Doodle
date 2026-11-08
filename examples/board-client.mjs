@@ -6,7 +6,7 @@ const transport = new StdioClientTransport({
   args: ["dist/index.js"],
   env: { ...process.env, PREVIEW_PORT: "3433", LOG_LEVEL: "error" },
 });
-const client = new Client({ name: "ai-draw-board-example", version: "1.0.0" });
+const client = new Client({ name: "doodle-board-example", version: "1.0.0" });
 
 try {
   await client.connect(transport);

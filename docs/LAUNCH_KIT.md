@@ -2,19 +2,19 @@
 
 ## Canonical description
 
-> A simple shared infinite canvas where people and AI draw objects, arrows, and short notes through MCP.
+> A tiny shared board for people and AI to doodle, draw, and leave short notes through MCP.
 
-Recommended homepage: `https://github.com/2648782102/ai-draw-mcp#readme`
+Recommended homepage: `https://github.com/2648782102/Doodle#readme`
 
-Recommended topics: `mcp`, `model-context-protocol`, `ai`, `canvas`, `whiteboard`, `drawing`, `visualization`, `developer-tools`, `local-first`, `typescript`.
+Recommended topics: `ai`, `canvas`, `developer-tools`, `drawing`, `local-first`, `mcp`, `typescript`, `whiteboard`.
 
 ## Short post
 
-AI Draw MCP is a tiny local MCP server that gives a person and a coding agent one shared infinite canvas. The agent uses `get_board`, `draw_board`, and `reply_on_board` inside its normal workflow; project structure is an optional read-only scan. Draw a note, an arrow, or a whole architecture sketch without opening a browser from the agent or giving the canvas authority to edit code.
+Doodle is a tiny local MCP server that gives a person and a coding agent one shared board. The agent uses `get_board`, `draw_board`, and `reply_on_board` inside its normal workflow; project structure is an optional read-only scan. Doodle a note, draw an arrow, or sketch a whole architecture without opening a browser from the agent or giving the canvas authority to edit code.
 
 ## Longer post
 
-Most visual tools for agents are either static diagram generators or full dashboards. AI Draw MCP keeps the useful part: one canvas where both sides can place simple objects and short messages. Four MCP tools, one versioned board state file, one small local web surface, and no mandatory workflow. `scan_project` can read bounded project structure, but the AI decides whether and how to draw it. The board never writes project files.
+Most visual tools for agents are either static diagram generators or full dashboards. Doodle keeps the useful part: one canvas where both sides can place simple objects and short messages. Four MCP tools, one versioned board state file, one small local web surface, and no mandatory workflow. `scan_project` can read bounded project structure, but the AI decides whether and how to draw it. The board never writes project files.
 
 ## Release notes starter
 

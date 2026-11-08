@@ -4,6 +4,7 @@
 
 ## Decisions in force
 
+0. **The product is called Doodle.** The project and GitHub repository are `Doodle`; the npm package, CLI, and MCP server identity are `doodle-mcp`. The short name should stay casual and avoid platform or diagram-generator connotations.
 1. **The board is the product.** `BOARD_JSON` is the only shared collaboration state. It is independent of project files, graph sessions, and proposal state.
 2. **Four MCP tools are enough.** `get_board`, `draw_board`, and `reply_on_board` form the default loop. `scan_project` is an optional read-only project-structure helper.
 3. **AI development stays inside the agent.** No tool opens a browser, IDE window, or editor. Logs stay on stderr; stdout remains clean for MCP JSON-RPC.

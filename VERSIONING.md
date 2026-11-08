@@ -1,6 +1,6 @@
 # Versioning
 
-AI Draw MCP follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
+Doodle follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 During the `0.x` series:
 

@@ -6,9 +6,11 @@ export class BoardStore {
   private board: SimpleBoard;
   private revision: number;
   private file: string;
+  private legacyFile: string;
 
   constructor(outputDir: string) {
-    this.file = path.join(outputDir, ".ai-draw", "board.json");
+    this.file = path.join(outputDir, ".doodle", "board.json");
+    this.legacyFile = path.join(outputDir, ".ai-draw", "board.json");
     this.board = createEmptyBoard();
     this.revision = 0;
   }
@@ -23,6 +25,7 @@ export class BoardStore {
       this.revision = 0;
       await this.persist();
     }
+    await this.migrateLegacyState();
   }
 
   get(): SimpleBoard {
@@ -49,12 +52,32 @@ export class BoardStore {
   }
 
   private async reload(): Promise<void> {
-    const raw = await fs.readFile(this.file, "utf-8");
+    const raw = await this.readState();
     const next = parseBoard(JSON.parse(raw));
     if (next.revision >= this.revision) {
       this.board = next;
       this.revision = next.revision;
     }
+  }
+
+  private async readState(): Promise<string> {
+    try {
+      return await fs.readFile(this.file, "utf-8");
+    } catch (error) {
+      if ((error as NodeJS.ErrnoException).code !== "ENOENT") throw error;
+      return fs.readFile(this.legacyFile, "utf-8");
+    }
+  }
+
+  private async migrateLegacyState(): Promise<void> {
+    if (this.revision === 0) return;
+    try {
+      await fs.access(this.file);
+      return;
+    } catch (error) {
+      if ((error as NodeJS.ErrnoException).code !== "ENOENT") throw error;
+    }
+    await this.persist();
   }
 
   private async persist(): Promise<void> {

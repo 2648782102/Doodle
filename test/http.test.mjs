@@ -18,7 +18,7 @@ function freePort() {
   });
 }
 
-const tempDir = await fs.mkdtemp(path.join(os.tmpdir(), "ai-draw-board-http-"));
+const tempDir = await fs.mkdtemp(path.join(os.tmpdir(), "doodle-board-http-"));
 const port = await freePort();
 const base = `http://127.0.0.1:${port}`;
 const board = new BoardStore(path.join(tempDir, "output"));

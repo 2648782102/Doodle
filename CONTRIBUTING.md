@@ -1,6 +1,6 @@
 # Contributing
 
-Thanks for helping keep AI Draw MCP small, predictable, and useful inside an agent.
+Thanks for helping keep Doodle small, predictable, and useful inside an agent.
 
 ## Ground rules
 
@@ -38,7 +38,7 @@ Add a regression test before changing behavior. Do not reintroduce a second stat
 
 - Keep changes focused and explain the human and AI sides of the experience.
 - Run `npm run check` and paste the relevant result.
-- Do not commit `dist/`, `output/.ai-draw/`, `.env`, credentials, generated images, or tarballs.
+- Do not commit `dist/`, `output/.doodle/`, `.env`, credentials, generated images, or tarballs.
 - Use the PR template and link an issue when the change affects product direction.
 
 ## Community

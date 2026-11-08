@@ -32,7 +32,7 @@ export function loadConfig(): AppConfig {
 
 export async function ensureOutputDirWritable(outputDir: string): Promise<void> {
   await fs.mkdir(outputDir, { recursive: true });
-  const probe = path.join(outputDir, ".ai-draw-write-probe");
+  const probe = path.join(outputDir, ".doodle-write-probe");
   try {
     await fs.writeFile(probe, "ok", "utf8");
     await fs.unlink(probe);

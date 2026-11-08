@@ -10,7 +10,7 @@ const SOURCE_EXTENSIONS = new Set([
 ]);
 const SKIPPED_DIRECTORIES = new Set([
   ".git", "node_modules", "dist", "build", "coverage", ".next", ".nuxt",
-  ".cache", ".codex", "vendor", "output", ".ai-draw",
+  ".cache", ".codex", "vendor", "output", ".doodle",
 ]);
 
 export interface ProjectEvidence {

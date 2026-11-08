@@ -7,7 +7,7 @@ body:
     attributes:
       value: |
         请先运行 `npm run doctor`，并贴出不含敏感信息的输出。
-        如果问题涉及画板状态，请说明 `revision`、对象 ID 和复现步骤；不需要提交 `output/.ai-draw/board.json` 中的私人内容。
+        如果问题涉及画板状态，请说明 `revision`、对象 ID 和复现步骤；不需要提交 `output/.doodle/board.json` 中的私人内容。
   - type: input
     id: version
     attributes:

@@ -1,6 +1,6 @@
 # Roadmap
 
-AI Draw MCP is a simple shared infinite board. The roadmap protects that boundary rather than listing a large feature catalogue.
+Doodle is a simple shared infinite board. The roadmap protects that boundary rather than listing a large feature catalogue.
 
 ## Shipped baseline — 0.4.0
 

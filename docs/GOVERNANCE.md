@@ -1,6 +1,6 @@
 # Governance
 
-AI Draw MCP is a small MIT-licensed open-source project. The repository is the canonical source of product copy, architecture decisions, release notes, and automation.
+Doodle is a small MIT-licensed open-source project. The repository is the canonical source of product copy, architecture decisions, release notes, and automation.
 
 ## Maintainer checklist
 
@@ -10,11 +10,11 @@ AI Draw MCP is a small MIT-licensed open-source project. The repository is the c
 - Keep normal MCP calls free of browser, IDE, and project-write side effects.
 - Keep dependencies minimal and verify with `npm run check`.
 - Keep the README, English quickstart, `AGENTS.md`, architecture, tests, examples, CI, and offline guards synchronized.
-- Never commit `dist/`, `output/.ai-draw/`, `.env`, credentials, or private board state.
+- Never commit `dist/`, `output/.doodle/`, `.env`, credentials, or private board state.
 
 ## Public surfaces
 
-- GitHub repository: `https://github.com/2648782102/ai-draw-mcp`
+- GitHub repository: `https://github.com/2648782102/Doodle`
 - Issues: bug reports, feature requests, and private security advisories.
 - Releases: version tags and changelog sections; already published tags and releases are immutable.
 - npm: published only through an explicit maintainer action, never by CI automatically.

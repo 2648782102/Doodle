@@ -9,7 +9,7 @@ npm run check
 npm run doctor
 ```
 
-Then configure the MCP host using a snippet from `examples/mcp-config/`. Set `AI_DRAW_WORKSPACE_ROOT` to the project the agent is working on and `OUTPUT_DIR` to a writable location.
+Then configure the MCP host using a snippet from `examples/mcp-config/`. Set `DOODLE_WORKSPACE_ROOT` to the project the agent is working on and `OUTPUT_DIR` to a writable location. Older `AI_DRAW_WORKSPACE_ROOT` settings still work as a legacy alias.
 
 ## Common issues
 

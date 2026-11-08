@@ -14,20 +14,27 @@ async function listFiles(directory) {
 
 describe("post-cleanup repository shape", () => {
   it("keeps the current human board state compatible with strict parsing", async () => {
-    const statePath = path.join(root, "output", ".ai-draw", "board.json");
+    const statePath = path.join(root, "output", ".doodle", "board.json");
+    const legacyPath = path.join(root, "output", ".ai-draw", "board.json");
     let raw;
     try {
       raw = await fs.readFile(statePath, "utf8");
     } catch (error) {
-      if (error.code === "ENOENT") return;
-      throw error;
+      if (error.code !== "ENOENT") throw error;
+      try {
+        raw = await fs.readFile(legacyPath, "utf8");
+      } catch (legacyError) {
+        if (legacyError.code === "ENOENT") return;
+        throw legacyError;
+      }
     }
     const board = parseBoard(JSON.parse(raw));
     expect(board.version).toBe(1);
     expect(board.items.length).toBeGreaterThan(0);
     expect(board.notes.every((note) => !note.itemId || board.items.some((item) => item.id === note.itemId))).toBe(true);
     expect(board.revision).toBe(JSON.parse(raw).revision);
-    expect((await fs.stat(statePath)).size).toBeGreaterThan(0);
+    const readablePath = await fs.access(statePath).then(() => statePath).catch(() => legacyPath);
+    expect((await fs.stat(readablePath)).size).toBeGreaterThan(0);
   });
 
   it("does not retain legacy source, extension, generated asset, or screenshot modules", async () => {
@@ -72,6 +79,28 @@ describe("post-cleanup repository shape", () => {
       expect(text, relative).not.toContain("open_preview");
       expect(text, relative).not.toContain("apply_visual_proposal");
       expect(text, relative).not.toContain("SessionStore.applyProposal");
+    }
+  });
+
+  it("uses one product name and one npm package name", async () => {
+    const packageJson = JSON.parse(await fs.readFile(path.join(root, "package.json"), "utf8"));
+    expect(packageJson.name).toBe("doodle-mcp");
+    expect(packageJson.bin["doodle-mcp"]).toBe("dist/index.js");
+    expect(packageJson.repository.url).toContain("/Doodle.git");
+    const strictFiles = [
+      "AGENTS.md", "CONTRIBUTING.md",
+      "SECURITY.md", "ROADMAP.md", "docs/PRODUCT_DIRECTION.md",
+      "docs/DECISIONS.md", "src/board/instructions.ts", "src/server.ts",
+    ];
+    for (const relative of strictFiles) {
+      const text = await fs.readFile(path.join(root, relative), "utf8");
+      expect(text, relative).not.toMatch(/AI Draw MCP|ai-draw-mcp|AI_DRAW_WORKSPACE_ROOT/);
+    }
+    const compatibilityFiles = ["README.md", "README.en.md", "docs/ARCHITECTURE.md", "docs/TROUBLESHOOTING.md", "CHANGELOG.md"];
+    for (const relative of compatibilityFiles) {
+      const text = await fs.readFile(path.join(root, relative), "utf8");
+      expect(text, relative).not.toContain("AI Draw MCP");
+      expect(text, relative).not.toContain("ai-draw-mcp");
     }
   });
 

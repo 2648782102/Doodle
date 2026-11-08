@@ -19,7 +19,7 @@ Releases are made from `master` by a maintainer. CI verifies; it does not publis
 3. The tag workflow in `.github/workflows/release.yml` runs the full check and package dry-run.
 4. After verification, create a GitHub Release from the matching `CHANGELOG.md` section. Check for an existing release on the tag first; do not recreate or edit published releases.
 5. Publish to npm only through an explicit maintainer action with the configured release environment.
-6. Verify that `npx ai-draw-mcp` starts, `npm run doctor` passes, and the changelog version matches the published package.
+6. Verify that `npx doodle-mcp` starts, `npm run doctor` passes, and the changelog version matches the published package.
 
 ## Rollback
 

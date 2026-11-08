@@ -4,6 +4,11 @@ All notable changes are documented here. Versions follow `VERSIONING.md`.
 
 ## 0.4.0 — Simple shared board cleanup
 
+### Added
+
+- Renamed the product to **Doodle**. The npm package and CLI are `doodle-mcp`; the GitHub repository is `Doodle`.
+- `DOODLE_WORKSPACE_ROOT` is the preferred workspace variable. `AI_DRAW_WORKSPACE_ROOT` remains a legacy alias so existing MCP host configs keep working.
+
 ### Changed
 
 - Collapsed the product to one simple shared infinite canvas with four AI-first MCP tools: `get_board`, `draw_board`, `reply_on_board`, and an optional read-only `scan_project`.
@@ -21,7 +26,7 @@ All notable changes are documented here. Versions follow `VERSIONING.md`.
 
 ### Compatibility
 
-- Existing version 1 `output/.ai-draw/board.json` files remain compatible.
+- Existing version 1 `output/.ai-draw/board.json` files remain readable; new state is written to `output/.doodle/board.json`.
 - Removed 0.3.x tool schemas, REST endpoints, and approval workflows are intentionally not restored. Code changes remain ordinary, separately reviewed coding-agent work.
 
 ## 0.3.x and earlier

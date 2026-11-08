@@ -11,7 +11,7 @@ This is a concise product-research note, not a feature list. It explains why the
 
 ## Positioning
 
-AI Draw MCP keeps one thing from each category and discards the rest:
+Doodle keeps one thing from each category and discards the rest:
 
 - from diagram tools: a short, structured visual expression;
 - from whiteboards: an infinite canvas with simple free placement;

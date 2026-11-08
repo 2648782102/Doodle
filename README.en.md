@@ -1,8 +1,8 @@
-# AI Draw MCP
+# Doodle
 
-> A simple shared infinite canvas where people and AI draw objects, arrows, and short notes through MCP.
+> A tiny shared board for people and AI to doodle, draw, and leave short notes through MCP.
 
-AI Draw MCP is a small local MCP server, not a hosted whiteboard, static diagram generator, chat product, or code-change approval system. It keeps only the shared canvas: a person can draw, move, edit, and leave a short note; an AI can read and draw on the same canvas from inside its coding agent.
+Doodle is a small local MCP server, not a hosted whiteboard, static diagram generator, chat product, or code-change approval system. It keeps only the shared canvas: a person can draw, move, edit, and leave a short note; an AI can read and draw on the same canvas from inside its coding agent.
 
 ## Four tools
 
@@ -24,7 +24,9 @@ npm run check
 npm run doctor
 ```
 
-Add `dist/index.js` as a stdio MCP server in your MCP host. Config snippets are in `examples/mcp-config/`. Use `AI_DRAW_WORKSPACE_ROOT` for the project that `scan_project` should inspect and `OUTPUT_DIR` for the board state directory. The default local panel is `http://127.0.0.1:3399/`; normal MCP calls do not open a browser.
+Add `dist/index.js` as a stdio MCP server in your MCP host. Config snippets are in `examples/mcp-config/`. Use `DOODLE_WORKSPACE_ROOT` for the project that `scan_project` should inspect and `OUTPUT_DIR` for the board state directory. The default local panel is `http://127.0.0.1:3399/`; normal MCP calls do not open a browser.
+
+`AI_DRAW_WORKSPACE_ROOT` and the old `output/.ai-draw/board.json` path remain read-only compatibility aliases. New setups should use `DOODLE_WORKSPACE_ROOT`.
 
 ## Drawing contract
 

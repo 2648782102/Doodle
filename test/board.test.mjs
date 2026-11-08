@@ -45,7 +45,7 @@ describe("simple shared board", () => {
   });
 
   it("updates, removes, revalidates, and persists independently", async () => {
-    const outputDir = await fs.mkdtemp(path.join(os.tmpdir(), "ai-draw-board-store-"));
+    const outputDir = await fs.mkdtemp(path.join(os.tmpdir(), "doodle-board-store-"));
     try {
       const store = new BoardStore(outputDir);
       await store.init();
@@ -65,7 +65,7 @@ describe("simple shared board", () => {
   });
 
   it("reloads a newer board written by another process", async () => {
-    const outputDir = await fs.mkdtemp(path.join(os.tmpdir(), "ai-draw-board-sync-"));
+    const outputDir = await fs.mkdtemp(path.join(os.tmpdir(), "doodle-board-sync-"));
     try {
       const writer = new BoardStore(outputDir);
       const reader = new BoardStore(outputDir);
@@ -85,7 +85,7 @@ describe("simple shared board", () => {
 
 describe("read-only project scan", () => {
   it("returns bounded relative paths and evidence without writing files", async () => {
-    const workspace = await fs.mkdtemp(path.join(os.tmpdir(), "ai-draw-scan-"));
+    const workspace = await fs.mkdtemp(path.join(os.tmpdir(), "doodle-scan-"));
     try {
       await fs.mkdir(path.join(workspace, "src"));
       await fs.writeFile(path.join(workspace, "README.md"), "# Demo\n", "utf8");

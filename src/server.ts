@@ -19,7 +19,7 @@ export async function createServer() {
   await board.init();
   const preview = new BoardHttpServer(board, config);
   const mcp = new McpServer(
-    { name: "ai-draw-mcp", version: SERVER_VERSION },
+    { name: "doodle-mcp", version: SERVER_VERSION },
     { instructions: MCP_INSTRUCTIONS },
   );
 

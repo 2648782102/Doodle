@@ -1,10 +1,10 @@
 {
-  "name": "ai-draw-mcp",
+  "name": "doodle-mcp",
   "version": "0.4.0",
-  "description": "A simple shared infinite canvas where people and AI draw objects, arrows, and short notes through MCP.",
+  "description": "A tiny shared board for people and AI to doodle, draw, and leave short notes through MCP.",
   "type": "module",
   "bin": {
-    "ai-draw-mcp": "dist/index.js"
+    "doodle-mcp": "dist/index.js"
   },
   "files": [
     "dist/",
@@ -16,11 +16,11 @@
   ],
   "repository": {
     "type": "git",
-    "url": "git+https://github.com/2648782102/ai-draw-mcp.git"
+    "url": "git+https://github.com/2648782102/Doodle.git"
   },
-  "homepage": "https://github.com/2648782102/ai-draw-mcp#readme",
+  "homepage": "https://github.com/2648782102/Doodle#readme",
   "bugs": {
-    "url": "https://github.com/2648782102/ai-draw-mcp/issues"
+    "url": "https://github.com/2648782102/Doodle/issues"
   },
   "scripts": {
     "build": "tsc && node scripts/build.mjs",
@@ -35,16 +35,14 @@
     "repo:check": "node scripts/repo-check.mjs"
   },
   "keywords": [
-    "mcp",
-    "model-context-protocol",
     "ai",
     "canvas",
-    "whiteboard",
-    "drawing",
-    "visualization",
     "developer-tools",
+    "drawing",
     "local-first",
-    "typescript"
+    "mcp",
+    "typescript",
+    "whiteboard"
   ],
   "license": "MIT",
   "publishConfig": {

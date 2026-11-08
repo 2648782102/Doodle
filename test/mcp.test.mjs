@@ -6,7 +6,7 @@ import { Client } from "@modelcontextprotocol/sdk/client/index.js";
 import { StdioClientTransport } from "@modelcontextprotocol/sdk/client/stdio.js";
 
 const EXPECTED_TOOLS = ["get_board", "draw_board", "reply_on_board", "scan_project"];
-const tempDir = await fs.mkdtemp(path.join(os.tmpdir(), "ai-draw-mcp-test-"));
+const tempDir = await fs.mkdtemp(path.join(os.tmpdir(), "doodle-mcp-test-"));
 
 afterAll(async () => {
   await fs.rm(tempDir, { recursive: true, force: true });
@@ -21,10 +21,10 @@ async function withClient(port, callback) {
       PREVIEW_PORT: String(port),
       LOG_LEVEL: "error",
       OUTPUT_DIR: tempDir,
-      AI_DRAW_WORKSPACE_ROOT: process.cwd(),
+      DOODLE_WORKSPACE_ROOT: process.cwd(),
     },
   });
-  const client = new Client({ name: "ai-draw-board-tests", version: "1.0.0" });
+  const client = new Client({ name: "doodle-board-tests", version: "1.0.0" });
   try {
     await client.connect(transport);
     await callback(client);

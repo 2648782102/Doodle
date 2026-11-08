@@ -4,7 +4,7 @@ This is the current operating manual for AI coding agents. Humans should read `R
 
 ## Product
 
-`ai-draw-mcp` is a local-first **simple shared infinite board**. A person and an AI place notes, text, rectangles, ellipses, directed arrows, and short messages on one canvas. MCP stdio is the AI's normal access channel inside an agent. The browser is a human-facing view, never a side effect of a normal tool call.
+`doodle-mcp` is a local-first **simple shared infinite board**. A person and an AI place notes, text, rectangles, ellipses, directed arrows, and short messages on one canvas. MCP stdio is the AI's normal access channel inside an agent. The browser is a human-facing view, never a side effect of a normal tool call.
 
 The board is the product. Project structure is only one optional subject that can be drawn. There is no second session model, proposal workflow, approval grant, code-change authority, diagram library, or workbench.
 
@@ -51,7 +51,7 @@ src/
 ├── infra/
 │   ├── config.ts               environment configuration
 │   ├── logger.ts               stderr-only logger
-│   ├── workspace.ts            AI_DRAW_WORKSPACE_ROOT resolution
+│   ├── workspace.ts            DOODLE_WORKSPACE_ROOT resolution
 │   ├── version.ts              package version lookup
 │   └── templates/board.html    one human-facing infinite canvas
 scripts/                        build, doctor, and offline repository guards
