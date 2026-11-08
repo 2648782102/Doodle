@@ -139,7 +139,7 @@ const sharedTools = await read("src/tools/_shared.ts");
 const openPreviewTool = await read("src/tools/open-preview.ts");
 const codexMcpExample = await read("examples/mcp-config/codex.toml");
 
-const expectedDescription = "Local-first visual communication board where people and AI share and refine a software project model; code changes remain human-approved.";
+const expectedDescription = "A simple shared infinite canvas where people and AI draw, annotate, and communicate through MCP; project tools stay optional and code changes remain human-approved.";
 const expectedHomepage = "https://github.com/2648782102/ai-draw-mcp#readme";
 const expectedTopics = [
   "mcp",
@@ -160,11 +160,13 @@ check(packageJson.description === expectedDescription, "package.json description
 check(agents.includes("ai-draw://board/{session,brief,capabilities,diagnostics,panel}"), "AGENTS.md does not document the agent-first MCP resources");
 check(architecture.includes("MCP 初始化指令与 5 个只读 `ai-draw://board/*` 资源"), "ARCHITECTURE.md does not document agent-first MCP resources");
 check(productDirection.includes("Keep the agent in the agent"), "PRODUCT_DIRECTION.md is missing the agent-first experience principle");
-check(englishQuickstart.includes("tools do not open a browser by default"), "README.en.md does not document the headless MCP default");
-check(readme.includes("工具调用不再自动弹出浏览器"), "README.md does not document the headless MCP default");
-check(roadmap.includes("ai-draw://board/*"), "ROADMAP.md does not document MCP resources");
+check(productDirection.includes("simple, practical shared infinite board"), "PRODUCT_DIRECTION.md is missing the simple-board definition");
+check(englishQuickstart.includes("without opening a browser") || englishQuickstart.includes("tools do not open a browser by default"), "README.en.md does not document the headless MCP default");
+check(readme.includes("这些工具都不主动打开浏览器"), "README.md does not document the headless MCP default");
+check(roadmap.includes("get_board"), "ROADMAP.md does not document the simple-board MCP defaults");
 check(documentationMap.includes("0024-agent-first-mcp-surface.md"), "docs/README.md does not link ADR 0024");
-check(agentFirstAdr.includes("MCP stdio is the default AI-facing product surface"), "ADR 0024 is missing the agent-first decision");
+check(documentationMap.includes("0025-simple-infinite-board-is-the-product.md"), "docs/README.md does not link ADR 0025");
+check(agentFirstAdr.includes("MCP stdio is the default AI-facing product surface"), "ADR 0024 is missing the historical agent-first decision");
 check(agentContext.includes("buildAgentSessionProjection"), "agent-context.ts is missing the session resource projection");
 check(agentContext.includes("scrubProposalMetadata"), "agent-context.ts does not scrub credential-like metadata");
 check(agentContextTest.includes("credential-free bundles"), "agent-context.test.mjs is missing the credential-free resource assertion");
@@ -182,7 +184,8 @@ check(launchKit.includes("Agent-first 短帖"), "LAUNCH_KIT.md is missing the ag
 check(troubleshooting.includes("no browser is required"), "TROUBLESHOOTING.md does not state the headless MCP default");
 check(contributing.includes("普通生成/扫描工具默认不打开浏览器"), "CONTRIBUTING.md does not state the headless tool convention");
 check(mcpTest.includes("agent-first instructions and credential-free read-only resources"), "mcp.test.mjs is missing MCP resource regression");
-check(agentWorkflowExample.includes("agent-first MCP instructions"), "agent-workflow.mjs does not verify MCP instructions");
+check(mcpTest.includes("Start with get_board"), "mcp.test.mjs is missing the simple-board default workflow");
+check(agentWorkflowExample.includes("simple-board default workflow"), "agent-workflow.mjs does not verify the simple-board default workflow");
 check(examplesReadme.includes("mcp-config/codex.toml"), "examples/README.md does not list the Codex MCP example");
 check(await assetExists("docs/collaboration-loop.svg"), "README is missing the shared-board concept diagram");
 check(await assetExists("docs/shared-board-panel.png"), "README is missing the canonical shared-board screenshot");
@@ -344,7 +347,7 @@ for (const [label, file, needle] of [
   ["readable board layout", visualSyncService, "flowchart TB"],
   ["readable board spacing", panel, "nodeSpacing: 18"],
   ["bounded board scan regression", sourceEvidenceTest, "bounds large workspace scans into grouped board nodes"],
-  ["legacy screenshot cleanup roadmap", roadmap, "Legacy UI screenshots were removed"],
+  ["simple board canonical screenshot roadmap", roadmap, "only retained UI screenshot"],
   ["stale workorder FAQ Chinese clear button", troubleshooting, "清空选择范围"],
   ["stale workorder FAQ Chinese stale-path warning", troubleshooting, "不要沿用旧候选路径起草 changes"],
   ["stale workorder FAQ English action", troubleshooting, "Clear selection"],
@@ -658,7 +661,7 @@ for (const [label, file, needle] of [
   ["review readiness examples map", examplesReadme, "REVIEW_READINESS_JSON"],
   ["capabilities shared type", types, "export interface Capabilities"],
   ["capabilities domain", capabilitiesDomain, "export function buildCapabilities"],
-  ["capabilities count", capabilitiesDomain, "SERVER_TOOL_COUNT = 26"],
+  ["capabilities count", capabilitiesDomain, "SERVER_TOOL_COUNT = 29"],
   ["capabilities name", capabilitiesDomain, 'name: "get_capabilities"'],
   ["capabilities writer", capabilitiesDomain, 'name: "apply_visual_proposal"'],
   ["capabilities marker contract", capabilitiesDomain, "marker: \"CAPABILITIES_JSON\""],
@@ -712,7 +715,7 @@ for (const [label, file, needle] of [
   ["selection troubleshooting", troubleshooting, "SELECTION_SCOPE_JSON"],
   ["selection examples map", examplesReadme, "SELECTION_SCOPE_JSON"],
   ["selection collaboration workflow", collaborationWorkflow, "SELECTION_SCOPE_JSON"],
-  ["selection workflow example", agentWorkflowExample, "26-tool catalogue"],
+  ["selection workflow example", agentWorkflowExample, "29-tool catalogue"],
   ["workorder shared type", types, "export interface SelectionWorkorder"],
   ["workorder domain", selectionWorkorderDomain, "export function buildSelectionWorkorder"],
   ["workorder no content", selectionWorkorderDomain, "excludesProjectChangeContent: true"],
@@ -730,7 +733,7 @@ for (const [label, file, needle] of [
   ["workorder freshness panel", panel, "workorder.freshness?.status"],
   ["workorder stale panel emphasis", panel, "signal stale"],
   ["modern brand header", panel, "brand-mark"],
-  ["shared board subtitle", panel, "人与 AI 的共享项目画板"],
+  ["legacy workbench subtitle", panel, "人与 AI 的共享项目画板"],
   ["collaboration safety kicker", panel, "LOCAL · READ-ONLY UNTIL APPROVAL"],
   ["collaboration section icons", panel, "section-icon"],
   ["proposal empty state", panel, "empty-state"],
@@ -752,14 +755,14 @@ for (const [label, file, needle] of [
   ["persistent canvas-first view mode", panel, "viewMode: 'canvas'"],
   ["canvas-first rail", panel, "boardContextTitle"],
   ["canvas-first rescan action", panel, "btnBoardRescan"],
-  ["canvas-first welcome rescan", panel, "btnWelcomeRescan"],
+  ["legacy workbench welcome rescan", panel, "btnWelcomeRescan"],
   ["canvas object thread view", panel, "canvasBoardThread"],
   ["canvas object note input", panel, "canvasBoardNoteInput"],
   ["canvas object note action", panel, "btnCanvasBoardNote"],
   ["canvas object note renderer", panel, "renderCanvasBoardThread"],
   ["canvas object note endpoint", panel, "saveCanvasBoardNote"],
   ["secondary workbench details", panel, "btnBoardDetails"],
-  ["shared board canonical screenshot", capturePanelScript, "shared-board-panel.png"],
+  ["simple board canonical screenshot", capturePanelScript, "shared-board-panel.png"],
   ["first-run welcome card", panel, "welcome-card"],
   ["local-only example diagram", panel, "loadExampleDiagram"],
   ["light workspace theme", panel, "theme-light"],
@@ -837,7 +840,7 @@ for (const [label, file, needle] of [
   ["canvas object hover edge trace label", panel, "canvasHoverTrace"],
   ["canvas object hover edge trace CSS", panel, ".flowchart-link.is-hover-path"],
   ["canvas object hover edge trace regression", canvasFocusTest, "highlightedEdges"],
-  ["canvas object hover edge trace screenshot", capturePanelScript, "flowchart-link.is-hover-path"],
+  ["simple board screenshot seed", capturePanelScript, "seedItems"],
   ["canvas object hover edge trace research", research, "关系路径与即时图形反馈调研"],
   ["canvas object hover edge trace boundary", research, "不把视觉高亮写回图数据"],
   ["compact touch glance CSS", panel, "@media (max-width: 620px)"],
@@ -877,7 +880,7 @@ for (const [label, file, needle] of [
   ["relation map existing focus reuse", panel, "setCanvasFocusNode(nodeId)"],
   ["relation map browser regression", canvasFocusTest, "relationMap"],
   ["relation map visual regression", panelUiTest, "relationMap"],
-  ["relation map screenshot", capturePanelScript, "#canvasRelationMap"],
+  ["simple board screenshot note area", capturePanelScript, "/api/board/notes"],
   ["relation map visual regression", panelUiTest, "relationMap"],
   ["relation map changelog", changelog, "对象关系轨道"],
   ["relation map launch copy", launchKit, "对象关系轨道增量"],
@@ -925,7 +928,7 @@ for (const [label, file, needle] of [
   ["canvas object hover browser regression", canvasFocusTest, "canvasHoverCard"],
   ["canvas object hover session boundary", canvasFocusTest, "sessionAfterHover"],
   ["canvas object hover browser regression", canvasFocusTest, "canvasHoverCard"],
-  ["canonical screenshot seed thread", capturePanelScript, "canvasBoardThread"],
+  ["canonical screenshot seed notes", capturePanelScript, "/api/board/notes"],
   ["canvas object hover research", research, "对象悬停速览与低摩擦上下文调研"],
   ["canvas object hover research boundary", research, "悬停不改变选中态"],
   ["canvas object hover keyboard boundary", research, "悬停与方向键不发布 focus/viewport"],
@@ -933,7 +936,7 @@ for (const [label, file, needle] of [
   ["Flow bottom-centered toast", panel, "body.flow-workspace:not(.zen-workspace) .toast"],
   ["Flow immersive toast override", panel, "body.flow-workspace.zen-workspace .toast"],
   ["Flow immersive toast browser regression", panelUiTest, "zenToastPlacement"],
-  ["single canonical screenshot flow", capturePanelScript, "canvasFocusRipple"],
+  ["single canonical screenshot board", capturePanelScript, "shared-board-panel.png"],
   ["Flow toast clear of canvas dock", panel, "bottom: 100px"],
   ["Flow toast browser regression", panelUiTest, "toastPlacement"],
   ["Flow toast browser regression", panelUiTest, "toastPlacement"],
@@ -949,7 +952,7 @@ for (const [label, file, needle] of [
   ["focused header context", panel, "headerContextTitle"],
   ["toolbar overflow menu", panel, "toolbarOverflowMenu"],
   ["restrained toolbar regression", panelUiTest, 'getComputedStyle(element.closest(".toolbar-overflow")).display'],
-  ["canonical screenshot object focus", capturePanelScript, "canvasObjectLabel"],
+  ["canonical screenshot board items", capturePanelScript, ".board-item"],
   ["canonical screenshot in Chinese README", readme, "shared-board-panel.png"],
   ["canonical screenshot in English README", englishQuickstart, "shared-board-panel.png"],
   ["restrained visual system in changelog", changelog, "克制视觉系统收束"],
@@ -994,41 +997,41 @@ for (const [label, file, needle] of [
   ["dialog star track canvas browser regression", canvasFocusTest, "handoffStars"],
   ["dialog star track reduced motion CSS", panel, '.dialog-star[data-status="pending"]::after { animation: none;'],
   ["dialog star track browser regression", panelUiTest, "welcomeDialogTrack"],
-  ["shared-board Chinese README", readme, "项目沟通画板"],
-  ["shared-board English README", englishQuickstart, "visual communication board"],
-  ["shared-board agents definition", agents, "AI 与人类项目沟通画板"],
-  ["shared-board roadmap principle", roadmap, "The shared visual board is the product"],
-  ["shared-board architecture", architecture, "人类与 AI 项目沟通画板"],
+  ["simple-board Chinese README", readme, "简单无限画布"],
+  ["simple-board English README", englishQuickstart, "shared infinite board"],
+  ["simple-board agents definition", agents, "简单共享无限画板"],
+  ["simple-board roadmap principle", roadmap, "A simple shared infinite board is the product"],
+  ["simple-board architecture", architecture, "人与 AI 共享无限画板"],
   ["shared-board ADR index", adrIndex, "0022-shared-visual-board-is-the-product.md"],
   ["shared-board product direction", productDirection, "## Shared loop"],
   ["shared-board decision", sharedBoardAdr, "The local-first shared visual board is the product"],
-  ["superseded MCP-first ADR", mcpToolAdr, "Superseded by [ADR 0022]"],
-  ["shared-board goal mode", goalMode, "AI 与人类项目沟通画板"],
-  ["board modules Chinese README", readme, "单一画板栏 + 连续画布 + 固定对象检视器"],
-  ["board modules English README", englishQuickstart, "board header, one continuous canvas"],
-  ["board modules ADR index", adrIndex, "0023-board-modules-and-library-boundary.md"],
-  ["board modules ADR boundary", boardModulesAdr, "Opening a library record is a local preview only"],
-  ["board modules changelog", changelog, "画板模块与图库边界"],
+  ["historical MCP-first ADR", mcpToolAdr, "Superseded by [ADR 0022]"],
+  ["simple-board goal mode", goalMode, "简单共享无限画板"],
+  ["simple board Chinese README", readme, "简单无限画布"],
+  ["simple board English README", englishQuickstart, "infinite canvas"],
+  ["simple board ADR index", adrIndex, "0025-simple-infinite-board-is-the-product.md"],
+  ["simple board ADR boundary", boardModulesAdr, "Opening a library record is a local preview only"],
+  ["simple board changelog", changelog, "简单无限画板成为默认产品"],
   ["board header action", panel, "btnBoardScanHeader"],
   ["board save action", panel, "btnBoardSaveHeader"],
-  ["single board header", panel, ".header { display: none !important; }"],
+  ["legacy workbench single header", panel, ".header { display: none !important; }"],
   ["hidden legacy flow rail", panel, 'id="flowRail" aria-label="共享画板状态" hidden'],
-  ["board safety boundary", panel, "boardSafetyState"],
+  ["legacy workbench safety boundary", panel, "boardSafetyState"],
   ["object inspector evidence", panel, "canvasContextStrip"],
-  ["single header regression", panelUiTest, 'document.querySelector(".board-header").getBoundingClientRect().height'],
+  ["legacy workbench header regression", panelUiTest, 'document.querySelector(".board-header").getBoundingClientRect().height'],
   ["hidden legacy flow rail regression", panelUiTest, 'getComputedStyle(element).display)).toBe("none")'],
   ["board library action", panel, "btnBoardLibraryHeader"],
   ["board library drawer", panel, "boardLibrary"],
   ["board history notice", panel, "boardHistoryNotice"],
-  ["board header regression", panelUiTest, "boardHeaderTitle"],
-  ["board library regression", panelUiTest, "btnBoardLibraryHeader"],
-  ["panel shared board framing", panel, "和 AI 在同一张图上理解项目"],
-  ["panel shared board context", panel, "SHARED VISUAL BOARD"],
+  ["legacy workbench header regression", panelUiTest, "boardHeaderTitle"],
+  ["legacy workbench library regression", panelUiTest, "btnBoardLibraryHeader"],
+  ["legacy workbench framing", panel, "和 AI 在同一张图上理解项目"],
+  ["legacy workbench context", panel, "SHARED VISUAL BOARD"],
   ["dialog live route CSS", panel, ".welcome-live-route"],
   ["dialog live route renderer", panel, "welcomeLiveRoute"],
   ["dialog live route browser regression", panelUiTest, "welcomeLiveRoute"],
-  ["restrained design Chinese README", readme, "克制视觉系统"],
-  ["English README records shared thread loop", englishQuickstart, "human replies in the same anchored thread"],
+  ["simple design Chinese README", readme, "少、清楚、直接"],
+  ["English README records simple board notes", englishQuickstart, "short messages beside the canvas"],
   ["product plan acceptance", productDirection, "No project file changes unless a separate proposal is reviewed and approved"],
   ["dialog live route changelog", changelog, "实时协作航线"],
   ["dialog live route launch copy", launchKit, "实时协作航线增量"],
@@ -1072,7 +1075,7 @@ for (const [label, file, needle] of [
   ["canvas thread badge browser regression", canvasFocusTest, "canvas-thread-badge"],
   ["canvas thread badge changelog", changelog, "节点级讨论标记"],
   ["restrained state surface regression", panelUiTest, 'getComputedStyle(element).display)).toBe("none")'],
-  ["restrained Chinese README", readme, "克制视觉系统"],
+  ["simple Chinese README", readme, "默认界面刻意保持少、清楚、直接"],
   ["restrained English README", englishQuickstart, "restrained"],
   ["shared board workbench Chinese README", readme, "项目工作台"],
   ["collaboration pulse changelog", changelog, "人机协作脉搏"],
@@ -1134,7 +1137,7 @@ for (const [label, file, needle] of [
   ["focus mode toggle", panel, "btnFocusMode"],
   ["focus mode shortcut", panel, "专注模式"],
   ["single screenshot output", capturePanelScript, "shared-board-panel.png"],
-  ["reproducible canvas example project", capturePanelScript, "示例 · 人机协作项目结构"],
+  ["reproducible simple board seed", capturePanelScript, "很简单的共享画板"],
   ["intent composer card", panel, "intent-composer"],
   ["local board note draft", panel, "BOARD_NOTE_DRAFT_KEY"],
   ["in-thread reply endpoint", panel, "/api/collab/annotations/${encodeURIComponent(id)}/reply"],
@@ -1186,7 +1189,7 @@ for (const [label, file, needle] of [
   ["panel UI action grouping regression", panelUiTest, "btnGraphMore"],
   ["panel UI board note counter regression", panelUiTest, "boardNoteCount"],
   ["panel UI default canvas regression", panelUiTest, 'data-view-target="canvas"'],
-  ["panel UI first-run rescan regression", panelUiTest, "btnWelcomeRescan"],
+  ["legacy workbench first-run rescan regression", panelUiTest, "btnWelcomeRescan"],
   ["panel UI workbench action regression", panelUiTest, "打开审阅台"],
   ["canvas object thread regression", panelUiTest, "canvasBoardThread"],
   ["panel UI first-run regression", panelUiTest, "btnLoadExample"],
@@ -1230,11 +1233,11 @@ for (const [label, file, needle] of [
   ["panel UI proposal card regression", panelUiTest, "proposal-card.status-pending"],
   ["panel UI proposal diff regression", panelUiTest, "proposal-diff.loaded"],
   ["panel UI diff review progression regression", panelUiTest, "approveAwaiting"],
-  ["reproducible proposal screenshot", capturePanelScript, "seedProposalCard"],
+  ["reproducible board screenshot", capturePanelScript, "seedItems"],
   ["reproducible screenshot command", JSON.stringify(packageJson), "ui:shots"],
   ["screenshot capture helper", capturePanelScript, "Captured docs/shared-board-panel.png"],
   ["README shows canonical shared board", readme, "当前共享画板（0.3.x）"],
-  ["README describes canonical shared board", readme, "这是可复现的当前共享画板"],
+  ["README describes canonical simple board", readme, "这是可复现的当前默认界面"],
   ["workorder freshness pure test", selectionWorkorderTest, "status: \"stale\""],
   ["workorder freshness MCP test", mcpTest, "Selection freshness none"],
   ["workorder freshness HTTP test", collaborationTest, "selectionStale: false"],
@@ -1273,9 +1276,9 @@ check(agents.includes("scripts/generate-doc-assets.mjs"), "AGENTS.md does not do
 check(agents.includes("ROADMAP.md"), "AGENTS.md does not list ROADMAP.md");
 check(agents.includes("annotationThreads"), "AGENTS.md does not document annotation thread context");
 check(agents.includes("preflight_visual_proposal"), "AGENTS.md does not document proposal preflight");
-check(readme.includes("26 个 MCP 工具"), "README.md does not reflect the 26 MCP tools");
-check(agents.includes("## 26 个 MCP 工具"), "AGENTS.md does not reflect the 26 MCP tools");
-check(roadmap.includes("26 tools"), "ROADMAP.md does not reflect the MCP tool surface");
+check(readme.includes("29 个 MCP 工具"), "README.md does not reflect the 29 MCP tools");
+check(agents.includes("## 29 个 MCP 工具"), "AGENTS.md does not reflect the 29 MCP tools");
+check(roadmap.includes("29 tools"), "ROADMAP.md does not reflect the MCP tool surface");
 const roadmapPhases = [...roadmap.matchAll(/^## Phase \d —/gm)].map((match) => match[0]);
 check(roadmapPhases.length === 5, "ROADMAP.md must keep a product-contract phase and four delivery phases");
 check(new Set(roadmapPhases).size === roadmapPhases.length, "ROADMAP.md has duplicate delivery phases");
@@ -1289,7 +1292,7 @@ check(readme.includes("list_change_templates"), "README.md does not document cha
 check(agents.includes("change-templates.ts"), "AGENTS.md does not list the change template module");
 check(agents.includes("list_change_templates"), "AGENTS.md does not document change templates");
 check(changeTemplateDomain.includes("does not create a proposal"), "change template guidance does not state its read-only boundary");
-check(packageJson.description?.includes("visual communication board"), "package.json description is missing the shared-board product positioning");
+check(packageJson.description?.includes("shared infinite canvas"), "package.json description is missing the simple-board product positioning");
 check(agents.includes("anchorStatus"), "AGENTS.md does not document stale annotation anchors");
 check(architecture.includes("annotationThreads.nextActor"), "ARCHITECTURE.md does not document annotation thread handoff");
 check(architecture.includes("anchorStatus"), "ARCHITECTURE.md does not document stale annotation anchors");
@@ -1353,7 +1356,7 @@ check(packageJson.version === "0.3.4", "package.json version is not 0.3.4");
 const lockfile = JSON.parse(await read("package-lock.json"));
 check(lockfile.version === packageJson.version, "package-lock.json version does not match package.json");
 check(lockfile.packages?.[""]?.version === packageJson.version, "package-lock.json root package version does not match package.json");
-check(readme.includes("当前版本 `0.3.4` 共 26 个工具"), "README.md does not reflect version 0.3.4 and 26 tools");
+check(readme.includes("当前版本 `0.3.4` 共 29 个工具"), "README.md does not reflect version 0.3.4 and 29 tools");
 check(readme.includes("| `get_source_navigation` |"), "README.md tool table is missing get_source_navigation");
 check(readme.includes("| `get_capabilities` |"), "README.md tool table is missing get_capabilities");
 check(launchKit.includes("Published release notes — 0.3.3"), "docs/LAUNCH_KIT.md is missing the published 0.3.3 release notes");
@@ -1452,6 +1455,28 @@ check(contributing.includes("SELECTION_WORKORDER_JSON"), "CONTRIBUTING.md does n
 check(pullRequestTemplate.includes("npm run test:examples:workflow"), "PR template does not require the reproducible workflow example");
 check(pullRequestTemplate.includes("Read-only JSON projection"), "PR template does not flag read-only contract changes");
 check(featureRequestTemplate.includes("Safety boundary"), "Feature request template does not ask for safety implications");
+
+const simpleBoard = await read("src/domain/simple-board.ts");
+const boardTemplate = await read("src/infra/templates/board.html");
+const boardTool = await read("src/tools/get-board.ts");
+const boardStore = await read("src/infra/simple-board-store.ts");
+const simpleBoardTest = await read("test/simple-board.test.mjs");
+const boardUiTest = await read("test/board-ui.test.mjs");
+const adr25 = await read("docs/ADR/0025-simple-infinite-board-is-the-product.md");
+check(adrIndex.includes("0025-simple-infinite-board-is-the-product.md"), "ADR index is missing ADR 0025");
+check(adr25.includes("The simple infinite board is the product"), "ADR 0025 is missing the product decision");
+check(simpleBoard.includes("export interface SimpleBoard"), "simple-board.ts is missing the version 1 board contract");
+check(boardStore.includes("board.json"), "simple-board-store.ts is missing the independent board state file");
+check(boardTool.includes("registerGetBoard") && boardTool.includes("registerDrawBoard") && boardTool.includes("registerReplyOnBoard"), "get-board.ts is missing the board tool trio");
+check(boardTemplate.includes("无限画布") && boardTemplate.includes("和 AI 说"), "board.html is missing the simple first-screen surfaces");
+check(boardTemplate.includes("/workbench"), "board.html is missing the optional workbench link");
+check(!boardTemplate.includes("scan_project") && !boardTemplate.includes("get_visual_context"), "board.html must not expose project-first jargon");
+check(previewServer.includes('serveHtml(req, res, "board.html")'), "preview-server.ts does not serve the simple board at /");
+check(previewServer.includes('"/api/board"'), "preview-server.ts is missing the simple board API");
+check(serverSource.includes("registerGetBoard(mcp, ctx)"), "server.ts does not register get_board");
+check(simpleBoardTest.includes("independent of project state"), "simple-board.test.mjs is missing the independent-state regression");
+check(boardUiTest.includes("dense workbench out of the first screen"), "board-ui.test.mjs is missing the simple first-screen regression");
+check(packageJson.scripts?.["ui:shots"] === "npm run build && node scripts/capture-panel.mjs", "ui:shots script is missing the reproducible simple-board capture");
 
 if (failures.length) {
   console.error("❌ Offline repository checks failed:");

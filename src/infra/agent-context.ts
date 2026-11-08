@@ -45,10 +45,11 @@ function scrubSnapshot(snapshot: SessionSnapshot): SessionSnapshot {
 }
 
 export const MCP_INSTRUCTIONS = [
-  "AI Draw MCP is an agent-first visual communication board. Prefer MCP tools and resources directly inside the agent; do not open a browser unless the human explicitly asks to see the board.",
-  "Start with get_capabilities or ai-draw://board/capabilities, then scan_project for a current project graph. Read ai-draw://board/session or get_visual_context for the shared state, and ai-draw://board/brief for a compact handoff.",
-  "Human intent lives on graph nodes, edges, selection, focus, annotations, and graph diffs. Never turn conversation or graph edits into project writes: create a proposal, let the human review the full line diff, obtain approval plus a one-time receipt, and only then call apply_visual_proposal.",
-  "The local HTTP panel is a thin human review surface, not a chat application and not the primary agent workflow. open_preview is an explicit human-facing action only.",
+  "AI Draw MCP is a simple shared infinite board for a person and an AI. Prefer MCP tools and resources directly inside the agent; do not open a browser unless the human explicitly asks to see the board.",
+  "Start with get_board. Use draw_board to put or edit simple visual objects on the canvas, and reply_on_board for a short response beside the board. Human drawings and notes are the shared context.",
+  "scan_project, get_visual_context, proposals, and source evidence belong to the optional /workbench project tools; they are not the board's default workflow. Never turn board notes or drawings into project writes.",
+  "If the human explicitly asks to change project files, use create_visual_proposal, let the human review the full line diff, obtain approval plus a one-time receipt, and only then call apply_visual_proposal.",
+  "The local HTTP panel is a thin human drawing surface, not a chat application and not the primary agent workflow. open_preview is an explicit human-facing action only.",
 ].join("\n");
 
 export function buildAgentSessionProjection(sessions: SessionStore) {

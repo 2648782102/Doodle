@@ -1,10 +1,10 @@
 # AI Draw MCP (English Quickstart)
 
-AI Draw MCP is a local-first visual communication board for people and AI coding agents working on a software project. The AI connects through MCP stdio and makes its project understanding visible on a shared, editable graph. A person corrects structure, selects scope, and attaches intent to visual objects; the AI reads those changes and responds in the same board context.
+AI Draw MCP is a very simple shared infinite board for people and AI. Both sides can draw notes, text, shapes, and lines, and leave short messages beside the canvas. AI uses `get_board`, `draw_board`, and `reply_on_board` through MCP inside the agent; project tools are optional and live at `/workbench`.
 
-The graph is the shared context, while MCP is the AI access channel and the repository remains the source of truth for code. The default panel is one board header, one continuous canvas, and one fixed object inspector; the legacy toolbar, Flow rail, and floating status cards are out of the default view. The diagram library and review surface are on-demand drawers for local historical previews, downloads, complete context, and change diffs. Project writes still require a proposal, full diff review, explicit human approval, and a one-time receipt. See the [product direction and delivery plan](docs/PRODUCT_DIRECTION.md), [ADR 0022](docs/ADR/0022-shared-visual-board-is-the-product.md), and [ADR 0023](docs/ADR/0023-board-modules-and-library-boundary.md).
+The canvas is the shared context, MCP is the AI access channel, and the repository remains the source of truth for code. The default page is one small toolbar, an infinite canvas, and a lightweight note area; no project scan or workflow dashboard is shown first. Project writes still require a proposal, full diff review, explicit human approval, and a one-time receipt. See the [product direction](docs/PRODUCT_DIRECTION.md) and [ADR 0025](docs/ADR/0025-simple-infinite-board-is-the-product.md).
 
-The current `0.3.4` implementation supports project scans, graph editing, scoped board notes, persistent node annotations, AI replies in annotation threads, human replies in the same anchored thread, and approval-gated proposals. Copyable AI context remains a separate read-only utility rather than the primary communication path.
+The current `0.3.4` implementation supports a bounded version 1 board, simple drawing tools, human and AI notes, and the compatible project workbench. Board communication never authorizes project writes.
 
 ![Collaboration loop](https://raw.githubusercontent.com/2648782102/ai-draw-mcp/master/docs/collaboration-loop.svg)
 
@@ -44,7 +44,7 @@ npm run doctor
 node examples/collab-demo.mjs
 ```
 
-Point your MCP stdio host at `dist/index.js`, set `OUTPUT_DIR` to an absolute path, and set `AI_DRAW_WORKSPACE_ROOT` to the repository the AI should scan. The agent can then consume `get_capabilities`, `scan_project`, `get_visual_context`, and the `ai-draw://board/*` resources directly; tools do not open a browser by default. Open `http://127.0.0.1:3399/` or call `open_preview` only when a person wants the shared project board.
+Point your MCP stdio host at `dist/index.js` and set `OUTPUT_DIR` to an absolute path. The agent starts with `get_board`, draws with `draw_board`, and answers beside the canvas with `reply_on_board`; tools do not open a browser by default. Open `http://127.0.0.1:3399/` for the simple shared infinite board. Project scanning, source evidence, and proposal review remain available at `/workbench`.
 
 ### npm / npx (older published `0.2.0`)
 
@@ -113,4 +113,4 @@ For autonomous, time-boxed maintenance, see [`docs/GOAL_MODE.md`](docs/GOAL_MODE
 
 MIT licensed. Contributions, roadmap feedback, and reproducible bug reports are welcome via [`CONTRIBUTING.md`](CONTRIBUTING.md), [`ROADMAP.md`](ROADMAP.md), and the issue templates. Public launch copy is versioned in [`docs/LAUNCH_KIT.md`](docs/LAUNCH_KIT.md); product research is in [`docs/COMPETITIVE_RESEARCH.md`](docs/COMPETITIVE_RESEARCH.md).
 
-`get_capabilities` returns a version 1 `CAPABILITIES_JSON` catalogue of all 26 tools, their JSON markers, the eight-step workflow readiness, a bounded next action, and the fixed write boundary. It is read-only application-level discovery that complements MCP's native `tools/list`; it never invokes tools, exports approval grants, exposes absolute workspace paths, or authorizes project writes. See [ADR 0017](docs/ADR/0017-capability-catalogue-is-read-only-discovery.md).
+`get_capabilities` returns a version 1 `CAPABILITIES_JSON` catalogue of all 29 tools, their JSON markers, the optional project-workbench workflow, a bounded next action, and the fixed write boundary. It is read-only application-level discovery that complements MCP's native `tools/list`; it never invokes tools, exports approval grants, exposes absolute workspace paths, or authorizes project writes. See [ADR 0017](docs/ADR/0017-capability-catalogue-is-read-only-discovery.md).

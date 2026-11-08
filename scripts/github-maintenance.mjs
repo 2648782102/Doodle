@@ -15,7 +15,7 @@ const repo = "2648782102/ai-draw-mcp";
 const api = "https://api.github.com";
 
 const expected = {
-  description: "Local-first visual communication board where people and AI share and refine a software project model; code changes remain human-approved.",
+  description: "A simple shared infinite canvas where people and AI draw, annotate, and communicate through MCP; project tools stay optional and code changes remain human-approved.",
   homepage: "https://github.com/2648782102/ai-draw-mcp#readme",
   topics: [
     "mcp",

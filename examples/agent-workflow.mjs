@@ -71,6 +71,9 @@ try {
   if (!instructions.includes("Prefer MCP tools and resources directly inside the agent")) {
     throw new Error("The server unexpectedly omitted agent-first MCP instructions");
   }
+  if (!instructions.includes("Start with get_board")) {
+    throw new Error("The server unexpectedly omitted the simple-board default workflow");
+  }
   const { resources } = await client.listResources();
   const resourceUris = resources.map((resource) => resource.uri);
   for (const uri of ["ai-draw://board/session", "ai-draw://board/brief", "ai-draw://board/capabilities", "ai-draw://board/diagnostics", "ai-draw://board/panel"]) {
@@ -92,8 +95,8 @@ try {
 
   const capabilitiesText = textOf(await client.callTool({ name: "get_capabilities", arguments: {} }));
   const capabilities = jsonAfter(capabilitiesText, "CAPABILITIES_JSON:");
-  if (capabilities.version !== 1 || capabilities.toolCount !== 26 || capabilities.safety?.grantsWriteAuthority !== false) {
-    throw new Error("Capabilities unexpectedly lost the read-only 26-tool catalogue");
+  if (capabilities.version !== 1 || capabilities.toolCount !== 29 || capabilities.safety?.grantsWriteAuthority !== false) {
+    throw new Error("Capabilities unexpectedly lost the read-only 29-tool catalogue");
   }
   if (!capabilities.contracts.some((contract) => contract.marker === "SELECTION_WORKORDER_JSON")) {
     throw new Error("Capabilities unexpectedly lost the SELECTION_WORKORDER_JSON contract");

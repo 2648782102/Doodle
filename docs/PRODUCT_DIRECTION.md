@@ -4,58 +4,54 @@ This document is the product contract for contributors, maintainers, and AI codi
 
 ## Definition
 
-**AI Draw MCP is a local-first visual communication board where a person and an AI share, correct, and advance an understanding of a software project.** The AI connects through MCP and expresses its project model on the canvas. The person steers that model by editing structure, selecting scope, and attaching intent to visual objects. The AI reads those changes and responds through updated graph state, contextual notes, and reviewable proposals.
+**AI Draw MCP is a simple, practical shared infinite board.** A person and an AI both draw and write on the same canvas to communicate. The AI connects through MCP and uses the board directly; the person uses a small local drawing surface. Project structure is only one optional thing someone may choose to draw or scan, not the definition of the product.
 
-The board is the shared context. MCP is the AI access channel. The source repository remains the source of truth for code.
+The canvas is the shared context. MCP is the AI access channel. The default interface is deliberately small, direct, and easy to use. The source repository remains the source of truth for code.
 
 ## Product promise
 
-When a person changes or comments on something in the board, the AI can identify what the person means and why. When the AI changes its understanding, the person can see what changed, what evidence supports it, and what remains uncertain. Both sides work against the same project graph and revision history.
+When a person draws or writes on the board, the AI can read the same objects and notes. When the AI draws or replies, the person sees it on the same board. Both sides work against one simple revisioned canvas without a mandatory workflow.
 
-The main interaction is visual and contextual: nodes, relationships, selected regions, evidence, annotations, and graph revisions. Text belongs beside the object or scope it explains. A standalone general-purpose chat stream is not the product surface.
+The main interaction is visual and lightweight: notes, text, shapes, lines, positions, and short messages beside the canvas. A standalone general-purpose chat stream is not the product surface.
 
 ## Shared loop
 
 ```text
-AI scans the project through MCP
-  → AI publishes a structured project graph with source evidence
-  → person edits the graph, selects scope, or adds an anchored note
-  → those changes become durable board context
-  → AI reads the same revision and responds on the board
-  → when code should change, AI creates a proposal tied to the context
-  → person reviews the complete diff and approves it
-  → AI applies the one-time approval and rescans the project
+person draws or writes on the infinite canvas
+  → AI reads the same board with get_board
+  → AI draws, edits, or replies with MCP tools
+  → person sees the change and continues on the same canvas
 ```
 
-The loop can pause or repeat at any point. Reading, correcting, and discussing the graph do not require a code-change proposal.
+The loop can pause or repeat at any point. Project scanning, source evidence, and code-change proposals live in `/workbench` and the legacy MCP tools; using them is optional.
 
 ## Product model
 
-- **Project graph:** an editable visual model of project structure, relationships, and bounded source evidence. It is a shared working representation, not a replacement for repository files.
-- **Human intent:** graph edits, focus, selection, and notes attached to a node, edge, or current scope. The intent records who added it and which graph revision it refers to.
-- **AI response:** explanations, contextual replies, and graph revisions that remain visible in the same board session and retain their source and revision context.
-- **Change proposal:** an optional transition from board intent to code changes. It includes affected paths, a complete line diff, and an impact summary.
-- **Approval:** a separate human decision that authorizes one specific proposal. Board discussion, graph edits, and AI responses never authorize project writes.
+- **Canvas:** an infinite surface with bounded simple objects: notes, text, rectangles, ellipses, and lines.
+- **Human input:** clicking, dragging, editing text, deleting objects, and short notes that may refer to a selected object.
+- **AI input:** `get_board` reads the canvas; `draw_board` adds, edits, or removes objects; `reply_on_board` adds a short response.
+- **Optional workbench:** project scans, source evidence, graph context, proposals, and approval-gated writes remain compatible secondary capabilities.
+- **Approval:** a separate human decision that authorizes one specific project proposal. Canvas communication never authorizes project writes.
 
 ## Experience principles
 
-1. **Open on the shared canvas.** A person should understand the project and current discussion without first learning MCP tool names or navigating a workflow dashboard.
-2. **Keep intent attached to meaning.** A note about a module belongs to that node; a question about a relationship belongs to that edge; broad intent belongs to the selected scope or board.
-3. **Make both authors visible.** Distinguish human input, AI interpretation, source evidence, and generated proposals, with enough revision context to understand what changed.
-4. **Show evidence and uncertainty.** Connect claims to repository-relative source locations where available. Mark gaps instead of presenting inferred structure as certain.
-5. **Keep the surface small.** The default view prioritizes canvas, current selection, and relevant notes. Diagnostics and derived JSON projections remain available on demand for agents and maintainers.
+1. **Open on an empty canvas.** A person should know where to click and how to draw immediately.
+2. **Keep the tools few.** Selection, note, text, rectangle, ellipse, line, and delete are enough for the first screen.
+3. **Keep communication beside the canvas.** Short notes are attached to the shared board, not a separate chat product.
+4. **Make both authors visible.** Every object and note records whether a person or AI created it.
+5. **Keep the surface small.** No default project scan, source evidence, workflow dashboard, diagnostics, or proposal cards.
 6. **Keep project writes explicit.** The person reviews the full diff and approves the exact proposal; the AI applies it using the one-time receipt and existing path-safety checks.
-7. **Stay local-first.** The board works with the local project and MCP host without requiring an account or hosted collaboration service.
-8. **Keep the agent in the agent.** MCP stdio tools, resources, and instructions are the default AI workflow; browser or IDE window opening is an explicit, human-facing opt-in rather than a side effect of normal tool calls.
+7. **Stay local-first.** The board works with the local MCP host without an account or hosted collaboration service.
+8. **Keep the agent in the agent.** MCP stdio tools and instructions are the default AI workflow; browser or IDE window opening is explicit.
 
 ## Boundaries
 
-- This is a project communication board, not a static diagram exporter.
-- It is not a general-purpose freehand whiteboard or a hosted multi-user SaaS.
-- It does not need a separate chat product, social presence, or mandatory turn-taking workflow. Contextual notes and replies serve the shared visual model.
+- This is a simple shared infinite board, not a project dashboard or static diagram exporter.
+- It is not a hosted multi-user SaaS.
+- It does not need a separate chat product, social presence, or mandatory turn-taking workflow.
 - It does not let the AI write project files directly from a conversation, graph edit, or annotation. Every project write goes through a proposal, human-reviewed full diff, explicit approval, one-time receipt, path validation, and `SessionStore.applyProposal()`.
-- The version 1 MCP and session contracts remain compatibility boundaries. Product realignment should reuse existing graph, message, annotation, focus, selection, and proposal capabilities where possible; any protocol change requires an ADR, migration plan, and compatibility coverage.
-- `ai-draw://board/*` resources are derived, credential-free projections for AI hosts. They do not add a second source of truth, conversation state machine, custom UI requirement, or approval grant.
+- The version 1 simple board state is independent of the optional project `SessionSnapshot`. Legacy MCP and session contracts remain compatibility boundaries for `/workbench`.
+- `ai-draw://board/*` resources remain derived, credential-free projections for legacy project-workbench hosts.
 
 ## Current implementation gap
 

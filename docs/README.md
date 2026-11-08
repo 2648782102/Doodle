@@ -1,6 +1,6 @@
 # Documentation Map
 
-AI Draw MCP is a local-first visual communication board for people and AI working on a software project. The AI connects through MCP; people use the shared graph, selection, evidence, and object notes to correct and develop its understanding. The current implementation and phased product plan are documented in [PRODUCT_DIRECTION.md](PRODUCT_DIRECTION.md).
+AI Draw MCP is a simple shared infinite board for people and AI. People draw on a small local canvas; AI reads and updates the same board through MCP. Project scanning and proposal workflows are optional workbench capabilities. The product contract is documented in [PRODUCT_DIRECTION.md](PRODUCT_DIRECTION.md).
 
 Start with the [main README](../README.md) for installation and the product overview.
 
@@ -11,9 +11,9 @@ Start with the [main README](../README.md) for installation and the product over
 | [TROUBLESHOOTING.md](TROUBLESHOOTING.md) | New users, maintainers | First-run checklist, common failures, and FAQ |
 | [ARCHITECTURE.md](ARCHITECTURE.md) | Contributors, reviewers | Components, collaboration protocol, REST/WebSocket API, safety model |
 | [COMPETITIVE_RESEARCH.md](COMPETITIVE_RESEARCH.md) | Maintainers, contributors | Market map, positioning, and product lessons from Mermaid/whiteboard/MCP tools |
-| [collaboration-loop.svg](collaboration-loop.svg) | Everyone | Product concept: shared board loop and human approval boundary |
-| [collaboration-workbench.svg](collaboration-workbench.svg) | Everyone | Target canvas interaction concept; not a screenshot of shipped UI |
-| [shared-board-panel.png](shared-board-panel.png) | Everyone | Only retained UI screenshot; canonical current `0.3.x` shared-board capture |
+| [collaboration-loop.svg](collaboration-loop.svg) | Everyone | Product concept: person ⇄ infinite canvas ⇄ AI |
+| [collaboration-workbench.svg](collaboration-workbench.svg) | Everyone | Simple board interaction concept; not a screenshot |
+| [shared-board-panel.png](shared-board-panel.png) | Everyone | Only retained UI screenshot; canonical current simple-board capture |
 | [DEPENDENCY_MAINTENANCE.md](DEPENDENCY_MAINTENANCE.md) | Maintainers | Dependabot policy, verification order, and major-version decisions |
 | [LAUNCH_KIT.md](LAUNCH_KIT.md) | Maintainers | Copy for GitHub About, releases, Show HN, X/Mastodon, and Chinese communities |
 | [GOVERNANCE.md](GOVERNANCE.md) | Maintainers, contributors | Public surfaces, maintainer checklist, and observed metadata drift |
@@ -36,6 +36,7 @@ Start with the [main README](../README.md) for installation and the product over
 | [ADR/0022-shared-visual-board-is-the-product.md](ADR/0022-shared-visual-board-is-the-product.md) | Contributors, reviewers | Why the shared visual board is the product and MCP is the AI access channel |
 | [ADR/0023-board-modules-and-library-boundary.md](ADR/0023-board-modules-and-library-boundary.md) | Contributors, reviewers | Why one board header, canvas, and object inspector replace the legacy status layers |
 | [ADR/0024-agent-first-mcp-surface.md](ADR/0024-agent-first-mcp-surface.md) | AI agents, maintainers | Why MCP tools/resources/instructions are the default agent surface and panel opening is opt-in |
+| [ADR/0025-simple-infinite-board-is-the-product.md](ADR/0025-simple-infinite-board-is-the-product.md) | Everyone | Why the product is a simple shared infinite board, with project tools kept in `/workbench` |
 | [../ROADMAP.md](../ROADMAP.md) | Everyone | Shipped direction, upcoming work, and explicit non-goals |
 | [../CONTRIBUTING.md](../CONTRIBUTING.md) | Contributors | Local setup, verification, PR expectations |
 | [../SECURITY.md](../SECURITY.md) | Security reviewers | Threat model, supported versions, vulnerability reporting |

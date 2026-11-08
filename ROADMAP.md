@@ -1,15 +1,15 @@
 # AI Draw MCP Roadmap
 
-This roadmap sequences work toward the product contract in [docs/PRODUCT_DIRECTION.md](docs/PRODUCT_DIRECTION.md). The shared visual board is the product; MCP is the AI access channel. The repository remains the source of truth for code.
+This roadmap sequences work toward the product contract in [docs/PRODUCT_DIRECTION.md](docs/PRODUCT_DIRECTION.md). A simple shared infinite board is the product; MCP is the AI access channel. Project scanning and proposal workflows are optional workbench capabilities. The repository remains the source of truth for code.
 
 ## Current baseline — 0.3.4
 
-- Local MCP stdio server with 26 tools for project scans, diagrams, graph context, proposals, and approval-gated writes.
-- Agent-first MCP discovery: initialization instructions and five read-only `ai-draw://board/*` resources expose session, brief, capabilities, diagnostics, and the optional panel URL inside the agent. Generated tools default to no window side effects; `open_preview` and `AI_DRAW_AUTO_OPEN_PANEL` are opt-in human paths. See [ADR 0024](docs/ADR/0024-agent-first-mcp-surface.md).
+- Local MCP stdio server with 29 tools: a simple board trio, diagrams, optional project scans, graph context, proposals, and approval-gated writes.
+- Agent-first MCP defaults: `get_board`, `draw_board`, and `reply_on_board` work inside the agent without opening a browser. `open_preview` and `AI_DRAW_AUTO_OPEN_PANEL` are opt-in human paths. See [ADR 0025](docs/ADR/0025-simple-infinite-board-is-the-product.md).
 - Local browser canvas with project scanning, editable nodes and edges, focus, selection, annotations, AI-readable context, and proposal review.
 - Version 1 session, graph, annotation, and proposal contracts with source evidence, graph diffs, and bounded read-only projections.
 - Shared board notes persist; people and AI can reply in the same anchored thread. Copyable AI context is a separate read-only utility.
-- The default panel is one board header, one shared canvas, and one fixed object inspector. The legacy brand header, Flow rail, duplicate render toolbar, and floating status cards are out of the default view. The diagram library is an on-demand drawer for local previews and downloads; the review surface holds graph editing, derived context, and change diffs. `docs/shared-board-panel.png` is the canonical shared-board capture. Legacy UI screenshots were removed so the repository has one current visual baseline.
+- The default page is one compact toolbar, an infinite canvas, and a lightweight note area. Project workbench UI is available at `/workbench`; it does not appear on the first screen. `docs/shared-board-panel.png` is the canonical current capture and the only retained UI screenshot.
 
 ## Phase 0 — Product contract
 

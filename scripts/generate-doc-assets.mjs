@@ -8,69 +8,59 @@ const outputDir = path.join(root, "docs");
 const checkOnly = process.argv.includes("--check");
 
 const escapeXml = (value) => value.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
-const rect = (left, top, width, height, fillColor, strokeColor = "#2b3a55") =>
-  `<rect x="${left}" y="${top}" width="${width}" height="${height}" rx="12" fill="${fillColor}" stroke="${strokeColor}" stroke-width="1.5"/>`;
-const label = (left, top, text, fontSize = 15, textColor = "#e8eef9", fontWeight = "600", textAnchor = "middle") =>
+const rect = (left, top, width, height, fillColor, strokeColor = "#d8dee8") =>
+  `<rect x="${left}" y="${top}" width="${width}" height="${height}" rx="10" fill="${fillColor}" stroke="${strokeColor}" stroke-width="1.5"/>`;
+const label = (left, top, text, fontSize = 15, textColor = "#1f2937", fontWeight = "600", textAnchor = "middle") =>
   `<text x="${left}" y="${top}" fill="${textColor}" font-family="-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif" font-size="${fontSize}" font-weight="${fontWeight}" text-anchor="${textAnchor}">${escapeXml(text)}</text>`;
-const arrow = (fromX, fromY, toX, toY, strokeColor = "#7aa2f7") =>
-  `<path d="M ${fromX} ${fromY} C ${fromX + 45} ${fromY}, ${toX - 45} ${toY}, ${toX} ${toY}" fill="none" stroke="${strokeColor}" stroke-width="2.5" marker-end="url(#arrow)"/>`;
+const arrow = (fromX, fromY, toX, toY) =>
+  `<path d="M ${fromX} ${fromY} C ${fromX + 55} ${fromY}, ${toX - 55} ${toY}, ${toX} ${toY}" fill="none" stroke="#2563eb" stroke-width="2.5" marker-end="url(#arrow)"/>`;
 const defs = `<defs>
   <marker id="arrow" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
-    <path d="M 0 0 L 10 5 L 0 10 z" fill="#7aa2f7"/>
+    <path d="M 0 0 L 10 5 L 0 10 z" fill="#2563eb"/>
   </marker>
-  <linearGradient id="bg" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#0d1321"/><stop offset="1" stop-color="#17243c"/></linearGradient>
 </defs>`;
 
-const loopDiagram = `<svg xmlns="http://www.w3.org/2000/svg" width="1200" height="520" viewBox="0 0 1200 520" role="img" aria-labelledby="title desc">
-<title id="title">AI Draw MCP 人类与 AI 共享项目画布</title>
-<desc id="desc">AI 通过 MCP 扫描项目并展示项目图，人类在同一画布编辑结构、选择范围和添加对象批注，AI 读取并回应。代码变更仍须完整 diff、人工批准和一次性确认号。</desc>
+const loopDiagram = `<svg xmlns="http://www.w3.org/2000/svg" width="1200" height="420" viewBox="0 0 1200 420" role="img" aria-labelledby="title desc">
+<title id="title">AI Draw MCP 简单共享无限画板</title>
+<desc id="desc">人和 AI 在同一张无限画布上画便签、文字、形状和线条，并在旁边写短留言；项目工作台只是可选能力。</desc>
 ${defs}
-<rect width="1200" height="520" fill="url(#bg)"/>
-${label(600, 54, "AI Draw MCP · 人类与 AI 共享的项目画布", 26, "#ffffff", "700")}
-${label(600, 84, "本机优先 · 共享图形上下文 · MCP 接入 · 人工批准", 14, "#93a4c3", "400")}
-${rect(60, 135, 200, 92, "#162842")}${label(160, 170, "AI", 20, "#7aa2f7")}${label(160, 198, "scan_project", 14, "#d8e2f5")}
-${rect(310, 135, 200, 92, "#162842")}${label(410, 170, "共享项目图", 18, "#ffffff")}${label(410, 198, "结构 · 证据 · 修订", 13, "#93a4c3", "400")}
-${rect(560, 135, 200, 92, "#213252")}${label(660, 170, "人类", 18, "#9ece6a")}${label(660, 198, "编辑 · 选择 · 对象批注", 13, "#d8e2f5")}
-${rect(810, 135, 200, 92, "#162842")}${label(910, 170, "AI", 20, "#7aa2f7")}${label(910, 198, "读取 · 解释 · 更新", 13, "#d8e2f5")}
-${rect(310, 330, 200, 92, "#2b2350")}${label(410, 365, "变更提案", 18, "#bb9af7")}${label(410, 393, "逐行 diff + 影响摘要", 12, "#d8e2f5")}
-${rect(560, 330, 200, 92, "#203b32")}${label(660, 365, "人类批准", 18, "#9ece6a")}${label(660, 393, "一次性确认号", 13, "#d8e2f5")}
-${rect(810, 330, 200, 92, "#162842")}${label(910, 365, "AI", 20, "#7aa2f7")}${label(910, 393, "apply_visual_proposal", 12, "#d8e2f5")}
-${arrow(260, 181, 310, 181)}${arrow(510, 181, 560, 181)}${arrow(760, 181, 810, 181)}
-${arrow(910, 227, 910, 285)}${arrow(810, 330, 760, 330)}${arrow(560, 330, 510, 330)}${arrow(310, 330, 260, 330)}
-${arrow(160, 330, 160, 227)}
-${label(600, 478, "画布沟通 ≠ 项目写入授权 · 完整 diff 与人工批准后才可应用提案", 13, "#f0a868", "500")}
+<rect width="1200" height="420" fill="#f8fafc"/>
+${label(600, 54, "AI Draw MCP · 简单共享无限画板", 25, "#111827", "700")}
+${label(600, 84, "人画 · AI 读 · AI 画 · 人继续画", 14, "#64748b", "400")}
+${rect(70, 145, 220, 110, "#ffffff")}${label(180, 183, "人", 21, "#0f766e")}${label(180, 214, "点一下就画", 14, "#475569", "400")}${label(180, 237, "拖一下就改", 14, "#475569", "400")}
+${rect(490, 120, 220, 160, "#eff6ff", "#93c5fd")}${label(600, 164, "无限画布", 21, "#1d4ed8")}${label(600, 196, "便签 · 文字 · 形状 · 线条", 12, "#475569", "400")}${label(600, 222, "人和 AI 的同一份上下文", 12, "#475569", "400")}${label(600, 252, "短留言放在画布旁", 12, "#475569", "400")}
+${rect(910, 145, 220, 110, "#ffffff")}${label(1020, 183, "AI", 21, "#5b4bc4")}${label(1020, 214, "get_board", 14, "#475569", "400")}${label(1020, 237, "draw_board", 14, "#475569", "400")}
+${arrow(290, 200, 490, 200)}${arrow(710, 200, 910, 200)}
+${arrow(910, 235, 710, 260)}${arrow(490, 235, 290, 260)}
+${rect(420, 335, 360, 48, "#ffffff")}${label(600, 365, "项目扫描 / diff / 批准 → /workbench（可选）", 13, "#64748b", "500")}
 </svg>`;
 
-const workbenchDiagram = `<svg xmlns="http://www.w3.org/2000/svg" width="1200" height="620" viewBox="0 0 1200 620" role="img" aria-labelledby="title desc">
-<title id="title">AI 与人类共享项目画布的交互方向</title>
-<desc id="desc">目标工作区以项目图为中心。选择图形对象后，旁边显示来源证据、人类意图、AI 回应和关联提案；代码写入仍需人工批准。</desc>
+const workbenchDiagram = `<svg xmlns="http://www.w3.org/2000/svg" width="1200" height="520" viewBox="0 0 1200 520" role="img" aria-labelledby="title desc">
+<title id="title">简单画板交互方向</title>
+<desc id="desc">默认界面只有顶栏、工具栏、无限画布和轻量交流区；项目工作台是次级入口。</desc>
 ${defs}
-<rect width="1200" height="620" fill="url(#bg)"/>
-<rect x="24" y="24" width="1152" height="572" rx="16" fill="#111a2c" stroke="#2b3a55" stroke-width="1.5"/>
-<rect x="24" y="24" width="1152" height="48" rx="16" fill="#18243a"/>
-${label(48, 54, "共享项目画布", 17, "#ffffff", "700", "start")}
-${label(250, 54, "AI 项目理解 ↔ 人类意图 · 同会话可追溯", 12, "#93a4c3", "400", "start")}
-${label(1148, 54, "本机项目 · rev 8", 12, "#d8e2f5", "600", "end")}
-<rect x="40" y="88" width="760" height="492" rx="10" fill="#0e1727" stroke="#2b3a55"/>
-${label(60, 116, "项目结构", 13, "#ffffff", "600", "start")}
-${rect(100, 160, 190, 58, "#1d3152")}${label(195, 194, "src / tools", 14, "#d8e2f5")}
-${rect(430, 160, 190, 58, "#213252", "#7aa2f7")}${label(525, 194, "src / domain", 14, "#ffffff")}
-${rect(260, 320, 190, 58, "#1d3152")}${label(355, 354, "src / infra", 14, "#d8e2f5")}
-<path d="M 290 190 C 340 190 365 190 430 190" stroke="#7aa2f7" stroke-width="2" fill="none"/>
-<path d="M 525 218 C 525 275 430 285 390 320" stroke="#7aa2f7" stroke-width="2" fill="none"/>
-${rect(476, 238, 285, 58, "#203b32")}${label(494, 261, "人 · 这个模块负责会话状态校验", 11, "#d8e2f5", "500", "start")}${label(494, 282, "绑定到 src / domain · rev 8", 10, "#9ece6a", "400", "start")}
-${label(60, 540, "点击对象查看证据并补充意图；图形变化保留为新修订", 11, "#93a4c3", "400", "start")}
-<rect x="816" y="88" width="344" height="492" rx="10" fill="#0e1727" stroke="#2b3a55"/>
-<rect x="816" y="88" width="344" height="38" rx="10" fill="#17243a"/>
-${label(836, 112, "src / domain", 14, "#ffffff", "600", "start")}
-${label(836, 151, "源码证据", 11, "#93a4c3", "600", "start")}
-${rect(836, 162, 304, 42, "#17243a")}${label(850, 188, "src/domain/session-store.ts · line 42", 10, "#d8e2f5", "400", "start")}
-${label(836, 228, "围绕此对象", 11, "#93a4c3", "600", "start")}
-${rect(836, 239, 304, 78, "#203b32")}${label(850, 262, "人 · 这个模块负责会话状态校验", 11, "#9ece6a", "500", "start")}${label(850, 286, "请保留批准前的提案校验。", 12, "#ffffff", "500", "start")}${label(850, 306, "选中 src / domain · rev 8", 10, "#93a4c3", "400", "start")}
-${rect(836, 326, 304, 78, "#213252")}${label(850, 349, "AI · 已读取并回应", 11, "#7aa2f7", "500", "start")}${label(850, 373, "我会保留此边界，并检查关联调用。", 11, "#ffffff", "500", "start")}${label(850, 393, "关联 2 个节点 · 1 条源码证据", 10, "#93a4c3", "400", "start")}
-${rect(836, 412, 304, 32, "#243247")}${label(850, 433, "继续回复此线程 · 人类可继续沟通", 11, "#9ece6a", "500", "start")}
-${rect(836, 454, 304, 76, "#1d2f4c")}${label(850, 477, "相关提案 · 2 个文件", 11, "#ffffff", "600", "start")}${label(850, 500, "查看完整 diff 与影响摘要", 11, "#d8e2f5", "400", "start")}${label(850, 522, "人类批准后才可应用", 10, "#f0a868", "500", "start")}
-${label(836, 556, "交流与批注不会授权项目写入", 10, "#93a4c3", "400", "start")}
+<rect width="1200" height="520" fill="#f8fafc"/>
+${rect(28, 28, 1144, 464, "#ffffff", "#d8dee8")}
+<rect x="28" y="28" width="1144" height="48" rx="14" fill="#ffffff"/>
+${label(52, 58, "AI 画板", 16, "#111827", "700", "start")}
+${label(1144, 58, "项目工作台", 12, "#2563eb", "500", "end")}
+<rect x="28" y="76" width="1144" height="1" fill="#e5e7eb"/>
+<rect x="44" y="92" width="92" height="34" rx="7" fill="#eff6ff" stroke="#93c5fd"/>${label(90, 114, "选择", 12, "#1d4ed8")}
+${rect(144, 92, 70, 34, "#ffffff", "#d8dee8")}${label(179, 114, "便签", 12, "#475569")}
+${rect(222, 92, 70, 34, "#ffffff", "#d8dee8")}${label(257, 114, "文字", 12, "#475569")}
+${rect(300, 92, 70, 34, "#ffffff", "#d8dee8")}${label(335, 114, "形状", 12, "#475569")}
+${rect(378, 92, 70, 34, "#ffffff", "#d8dee8")}${label(413, 114, "线条", 12, "#475569")}
+<rect x="44" y="142" width="820" height="326" rx="8" fill="#fbfbfd" stroke="#e5e7eb"/>
+<rect x="190" y="214" width="160" height="104" rx="7" fill="#f6d365" stroke="#d6b656"/>${label(270, 270, "一个想法", 15, "#111827")}
+<rect x="430" y="190" width="170" height="102" rx="52" fill="#b8e0d2" stroke="#8bbfae"/>${label(515, 247, "AI 补充", 15, "#111827")}
+<rect x="310" y="350" width="300" height="42" rx="7" fill="#ffffff" stroke="#d8dee8"/>${label(460, 376, "少一点界面，多一点画布", 13, "#475569", "400")}
+<path d="M 350 266 L 430 245" stroke="#64748b" stroke-width="3" fill="none"/>
+<rect x="884" y="142" width="272" height="326" rx="8" fill="#ffffff" stroke="#e5e7eb"/>
+${label(904, 174, "和 AI 说", 15, "#111827", "700", "start")}
+<rect x="904" y="194" width="232" height="54" rx="7" fill="#f8fafc" stroke="#e5e7eb"/>${label(920, 218, "人 · 这里再简单一点", 11, "#0f766e", "500", "start")}${label(920, 238, "关联当前对象", 10, "#94a3b8", "400", "start")}
+<rect x="904" y="260" width="232" height="54" rx="7" fill="#f8fafc" stroke="#e5e7eb"/>${label(920, 284, "AI · 好的，我补在画布上", 11, "#5b4bc4", "500", "start")}${label(920, 304, "同一份 BOARD_JSON", 10, "#94a3b8", "400", "start")}
+<rect x="904" y="410" width="232" height="38" rx="7" fill="#eff6ff" stroke="#93c5fd"/>${label(1020, 434, "放到画板", 12, "#1d4ed8")}
+${label(600, 503, "默认界面不展示扫描、源码证据、流程图仪表盘或提案卡片", 12, "#94a3b8", "400")}
 </svg>`;
 
 const assets = [

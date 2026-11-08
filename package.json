@@ -1,7 +1,7 @@
 {
   "name": "ai-draw-mcp",
   "version": "0.3.4",
-  "description": "Local-first visual communication board where people and AI share and refine a software project model; code changes remain human-approved.",
+  "description": "A simple shared infinite canvas where people and AI draw, annotate, and communicate through MCP; project tools stay optional and code changes remain human-approved.",
   "type": "module",
   "bin": {
     "ai-draw-mcp": "dist/index.js"

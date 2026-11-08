@@ -1,10 +1,10 @@
 # AI Draw MCP
 
-> 一个本机优先、给 IDE 里的 AI 直接使用的项目沟通画板：AI 通过 MCP 工具与资源读写共享图形上下文，人只在需要查看、纠错、审 diff 时打开薄面板；项目文件变更仍须人工审阅与批准。
+> 一个很简单但实用的共享无限画板：人和 AI 都能直接在画布上画图、改图、写一句，AI 通过 MCP 在 agent 内自然使用；项目扫描与代码提案只是可选的 `/workbench` 能力。
 
-AI 默认在 agent 内部通过 MCP stdio / `ai-draw://board/*` 资源读取共享项目图、源码证据、人的焦点/选择与画布上下文；工具调用不再自动弹出浏览器。人可以在需要时通过 `open_preview` 或 `http://127.0.0.1:3399/` 打开本机共享画板查看并纠正 AI 的理解。节点、关系、批注和修订共同承载双方围绕项目的交流，AI 可读取人的视觉意图并在同一会话中回应。
+打开 `http://127.0.0.1:3399/` 就是一张无限画布：选工具、点一下、拖动、双击改字，右侧写一句给 AI。AI 用 `get_board` 读取画板，用 `draw_board` 画便签/形状/线条，用 `reply_on_board` 把回应放在画板旁；这些工具都不主动打开浏览器。默认界面刻意保持少、清楚、直接，项目工作台留在 `/workbench`。
 
-产品定义与后续演进计划见 [产品方向](docs/PRODUCT_DIRECTION.md)。当前 `0.3.4` 已支持项目扫描、图形编辑、选择、给当前对象/范围写画布留言、在同一锚定线程里继续回复、AI 读取并回应，以及提案审批。画布沟通本身不授权写入：**只有人类审阅完整 diff、明确批准并签发一次性确认号后，AI 才能应用提案修改项目文件**。
+产品定义见 [产品方向](docs/PRODUCT_DIRECTION.md) 和 [ADR 0025](docs/ADR/0025-simple-infinite-board-is-the-product.md)。画板沟通本身不授权写入：**只有人类审阅完整 diff、明确批准并签发一次性确认号后，AI 才能应用提案修改项目文件**。
 
 > **30 秒阅读**：[快速开始](#快速开始) · [工具列表](#工具列表) · [安全模型与完整文档](docs/ARCHITECTURE.md)。仓库当前源码与 GitHub Release 为 `0.3.4`；npm `ai-draw-mcp` 仍为 `0.2.0`，体验当前版本请优先从源码安装，详见下方版本说明。
 
@@ -32,14 +32,15 @@ AI 默认在 agent 内部通过 MCP stdio / `ai-draw://board/*` 资源读取共�
 
 ![AI Draw MCP 共享画板](https://raw.githubusercontent.com/2648782102/ai-draw-mcp/master/docs/shared-board-panel.png)
 
-界面沿用克制视觉系统。这是可复现的当前共享画板：单一画板栏、连续画布和右侧固定对象检视器构成默认工作区；旧品牌栏、流程轨、悬浮状态卡和重复工具栏已从首屏移除。图库与审阅台按需打开，用于查看本机图记录、完整上下文和变更 diff，不会静默切换当前共享会话。闭环概念图与后续阶段见 [产品方向](docs/PRODUCT_DIRECTION.md)、[ADR 0022](docs/ADR/0022-shared-visual-board-is-the-product.md) 与 [ADR 0023](docs/ADR/0023-board-modules-and-library-boundary.md)。仓库只保留这一张可复现界面截图，旧版布局截图已清理，避免旧面板被误解为并行产品入口。
+这是可复现的当前默认界面：一条顶栏、一个小工具栏、无限画布和右侧轻量交流区。项目扫描、源码证据与 diff 审阅都从 `/workbench` 进入，不占据首屏。仓库只保留这一张可复现界面截图，避免旧面板被误解为并行产品入口。
 
 ---
 
 ## 功能
 
-- **26 个 MCP 工具 + 5 个只读资源** — 原有 11 个绘图/管理工具，加上 `scan_project`、`get_capabilities`、`get_selection_scope`、`get_selection_workorder`、`get_visual_context`、`get_shared_brief`、`get_decision_trail`、`get_node_context`、`get_source_navigation`、`get_agent_workflow`、`reply_to_visual_context`、`preflight_visual_proposal`、`list_change_templates`、`create_visual_proposal`、`apply_visual_proposal`；新 agent 可直接读取 `ai-draw://board/{session,brief,capabilities,diagnostics,panel}`，MCP 初始化指令也会明确「优先在 agent 内使用，不主动开浏览器」
-- **共享画布** — 默认以「单一画板栏 + 连续画布 + 固定对象检视器」展示 AI 扫描的项目结构，支持节点/连线纠错、焦点/多选；右侧把当前对象、源码证据、关系、有序人 / AI 线程收束在同一处，并可直接留言或继续回复；图库与审阅台都按需打开
+- **29 个 MCP 工具 + 5 个只读资源** — 新增 `get_board`、`draw_board`、`reply_on_board` 作为 AI 使用无限画板的默认入口；旧项目工具仍兼容可用，MCP 初始化指令明确「先读画板，不主动开浏览器」
+- **简单无限画布** — 便签、文字、矩形、椭圆、线条；点击创建、拖动移动、双击改字、滚轮缩放、空白处拖拽平移；人和 AI 的对象都带作者与修订信息
+- **画板旁的轻量交流** — 人写一句放到共享画板，可关联当前选中对象；AI 读取同一份 `BOARD_JSON` 并把回应放回画板旁，不另做聊天主体
 - **有界图形撤销 / 重做** — 12 步视觉状态历史，人类确认后恢复节点/连线/批注为一次新图形修订；不回退项目文件、提案状态或一次性批准凭据
 - **只读源码证据** — 扫描时为源码/文档节点记录少量 `file:line` 定义、导入或标题线索，AI 与面板可引用代码位置；证据不自动改代码、不扩大提案路径，也不签发批准凭据
 - **有界多选范围** — 面板复选框最多选择 24 个节点；`get_selection_scope` 与 `SELECTION_SCOPE_JSON` 把「这几个模块」投影成节点、内部连线和安全相对 `file:line` 证据。选择范围只表达意图，不签发凭据、不改变图修订或授权项目写入，详见 [ADR 0018](docs/ADR/0018-human-selection-is-read-only-scope.md)
@@ -85,7 +86,7 @@ AI 默认在 agent 内部通过 MCP stdio / `ai-draw://board/*` 资源读取共�
 | [VERSIONING.md](VERSIONING.md) / [RELEASING.md](RELEASING.md) | 版本与发布策略 |
 | [examples/](examples/README.md) | MCP 配置、Mermaid/SVG、端到端协作演示 |
 
-> 本项目是本机优先的项目沟通画板，不是托管白板或「AI 自动改代码」按钮；AI 与人可以围绕同一张项目图交流，项目文件变更仍须人类审阅与一次性批准。非目标与未来方向见 [ROADMAP.md](ROADMAP.md)。
+> 本项目是本机优先的 AI 画板：简单、实用、人和 AI 都能画。项目结构只是可选能力，不是产品定义；项目文件变更仍须人类审阅与一次性批准。非目标与未来方向见 [ROADMAP.md](ROADMAP.md)。
 
 ---
 
@@ -222,7 +223,7 @@ npm install -g ai-draw-mcp
 
 ## 工具列表
 
-> 当前版本 `0.3.4` 共 26 个工具；工具名与数量同步受 `src/server.ts` 的 `TOOL_COUNT`、`SERVER_TOOL_COUNT`、离线检查与 MCP 测试保护。
+> 当前版本 `0.3.4` 共 29 个工具；工具名与数量同步受 `src/server.ts` 的 `TOOL_COUNT`、`SERVER_TOOL_COUNT`、离线检查与 MCP 测试保护。
 
 | 工具 | 用途 |
 |------|------|

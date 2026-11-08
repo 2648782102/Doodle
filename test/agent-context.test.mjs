@@ -48,7 +48,7 @@ describe("agent-first MCP context", () => {
   it("publishes agent-first instructions without making the browser the primary surface", () => {
     expect(MCP_INSTRUCTIONS).toContain("Prefer MCP tools and resources directly inside the agent");
     expect(MCP_INSTRUCTIONS).toContain("do not open a browser unless the human explicitly asks");
-    expect(MCP_INSTRUCTIONS).toContain("ai-draw://board/session");
+    expect(MCP_INSTRUCTIONS).toContain("Start with get_board");
   });
 
   it("projects credential-free bundles and derived resources without mutating session state", () => {

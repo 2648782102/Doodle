@@ -7,7 +7,7 @@ Versioned copy for GitHub, releases, and community posts. Keep claims tied to wh
 Description:
 
 ```text
-Local-first visual communication board where people and AI share and refine a software project model; code changes remain human-approved.
+A simple shared infinite canvas where people and AI draw, annotate, and communicate through MCP; project tools stay optional and code changes remain human-approved.
 ```
 
 Homepage:

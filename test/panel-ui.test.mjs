@@ -128,9 +128,9 @@ describe("collaboration panel UI", () => {
       const pageErrors = [];
       page.on("pageerror", (error) => pageErrors.push(error.message));
       await page.setViewport({ width: 1440, height: 900 });
-      await page.goto(base, { waitUntil: "networkidle2" });
+      await page.goto(`${base}/workbench`, { waitUntil: "networkidle2" });
       await page.evaluate(() => localStorage.clear());
-      await page.reload({ waitUntil: "networkidle2" });
+      await page.goto(`${base}/workbench`, { waitUntil: "networkidle2" });
 
       expect(await page.$(".brand-mark")).toBeTruthy();
       expect(await page.$eval(".board-header", (element) => getComputedStyle(element).display)).toBe("flex");
@@ -827,7 +827,7 @@ describe("collaboration panel UI", () => {
       });
       expect(await page.$eval("#graphMoreActions", (element) => element.classList.contains("open"))).toBe(true);
       const { headers } = await seedBoardThread(base);
-      await page.reload({ waitUntil: "networkidle2" });
+      await page.goto(`${base}/workbench`, { waitUntil: "networkidle2" });
       await page.keyboard.press("c");
       await page.waitForFunction(() => !document.querySelector("#collabShell").hidden);
       await page.$eval('[data-history-target="annotations"]', (element) => element.click());
@@ -845,7 +845,7 @@ describe("collaboration panel UI", () => {
       expect(await page.$eval("#btnSaveBoardNote", (element) => element.classList.contains("has-draft"))).toBe(true);
       await page.click("#btnSaveBoardNote");
       await page.waitForFunction(() => document.querySelector("#intentState").textContent.includes("已保存"));
-      await page.reload({ waitUntil: "networkidle2" });
+      await page.goto(`${base}/workbench`, { waitUntil: "networkidle2" });
       await page.keyboard.press("c");
       await page.waitForFunction(() => !document.querySelector("#collabShell").hidden);
       await page.$eval('[data-history-target="annotations"]', (element) => element.click());
@@ -947,6 +947,11 @@ describe("collaboration panel UI", () => {
       expect(Number(nextIndex.split("/")[0].trim())).toBeGreaterThanOrEqual(1);
       expect(nextFocus).toBeTruthy();
       await page.keyboard.press("[");
+      await page.waitForFunction((expected) => {
+        const label = document.querySelector("#canvasObjectLabel")?.textContent?.trim() ?? "";
+        const summary = document.querySelector("#focusSummary")?.textContent ?? "";
+        return label === expected && summary.includes(expected);
+      }, { timeout: 5000 }, firstFocus);
       expect(await page.$eval("#canvasObjectLabel", (element) => element.textContent)).toBe(firstFocus);
       expect(await page.$eval("#focusSummary", (element) => element.textContent)).toContain(firstFocus);
       expect(await page.$eval("#canvasObjectCard", (element) => getComputedStyle(element).display)).toBe("grid");

@@ -2,9 +2,12 @@ import { buildReviewReadiness } from "./review-readiness.js";
 import { buildAgentWorkflow } from "./agent-workflow.js";
 import type { Capabilities, SessionSnapshot } from "./types.js";
 
-export const SERVER_TOOL_COUNT = 26;
+export const SERVER_TOOL_COUNT = 29;
 
 const CAPABILITIES: Array<Capabilities["tools"][number]> = [
+  { name: "get_board", group: "collaboration", purpose: "Read the shared infinite canvas and recent notes", output: "BOARD_JSON", readOnly: true, writes: "none" },
+  { name: "draw_board", group: "collaboration", purpose: "Add, update, or remove simple visual objects on the shared board", output: "DRAW_JSON", readOnly: false, writes: "session" },
+  { name: "reply_on_board", group: "collaboration", purpose: "Place a short AI response beside the board", output: "REPLY JSON", readOnly: false, writes: "session" },
   { name: "render_diagram", group: "diagram", purpose: "Render arbitrary Mermaid DSL", output: "DIAGRAM_JSON", readOnly: false, writes: "output" },
   { name: "render_flowchart", group: "diagram", purpose: "Build and render a structured flowchart", output: "DIAGRAM_JSON", readOnly: false, writes: "output" },
   { name: "render_sequence", group: "diagram", purpose: "Build and render a sequence diagram", output: "DIAGRAM_JSON", readOnly: false, writes: "output" },
@@ -34,6 +37,7 @@ const CAPABILITIES: Array<Capabilities["tools"][number]> = [
 ];
 
 const CONTRACTS: Capabilities["contracts"] = [
+  { marker: "BOARD_JSON", purpose: "Read-only shared infinite canvas projection", sideEffect: "none" },
   { marker: "CAPABILITIES_JSON", purpose: "Bounded, read-only tool and safety catalogue", sideEffect: "none" },
   { marker: "WORKFLOW_JSON", purpose: "Ordered collaboration steps with write targets and blockers", sideEffect: "none" },
   { marker: "CONTEXT_JSON", purpose: "Full visual and conversational context for the AI", sideEffect: "none" },
@@ -89,6 +93,7 @@ export function buildCapabilities(snapshot: SessionSnapshot, serverVersion: stri
     nextAction,
     copyText,
     guidance: [
+      "Start with get_board for the shared canvas; scan_project is an optional project-workbench capability, not the board's prerequisite.",
       "CAPABILITIES_JSON is a descriptive, read-only catalogue; it never invokes tools or grants write authority.",
       "Use get_agent_workflow for ordered prerequisites and get_visual_context for the full current session state.",
       "Use get_selection_scope when the human refers to a bounded multi-node range; selection is context, not approval.",

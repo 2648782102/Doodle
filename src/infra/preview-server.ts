@@ -60,6 +60,14 @@ import type { AppConfig, DiagramRecord } from "./config.js";
 import type { SessionStore } from "./session-store.js";
 import type { VisualSyncService } from "./visual-sync-service.js";
 import type { VisualGraph } from "../domain/types.js";
+import type { SimpleBoardStore } from "./simple-board-store.js";
+import {
+  addBoardItem,
+  addBoardNote,
+  removeBoardItem,
+  updateBoardItem,
+  type BoardItemInput,
+} from "../domain/simple-board.js";
 import { buildActivityTimeline } from "../domain/activity-timeline.js";
 import { buildSessionDiagnostics } from "../domain/session-diagnostics.js";
 import { buildNodeContext } from "../domain/node-context.js";
@@ -106,6 +114,7 @@ export class PreviewServer {
     private config: AppConfig,
     private sessions: SessionStore,
     private visualSync: VisualSyncService,
+    private board: SimpleBoardStore,
   ) {
     this.app.use(express.json());
 
@@ -118,7 +127,74 @@ export class PreviewServer {
     }
 
     this.setupRoutes();
+    this.setupBoardRoutes();
     this.setupCollabRoutes();
+  }
+
+  private setupBoardRoutes(): void {
+    this.app.use("/api/board", (req, res, next) => {
+      if (req.method === "GET") return next();
+      if (req.header("X-AI-Draw-Token") !== panelToken)
+        return res.status(401).json({ error: "Invalid panel token" });
+      next();
+    });
+
+    this.app.get("/api/board", (_req, res) => {
+      res.json(this.board.get());
+    });
+
+    const commit = async (res: express.Response, board: ReturnType<SimpleBoardStore["get"]>) => {
+      await this.board.replace(board);
+      this.broadcast({ type: "board_updated", revision: board.revision });
+      res.json({ ok: true, board });
+    };
+
+    this.app.post("/api/board/items", async (req, res) => {
+      const body = req.body as { item?: BoardItemInput; confirmedBy?: string };
+      if (body.confirmedBy !== "human") return res.status(403).json({ error: "Human confirmation is required" });
+      if (!body.item) return res.status(400).json({ error: "item is required" });
+      try {
+        await commit(res, addBoardItem(this.board.get(), { ...body.item, author: "human" }));
+      } catch (error) {
+        res.status(400).json({ error: error instanceof Error ? error.message : String(error) });
+      }
+    });
+
+    this.app.patch("/api/board/items/:id", async (req, res) => {
+      const body = req.body as { patch?: Partial<BoardItemInput>; confirmedBy?: string };
+      if (body.confirmedBy !== "human") return res.status(403).json({ error: "Human confirmation is required" });
+      if (!body.patch) return res.status(400).json({ error: "patch is required" });
+      try {
+        await commit(res, updateBoardItem(this.board.get(), req.params.id, body.patch));
+      } catch (error) {
+        res.status(400).json({ error: error instanceof Error ? error.message : String(error) });
+      }
+    });
+
+    this.app.delete("/api/board/items/:id", async (req, res) => {
+      const body = req.body as { confirmedBy?: string };
+      if (body.confirmedBy !== "human") return res.status(403).json({ error: "Human confirmation is required" });
+      try {
+        await commit(res, removeBoardItem(this.board.get(), req.params.id));
+      } catch (error) {
+        res.status(400).json({ error: error instanceof Error ? error.message : String(error) });
+      }
+    });
+
+    this.app.post("/api/board/notes", async (req, res) => {
+      const body = req.body as { body?: string; itemId?: string; confirmedBy?: string };
+      if (body.confirmedBy !== "human") return res.status(403).json({ error: "Human confirmation is required" });
+      if (typeof body.body !== "string") return res.status(400).json({ error: "body is required" });
+      try {
+        await commit(res, addBoardNote(this.board.get(), {
+          body: body.body,
+          author: "human",
+          itemId: body.itemId,
+        }));
+      } catch (error) {
+        res.status(400).json({ error: error instanceof Error ? error.message : String(error) });
+      }
+    });
   }
 
   private setupCollabRoutes(): void {
@@ -611,9 +687,9 @@ export class PreviewServer {
     });
   }
 
-  private async serveHtml(_req: express.Request, res: express.Response) {
-    const source   = path.resolve(__dirname, "../../src/infra/templates/index.html");
-    const compiled = path.join(__dirname, "templates", "index.html");
+  private async serveHtml(_req: express.Request, res: express.Response, template = "index.html") {
+    const source   = path.resolve(__dirname, `../../src/infra/templates/${template}`);
+    const compiled = path.join(__dirname, "templates", template);
     const candidates = source === compiled ? [source] : [source, compiled];
     res.set("Cache-Control", "no-store, max-age=0");
     for (const p of candidates) {
@@ -627,7 +703,8 @@ export class PreviewServer {
   }
 
   private setupRoutes() {
-    this.app.get("/", (req, res) => this.serveHtml(req, res));
+    this.app.get("/", (req, res) => this.serveHtml(req, res, "board.html"));
+    this.app.get("/workbench", (req, res) => this.serveHtml(req, res));
     this.app.get("/diagram/:id", (req, res) => this.serveHtml(req, res));
 
     this.app.get("/api/diagrams", (_req, res) => { res.json(this.store.list()); });

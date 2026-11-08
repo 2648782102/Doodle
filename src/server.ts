@@ -16,6 +16,7 @@ import { DiagramStore } from "./infra/store.js";
 import { PreviewServer } from "./infra/preview-server.js";
 import { SessionStore } from "./infra/session-store.js";
 import { VisualSyncService } from "./infra/visual-sync-service.js";
+import { SimpleBoardStore } from "./infra/simple-board-store.js";
 import { logger } from "./infra/logger.js";
 import { SERVER_VERSION } from "./infra/version.js";
 import {
@@ -54,6 +55,7 @@ import { registerGetSourceNavigation } from "./tools/get-source-navigation.js";
 import { registerGetCapabilities } from "./tools/get-capabilities.js";
 import { registerGetSelectionScope } from "./tools/get-selection-scope.js";
 import { registerGetSelectionWorkorder } from "./tools/get-selection-workorder.js";
+import { registerDrawBoard, registerGetBoard, registerReplyOnBoard } from "./tools/get-board.js";
 import { SERVER_TOOL_COUNT } from "./domain/capabilities.js";
 
 const TOOL_COUNT = SERVER_TOOL_COUNT; // keep in sync when adding tools
@@ -148,6 +150,9 @@ export async function createServer() {
     workspaceRoot: config.workspaceRoot,
   });
 
+  const board = new SimpleBoardStore(config.outputDir);
+  await board.init();
+
   let preview: PreviewServer;
   const visualSync = new VisualSyncService({
     store,
@@ -155,14 +160,14 @@ export async function createServer() {
     sessions,
     get preview() { return preview; },
   });
-  preview = new PreviewServer(store, config, sessions, visualSync);
+  preview = new PreviewServer(store, config, sessions, visualSync, board);
 
   const mcp = new McpServer(
     { name: "ai-draw-mcp", version: SERVER_VERSION },
     { instructions: MCP_INSTRUCTIONS },
   );
 
-  const ctx = { store, config, preview, sessions, visualSync };
+  const ctx = { store, config, preview, sessions, visualSync, board };
 
   // ── Tool registrations ────────────────────────────────────────────────────
   // ← ADD NEW TOOL REGISTRATION HERE
@@ -192,10 +197,13 @@ export async function createServer() {
   registerGetCapabilities(mcp, ctx);
   registerGetSelectionScope(mcp, ctx);
   registerGetSelectionWorkorder(mcp, ctx);
+  registerGetBoard(mcp, ctx);
+  registerDrawBoard(mcp, ctx);
+  registerReplyOnBoard(mcp, ctx);
 
   registerAgentResources(mcp, sessions, config);
 
   logger.info(`${TOOL_COUNT} MCP tools registered`);
 
-  return { mcp, store, preview, config, sessions, visualSync };
+  return { mcp, store, preview, config, sessions, visualSync, board };
 }

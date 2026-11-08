@@ -3,6 +3,9 @@ import { Client } from "@modelcontextprotocol/sdk/client/index.js";
 import { StdioClientTransport } from "@modelcontextprotocol/sdk/client/stdio.js";
 
 const COLLAB_TOOLS = [
+  "get_board",
+  "draw_board",
+  "reply_on_board",
   "scan_project",
   "get_visual_context",
   "create_visual_proposal",
@@ -75,7 +78,7 @@ describe("MCP server", () => {
     await withClient(3421, async (client) => {
       const { tools } = await client.listTools();
       const names = tools.map((tool) => tool.name);
-      expect(names).toHaveLength(26);
+      expect(names).toHaveLength(29);
       expect(names).toContain("render_diagram");
       expect(names).toContain("delete_diagram");
       for (const name of COLLAB_TOOLS) expect(names).toContain(name);
@@ -87,6 +90,7 @@ describe("MCP server", () => {
       const instructions = client.getInstructions();
       expect(instructions).toContain("Prefer MCP tools and resources directly inside the agent");
       expect(instructions).toContain("do not open a browser unless the human explicitly asks");
+      expect(instructions).toContain("Start with get_board");
       const { resources } = await client.listResources();
       expect(resources.map((resource) => resource.uri)).toEqual(expect.arrayContaining([
         "ai-draw://board/session",
@@ -221,8 +225,8 @@ describe("MCP server", () => {
       const text = textOf(await client.callTool({ name: "get_capabilities", arguments: {} }));
       expect(text).toContain("CAPABILITIES_JSON:");
       const capabilities = jsonAfter(text, "CAPABILITIES_JSON:");
-      expect(capabilities).toMatchObject({ version: 1, readOnly: true, toolCount: 26 });
-      expect(capabilities.tools).toHaveLength(26);
+      expect(capabilities).toMatchObject({ version: 1, readOnly: true, toolCount: 29 });
+      expect(capabilities.tools).toHaveLength(29);
       expect(capabilities.contracts.map((contract) => contract.marker)).toContain("SELECTION_WORKORDER_JSON");
       expect(capabilities.tools.filter((tool) => tool.writes === "project").map((tool) => tool.name)).toEqual(["apply_visual_proposal"]);
       expect(capabilities.workflow).toMatchObject({ version: 1, steps: 8, projectWriteTool: "apply_visual_proposal" });

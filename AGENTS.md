@@ -6,9 +6,9 @@
 
 ## 项目是什么
 
-`ai-draw-mcp` 是一个本机优先的**AI 与人类项目沟通画板**。共享项目图是双方交流项目理解与意图的主要工作区；MCP stdio 是 AI 访问图形、证据、焦点/选择、批注和提案的接入方式。人类在画布中改图、选范围、附加上下文；AI 读取这些变化并在同一会话回应。产品定义与落地顺序见 [docs/PRODUCT_DIRECTION.md](docs/PRODUCT_DIRECTION.md) 与 [ADR 0022](docs/ADR/0022-shared-visual-board-is-the-product.md)。
+`ai-draw-mcp` 是一个本机优先的**简单共享无限画板**。人和 AI 都能在同一张画布上画便签、文字、形状、线条并写短留言；MCP stdio 是 AI 在 agent 内自然使用画板的接入方式。默认前端只保留工具栏、无限画布与轻量交流区；项目扫描、源码证据、提案与批准保留在 `/workbench` 和兼容工具中，是可选能力而非产品定义。产品定义见 [docs/PRODUCT_DIRECTION.md](docs/PRODUCT_DIRECTION.md) 与 [ADR 0025](docs/ADR/0025-simple-infinite-board-is-the-product.md)。
 
-AI 的默认工作位置是 agent 内部：MCP 初始化指令与 `ai-draw://board/{session,brief,capabilities,diagnostics,panel}` 只读资源为宿主提供发现、交接、会话、诊断和可选面板 URL；普通工具调用不应自动打开浏览器或 IDE。`open_preview`、`scan_project(open_panel: true)` 与 `AI_DRAW_AUTO_OPEN_PANEL=1` 是面向人的显式兼容入口。详见 [ADR 0024](docs/ADR/0024-agent-first-mcp-surface.md)。官方 OpenAI 文档把 MCP UI 资源列为可选能力，并说明 Codex CLI 与 IDE 共用 MCP 配置。
+AI 的默认工作位置是 agent 内部：先调用 `get_board`，需要时用 `draw_board` 画 / 改对象，或 `reply_on_board` 回应；普通工具调用不应自动打开浏览器或 IDE。`open_preview` 与 `AI_DRAW_AUTO_OPEN_PANEL=1` 是面向人的显式兼容入口。旧 `ai-draw://board/{session,brief,capabilities,diagnostics,panel}` 只读资源保留给项目工作台宿主，但不是默认画板主路径。详见 [ADR 0024](docs/ADR/0024-agent-first-mcp-surface.md) 与 [ADR 0025](docs/ADR/0025-simple-infinite-board-is-the-product.md)。
 
 AI 主循环：
 
@@ -127,7 +127,7 @@ ROADMAP.md                   产品路线图与非目标
 
 ---
 
-## 26 个 MCP 工具
+## 29 个 MCP 工具
 
 | 分组 | 工具 |
 |------|------|

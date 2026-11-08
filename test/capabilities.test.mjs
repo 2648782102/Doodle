@@ -41,17 +41,17 @@ describe("read-only capabilities catalogue", () => {
   it("enumerates the tool surface, JSON contracts, and safe next action without secrets", () => {
     const capabilities = buildCapabilities(snapshot, "0.3.4");
     const serialized = JSON.stringify(capabilities);
-    expect(SERVER_TOOL_COUNT).toBe(26);
+    expect(SERVER_TOOL_COUNT).toBe(29);
     expect(capabilities).toMatchObject({
       version: 1,
       readOnly: true,
       serverVersion: "0.3.4",
       sessionId: "session_capabilities",
       graphRevision: 2,
-      toolCount: 26,
+      toolCount: 29,
     });
-    expect(capabilities.tools).toHaveLength(26);
-    expect(new Set(capabilities.tools.map((tool) => tool.name)).size).toBe(26);
+    expect(capabilities.tools).toHaveLength(29);
+    expect(new Set(capabilities.tools.map((tool) => tool.name)).size).toBe(29);
     expect(capabilities.tools.filter((tool) => tool.writes === "project").map((tool) => tool.name)).toEqual(["apply_visual_proposal"]);
     expect(capabilities.tools.find((tool) => tool.name === "get_capabilities")).toMatchObject({ output: "CAPABILITIES_JSON", readOnly: true, writes: "none" });
     expect(capabilities.contracts.map((contract) => contract.marker)).toEqual(expect.arrayContaining(["CAPABILITIES_JSON", "SELECTION_WORKORDER_JSON"]));
@@ -62,7 +62,7 @@ describe("read-only capabilities catalogue", () => {
     });
     expect(capabilities.workflow).toMatchObject({ version: 1, steps: 8, projectWriteTool: "apply_visual_proposal" });
     expect(capabilities.nextAction).toContain("get_visual_context");
-    expect(capabilities.copyText).toContain("26 tools");
+    expect(capabilities.copyText).toContain("29 tools");
     expect(capabilities.safety).toMatchObject({
       readOnly: true,
       grantsWriteAuthority: false,

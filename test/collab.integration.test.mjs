@@ -487,7 +487,7 @@ describe("collaboration session", () => {
       const capabilitiesResponse = await fetch(`${base}/api/collab/capabilities`, { headers });
       expect(capabilitiesResponse.ok).toBe(true);
       const capabilities = await capabilitiesResponse.json();
-      expect(capabilities).toMatchObject({ version: 1, readOnly: true, toolCount: 26 });
+      expect(capabilities).toMatchObject({ version: 1, readOnly: true, toolCount: 29 });
       expect(capabilities.tools.filter((tool) => tool.writes === "project").map((tool) => tool.name)).toEqual(["apply_visual_proposal"]);
       expect(capabilities.workflow).toMatchObject({ version: 1, steps: 8, projectWriteTool: "apply_visual_proposal" });
       expect(JSON.stringify(capabilities)).not.toContain("approvalGrant");

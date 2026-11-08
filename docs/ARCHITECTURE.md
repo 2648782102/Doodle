@@ -1,6 +1,6 @@
 # Architecture
 
-AI Draw MCP 是一个本机优先的**人类与 AI 项目沟通画板**。共享项目图是人类可见的主要工作区；MCP stdio 是 AI 读取和更新画布状态的接入方式。节点、关系、来源证据、人的选择与批注、AI 的回复和图形修订共同组成双方的项目上下文。产品定义与分阶段计划见 [PRODUCT_DIRECTION.md](PRODUCT_DIRECTION.md)。
+AI Draw MCP 是一个本机优先的**人与 AI 共享无限画板**。默认产品是简单画布：人和 AI 都能画便签、文字、形状与线条，并在旁边写短留言；AI 通过 MCP stdio 的 `get_board` / `draw_board` / `reply_on_board` 自然使用，普通工具调用不打开浏览器。独立 version 1 画板状态保存在 `output/.ai-draw/board.json`，由 `/api/board/*` 读写并经过 WebSocket 广播。项目扫描、源码证据、提案与写入闸门保留在 `/workbench` 和兼容工具中，作为可选能力。产品定义见 [PRODUCT_DIRECTION.md](PRODUCT_DIRECTION.md) 与 [ADR 0025](ADR/0025-simple-infinite-board-is-the-product.md)。
 
 当前 `0.3.x` 默认打开共享画布：首用可直接只读扫描项目，节点对象卡显示人与 AI 的有序留言并支持就地续答；项目工作台作为次级入口保留图形编辑、只读投影、变更 diff 与人工批准。可复制只读投影作为辅助工具独立存在。后续阶段继续补强证据可信度与从视觉意图到安全提案的追踪。无论任何交互路径，项目文件写入仍须经过提案、完整 diff、人工批准和一次性确认号。系统由四层组成：
 

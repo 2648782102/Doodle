@@ -48,7 +48,7 @@ If the maintainer is asleep or offline, the agent should make reasonable low-ris
 ```text
 请使用目标模式维护开源项目 <仓库路径 / GitHub 地址>，直到 <日期 时间 时区>。
 
-产品愿景：AI Draw MCP 是本机优先的 AI 与人类项目沟通画板；AI 通过 MCP 接入共享项目图，人通过画布编辑、选择与对象批注表达意图，AI 在同一会话回应。详见 `docs/PRODUCT_DIRECTION.md`。项目文件写入仍须完整 diff、人工批准、一次性确认号与路径安全校验。
+产品愿景：AI Draw MCP 是本机优先的简单共享无限画板；人和 AI 都能在画布上直接画图、改图和写短留言，AI 通过 MCP 在 agent 内自然使用。项目扫描与代码提案是可选项，详见 `docs/PRODUCT_DIRECTION.md`。项目文件写入仍须完整 diff、人工批准、一次性确认号与路径安全校验。
 你可以自主选择高价值增量：功能、交互、安全、测试、示例、文档、README/About/topics、Release、Issue、宣发与同类产品调研；每轮先验证，再提交并正常推送到 <分支>，不要 force push、改写历史、移动标签、删除数据或提交凭据。
 
 安全边界：<列出不可绕过的人类批准、项目写入规则、外部账号/发布权限与危险操作>。
