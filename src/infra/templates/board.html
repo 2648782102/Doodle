@@ -244,7 +244,7 @@
     const toastElement = document.querySelector("#toast");
     const toolButtons = [...document.querySelectorAll(".tool[data-tool]")];
     const headers = { "Content-Type": "application/json", "X-AI-Draw-Token": PANEL_TOKEN };
-    const endpoints = {
+    const boardEndpoints = {
       addItem: "/api/board/items",
       patchItem: (id) => `/api/board/items/${encodeURIComponent(id)}`,
       deleteItem: (id) => `/api/board/items/${encodeURIComponent(id)}`,
@@ -416,7 +416,7 @@
     async function createItem(itemType, point) {
       const size = defaultSize[itemType];
       const color = colorCycle[board.items.length % colorCycle.length];
-      await boardWrite(endpoints.addItem, "POST", {
+      await boardWrite(boardEndpoints.addItem, "POST", {
         confirmedBy: "human",
         item: {
           type: itemType,
@@ -451,7 +451,7 @@
         const item = board.items.find((candidate) => candidate.id === itemId);
         const nextText = element.textContent || "";
         if (save && item && nextText !== item.text) {
-          await boardWrite(endpoints.patchItem(itemId), "PATCH", {
+          await boardWrite(boardEndpoints.patchItem(itemId), "PATCH", {
             confirmedBy: "human", patch: { text: nextText },
           }).catch((error) => showToast(error.message));
         } else {
@@ -467,7 +467,7 @@
 
     async function deleteSelected() {
       if (!selectedId) { showToast("先选中一个对象"); return; }
-      await boardWrite(endpoints.deleteItem(selectedId), "DELETE", { confirmedBy: "human" });
+      await boardWrite(boardEndpoints.deleteItem(selectedId), "DELETE", { confirmedBy: "human" });
       selectedId = null;
       renderBoard();
     }
@@ -586,7 +586,7 @@
       if (state.kind === "move" && state.moved) {
         const deltaX = (event.clientX - state.startX) / viewport.scale;
         const deltaY = (event.clientY - state.startY) / viewport.scale;
-        boardWrite(endpoints.patchItem(state.id), "PATCH", {
+        boardWrite(boardEndpoints.patchItem(state.id), "PATCH", {
           confirmedBy: "human", patch: { x: state.originX + deltaX, y: state.originY + deltaY },
         }).catch((error) => showToast(error.message));
       }
