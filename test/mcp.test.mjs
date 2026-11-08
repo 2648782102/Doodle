@@ -1,24 +1,16 @@
-import { describe, expect, it } from "vitest";
+import fs from "node:fs/promises";
+import os from "node:os";
+import path from "node:path";
+import { afterAll, describe, expect, it } from "vitest";
 import { Client } from "@modelcontextprotocol/sdk/client/index.js";
 import { StdioClientTransport } from "@modelcontextprotocol/sdk/client/stdio.js";
 
-const COLLAB_TOOLS = [
-  "scan_project",
-  "get_visual_context",
-  "create_visual_proposal",
-  "apply_visual_proposal",
-  "reply_to_visual_context",
-  "preflight_visual_proposal",
-  "list_change_templates",
-  "get_agent_workflow",
-  "get_node_context",
-  "get_shared_brief",
-  "get_decision_trail",
-  "get_source_navigation",
-  "get_capabilities",
-  "get_selection_scope",
-  "get_selection_workorder",
-];
+const EXPECTED_TOOLS = ["get_board", "draw_board", "reply_on_board", "scan_project"];
+const tempDir = await fs.mkdtemp(path.join(os.tmpdir(), "doodle-mcp-test-"));
+
+afterAll(async () => {
+  await fs.rm(tempDir, { recursive: true, force: true });
+});
 
 async function withClient(port, callback) {
   const transport = new StdioClientTransport({
@@ -28,10 +20,11 @@ async function withClient(port, callback) {
       ...process.env,
       PREVIEW_PORT: String(port),
       LOG_LEVEL: "error",
-      AI_DRAW_WORKSPACE_ROOT: process.cwd(),
+      OUTPUT_DIR: tempDir,
+      DOODLE_WORKSPACE_ROOT: process.cwd(),
     },
   });
-  const client = new Client({ name: "ai-draw-tests", version: "1.0.0" });
+  const client = new Client({ name: "doodle-board-tests", version: "1.0.0" });
   try {
     await client.connect(transport);
     await callback(client);
@@ -49,7 +42,6 @@ function jsonAfter(text, marker) {
   let depth = 0;
   let inString = false;
   let escaped = false;
-  let end = -1;
   for (let index = start; index < text.length; index += 1) {
     const character = text[index];
     if (inString) {
@@ -62,309 +54,80 @@ function jsonAfter(text, marker) {
     else if (character === "{") depth += 1;
     else if (character === "}") {
       depth -= 1;
-      if (depth === 0) { end = index + 1; break; }
+      if (depth === 0) return JSON.parse(text.slice(start, index + 1));
     }
   }
-  if (end < 0) throw new Error(`No complete JSON object after ${marker}`);
-  return JSON.parse(text.slice(start, end));
+  throw new Error(`No complete JSON object after ${marker}`);
 }
 
-describe("MCP server", () => {
-  it("registers legacy and collaboration tools", async () => {
+describe("MCP board server", () => {
+  it("registers exactly four agent-first tools and no browser-opening tool", async () => {
     await withClient(3421, async (client) => {
       const { tools } = await client.listTools();
-      const names = tools.map((tool) => tool.name);
-      expect(names).toHaveLength(26);
-      expect(names).toContain("render_diagram");
-      expect(names).toContain("delete_diagram");
-      for (const name of COLLAB_TOOLS) expect(names).toContain(name);
+      expect(tools.map((tool) => tool.name).sort()).toEqual([...EXPECTED_TOOLS].sort());
+      expect(client.getInstructions()).toContain("Start with get_board");
+      expect(client.getInstructions()).toContain("scan_project is optional");
     });
-  });
+  }, 30_000);
 
-  it("renders and deletes a diagram through the full pipeline", async () => {
+  it("returns the shared board and drawing guide through get_board", async () => {
+    await withClient(3441, async (client) => {
+      const text = textOf(await client.callTool({ name: "get_board", arguments: {} }));
+      expect(text).toContain("BOARD_JSON:");
+      expect(text).toContain("Drawing guide:");
+      expect(text).toContain("(x,y) to (x+w,y+h)");
+      const board = jsonAfter(text, "BOARD_JSON:");
+      expect(board).toMatchObject({ version: 1, readOnly: true });
+      expect(Array.isArray(board.items)).toBe(true);
+      expect(board.safety).toMatchObject({ projectWritesRequireHumanApproval: true });
+    });
+  }, 30_000);
+
+  it("draws a directed board arrow and replies on the same canvas", async () => {
     await withClient(3422, async (client) => {
-      const rendered = await client.callTool({
-        name: "render_diagram",
-        arguments: { title: "Vitest Diagram", mermaid_code: "graph TD\n  A[Start] --> B[End]" },
+      const before = jsonAfter(textOf(await client.callTool({ name: "get_board", arguments: {} })), "BOARD_JSON:");
+      const drawn = textOf(await client.callTool({
+        name: "draw_board",
+        arguments: {
+          author: "ai",
+          items: [
+            { type: "note", x: 0, y: 0, w: 180, h: 100, text: "MCP test", color: "#f6d365" },
+            { type: "line", x: 180, y: 50, w: 120, h: 0, text: "→", color: "#64748b" },
+          ],
+        },
+      }));
+      expect(drawn).toContain("新增 2");
+      const reply = textOf(await client.callTool({
+        name: "reply_on_board",
+        arguments: { body: "这是同一张画板上的一句回应" },
+      }));
+      expect(reply).toContain("AI 回应已放到画板旁");
+      const after = jsonAfter(textOf(await client.callTool({ name: "get_board", arguments: {} })), "BOARD_JSON:");
+      expect(after.items.filter((item) => item.text === "MCP test")).toHaveLength(1);
+      expect(after.notes.at(-1).body).toContain("同一张画板");
+      await client.callTool({
+        name: "draw_board",
+        arguments: {
+          remove_ids: after.items.filter((item) => item.text === "MCP test" || item.text === "→").map((item) => item.id),
+        },
       });
-      const text = textOf(rendered);
-      const id = text.match(/ID:\s*(\S+)/)?.[1];
-      expect(id).toBeTruthy();
-
-      const deleted = await client.callTool({
-        name: "delete_diagram",
-        arguments: { diagram_id: id },
-      });
-      expect(textOf(deleted)).toContain("已删除");
+      expect(before.revision).toBeLessThan(after.revision);
     });
   }, 30_000);
 
-  it("returns node-linked visual intent for AI agents", async () => {
+  it("scans the project read-only as optional board context", async () => {
     await withClient(3423, async (client) => {
-      const snapshot = await client.callTool({ name: "get_visual_context", arguments: {} });
-      const text = textOf(snapshot);
-      expect(text).toContain("CONTEXT_JSON:");
-      const jsonStart = text.indexOf("CONTEXT_JSON:") + "CONTEXT_JSON:".length;
-      const payload = JSON.parse(text.slice(jsonStart));
-      expect(payload.intentSummary).toBeTruthy();
-      expect(payload.intentSummary).toHaveProperty("intentByNode");
-      expect(payload.intentSummary).toHaveProperty("edgeLabels");
-      expect(payload.annotationThreads).toBeTruthy();
-      expect(payload.intentSummary.annotationThreads).toBeTruthy();
-      expect(payload.intentSummary).toHaveProperty("nextActor");
-      expect(payload.activityTimeline).toMatchObject({ version: 1 });
-      expect(payload.diagnostics).toMatchObject({ version: 1 });
-      expect(payload.diagnostics.safety.projectWritesRequireHumanApproval).toBe(true);
-      expect(payload.diagnostics.sourceEvidence).toMatchObject({ nodes: expect.any(Number), items: expect.any(Number) });
-      expect(payload).toHaveProperty("focus");
-      expect(payload.intentSummary).toHaveProperty("focus");
-      expect(payload).toHaveProperty("viewport");
-      expect(payload).toHaveProperty("selectionScope");
-      expect(Array.isArray(payload.graphDiffs)).toBe(true);
-      expect(Array.isArray(payload.sourceEvidence)).toBe(true);
-      expect(Array.isArray(payload.intentSummary.sourceEvidence)).toBe(true);
-      expect(payload.intentSummary.guidance).toContain("activityTimeline");
-      expect(payload.nextActions.join(" ")).toContain("create_visual_proposal");
-      expect(payload.nextActions.join(" ")).toContain("viewport");
-      expect(payload.nextActions.join(" ")).toContain("selectionScope");
-    });
-  }, 30_000);
-
-  it("preflights candidate changes without writing files or creating proposals", async () => {
-    await withClient(3424, async (client) => {
-      const relativePath = `test/preflight-${Date.now()}.md`;
-      const result = await client.callTool({
-        name: "preflight_visual_proposal",
-        arguments: {
-          changes: [{ kind: "create", path: relativePath, content: "# Preflight\n" }],
-        },
-      });
-      const text = textOf(result);
-      expect(text).toContain("PREFLIGHT_JSON:");
-      const jsonStart = text.indexOf("PREFLIGHT_JSON:") + "PREFLIGHT_JSON:".length;
-      const summary = JSON.parse(text.slice(jsonStart));
-      expect(summary).toMatchObject({ version: 1, files: 1, newFiles: 1 });
-      expect(summary.safe).toBe(true);
-      expect(summary.findings.every((finding) => finding.severity !== "blocker")).toBe(true);
-      expect(text).not.toContain("PROPOSAL_JSON:");
-    });
-  }, 30_000);
-
-  it("lists change templates and expands a read-only draft", async () => {
-    await withClient(3426, async (client) => {
-      const listed = textOf(await client.callTool({ name: "list_change_templates", arguments: {} }));
-      expect(listed).toContain("TEMPLATES_JSON:");
-      const templates = jsonAfter(listed, "TEMPLATES_JSON:");
-      expect(templates.templates.map((template) => template.id)).toContain("update_documentation");
-
-      const expanded = textOf(await client.callTool({
-        name: "list_change_templates",
-        arguments: {
-          template_id: "create_module",
-          path: "examples/template-stub.ts",
-          title: "templateStub",
-        },
-      }));
-      expect(expanded).toContain("DRAFT_JSON:");
-      const draft = jsonAfter(expanded, "DRAFT_JSON:");
-      expect(draft.changes[0]).toMatchObject({ kind: "create", path: "examples/template-stub.ts" });
-      expect(expanded).not.toContain("PROPOSAL_JSON:");
-      expect(expanded).toContain("preflight_visual_proposal");
-    });
-  }, 30_000);
-
-  it("returns a reproducible read-only agent workflow", async () => {
-    await withClient(3428, async (client) => {
-      const text = textOf(await client.callTool({ name: "get_agent_workflow", arguments: {} }));
-      expect(text).toContain("WORKFLOW_JSON:");
-      const workflow = jsonAfter(text, "WORKFLOW_JSON:");
-      expect(workflow).toMatchObject({ version: 1 });
-      expect(Array.isArray(workflow.blocked)).toBe(true);
-      expect(workflow.reviewReadiness).toMatchObject({ version: 1, readOnly: true, grantsWriteAuthority: false });
-      expect(["ready", "review", "blocked"]).toContain(workflow.reviewReadiness.status);
-      expect(workflow.steps.map((step) => step.id)).toContain("preflight");
-      expect(workflow.steps.every((step) => step.grantsWriteAuthority === false)).toBe(true);
-      expect(workflow.steps.filter((step) => step.writes === "project").map((step) => step.id)).toEqual(["apply"]);
-      expect(workflow.steps.find((step) => step.id === "apply").requires.join(" ")).toContain("one-time receipt");
-      expect(text).not.toContain("grantHash");
-      expect(text).not.toContain("approvalId");
-    });
-  }, 30_000);
-
-  it("returns a bounded, read-only capability catalogue", async () => {
-    await withClient(3431, async (client) => {
-      const text = textOf(await client.callTool({ name: "get_capabilities", arguments: {} }));
-      expect(text).toContain("CAPABILITIES_JSON:");
-      const capabilities = jsonAfter(text, "CAPABILITIES_JSON:");
-      expect(capabilities).toMatchObject({ version: 1, readOnly: true, toolCount: 26 });
-      expect(capabilities.tools).toHaveLength(26);
-      expect(capabilities.contracts.map((contract) => contract.marker)).toContain("SELECTION_WORKORDER_JSON");
-      expect(capabilities.tools.filter((tool) => tool.writes === "project").map((tool) => tool.name)).toEqual(["apply_visual_proposal"]);
-      expect(capabilities.workflow).toMatchObject({ version: 1, steps: 8, projectWriteTool: "apply_visual_proposal" });
-      expect(capabilities.safety).toMatchObject({ grantsWriteAuthority: false, excludesApprovalGrants: true, excludesWorkspaceAbsolutePaths: true });
-      expect(text).not.toContain("approvalGrant");
-      expect(text).not.toContain(process.cwd());
-    });
-  }, 30_000);
-
-  it("returns a bounded, read-only selection scope", async () => {
-    await withClient(3432, async (client) => {
-      const text = textOf(await client.callTool({ name: "get_selection_scope", arguments: { evidence_limit: 3, edge_limit: 4 } }));
-      expect(text).toContain("SELECTION_SCOPE_JSON:");
-      const scope = jsonAfter(text, "SELECTION_SCOPE_JSON:");
-      expect(scope).toMatchObject({ version: 1, readOnly: true, selectedCount: 0, source: "none", limit: 24 });
-      expect(scope.safety).toMatchObject({ grantsWriteAuthority: false, projectWritesRequireHumanApproval: true });
-      expect(text).not.toContain("approvalGrant");
-      expect(text).not.toContain(process.cwd());
-    });
-  }, 30_000);
-
-  it("returns a read-only pre-proposal selection workorder", async () => {
-    await withClient(3438, async (client) => {
       const text = textOf(await client.callTool({
-        name: "get_selection_workorder",
-        arguments: { item_limit: 4 },
-      }));
-      expect(text).toContain("SELECTION_WORKORDER_JSON:");
-      const workorder = jsonAfter(text, "SELECTION_WORKORDER_JSON:");
-      expect(workorder).toMatchObject({
-        version: 1,
-        readOnly: true,
-        selectedCount: 0,
-        selectionLimit: 24,
-        freshness: {
-          status: "none",
-          selectionStale: false,
-          selectedAtRevision: null,
-        },
-      });
-      expect(workorder.safety).toMatchObject({
-        grantsWriteAuthority: false,
-        excludesProjectChangeContent: true,
-        projectWritesRequireHumanApproval: true,
-      });
-      expect(Array.isArray(workorder.gaps)).toBe(true);
-      expect(workorder.gaps.join(" ")).toContain("No active human selection");
-      expect(text).toContain("Selection freshness none");
-      expect(text).not.toContain("approvalGrant");
-      expect(text).not.toContain("PROPOSAL_JSON:");
-    });
-  }, 30_000);
-
-  it("returns bounded, read-only source navigation", async () => {
-    await withClient(3430, async (client) => {
-      const scanText = textOf(await client.callTool({
         name: "scan_project",
-        arguments: { title: "Navigation", open_panel: false, render: false },
+        arguments: { max_depth: 1, max_files: 12, include_evidence: false },
       }));
-      expect(scanText).toContain("PRESERVATION_JSON:");
-      const text = textOf(await client.callTool({ name: "get_source_navigation", arguments: { limit: 5 } }));
-      expect(text).toContain("SOURCE_NAVIGATION_JSON:");
-      const navigation = jsonAfter(text, "SOURCE_NAVIGATION_JSON:");
-      expect(navigation).toMatchObject({ version: 1, readOnly: true, returnedItems: 5 });
-      expect(navigation.safety).toMatchObject({
-        readOnly: true,
-        grantsWriteAuthority: false,
-        excludesAbsolutePaths: true,
-        doesNotOpenFiles: true,
-        projectWritesRequireHumanApproval: true,
-      });
-      expect(navigation.returnedItems).toBeLessThanOrEqual(5);
-      expect(text).not.toContain("approvalGrant");
-      expect(text).not.toContain(process.cwd());
-    });
-  }, 30_000);
-
-  it("scans into stable project nodes and returns a preservation contract for agents", async () => {
-    await withClient(3427, async (client) => {
-      const first = textOf(await client.callTool({
-        name: "scan_project",
-        arguments: { title: "Stable scan", open_panel: false, render: false },
-      }));
-      expect(first).toContain("PRESERVATION_JSON:");
-      const firstPreservation = jsonAfter(first, "PRESERVATION_JSON:");
-      expect(firstPreservation).toMatchObject({ version: 1, strategy: "stable-path-merge" });
-      const firstNodes = JSON.parse(first.match(/Nodes\/edges \(structured\): (\{.*\})/)?.[1] ?? "{}");
-      expect(firstNodes.nodes.length).toBeGreaterThan(1);
-      expect(firstNodes.nodes.every((node) => /^node_[0-9a-f]{12}$/.test(node.id))).toBe(true);
-
-      const second = textOf(await client.callTool({
-        name: "scan_project",
-        arguments: { title: "Stable scan", open_panel: false, render: false },
-      }));
-      const secondNodes = JSON.parse(second.match(/Nodes\/edges \(structured\): (\{.*\})/)?.[1] ?? "{}");
-      expect(secondNodes.nodes.map((node) => node.id)).toEqual(firstNodes.nodes.map((node) => node.id));
-      const secondPreservation = jsonAfter(second, "PRESERVATION_JSON:");
-      expect(secondPreservation.matchedNodes).toBe(firstNodes.nodes.length);
-      expect(secondPreservation.newNodes).toBe(0);
-      expect(secondPreservation.removedNodes).toBe(0);
-      expect(second).not.toContain("grantHash");
-    });
-  }, 30_000);
-
-  it("returns a compact read-only context for an explicitly addressed graph node", async () => {
-    await withClient(3426, async (client) => {
-      const scan = textOf(await client.callTool({
-        name: "scan_project",
-        arguments: { title: "Node context scan", open_panel: false, render: false },
-      }));
-      expect(scan).toContain("PRESERVATION_JSON:");
-      const contextText = textOf(await client.callTool({
-        name: "get_node_context",
-        arguments: { node_id: "node_eee6999cab6b" },
-      }));
-      expect(contextText).toContain("NODE_CONTEXT_JSON:");
-      const context = jsonAfter(contextText, "NODE_CONTEXT_JSON:");
-      expect(context).toMatchObject({ version: 1, nodeId: "node_eee6999cab6b" });
-      expect(context.safety).toMatchObject({ readOnly: true, grantsWriteAuthority: false });
-      expect(Array.isArray(context.node.sourceEvidence)).toBe(true);
-      expect(Array.isArray(context.annotationThreads)).toBe(true);
-      expect(Array.isArray(context.edges)).toBe(true);
-      expect(contextText).not.toContain("approvalId");
-      expect(contextText).not.toContain("grantHash");
-    });
-  }, 30_000);
-
-  it("returns a compact read-only shared brief for handoffs", async () => {
-    await withClient(3429, async (client) => {
-      const scan = textOf(await client.callTool({
-        name: "scan_project",
-        arguments: { title: "Shared brief scan", open_panel: false, render: false },
-      }));
-      expect(scan).toContain("PRESERVATION_JSON:");
-      const briefText = textOf(await client.callTool({ name: "get_shared_brief", arguments: {} }));
-      expect(briefText).toContain("BRIEF_JSON:");
-      const brief = jsonAfter(briefText, "BRIEF_JSON:");
-      expect(brief).toMatchObject({ version: 1, graphRevision: expect.any(Number) });
-      expect(brief.safety).toMatchObject({ readOnly: true, grantsWriteAuthority: false, excludesApprovalGrants: true });
-      expect(Array.isArray(brief.intent.blockers)).toBe(true);
-      expect(Array.isArray(brief.intent.nextActions)).toBe(true);
-      expect(briefText).not.toContain("approvalId");
-      expect(briefText).not.toContain("grantHash");
-    });
-  }, 30_000);
-
-  it("returns a read-only decision trail without approval grants", async () => {
-    await withClient(3430, async (client) => {
-      const scan = textOf(await client.callTool({
-        name: "scan_project",
-        arguments: { title: "Decision trail scan", open_panel: false, render: false },
-      }));
-      expect(scan).toContain("PRESERVATION_JSON:");
-      const trailText = textOf(await client.callTool({ name: "get_decision_trail", arguments: {} }));
-      expect(trailText).toContain("DECISION_TRAIL_JSON:");
-      const trail = jsonAfter(trailText, "DECISION_TRAIL_JSON:");
-      expect(trail).toMatchObject({ version: 1, graphRevision: expect.any(Number) });
-      expect(trail.safety).toMatchObject({
-        readOnly: true,
-        grantsWriteAuthority: false,
-        excludesApprovalGrants: true,
-        projectWritesRequireHumanApproval: true,
-      });
-      expect(Array.isArray(trail.events)).toBe(true);
-      expect(Array.isArray(trail.proposals)).toBe(true);
-      expect(trailText).not.toContain("approvalId");
-      expect(trailText).not.toContain("grantHash");
+      expect(text).toContain("PROJECT_JSON:");
+      const snapshot = jsonAfter(text, "PROJECT_JSON:");
+      expect(snapshot).toMatchObject({ version: 1, readOnly: true, writes: "none" });
+      expect(snapshot.files.length).toBeGreaterThan(0);
+      expect(snapshot).not.toHaveProperty("workspaceRoot");
+      expect(JSON.stringify(snapshot)).not.toContain(process.cwd());
+      expect(text).toContain("Use draw_board to visualize this read-only context");
     });
   }, 30_000);
 });

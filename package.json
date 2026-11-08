@@ -1,10 +1,10 @@
 {
-  "name": "ai-draw-mcp",
-  "version": "0.3.4",
-  "description": "Local-first visual communication board where people and AI share and refine a software project model; code changes remain human-approved.",
+  "name": "doodle-mcp",
+  "version": "0.4.0",
+  "description": "A tiny shared board for people and AI to doodle, draw, and leave short notes through MCP.",
   "type": "module",
   "bin": {
-    "ai-draw-mcp": "dist/index.js"
+    "doodle-mcp": "dist/index.js"
   },
   "files": [
     "dist/",
@@ -16,48 +16,33 @@
   ],
   "repository": {
     "type": "git",
-    "url": "git+https://github.com/2648782102/ai-draw-mcp.git"
+    "url": "git+https://github.com/2648782102/Doodle.git"
   },
-  "homepage": "https://github.com/2648782102/ai-draw-mcp#readme",
+  "homepage": "https://github.com/2648782102/Doodle#readme",
   "bugs": {
-    "url": "https://github.com/2648782102/ai-draw-mcp/issues"
+    "url": "https://github.com/2648782102/Doodle/issues"
   },
   "scripts": {
-    "build": "node -e \"require('fs').rmSync('dist',{recursive:true,force:true})\" && tsc && node -e \"const fs=require('fs'),p=require('path');const s=p.join('src','infra','templates'),d=p.join('dist','infra','templates');fs.mkdirSync(d,{recursive:true});fs.readdirSync(s).forEach(f=>fs.copyFileSync(p.join(s,f),p.join(d,f)))\"",
+    "build": "tsc && node scripts/build.mjs",
     "prepublishOnly": "npm run build",
     "dev": "tsx watch src/index.ts",
     "start": "node dist/index.js",
     "lint": "tsc --noEmit",
     "test": "vitest run",
-    "test:mcp": "vitest run test/mcp.test.mjs",
-    "test:examples": "node --check examples/node-client.mjs && node --check examples/collab-demo.mjs && node --check examples/agent-workflow.mjs",
-    "test:examples:workflow": "node examples/agent-workflow.mjs",
-    "check": "npm run lint && npm run build && npm test && npm run test:examples && npm run test:examples:workflow && npm run docs:assets:check && npm run repo:check && npm run doctor && npm pack --dry-run",
+    "check": "npm run lint && npm run build && npm test && npm run test:examples && npm run repo:check && npm run doctor && npm pack --dry-run",
+    "test:examples": "node --check examples/board-client.mjs",
     "doctor": "node scripts/doctor.mjs",
-    "github:check": "node scripts/github-maintenance.mjs --check",
-    "github:sync": "node scripts/github-maintenance.mjs",
-    "docs:assets": "node scripts/generate-doc-assets.mjs",
-    "docs:assets:check": "node scripts/generate-doc-assets.mjs --check",
-    "ui:shots": "npm run build && node scripts/capture-panel.mjs",
     "repo:check": "node scripts/repo-check.mjs"
   },
   "keywords": [
-    "mcp",
-    "mcp-server",
     "ai",
+    "canvas",
+    "developer-tools",
     "drawing",
-    "diagram",
-    "mermaid",
-    "flowchart",
-    "cursor",
-    "vscode",
-    "windsurf",
-    "trae",
-    "claude",
-    "llm",
-    "human-in-the-loop",
-    "visualization",
-    "local-first"
+    "local-first",
+    "mcp",
+    "typescript",
+    "whiteboard"
   ],
   "license": "MIT",
   "publishConfig": {
@@ -67,22 +52,29 @@
     "node": ">=20.0.0"
   },
   "dependencies": {
-    "@modelcontextprotocol/sdk": "^1.12.0",
-    "express": "^5.1.0",
-    "mermaid": "^11.6.0",
-    "@mermaid-js/mermaid-cli": "^11.4.0",
-    "sharp": "^0.33.0",
-    "ws": "^8.18.0",
-    "zod": "^3.24.0",
-    "nanoid": "^5.1.0",
-    "open": "^10.1.0"
+    "@modelcontextprotocol/sdk": "^1.32.2",
+    "express": "^5.3.0",
+    "ws": "^8.22.2",
+    "zod": "^4.6.7"
   },
   "devDependencies": {
-    "@types/express": "^5.0.0",
-    "@types/node": "^22.0.0",
-    "@types/ws": "^8.18.0",
-    "tsx": "^4.19.0",
-    "typescript": "^5.8.0",
-    "vitest": "^3.1.0"
+    "@types/express": "^5.0.6",
+    "@types/node": "^22.20.5",
+    "@types/ws": "^8.18.2",
+    "tsx": "^4.23.15",
+    "typescript": "^5.9.3",
+    "vitest": "^3.2.7"
+  },
+  "overrides": {
+    "@hono/node-server": "^2.1.6",
+    "esbuild": "^0.28.2",
+    "fast-uri": "^4.2.3",
+    "hono": "^4.13.17",
+    "ip-address": "^10.7.6",
+    "nanoid": "^3.3.18",
+    "postcss": "^8.5.12",
+    "source-map-js": "^1.2.2",
+    "tinypool": "^2.2.0",
+    "vite": "^7.3.7"
   }
 }

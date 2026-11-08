@@ -1,0 +1,704 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>AI 画板</title>
+  <style>
+    :root {
+      --bg: #f7f8fa;
+      --surface: #ffffff;
+      --line: #d9dde4;
+      --text: #1f2937;
+      --muted: #6b7280;
+      --accent: #2563eb;
+      --accent-soft: #eaf1ff;
+      --human: #0f766e;
+      --ai: #5b4bc4;
+      --radius: 8px;
+      --header-height: 52px;
+    }
+    * { box-sizing: border-box; }
+    html, body { height: 100%; margin: 0; }
+    body {
+      color: var(--text);
+      background: var(--bg);
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", "PingFang SC", "Microsoft YaHei", sans-serif;
+      font-size: 14px;
+      overflow: hidden;
+    }
+    button, input, textarea { font: inherit; }
+    button { color: inherit; }
+    button:focus-visible, input:focus-visible, textarea:focus-visible, [contenteditable="true"]:focus-visible {
+      outline: 2px solid var(--accent);
+      outline-offset: 2px;
+    }
+    .topbar {
+      height: var(--header-height);
+      display: flex;
+      align-items: center;
+      gap: 16px;
+      padding: 0 16px;
+      border-bottom: 1px solid var(--line);
+      background: var(--surface);
+    }
+    .brand { display: flex; align-items: baseline; gap: 8px; font-weight: 700; white-space: nowrap; }
+    .brand small { color: var(--muted); font-weight: 400; }
+    #boardTitle { font-weight: 600; }
+    #status { color: var(--muted); margin-left: auto; font-size: 12px; }
+    .text-link { color: var(--accent); text-decoration: none; }
+    .text-link:hover { text-decoration: underline; }
+    .app { height: calc(100% - var(--header-height)); display: grid; grid-template-columns: 1fr 300px; }
+    .canvas-region { position: relative; min-width: 0; overflow: hidden; }
+    #canvas {
+      position: absolute;
+      inset: 0;
+      overflow: hidden;
+      cursor: grab;
+      background-color: #fbfbfc;
+      background-image: radial-gradient(#d5d9e0 1px, transparent 1px);
+      background-size: 24px 24px;
+      touch-action: none;
+    }
+    #canvas.panning { cursor: grabbing; }
+    #canvas.creating { cursor: crosshair; }
+    #world { position: absolute; left: 0; top: 0; transform-origin: 0 0; width: 1px; height: 1px; }
+    .toolbar {
+      position: absolute;
+      top: 12px;
+      left: 12px;
+      z-index: 4;
+      display: flex;
+      gap: 4px;
+      padding: 4px;
+      border: 1px solid var(--line);
+      border-radius: var(--radius);
+      background: rgba(255, 255, 255, 0.96);
+    }
+    .tool {
+      min-width: 34px;
+      height: 34px;
+      padding: 0 9px;
+      border: 0;
+      border-radius: 6px;
+      background: transparent;
+      cursor: pointer;
+    }
+    .tool:hover { background: #f1f3f6; }
+    .tool[aria-pressed="true"] { background: var(--accent-soft); color: var(--accent); }
+    .tool.danger:hover { background: #fff1f1; color: #b91c1c; }
+    .viewbar {
+      position: absolute;
+      left: 12px;
+      bottom: 12px;
+      z-index: 4;
+      display: flex;
+      gap: 4px;
+      padding: 4px;
+      border: 1px solid var(--line);
+      border-radius: var(--radius);
+      background: rgba(255, 255, 255, 0.96);
+    }
+    .viewbar button { min-width: 30px; height: 30px; border: 0; border-radius: 5px; background: transparent; cursor: pointer; }
+    .viewbar button:hover { background: #f1f3f6; }
+    #emptyState {
+      position: absolute;
+      inset: 0;
+      z-index: 1;
+      display: grid;
+      place-items: center;
+      pointer-events: none;
+      color: var(--muted);
+      font-size: 15px;
+    }
+    #emptyState.hidden { display: none; }
+    .board-item {
+      position: absolute;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      padding: 10px;
+      border: 1px solid #cbd2dc;
+      border-radius: 6px;
+      background: #f6d365;
+      user-select: none;
+      cursor: move;
+      overflow: hidden;
+      word-break: break-word;
+      line-height: 1.45;
+      white-space: pre-wrap;
+    }
+    .board-item:hover { border-color: #8d99a9; }
+    .board-item.selected { outline: 2px solid var(--accent); outline-offset: 2px; }
+    .board-item[data-type="text"] { border-color: transparent; background: transparent; justify-content: flex-start; padding: 4px; font-size: 18px; }
+    .board-item[data-type="rect"] { background: var(--item-color, #c7d8ff); }
+    .board-item[data-type="ellipse"] { background: var(--item-color, #b8e0d2); border-radius: 50%; }
+    .board-item[data-type="line"] {
+      display: block;
+      padding: 0;
+      border: 0;
+      border-radius: 0;
+      background: transparent;
+      overflow: visible;
+      pointer-events: auto;
+    }
+    .board-item[data-type="line"] svg { display: block; width: 100%; height: 100%; overflow: visible; pointer-events: none; }
+    .board-item[data-type="line"] .item-text {
+      position: absolute;
+      left: 50%;
+      top: 50%;
+      transform: translate(-50%, -50%);
+      max-width: 160px;
+      padding: 2px 6px;
+      border-radius: 5px;
+      background: rgba(255, 255, 255, 0.94);
+      color: var(--muted);
+      font-size: 11px;
+      line-height: 1.35;
+      text-align: center;
+      white-space: pre;
+      pointer-events: none;
+    }
+    .board-item[data-type="line"] .item-text:empty { display: none; }
+    .item-author { position: absolute; right: 5px; bottom: 3px; color: rgba(31, 41, 55, 0.55); font-size: 10px; }
+    .board-item[data-type="text"] .item-author, .board-item[data-type="line"] .item-author { display: none; }
+    .side {
+      display: flex;
+      flex-direction: column;
+      min-width: 0;
+      border-left: 1px solid var(--line);
+      background: var(--surface);
+    }
+    .side-header { padding: 14px 16px 10px; border-bottom: 1px solid var(--line); }
+    .side-header h2 { margin: 0 0 4px; font-size: 15px; }
+    .side-header p { margin: 0; color: var(--muted); font-size: 12px; line-height: 1.5; }
+    #notes { flex: 1; min-height: 0; overflow: auto; padding: 12px 16px; }
+    .note { margin: 0 0 12px; padding: 9px 10px; border: 1px solid var(--line); border-radius: var(--radius); }
+    .note.human { border-left: 3px solid var(--human); }
+    .note.ai { border-left: 3px solid var(--ai); }
+    .note-meta { display: flex; justify-content: space-between; gap: 8px; margin-bottom: 4px; color: var(--muted); font-size: 11px; }
+    .note-body { white-space: pre-wrap; word-break: break-word; line-height: 1.5; }
+    .note-anchor { margin-top: 5px; color: var(--muted); font-size: 11px; }
+    .composer { padding: 12px 16px 16px; border-top: 1px solid var(--line); }
+    .composer label { display: block; margin-bottom: 6px; color: var(--muted); font-size: 12px; }
+    #noteInput { width: 100%; min-height: 62px; resize: vertical; padding: 9px 10px; border: 1px solid var(--line); border-radius: var(--radius); color: var(--text); background: #fff; }
+    .composer-row { display: flex; align-items: center; gap: 8px; margin-top: 8px; }
+    #anchorHint { color: var(--muted); font-size: 11px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+    #btnSend { margin-left: auto; padding: 7px 13px; border: 0; border-radius: 6px; color: #fff; background: var(--accent); cursor: pointer; }
+    #btnSend:hover { background: #1d4ed8; }
+    #toast { position: absolute; left: 50%; bottom: 18px; z-index: 8; transform: translateX(-50%); padding: 7px 12px; border-radius: 6px; color: #fff; background: #334155; opacity: 0; pointer-events: none; transition: opacity .18s ease; }
+    #toast.visible { opacity: 1; }
+    @media (max-width: 760px) {
+      .app { grid-template-columns: 1fr; grid-template-rows: 1fr 220px; }
+      .side { border-left: 0; border-top: 1px solid var(--line); }
+      .brand small, #boardTitle, #status { display: none; }
+      #notes { padding: 8px 12px; }
+      .composer { padding: 8px 12px 12px; }
+      .toolbar { max-width: calc(100vw - 24px); overflow-x: auto; }
+    }
+    @media (prefers-reduced-motion: reduce) {
+      #toast { transition: none; }
+    }
+  </style>
+</head>
+<body>
+  <header class="topbar">
+    <div class="brand">AI 画板 <small>人 · 画布 · AI</small></div>
+    <span id="boardTitle">和 AI 一起画</span>
+    <span id="status">正在连接…</span>
+  </header>
+  <main class="app">
+    <section class="canvas-region" aria-label="无限画布">
+      <div class="toolbar" role="toolbar" aria-label="画板工具">
+        <button class="tool" data-tool="select" aria-pressed="true" title="选择 / 移动 (V)">选择</button>
+        <button class="tool" data-tool="note" aria-pressed="false" title="便签 (N)">便签</button>
+        <button class="tool" data-tool="text" aria-pressed="false" title="文字 (T)">文字</button>
+        <button class="tool" data-tool="rect" aria-pressed="false" title="矩形 (R)">矩形</button>
+        <button class="tool" data-tool="ellipse" aria-pressed="false" title="椭圆 (E)">椭圆</button>
+        <button class="tool" data-tool="line" aria-pressed="false" title="箭头 (L)">箭头</button>
+        <button class="tool danger" id="btnDelete" title="删除选中对象 (Delete)">删除</button>
+      </div>
+      <div id="canvas" tabindex="0" aria-label="可平移缩放的无限画布">
+        <div id="world"></div>
+        <div id="emptyState">选一个工具，点一下画布开始画</div>
+      </div>
+      <div class="viewbar" aria-label="视图控制">
+        <button id="btnZoomOut" title="缩小" aria-label="缩小">−</button>
+        <button id="btnZoomReset" title="重置视图" aria-label="重置视图">100%</button>
+        <button id="btnZoomIn" title="放大" aria-label="放大">+</button>
+        <button id="btnFit" title="适应内容" aria-label="适应内容">适应</button>
+      </div>
+      <div id="toast" role="status" aria-live="polite"></div>
+    </section>
+    <aside class="side" aria-label="画板交流">
+      <div class="side-header">
+        <h2>和 AI 说</h2>
+        <p>留言和画布存在一起。AI 通过 MCP 读取、画图和回应。</p>
+      </div>
+      <div id="notes" aria-live="polite"></div>
+      <div class="composer">
+        <label for="noteInput">写一句给 AI</label>
+        <textarea id="noteInput" maxlength="1200" placeholder="例如：把这三个想法连起来，或在这里补一张图"></textarea>
+        <div class="composer-row">
+          <span id="anchorHint">未关联对象</span>
+          <button id="btnSend">放到画板</button>
+        </div>
+      </div>
+    </aside>
+  </main>
+  <script>
+    const PANEL_TOKEN = "__DOODLE_PANEL_TOKEN__";
+    const canvas = document.querySelector("#canvas");
+    const world = document.querySelector("#world");
+    const emptyState = document.querySelector("#emptyState");
+    const notesElement = document.querySelector("#notes");
+    const noteInput = document.querySelector("#noteInput");
+    const anchorHint = document.querySelector("#anchorHint");
+    const statusElement = document.querySelector("#status");
+    const boardTitle = document.querySelector("#boardTitle");
+    const toastElement = document.querySelector("#toast");
+    const toolButtons = [...document.querySelectorAll(".tool[data-tool]")];
+    const headers = { "Content-Type": "application/json", "X-AI-Draw-Token": PANEL_TOKEN };
+    const boardEndpoints = {
+      addItem: "/api/board/items",
+      patchItem: (id) => `/api/board/items/${encodeURIComponent(id)}`,
+      deleteItem: (id) => `/api/board/items/${encodeURIComponent(id)}`,
+    };
+    const defaultText = { note: "写点什么", text: "文字", rect: "", ellipse: "", line: "" };
+    const defaultSize = {
+      note: { w: 180, h: 120 }, text: { w: 220, h: 44 },
+      rect: { w: 180, h: 110 }, ellipse: { w: 180, h: 110 }, line: { w: 180, h: 0 },
+    };
+    const colorCycle = ["#f6d365", "#b8e0d2", "#c7d8ff", "#ffd1dc", "#e8e8e8", "#ffffff"];
+    let board = { version: 1, title: "和 AI 一起画", revision: 0, items: [], notes: [] };
+    let tool = "select";
+    let selectedId = null;
+    let viewport = { x: 0, y: 0, scale: 1 };
+    let userAdjustedViewport = localStorage.getItem("aiDrawBoardUserViewport") === "1";
+    let pointerState = null;
+    let toastTimer = 0;
+
+    function markUserViewport() {
+      userAdjustedViewport = true;
+      localStorage.setItem("aiDrawBoardUserViewport", "1");
+    }
+
+    function showToast(message) {
+      toastElement.textContent = message;
+      toastElement.classList.add("visible");
+      clearTimeout(toastTimer);
+      toastTimer = window.setTimeout(() => toastElement.classList.remove("visible"), 1800);
+    }
+
+    function setStatus(message) {
+      statusElement.textContent = message;
+    }
+
+    function applyViewport() {
+      world.style.transform = `translate(${viewport.x}px, ${viewport.y}px) scale(${viewport.scale})`;
+      const grid = 24 * viewport.scale;
+      canvas.style.backgroundSize = `${grid}px ${grid}px`;
+      canvas.style.backgroundPosition = `${viewport.x}px ${viewport.y}px`;
+      document.querySelector("#btnZoomReset").textContent = `${Math.round(viewport.scale * 100)}%`;
+      localStorage.setItem("aiDrawBoardViewport", JSON.stringify(viewport));
+    }
+
+    function restoreViewport() {
+      try {
+        const saved = JSON.parse(localStorage.getItem("aiDrawBoardViewport") || "null");
+        if (saved && Number.isFinite(saved.x) && Number.isFinite(saved.y) && Number.isFinite(saved.scale)) {
+          viewport = { x: saved.x, y: saved.y, scale: Math.max(0.25, Math.min(3, saved.scale)) };
+        }
+      } catch {}
+      applyViewport();
+    }
+
+    function screenToWorld(clientX, clientY) {
+      const rect = canvas.getBoundingClientRect();
+      return {
+        x: (clientX - rect.left - viewport.x) / viewport.scale,
+        y: (clientY - rect.top - viewport.y) / viewport.scale,
+      };
+    }
+
+    function zoomAt(clientX, clientY, nextScale) {
+      markUserViewport();
+      const rect = canvas.getBoundingClientRect();
+      const screenX = clientX - rect.left;
+      const screenY = clientY - rect.top;
+      const worldX = (screenX - viewport.x) / viewport.scale;
+      const worldY = (screenY - viewport.y) / viewport.scale;
+      viewport.scale = Math.max(0.25, Math.min(3, nextScale));
+      viewport.x = screenX - worldX * viewport.scale;
+      viewport.y = screenY - worldY * viewport.scale;
+      applyViewport();
+    }
+
+    function selectTool(nextTool) {
+      tool = nextTool;
+      for (const button of toolButtons) button.setAttribute("aria-pressed", String(button.dataset.tool === nextTool));
+      canvas.classList.toggle("creating", nextTool !== "select");
+    }
+
+    function renderBoard() {
+      boardTitle.textContent = board.title;
+      setStatus(`已保存 · rev ${board.revision}`);
+      emptyState.classList.toggle("hidden", board.items.length > 0);
+      world.replaceChildren();
+      for (const [index, item] of board.items.entries()) {
+        const element = document.createElement("div");
+        element.className = "board-item";
+        element.dataset.id = item.id;
+        element.dataset.type = item.type;
+        element.classList.toggle("selected", item.id === selectedId);
+        let lineGeometry = null;
+        if (item.type === "line") {
+          const left = Math.min(item.x, item.x + item.w);
+          const top = Math.min(item.y, item.y + item.h);
+          const width = Math.max(1, Math.abs(item.w));
+          const height = Math.max(1, Math.abs(item.h));
+          lineGeometry = {
+            width,
+            height,
+            startX: item.x - left,
+            startY: item.y - top,
+            endX: item.x + item.w - left,
+            endY: item.y + item.h - top,
+          };
+          element.style.left = `${left}px`;
+          element.style.top = `${top}px`;
+          element.style.width = `${width}px`;
+          element.style.height = `${height}px`;
+        } else {
+          element.style.left = `${item.x}px`;
+          element.style.top = `${item.y}px`;
+          element.style.width = `${item.w}px`;
+          element.style.height = `${item.h}px`;
+        }
+        element.style.setProperty("--item-color", item.color);
+        if (item.type !== "line") element.style.background = item.color;
+        if (item.type === "line") {
+          const { width, height, startX, startY, endX, endY } = lineGeometry;
+          const markerId = `board-arrow-${index}`;
+          const svg = document.createElementNS("http://www.w3.org/2000/svg", "svg");
+          svg.setAttribute("viewBox", `0 0 ${width} ${height}`);
+          svg.setAttribute("preserveAspectRatio", "none");
+          const path = document.createElementNS("http://www.w3.org/2000/svg", "path");
+          path.setAttribute("d", `M ${startX} ${startY} L ${endX} ${endY}`);
+          path.setAttribute("stroke", item.color);
+          path.setAttribute("stroke-width", "3");
+          path.setAttribute("stroke-linecap", "round");
+          path.setAttribute("fill", "none");
+          path.setAttribute("marker-end", `url(#${markerId})`);
+          const defs = document.createElementNS("http://www.w3.org/2000/svg", "defs");
+          const marker = document.createElementNS("http://www.w3.org/2000/svg", "marker");
+          marker.setAttribute("id", markerId);
+          marker.setAttribute("viewBox", "0 0 10 10");
+          marker.setAttribute("refX", "9");
+          marker.setAttribute("refY", "5");
+          marker.setAttribute("markerWidth", "7");
+          marker.setAttribute("markerHeight", "7");
+          marker.setAttribute("orient", "auto-start-reverse");
+          const arrowHead = document.createElementNS("http://www.w3.org/2000/svg", "path");
+          arrowHead.setAttribute("d", "M 0 0 L 10 5 L 0 10 z");
+          arrowHead.setAttribute("fill", item.color);
+          marker.append(arrowHead);
+          defs.append(marker);
+          svg.append(defs, path);
+          element.append(svg);
+        }
+        const textElement = document.createElement("div");
+        textElement.className = "item-text";
+        textElement.textContent = item.text;
+        element.append(textElement);
+        if (item.type === "note" || item.type === "rect" || item.type === "ellipse") {
+          const authorElement = document.createElement("span");
+          authorElement.className = "item-author";
+          authorElement.textContent = item.author === "ai" ? "AI" : "人";
+          element.append(authorElement);
+        }
+        world.append(element);
+      }
+      renderNotes();
+      updateAnchorHint();
+    }
+
+    function renderNotes() {
+      notesElement.replaceChildren();
+      const recentNotes = board.notes.slice(-50);
+      if (recentNotes.length === 0) {
+        const empty = document.createElement("p");
+        empty.style.color = "var(--muted)";
+        empty.textContent = "还没有留言。画点什么，或者直接写一句。";
+        notesElement.append(empty);
+        return;
+      }
+      for (const note of recentNotes) {
+        const card = document.createElement("article");
+        card.className = `note ${note.author}`;
+        const meta = document.createElement("div");
+        meta.className = "note-meta";
+        const author = document.createElement("span");
+        author.textContent = note.author === "ai" ? "AI" : "人";
+        const time = document.createElement("span");
+        time.textContent = new Date(note.createdAt).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" });
+        meta.append(author, time);
+        const body = document.createElement("div");
+        body.className = "note-body";
+        body.textContent = note.body;
+        card.append(meta, body);
+        if (note.itemId) {
+          const anchor = document.createElement("div");
+          anchor.className = "note-anchor";
+          anchor.textContent = `关联对象：${note.itemId.slice(0, 12)}`;
+          card.append(anchor);
+        }
+        notesElement.append(card);
+      }
+      notesElement.scrollTop = notesElement.scrollHeight;
+    }
+
+    function updateAnchorHint() {
+      anchorHint.textContent = selectedId ? `关联：${selectedId.slice(0, 12)}` : "未关联对象";
+    }
+
+    async function loadBoard() {
+      const response = await fetch("/api/board");
+      if (!response.ok) throw new Error(`HTTP ${response.status}`);
+      board = await response.json();
+      if (selectedId && !board.items.some((item) => item.id === selectedId)) selectedId = null;
+      renderBoard();
+    }
+
+    async function boardWrite(path, method, payload) {
+      const response = await fetch(path, { method, headers, body: JSON.stringify(payload) });
+      const result = await response.json();
+      if (!response.ok) throw new Error(result.error || `HTTP ${response.status}`);
+      board = result.board;
+      renderBoard();
+    }
+
+    async function createItem(itemType, point) {
+      const size = defaultSize[itemType];
+      const color = colorCycle[board.items.length % colorCycle.length];
+      await boardWrite(boardEndpoints.addItem, "POST", {
+        confirmedBy: "human",
+        item: {
+          type: itemType,
+          x: point.x - size.w / 2,
+          y: point.y - size.h / 2,
+          w: size.w,
+          h: size.h,
+          text: defaultText[itemType],
+          color,
+        },
+      });
+      const newest = board.items[board.items.length - 1];
+      if (newest) {
+        selectedId = newest.id;
+        renderBoard();
+        beginTextEdit(newest.id);
+      }
+    }
+
+    function beginTextEdit(itemId) {
+      const element = world.querySelector(`[data-id="${CSS.escape(itemId)}"] .item-text`);
+      if (!element) return;
+      element.contentEditable = "true";
+      element.focus();
+      const range = document.createRange();
+      range.selectNodeContents(element);
+      const selection = window.getSelection();
+      selection.removeAllRanges();
+      selection.addRange(range);
+      const finish = async (save) => {
+        element.contentEditable = "false";
+        const item = board.items.find((candidate) => candidate.id === itemId);
+        const nextText = element.textContent || "";
+        if (save && item && nextText !== item.text) {
+          await boardWrite(boardEndpoints.patchItem(itemId), "PATCH", {
+            confirmedBy: "human", patch: { text: nextText },
+          }).catch((error) => showToast(error.message));
+        } else {
+          element.textContent = item?.text ?? "";
+        }
+      };
+      element.addEventListener("blur", () => finish(true), { once: true });
+      element.addEventListener("keydown", (event) => {
+        if (event.key === "Escape") { event.preventDefault(); element.blur(); }
+        if (event.key === "Enter" && (event.metaKey || event.ctrlKey)) { event.preventDefault(); element.blur(); }
+      }, { once: true });
+    }
+
+    async function deleteSelected() {
+      if (!selectedId) { showToast("先选中一个对象"); return; }
+      await boardWrite(boardEndpoints.deleteItem(selectedId), "DELETE", { confirmedBy: "human" });
+      selectedId = null;
+      renderBoard();
+    }
+
+    async function sendNote() {
+      const body = noteInput.value.trim();
+      if (!body) return;
+      await boardWrite("/api/board/notes", "POST", {
+        confirmedBy: "human", body, itemId: selectedId || undefined,
+      });
+      noteInput.value = "";
+      noteInput.focus();
+    }
+
+    function fitToContent() {
+      if (board.items.length === 0) {
+        viewport = { x: canvas.clientWidth / 2, y: canvas.clientHeight / 2, scale: 1 };
+        applyViewport();
+        return;
+      }
+      const bounds = board.items.map((item) => item.type === "line" ? {
+        left: Math.min(item.x, item.x + item.w),
+        top: Math.min(item.y, item.y + item.h),
+        right: Math.max(item.x, item.x + item.w),
+        bottom: Math.max(item.y, item.y + item.h),
+      } : { left: item.x, top: item.y, right: item.x + item.w, bottom: item.y + item.h });
+      const left = Math.min(...bounds.map((bound) => bound.left));
+      const top = Math.min(...bounds.map((bound) => bound.top));
+      const right = Math.max(...bounds.map((bound) => bound.right));
+      const bottom = Math.max(...bounds.map((bound) => bound.bottom));
+      const padding = 80;
+      const scale = Math.max(0.25, Math.min(1.4,
+        Math.min(canvas.clientWidth / Math.max(1, right - left + padding * 2),
+          canvas.clientHeight / Math.max(1, bottom - top + padding * 2))));
+      viewport.scale = scale;
+      viewport.x = (canvas.clientWidth - (right - left) * scale) / 2 - left * scale;
+      viewport.y = (canvas.clientHeight - (bottom - top) * scale) / 2 - top * scale;
+      applyViewport();
+    }
+
+    for (const button of toolButtons) button.addEventListener("click", () => selectTool(button.dataset.tool));
+    document.querySelector("#btnDelete").addEventListener("click", deleteSelected);
+    document.querySelector("#btnSend").addEventListener("click", sendNote);
+    document.querySelector("#btnZoomOut").addEventListener("click", () => zoomAt(canvas.getBoundingClientRect().left + canvas.clientWidth / 2, canvas.getBoundingClientRect().top + canvas.clientHeight / 2, viewport.scale / 1.2));
+    document.querySelector("#btnZoomIn").addEventListener("click", () => zoomAt(canvas.getBoundingClientRect().left + canvas.clientWidth / 2, canvas.getBoundingClientRect().top + canvas.clientHeight / 2, viewport.scale * 1.2));
+    document.querySelector("#btnZoomReset").addEventListener("click", () => {
+      markUserViewport();
+      viewport = { x: 0, y: 0, scale: 1 };
+      applyViewport();
+    });
+    document.querySelector("#btnFit").addEventListener("click", () => {
+      userAdjustedViewport = false;
+      localStorage.removeItem("aiDrawBoardUserViewport");
+      fitToContent();
+    });
+
+    noteInput.addEventListener("keydown", (event) => {
+      if (event.key === "Enter" && !event.shiftKey) {
+        event.preventDefault();
+        sendNote().catch((error) => showToast(error.message));
+      }
+    });
+
+    canvas.addEventListener("wheel", (event) => {
+      event.preventDefault();
+      zoomAt(event.clientX, event.clientY, viewport.scale * (event.deltaY > 0 ? 0.9 : 1.1));
+    }, { passive: false });
+
+    canvas.addEventListener("pointerdown", (event) => {
+      if (event.button !== 0) return;
+      const itemElement = event.target.closest(".board-item");
+      const point = screenToWorld(event.clientX, event.clientY);
+      if (tool !== "select") {
+        createItem(tool, point).catch((error) => showToast(error.message));
+        return;
+      }
+      if (itemElement) {
+        const item = board.items.find((candidate) => candidate.id === itemElement.dataset.id);
+        if (!item) return;
+        selectedId = item.id;
+        renderBoard();
+        pointerState = {
+          kind: "move", id: item.id, startX: event.clientX, startY: event.clientY,
+          originX: item.x, originY: item.y, moved: false,
+        };
+      } else {
+        selectedId = null;
+        renderBoard();
+        pointerState = {
+          kind: "pan", startX: event.clientX, startY: event.clientY,
+          originX: viewport.x, originY: viewport.y, moved: false,
+        };
+        canvas.classList.add("panning");
+      }
+      canvas.setPointerCapture(event.pointerId);
+    });
+
+    canvas.addEventListener("pointermove", (event) => {
+      if (!pointerState) return;
+      const deltaX = event.clientX - pointerState.startX;
+      const deltaY = event.clientY - pointerState.startY;
+      if (Math.abs(deltaX) + Math.abs(deltaY) > 3) pointerState.moved = true;
+      if (pointerState.kind === "pan") {
+        if (pointerState.moved) markUserViewport();
+        viewport.x = pointerState.originX + deltaX;
+        viewport.y = pointerState.originY + deltaY;
+        applyViewport();
+      } else if (pointerState.moved) {
+        const element = world.querySelector(`[data-id="${CSS.escape(pointerState.id)}"]`);
+        if (element) {
+          element.style.left = `${pointerState.originX + deltaX / viewport.scale}px`;
+          element.style.top = `${pointerState.originY + deltaY / viewport.scale}px`;
+        }
+      }
+    });
+
+    canvas.addEventListener("pointerup", (event) => {
+      if (!pointerState) return;
+      const state = pointerState;
+      pointerState = null;
+      canvas.classList.remove("panning");
+      if (state.kind === "move" && state.moved) {
+        const deltaX = (event.clientX - state.startX) / viewport.scale;
+        const deltaY = (event.clientY - state.startY) / viewport.scale;
+        boardWrite(boardEndpoints.patchItem(state.id), "PATCH", {
+          confirmedBy: "human", patch: { x: state.originX + deltaX, y: state.originY + deltaY },
+        }).catch((error) => showToast(error.message));
+      }
+    });
+
+    canvas.addEventListener("dblclick", (event) => {
+      const itemElement = event.target.closest(".board-item");
+      if (itemElement) beginTextEdit(itemElement.dataset.id);
+    });
+
+    window.addEventListener("keydown", (event) => {
+      const typing = /^(INPUT|TEXTAREA)$/.test(document.activeElement?.tagName || "") || document.activeElement?.isContentEditable;
+      if (typing) return;
+      const shortcut = { v: "select", n: "note", t: "text", r: "rect", e: "ellipse", l: "line" }[event.key.toLowerCase()];
+      if (shortcut) { selectTool(shortcut); return; }
+      if (event.key === "Delete" || event.key === "Backspace") { event.preventDefault(); deleteSelected().catch((error) => showToast(error.message)); }
+      if (event.key === "Escape") { selectedId = null; selectTool("select"); renderBoard(); }
+    });
+
+    function connectUpdates() {
+      const protocol = location.protocol === "https:" ? "wss" : "ws";
+      const socket = new WebSocket(`${protocol}://${location.host}/ws`);
+      socket.addEventListener("message", (event) => {
+        try {
+          const message = JSON.parse(event.data);
+          if (message.type === "board_updated") loadBoard().catch(() => {});
+        } catch {}
+      });
+      socket.addEventListener("close", () => window.setTimeout(connectUpdates, 1500));
+    }
+
+    restoreViewport();
+    loadBoard().then(() => {
+      if (board.items.length === 0 && !userAdjustedViewport) {
+        viewport = { x: canvas.clientWidth / 2, y: canvas.clientHeight / 2, scale: 1 };
+        applyViewport();
+      } else if (board.items.length > 0 && !userAdjustedViewport) {
+        fitToContent();
+      }
+      connectUpdates();
+    }).catch((error) => setStatus(`连接失败：${error.message}`));
+  </script>
+</body>
+</html>

@@ -1,8 +1,9 @@
 {
   "command": "npx",
-  "args": ["ai-draw-mcp"],
+  "args": ["doodle-mcp"],
   "env": {
-    "AI_DRAW_WORKSPACE_ROOT": "<absolute-path-to-your-project>",
-    "OUTPUT_DIR": "./output"
+    "DOODLE_WORKSPACE_ROOT": "<absolute-path-to-your-project>",
+    "OUTPUT_DIR": "<absolute-path-to>/Doodle/output",
+    "LOG_LEVEL": "info"
   }
 }

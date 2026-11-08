@@ -2,24 +2,23 @@
 
 <!-- What changed and why? -->
 
-## Human ↔ AI impact
+## Shared board impact
 
 - [ ] MCP tool schema or tool count changed
-- [ ] Collaboration protocol / persisted session changed
-- [ ] Preview panel UX changed
-- [ ] Security boundary changed (explain threat model below)
-- [ ] Read-only JSON projection, tool catalogue, or ADR changed
+- [ ] Board version 1 state or HTTP API changed
+- [ ] Human canvas UX changed
+- [ ] Project scan boundary changed
+- [ ] Documentation, examples, or CI changed
 
 ## Validation
 
 - [ ] `npm run lint`
 - [ ] `npm run build`
 - [ ] `npm test`
-- [ ] `npm run test:examples:workflow`
 - [ ] `npm run repo:check`
 - [ ] `npm run doctor`
 - [ ] Updated `README.md`, `AGENTS.md`, `CHANGELOG.md`
 
 ## Notes for reviewers
 
-<!-- Screenshots, tradeoffs, follow-up work, or rollback plan. -->
+<!-- Tradeoffs, compatibility, screenshots, or rollback plan. -->

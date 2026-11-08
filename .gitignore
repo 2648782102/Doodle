@@ -10,7 +10,5 @@ output/manifest.json
 .DS_Store
 .codex/
 output/.ai-draw/
+output/.doodle/
 test-results/
-
-extensions/ai-draw-panel/out/
-extensions/ai-draw-panel/node_modules/

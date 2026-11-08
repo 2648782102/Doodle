@@ -1,23 +1,20 @@
 # Versioning
 
-AI Draw MCP follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
+Doodle follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 During the `0.x` series:
 
-- Breaking changes increment the minor version: `0.2.0` → `0.3.0`.
+- Breaking changes increment the minor version: `0.3.4` → `0.4.0`.
 - Backward-compatible features increment the minor version.
 - Fixes and documentation-only corrections increment the patch version.
 
 A breaking change includes, but is not limited to:
 
-- Renaming/removing an MCP tool, or changing required tool parameters.
-- Changing the machine-readable `ID:` / `JSON:` response lines consumed by models.
-- Changing environment variable names, defaults, ports, output directories, or persisted protocol versions.
-- Changing the preview REST/WebSocket contract in a way old panels cannot ignore.
+- Adding, renaming, or removing an MCP tool, or changing required tool parameters.
+- Changing machine-readable `BOARD_JSON`, `PROJECT_JSON`, or `JSON:` response fields consumed by models.
+- Changing `SimpleBoard` version 1 persistence, revision semantics, or compatibility rules.
+- Changing environment variable names, defaults, ports, or output directories.
+- Changing the local REST/WebSocket contract in a way an active panel cannot ignore.
 - Raising the minimum supported Node.js version.
 
-The MCP server reports its version from `package.json`; keep package version, `CHANGELOG.md`, and release tags in sync.
-
-## Supported versions
-
-Only the latest `0.3.x` release receives fixes. Older `0.2.x`, `0.3.0`, `0.3.1`, `0.3.2`, and `0.3.3` installations should upgrade to `0.3.4` for the read-only selection workorder, capability-discovery tool, bounded selection scope, read-only projections, and security improvements.
+The MCP server reports its version from `package.json`. Keep package version, `CHANGELOG.md`, and release tags in sync. Only the latest `0.4.x` release receives fixes.

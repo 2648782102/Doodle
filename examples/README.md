@@ -1,44 +1,17 @@
 # Examples
 
-These examples are intentionally small and contain no secrets or absolute paths.
+These examples are small and contain no secrets or absolute paths.
 
-- `mcp-config/cursor.json` — Cursor MCP server configuration for local development.
+- `mcp-config/codex.toml` — Codex MCP stdio snippet.
+- `mcp-config/cursor.json` — Cursor MCP stdio snippet.
 - `mcp-config/stdio.json` — generic stdio configuration shape.
-- `mermaid/login-flow.mmd` — a Mermaid flowchart for `render_diagram`.
-- `svg/badge.svg` — an SVG fragment for `render_svg`.
-- `node-client.mjs` — a minimal MCP client that lists tools and renders an example diagram.
-- `collab-demo.mjs` — an end-to-end collaboration demo in a temporary workspace.
-- `agent-workflow.mjs` — a reproducible read-only workflow: ordered steps → template draft → preflight, without creating a proposal or writing files.
-- `get_node_context` — a read-only MCP tool for one focused node's evidence, threads, edges, graph diffs, and focus state; available after `scan_project`.
-- `get_shared_brief` — a read-only `BRIEF_JSON` handoff tool for readiness blockers, bounded intent, stale threads, latest graph diff, evidence, and next actions; `agent-workflow.mjs` verifies it before preflight.
-- `get_decision_trail` — a read-only `DECISION_TRAIL_JSON` chronology linking human intent, graph diffs, bounded proposal change summaries, proposal stages, gaps, and activity events; `agent-workflow.mjs` verifies its no-grant boundary before preflight. It does not replace the full line diff.
-- `BRIEF_JSON.viewport` — bounded human zoom/pan attention context; it is read-only and never becomes a graph revision, timeline event, bundle field, or approval grant.
-- `EXPORT_MANIFEST_JSON` — a derived, credential-free inventory attached to downloaded session bundles; it lists counts, exclusions, and read-only safety flags, and is not required for strict bundle import.
-- `REVIEW_READINESS_JSON` — a derived, read-only diagnostic in `CONTEXT_JSON.diagnostics.reviewReadiness` and the panel; `agent-workflow.mjs` verifies its status before preflight without approving or writing files. See [ADR 0015](../docs/ADR/0015-review-readiness-is-a-derived-diagnostic.md).
-- `SOURCE_NAVIGATION_JSON` — a bounded, read-only, workspace-relative `file:line` navigation hint from `get_source_navigation`; `agent-workflow.mjs` verifies its no-side-effect contract before preflight. It returns copyable VS Code/Cursor URI and CLI text but never opens files or launches an IDE. See [ADR 0016](../docs/ADR/0016-source-navigation-is-copyable-context.md).
-- `CAPABILITIES_JSON` — a bounded, read-only catalogue of all 26 tools, JSON contracts, workflow readiness, suggested next action, and the unique receipt-gated project-write boundary; `agent-workflow.mjs` verifies it before reading the ordered workflow. It complements MCP `tools/list` without invoking tools or issuing grants. See [ADR 0017](../docs/ADR/0017-capability-catalogue-is-read-only-discovery.md).
-- `SELECTION_SCOPE_JSON` — a bounded, read-only projection of human multi-node selection: selected nodes, internal edges, safe relative `file:line` evidence, focus membership, and fixed safety flags. It is context only and never grants writes. See [ADR 0018](../docs/ADR/0018-human-selection-is-read-only-scope.md).
-- `SELECTION_WORKORDER_JSON` — a bounded, read-only pre-proposal checklist derived from a human selection, in-scope intent, safe candidate paths, evidence, readiness gaps, descriptive selection freshness, and next actions. It contains no file content, line diff, proposal, approval grant, or absolute path; `agent-workflow.mjs` verifies its freshness and safety contract before continuing to the workflow. See [ADR 0019](../docs/ADR/0019-selection-workorder-is-read-only-preflight.md).
-- `collaboration-workflow.md` — a human ↔ AI walkthrough for scanning, annotating, approving, and applying a proposal.
+- `board-client.mjs` — a minimal MCP client that lists the four board tools, reads `BOARD_JSON`, draws one note, and leaves one AI response.
 
-Run the client after `npm run build`:
+Build the server first, then run:
 
 ```bash
-node examples/node-client.mjs
+npm run build
+node examples/board-client.mjs
 ```
 
-Run the full collaboration loop without touching your own project:
-
-```bash
-node examples/collab-demo.mjs
-```
-
-Run the read-only agent workflow example, which stops before proposal creation and is also executed by CI:
-
-```bash
-npm run test:examples:workflow
-```
-
-For the bidirectional workflow, follow [collaboration-workflow.md](collaboration-workflow.md).
-
-Set `PUPPETEER_EXECUTABLE_PATH` if `mmdc` cannot find a local Chrome/Chromium.
+Normal MCP calls do not open a browser. Open `http://127.0.0.1:3399/` only when a human wants to see the shared canvas.

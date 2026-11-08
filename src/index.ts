@@ -9,7 +9,7 @@ async function main() {
   await preview.start();
   const transport = new StdioServerTransport();
   await mcp.connect(transport);
-  logger.info("ai-draw-mcp is running (stdio + preview server)");
+  logger.info("doodle-mcp is running (stdio + preview server)");
 }
 
 main().catch((err) => {

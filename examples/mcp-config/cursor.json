@@ -1,14 +1,12 @@
 {
   "mcpServers": {
-    "ai-draw": {
+    "doodle": {
       "command": "node",
-      "args": ["<absolute-path-to>/ai-draw-mcp/dist/index.js"],
+      "args": ["<absolute-path-to>/Doodle/dist/index.js"],
       "env": {
-        "AI_DRAW_WORKSPACE_ROOT": "<absolute-path-to-your-project>",
-        "OUTPUT_DIR": "<absolute-path-to>/ai-draw-mcp/output",
+        "DOODLE_WORKSPACE_ROOT": "<absolute-path-to-your-project>",
+        "OUTPUT_DIR": "<absolute-path-to>/Doodle/output",
         "PREVIEW_PORT": "3399",
-        "DEFAULT_THEME": "default",
-        "DEFAULT_FORMAT": "svg",
         "LOG_LEVEL": "info"
       }
     }

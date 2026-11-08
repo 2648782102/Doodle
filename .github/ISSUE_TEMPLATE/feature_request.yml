@@ -1,5 +1,5 @@
 name: Feature request
-description: Suggest a capability for human-AI visual collaboration
+description: Suggest a small capability for the shared board
 title: "[Feature]: "
 labels: ["enhancement"]
 body:
@@ -7,27 +7,23 @@ body:
     id: problem
     attributes:
       label: Problem
-      description: What workflow is difficult today?
+      description: What is difficult for the human or AI today?
     validations:
       required: true
   - type: textarea
-    id: proposal
+    id: experience
     attributes:
       label: Proposed experience
-      description: Describe both the human side and the AI/MCP side.
+      description: Keep the canvas simple; describe both the MCP and human sides.
     validations:
       required: true
   - type: textarea
-    id: alternatives
+    id: boundary
     attributes:
-      label: Alternatives considered
-  - type: textarea
-    id: safety
-    attributes:
-      label: Safety boundary
-      description: Does this change tool discovery, persisted state, approval receipts, project writes, absolute paths, or a read-only JSON projection?
+      label: Boundary
+      description: Does this add a tool, persist state, open windows, expose workspace paths, or write project files?
   - type: textarea
     id: validation
     attributes:
       label: Expected validation
-      description: Which MCP/panel/domain/offline checks should prove the human and AI sides stay aligned?
+      description: Which tests and offline checks should prove the change?
