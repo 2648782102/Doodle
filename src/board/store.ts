@@ -1,17 +1,20 @@
 import fs from "node:fs/promises";
 import path from "node:path";
-import { createEmptyBoard, parseBoard, type SimpleBoard } from "./types.js";
+import { BoardRevisionConflictError } from "./errors.js";
+import { AsyncMutex } from "./mutex.js";
+import { createStarterBoard, parseBoard, touchBoard, type SimpleBoard } from "./types.js";
 
 export class BoardStore {
   private board: SimpleBoard;
   private revision: number;
   private file: string;
   private legacyFile: string;
+  private readonly mutex = new AsyncMutex();
 
   constructor(outputDir: string) {
     this.file = path.join(outputDir, ".doodle", "board.json");
     this.legacyFile = path.join(outputDir, ".ai-draw", "board.json");
-    this.board = createEmptyBoard();
+    this.board = createStarterBoard();
     this.revision = 0;
   }
 
@@ -23,7 +26,8 @@ export class BoardStore {
         throw new Error(`Failed to read simple board: ${error instanceof Error ? error.message : String(error)}`);
       }
       this.revision = 0;
-      await this.persist();
+      this.board = createStarterBoard();
+      await this.commit(touchBoard(this.board));
     }
     await this.migrateLegacyState();
   }
@@ -33,10 +37,17 @@ export class BoardStore {
   }
 
   async replace(board: SimpleBoard): Promise<SimpleBoard> {
-    this.board = parseBoard(board);
-    this.revision = this.board.revision;
-    await this.persist();
-    return this.board;
+    return this.commit(board);
+  }
+
+  async replaceIfRevision(board: SimpleBoard, expectedRevision: number): Promise<SimpleBoard> {
+    return this.mutex.run(async () => {
+      const current = await this.readFreshState();
+      if (current.revision !== expectedRevision) {
+        throw new BoardRevisionConflictError(expectedRevision, current.revision);
+      }
+      return this.persist(parseBoard(board));
+    });
   }
 
   async snapshot(): Promise<SimpleBoard> {
@@ -47,17 +58,29 @@ export class BoardStore {
   }
 
   async mutate(change: (board: SimpleBoard) => SimpleBoard): Promise<SimpleBoard> {
-    await this.snapshot();
-    return this.replace(change(this.board));
+    return this.mutex.run(async () => {
+      const current = await this.readFreshState();
+      return this.persist(parseBoard(change(current)));
+    });
+  }
+
+  private async commit(board: SimpleBoard): Promise<SimpleBoard> {
+    return this.mutex.run(() => this.persist(parseBoard(board)));
   }
 
   private async reload(): Promise<void> {
-    const raw = await this.readState();
-    const next = parseBoard(JSON.parse(raw));
+    const next = await this.readFreshState();
+    this.board = next;
+    this.revision = next.revision;
+  }
+
+  private async readFreshState(): Promise<SimpleBoard> {
+    const next = parseBoard(JSON.parse(await this.readState()));
     if (next.revision >= this.revision) {
       this.board = next;
       this.revision = next.revision;
     }
+    return this.board;
   }
 
   private async readState(): Promise<string> {
@@ -77,14 +100,17 @@ export class BoardStore {
     } catch (error) {
       if ((error as NodeJS.ErrnoException).code !== "ENOENT") throw error;
     }
-    await this.persist();
+    await this.commit(this.board);
   }
 
-  private async persist(): Promise<void> {
+  private async persist(board: SimpleBoard): Promise<SimpleBoard> {
     await fs.mkdir(path.dirname(this.file), { recursive: true });
     const temp = `${this.file}.tmp`;
-    const serialized = JSON.stringify(this.board, null, 2);
+    const serialized = JSON.stringify(board, null, 2);
     await fs.writeFile(temp, serialized, "utf-8");
     await fs.rename(temp, this.file);
+    this.board = board;
+    this.revision = board.revision;
+    return board;
   }
 }

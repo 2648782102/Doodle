@@ -56,7 +56,7 @@ describe("post-cleanup repository shape", () => {
       expect(current.some((name) => pattern.test(name)), `unexpected legacy path matching ${pattern}`).toBe(false);
     }
     expect(extensions).toBe(false);
-    expect(source.filter((name) => name.endsWith(".ts"))).toHaveLength(13);
+    expect(source.filter((name) => name.endsWith(".ts"))).toHaveLength(15);
     expect(scripts.filter((name) => name.endsWith(".mjs"))).toHaveLength(3);
     expect(tests.filter((name) => name.endsWith(".test.mjs"))).toHaveLength(4);
     const compiled = await listFiles(path.join(root, "dist"));
@@ -102,6 +102,20 @@ describe("post-cleanup repository shape", () => {
       expect(text, relative).not.toContain("AI Draw MCP");
       expect(text, relative).not.toContain("ai-draw-mcp");
     }
+  });
+
+  it("keeps current user-facing surfaces on the Doodle name and current endpoints", async () => {
+    const template = await fs.readFile(path.join(root, "src", "infra", "templates", "board.html"), "utf8");
+    expect(template).toContain("<title>Doodle</title>");
+    expect(template).toContain('class="brand">Doodle');
+    expect(template).not.toContain('setItem("aiDrawBoardViewport"');
+    expect(template).toContain("doodleBoardViewport");
+    const architecture = await fs.readFile(path.join(root, "docs", "ARCHITECTURE.md"), "utf8");
+    expect(architecture).toContain("GET /api/board/project");
+    expect(architecture).not.toContain("GET /project");
+    const stdioExample = JSON.parse(await fs.readFile(path.join(root, "examples", "mcp-config", "stdio.json"), "utf8"));
+    expect(stdioExample.command).toBe("node");
+    expect(stdioExample.args[0]).toContain("Doodle/dist/index.js");
   });
 
   it("links only existing current documentation targets", async () => {

@@ -63,7 +63,8 @@ npm run doctor
 - stdout 只用于 MCP JSON-RPC；所有日志写 stderr。
 - 本地 HTTP 默认只监听 `127.0.0.1`。
 - 非 GET `/api/board/*` 需要页面随机 `X-AI-Draw-Token` 和 `confirmedBy: "human"`。
-- `scan_project` 跳过常见生成目录、dot-private 文件、`.env`-like 文件和大文件；只返回工作区相对路径与短证据。
+- `scan_project` 跳过常见生成目录、dot-private 文件、`.env`-like 文件和大文件；只返回工作区相对路径与脱敏短证据。
+- 画板写入按 revision 做并发检查；旧快照不会覆盖其他人或 AI 刚画的内容。
 - 画板对象和留言只是沟通上下文，不签发凭据，不写项目文件。
 
 ## 开发

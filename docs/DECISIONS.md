@@ -13,6 +13,9 @@
 6. **Human writes are explicitly local.** Non-GET `/api/board/*` requests require `X-AI-Draw-Token` and `confirmedBy: "human"`. The server binds to `127.0.0.1` by default.
 7. **No project-write protocol is bundled.** Code changes remain ordinary coding-agent work. Board objects and notes never become approval credentials or automatic file edits.
 8. **Dependencies follow the product.** Mermaid rendering, image conversion, IDE launchers, nanoid, and VS Code extension code were removed in `0.4.0`.
+9. **Shared board edits do not overwrite each other.** Board writes are serialized. HTTP edits use a fresh in-process snapshot; `draw_board` commits with the revision it read and reports a conflict if another writer moved the canvas first. Human HTTP and MCP edits stay on the same version 1 state file without a second workflow model.
+10. **A fresh board shows Doodle, not a stale project diagram.** New state begins with a small welcome sketch and one short AI note. Existing boards are preserved; browser view preferences use `doodleBoard*` localStorage keys and migrate old local values.
+11. **Project evidence is conservative.** `scan_project` skips credential-like lines and redacts assigned values; it never turns short source excerpts into a secret-export surface.
 
 ## Historical records
 
