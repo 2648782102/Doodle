@@ -123,7 +123,8 @@ export function registerBoardTools(server: McpServer, ctx: BoardToolContext): vo
     },
     async ({ items, remove_ids, author }) => {
       try {
-        let board = await ctx.board.snapshot();
+        const initial = await ctx.board.snapshot();
+        let board = initial;
         let created = 0;
         let updated = 0;
         for (const raw of items ?? []) {
@@ -140,7 +141,7 @@ export function registerBoardTools(server: McpServer, ctx: BoardToolContext): vo
         for (const id of remove_ids ?? []) {
           board = removeBoardItem(board, id);
         }
-        await ctx.board.replace(board);
+        await ctx.board.replaceIfRevision(board, initial.revision);
         ctx.preview.broadcast({ type: "board_updated", revision: board.revision });
         return {
           content: [{
@@ -175,9 +176,11 @@ export function registerBoardTools(server: McpServer, ctx: BoardToolContext): vo
     },
     async ({ body, item_id }) => {
       try {
-        let board = await ctx.board.snapshot();
-        board = addBoardNote(board, { body, author: "ai", itemId: item_id });
-        await ctx.board.replace(board);
+        const board = await ctx.board.mutate((current) => addBoardNote(current, {
+          body,
+          author: "ai",
+          itemId: item_id,
+        }));
         ctx.preview.broadcast({ type: "board_updated", revision: board.revision });
         const note = board.notes[board.notes.length - 1];
         return {

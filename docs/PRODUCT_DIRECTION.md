@@ -21,6 +21,7 @@ The loop can pause or repeat at any point. `scan_project` is an optional read-on
 - **Human input:** clicking, dragging, editing text, deleting objects, and short messages that may refer to a selected object.
 - **AI input:** `get_board` reads the canvas; `draw_board` adds, edits, or removes objects; `reply_on_board` adds one short response; `scan_project` optionally reads bounded project structure.
 - **Authors:** every object and note records whether a person or AI created it.
+- **Concurrent edits:** writes take a local lock, reread the shared state, and are rejected when the canvas revision changed after it was read. Existing board content is never cleared automatically.
 - **Approval:** this product has no built-in code-change approval protocol. Board communication never authorizes project writes.
 
 ## Experience principles
@@ -43,7 +44,7 @@ The loop can pause or repeat at any point. `scan_project` is an optional read-on
 
 ## Acceptance
 
-A fresh checkout can build, pass `npm run check`, and start a local MCP server with exactly four tools. An agent can read `BOARD_JSON`, draw a structured diagram with aligned arrows, and leave one short reply without opening a browser or touching project files. A human can open the same board locally, move objects, edit text, and leave a message that the AI reads on its next `get_board`.
+A fresh checkout can build, pass `npm run check`, and start a local MCP server with exactly four tools. A new board starts with a small Doodle welcome sketch; existing content is preserved. An agent can read `BOARD_JSON`, draw a structured diagram with aligned arrows, and leave one short reply without opening a browser or touching project files. A human can open the same board locally, move objects, edit text, and leave a message that the AI reads on its next `get_board`.
 
 ## Next work
 

@@ -3,7 +3,7 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>AI 画板</title>
+  <title>Doodle</title>
   <style>
     :root {
       --bg: #f7f8fa;
@@ -203,7 +203,7 @@
 </head>
 <body>
   <header class="topbar">
-    <div class="brand">AI 画板 <small>人 · 画布 · AI</small></div>
+    <div class="brand">Doodle <small>人 · 画布 · AI</small></div>
     <span id="boardTitle">和 AI 一起画</span>
     <span id="status">正在连接…</span>
   </header>
@@ -270,17 +270,22 @@
       rect: { w: 180, h: 110 }, ellipse: { w: 180, h: 110 }, line: { w: 180, h: 0 },
     };
     const colorCycle = ["#f6d365", "#b8e0d2", "#c7d8ff", "#ffd1dc", "#e8e8e8", "#ffffff"];
-    let board = { version: 1, title: "和 AI 一起画", revision: 0, items: [], notes: [] };
+    let board = { version: 1, title: "Doodle · 和 AI 一起画", revision: 0, items: [], notes: [] };
     let tool = "select";
     let selectedId = null;
     let viewport = { x: 0, y: 0, scale: 1 };
-    let userAdjustedViewport = localStorage.getItem("aiDrawBoardUserViewport") === "1";
+    const viewportKey = "doodleBoardViewport";
+    const userViewportKey = "doodleBoardUserViewport";
+    const legacyViewport = localStorage.getItem("aiDrawBoardViewport");
+    if (legacyViewport && !localStorage.getItem(viewportKey)) localStorage.setItem(viewportKey, legacyViewport);
+    if (localStorage.getItem("aiDrawBoardUserViewport") === "1") localStorage.setItem(userViewportKey, "1");
+    let userAdjustedViewport = localStorage.getItem(userViewportKey) === "1";
     let pointerState = null;
     let toastTimer = 0;
 
     function markUserViewport() {
       userAdjustedViewport = true;
-      localStorage.setItem("aiDrawBoardUserViewport", "1");
+      localStorage.setItem(userViewportKey, "1");
     }
 
     function showToast(message) {
@@ -300,12 +305,12 @@
       canvas.style.backgroundSize = `${grid}px ${grid}px`;
       canvas.style.backgroundPosition = `${viewport.x}px ${viewport.y}px`;
       document.querySelector("#btnZoomReset").textContent = `${Math.round(viewport.scale * 100)}%`;
-      localStorage.setItem("aiDrawBoardViewport", JSON.stringify(viewport));
+      localStorage.setItem(viewportKey, JSON.stringify(viewport));
     }
 
     function restoreViewport() {
       try {
-        const saved = JSON.parse(localStorage.getItem("aiDrawBoardViewport") || "null");
+        const saved = JSON.parse(localStorage.getItem(viewportKey) || "null");
         if (saved && Number.isFinite(saved.x) && Number.isFinite(saved.y) && Number.isFinite(saved.scale)) {
           viewport = { x: saved.x, y: saved.y, scale: Math.max(0.25, Math.min(3, saved.scale)) };
         }
@@ -585,7 +590,7 @@
     });
     document.querySelector("#btnFit").addEventListener("click", () => {
       userAdjustedViewport = false;
-      localStorage.removeItem("aiDrawBoardUserViewport");
+      localStorage.removeItem(userViewportKey);
       fitToContent();
     });
 

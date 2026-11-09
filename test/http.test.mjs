@@ -39,9 +39,10 @@ afterAll(async () => {
 describe("board HTTP surface", () => {
   it("serves the human board and the read-only board API", async () => {
     const html = await fetch(base).then((response) => response.text());
-    expect(html).toContain("AI 画板");
+    expect(html).toContain("Doodle");
     expect(html).toContain("/api/board");
     expect(html).not.toContain("/workbench");
+    expect(html).not.toContain("<title>AI 画板</title>");
     const snapshot = await fetch(`${base}/api/board`).then((response) => response.json());
     expect(snapshot).toMatchObject({ version: 1 });
   });

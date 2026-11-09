@@ -73,6 +73,10 @@ function now(): string {
   return new Date().toISOString();
 }
 
+export function touchBoard(board: SimpleBoard): SimpleBoard {
+  return { ...board, revision: board.revision + 1, updatedAt: now() };
+}
+
 export function createEmptyBoard(): SimpleBoard {
   const timestamp = now();
   return {
@@ -84,6 +88,66 @@ export function createEmptyBoard(): SimpleBoard {
     items: [],
     notes: [],
   };
+}
+
+export function createStarterBoard(): SimpleBoard {
+  const timestamp = now();
+  const authorStamp = `starter_${timestamp}`;
+  const title = "Doodle · 和 AI 一起画";
+  const items: BoardItem[] = [
+    {
+      id: "starter_title", type: "text", x: 40, y: 36, w: 560, h: 44,
+      text: "Doodle · 人和 AI 的共享画板", color: "#ffffff", author: "ai",
+      createdAt: timestamp, updatedAt: timestamp,
+    },
+    {
+      id: "starter_hint", type: "text", x: 40, y: 82, w: 680, h: 32,
+      text: "画一个对象、写一句短留言，AI 会从同一张画布继续", color: "#ffffff", author: "ai",
+      createdAt: timestamp, updatedAt: timestamp,
+    },
+    {
+      id: "starter_human", type: "note", x: 40, y: 150, w: 210, h: 120,
+      text: "人\n在这里随手画", color: "#f6d365", author: "human",
+      createdAt: timestamp, updatedAt: timestamp,
+    },
+    {
+      id: "starter_board", type: "rect", x: 330, y: 150, w: 230, h: 120,
+      text: "同一张无限画布", color: "#c7d8ff", author: "ai",
+      createdAt: timestamp, updatedAt: timestamp,
+    },
+    {
+      id: "starter_ai", type: "note", x: 640, y: 150, w: 210, h: 120,
+      text: "AI\n用 MCP 画 / 回应", color: "#b8e0d2", author: "ai",
+      createdAt: timestamp, updatedAt: timestamp,
+    },
+    {
+      id: "starter_arrow_human", type: "line", x: 250, y: 210, w: 70, h: 0,
+      text: "画", color: "#64748b", author: "ai",
+      createdAt: timestamp, updatedAt: timestamp,
+    },
+    {
+      id: "starter_arrow_ai", type: "line", x: 560, y: 210, w: 70, h: 0,
+      text: "读 / 画", color: "#64748b", author: "ai",
+      createdAt: timestamp, updatedAt: timestamp,
+    },
+    {
+      id: "starter_loop", type: "text", x: 40, y: 320, w: 810, h: 32,
+      text: "get_board  →  draw_board / reply_on_board  →  人继续画", color: "#ffffff", author: "ai",
+      createdAt: timestamp, updatedAt: timestamp,
+    },
+    {
+      id: "starter_boundary", type: "text", x: 40, y: 370, w: 810, h: 32,
+      text: "项目结构只是可画的主题之一；画板不写项目文件", color: "#ffffff", author: "ai",
+      createdAt: timestamp, updatedAt: timestamp,
+    },
+  ];
+  const notes: BoardNote[] = [{
+    id: `note_${authorStamp}`,
+    author: "ai",
+    body: "欢迎来到 Doodle。随手画，或写一句，AI 会从同一张画布继续。",
+    createdAt: timestamp,
+  }];
+  return { version: 1, id: `board_${authorStamp}`, title, revision: 0, updatedAt: timestamp, items, notes };
 }
 
 export function parseBoard(value: unknown): SimpleBoard {
@@ -254,10 +318,6 @@ export function addBoardNote(
     createdAt: now(),
   };
   return touchBoard({ ...board, notes: [...board.notes, note] });
-}
-
-export function touchBoard(board: SimpleBoard): SimpleBoard {
-  return { ...board, revision: board.revision + 1, updatedAt: now() };
 }
 
 export function boardCopyText(board: SimpleBoard): string {

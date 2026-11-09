@@ -7,11 +7,13 @@ import {
   addBoardNote,
   boardCopyText,
   createEmptyBoard,
+  createStarterBoard,
   parseBoard,
   removeBoardItem,
   updateBoardItem,
 } from "../dist/board/types.js";
 import { BoardStore } from "../dist/board/store.js";
+import { BoardRevisionConflictError } from "../dist/board/errors.js";
 import { scanProject } from "../dist/board/project-scan.js";
 
 describe("simple shared board", () => {
@@ -57,7 +59,7 @@ describe("simple shared board", () => {
       await reload.init();
       expect(reload.get().items[0].text).toBe("final");
       const removed = removeBoardItem(reload.get(), id);
-      expect(removed.items).toHaveLength(0);
+      expect(removed.items.some((item) => item.id === id)).toBe(false);
       expect(() => addBoardNote(removed, { author: "ai", body: "orphan", itemId: id })).toThrow();
     } finally {
       await fs.rm(outputDir, { recursive: true, force: true });
@@ -76,7 +78,78 @@ describe("simple shared board", () => {
       }));
       const observed = await reader.snapshot();
       expect(observed.revision).toBe(written.revision);
-      expect(observed.items[0]?.text).toBe("from another agent");
+      expect(observed.items.some((item) => item.text === "from another agent")).toBe(true);
+    } finally {
+      await fs.rm(outputDir, { recursive: true, force: true });
+    }
+  });
+
+  it("starts new boards with a Doodle welcome sketch and rejects stale writes", async () => {
+    const outputDir = await fs.mkdtemp(path.join(os.tmpdir(), "doodle-board-cas-"));
+    try {
+      const store = new BoardStore(outputDir);
+      await store.init();
+      const initial = await store.snapshot();
+      expect(initial.title).toContain("Doodle");
+      expect(initial.items.length).toBeGreaterThan(0);
+      expect(initial.notes[0]?.body).toContain("Doodle");
+      expect(initial.revision).toBe(1);
+
+      const stale = addBoardItem(initial, { type: "note", x: 900, y: 0, text: "stale" });
+      await store.mutate((current) => addBoardItem(current, { type: "note", x: 900, y: 120, text: "newer" }));
+      await expect(store.replaceIfRevision(stale, initial.revision)).rejects.toBeInstanceOf(BoardRevisionConflictError);
+      const current = await store.snapshot();
+      expect(current.items.some((item) => item.text === "newer")).toBe(true);
+      expect(current.items.some((item) => item.text === "stale")).toBe(false);
+    } finally {
+      await fs.rm(outputDir, { recursive: true, force: true });
+    }
+  });
+
+  it("serializes simultaneous human-style writes", async () => {
+    const outputDir = await fs.mkdtemp(path.join(os.tmpdir(), "doodle-board-lock-"));
+    try {
+      const store = new BoardStore(outputDir);
+      await store.init();
+      await Promise.all(Array.from({ length: 6 }, (_, index) => store.mutate((current) =>
+        addBoardItem(current, { type: "text", x: index * 20, y: 0, text: `item ${index}` }))));
+      const current = await store.snapshot();
+      expect(current.items.filter((item) => /^item \d$/.test(item.text))).toHaveLength(6);
+      expect(current.revision).toBe(7);
+    } finally {
+      await fs.rm(outputDir, { recursive: true, force: true });
+    }
+  });
+
+  it("serializes simultaneous writes from independent board stores", async () => {
+    const outputDir = await fs.mkdtemp(path.join(os.tmpdir(), "doodle-board-process-lock-"));
+    try {
+      const stores = Array.from({ length: 6 }, () => new BoardStore(outputDir));
+      await Promise.all(stores.map((store) => store.init()));
+      await Promise.all(stores.map((store, index) => store.mutate((current) =>
+        addBoardItem(current, { type: "text", x: index * 20, y: 0, text: `process ${index}` }))));
+      const current = await stores[0].snapshot();
+      expect(current.items.filter((item) => /^process \d$/.test(item.text))).toHaveLength(6);
+      expect(current.revision).toBe(7);
+    } finally {
+      await fs.rm(outputDir, { recursive: true, force: true });
+    }
+  });
+
+  it("recovers from a stale board lock without losing state", async () => {
+    const outputDir = await fs.mkdtemp(path.join(os.tmpdir(), "doodle-board-stale-lock-"));
+    try {
+      const store = new BoardStore(outputDir);
+      await store.init();
+      const initial = await store.snapshot();
+      const lockFile = path.join(outputDir, ".doodle", "board.json.lock");
+      await fs.writeFile(lockFile, `${process.pid}\n`, "utf8");
+      await fs.utimes(lockFile, new Date(0), new Date(0));
+      const current = await store.mutate((board) =>
+        addBoardItem(board, { type: "text", x: 10, y: 20, text: "after stale lock" }));
+      expect(current.revision).toBe(initial.revision + 1);
+      expect(current.items.some((item) => item.text === "after stale lock")).toBe(true);
+      expect(await fs.access(lockFile).then(() => true, () => false)).toBe(false);
     } finally {
       await fs.rm(outputDir, { recursive: true, force: true });
     }
@@ -91,6 +164,7 @@ describe("read-only project scan", () => {
       await fs.writeFile(path.join(workspace, "README.md"), "# Demo\n", "utf8");
       await fs.writeFile(path.join(workspace, "src", "main.ts"), "export function main() {}\n", "utf8");
       await fs.writeFile(path.join(workspace, ".env"), "SECRET=never-export\n", "utf8");
+      await fs.writeFile(path.join(workspace, "src", "config.ts"), "export const apiKey = 'sk-live-abcdef123456';\n", "utf8");
       const snapshot = await scanProject(workspace, { maxDepth: 2, maxFiles: 20 });
       expect(snapshot).toMatchObject({ version: 1, readOnly: true, writes: "none" });
       expect(snapshot.files.map((file) => file.path)).toContain("README.md");
@@ -98,6 +172,8 @@ describe("read-only project scan", () => {
       expect(snapshot.files.map((file) => file.path)).not.toContain(".env");
       expect(snapshot.evidence.some((item) => item.path === "src/main.ts" && item.kind === "definition")).toBe(true);
       expect(JSON.stringify(snapshot)).not.toContain("never-export");
+      expect(JSON.stringify(snapshot)).not.toContain("sk-live-abcdef123456");
+      expect(snapshot.evidence.some((item) => item.excerpt.includes("apiKey"))).toBe(false);
     } finally {
       await fs.rm(workspace, { recursive: true, force: true });
     }

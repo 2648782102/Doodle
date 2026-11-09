@@ -11,6 +11,8 @@ src/
 ├── board/
 │   ├── types.ts                version 1 board state and pure object mutations
 │   ├── store.ts                atomic board.json persistence and revision sync
+│   ├── errors.ts               board revision conflict error
+│   ├── mutex.ts                cross-process lock around board writes
 │   ├── project-scan.ts         bounded read-only workspace path/evidence scan
 │   ├── http.ts                 local board API, HTML template, WebSocket updates
 │   ├── tools.ts                get / draw / reply / scan MCP tools
@@ -41,7 +43,7 @@ No tool opens a browser, writes a project file, launches an IDE, or emits approv
 
 ## Board state
 
-`BoardStore` persists `output/.doodle/board.json` through a temporary file and atomic rename. It can read the legacy `output/.ai-draw/board.json` once when the new file does not exist. Every read compares the on-disk revision with the in-memory revision, so a long-lived HTTP process and short-lived MCP clients stay synchronized.
+`BoardStore` persists `output/.doodle/board.json` through a temporary file and atomic rename. It can read the legacy `output/.ai-draw/board.json` once when the new file does not exist. Every read uses the on-disk revision as the current state, so a long-lived HTTP process and short-lived MCP clients stay synchronized. A fresh state starts from a small Doodle welcome sketch; existing boards are never reset. Writes take `output/.doodle/board.json.lock`, reread disk state, and `draw_board` commits only when the revision it read is still current.
 
 `SimpleBoard` is version 1 and contains bounded `items` and `notes`. Items have finite coordinates, one of five simple types, a hex color, a `human` / `ai` author, and timestamps. For `line`, `(x,y)` is the start point and `(x+w,y+h)` is the end point; `w` and `h` are signed endpoint deltas. Other types use `(x,y)` as the top-left corner and positive width/height.
 
@@ -59,15 +61,15 @@ The HTTP server binds to `127.0.0.1` by default and serves only the board:
 | `PATCH /api/board/items/:id` | Human-confirmed object update |
 | `DELETE /api/board/items/:id` | Human-confirmed object deletion |
 | `POST /api/board/notes` | Human-confirmed short message |
-| `GET /project` | Bounded read-only project structure JSON |
-| `GET /project/text` | Plain-text projection of the same scan |
+| `GET /api/board/project` | Bounded read-only project structure JSON |
+| `GET /api/board/project/text` | Plain-text projection of the same scan |
 | `WS /ws` | `board_updated` revision broadcasts |
 
 Non-GET `/api/board/*` requests require the random `X-AI-Draw-Token` injected into the HTML and `confirmedBy: "human"`. The token exists only in the local browser session and never enters persisted state.
 
 ## Read-only project scan
 
-`scan_project` walks the configured workspace root with bounded depth and entry count, skips common generated/private directories, ignores dot-private files including `.env`, and reads only small text files for at most five safe `file:line` evidence lines. Paths are workspace-relative. It returns no file contents beyond short evidence excerpts, no absolute workspace path, and no write capability.
+`scan_project` walks the configured workspace root with bounded depth and entry count, skips common generated/private directories, ignores dot-private files including `.env`, and reads only small text files for at most five safe `file:line` evidence lines. It skips credential-like lines and redacts assigned values in evidence. Paths are workspace-relative. It returns no file contents beyond short evidence excerpts, no absolute workspace path, and no write capability.
 
 Project scanning does not modify the board. If the AI wants to show structure, it calls `draw_board` with a layout derived from the scan result.
 
@@ -77,7 +79,8 @@ Project scanning does not modify the board. If the AI wants to show structure, i
 - The preview server defaults to `127.0.0.1`; use `PREVIEW_HOST` only for explicit local configuration.
 - The board is communication context, never an authorization channel.
 - `scan_project` never writes files; board writes never write project files.
-- Offline guards in `scripts/repo-check.mjs` verify the four-tool surface, dependency cleanup, docs alignment, arrow contract, HTTP authentication, and read-only scan boundary. `scripts/build.mjs` removes known stale compiled directories and templates so a local rebuild cannot package deleted source modules.
+- Board writes are serialized by a local lock file; stale locks are removed without clearing board state.
+- Offline guards in `scripts/repo-check.mjs` verify the four-tool surface, dependency cleanup, docs alignment, arrow contract, HTTP authentication, Doodle branding, revision concurrency, and read-only scan boundary. `scripts/build.mjs` removes known stale compiled directories and templates so a local rebuild cannot package deleted source modules.
 - `npm run check` runs lint, build, tests, example syntax, offline guards, doctor, and package dry-run.
 
 ## Compatibility

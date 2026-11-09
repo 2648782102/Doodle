@@ -4,7 +4,7 @@ These examples are small and contain no secrets or absolute paths.
 
 - `mcp-config/codex.toml` — Codex MCP stdio snippet.
 - `mcp-config/cursor.json` — Cursor MCP stdio snippet.
-- `mcp-config/stdio.json` — generic stdio configuration shape.
+- `mcp-config/stdio.json` — generic local stdio configuration shape; use the built `dist/index.js` until `doodle-mcp` is published.
 - `board-client.mjs` — a minimal MCP client that lists the four board tools, reads `BOARD_JSON`, draws one note, and leaves one AI response.
 
 Build the server first, then run:

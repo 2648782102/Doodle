@@ -17,6 +17,7 @@ Doodle is a simple shared infinite board. The roadmap protects that boundary rat
 - Improve agent-facing guidance with concrete, tested layout conventions for architecture sketches.
 - Keep project scan evidence bounded, private-path safe, and useful without making structure the product.
 - Strengthen tests around atomic board persistence, HTTP authorization, MCP instructions, and package contents.
+- Keep concurrent human and AI writes revision-safe, and keep default board content aligned with the Doodle product name.
 
 ## Explicit non-goals
 

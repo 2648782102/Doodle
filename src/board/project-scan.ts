@@ -8,6 +8,9 @@ const SOURCE_EXTENSIONS = new Set([
   ".ts", ".tsx", ".js", ".jsx", ".mjs", ".cjs", ".json", ".md",
   ".css", ".scss", ".html", ".yml", ".yaml", ".toml", ".py", ".go", ".rs",
 ]);
+const EVIDENCE_KINDS = new Set(["definition", "heading", "import"]);
+const SENSITIVE_EVIDENCE = /(api[_-]?key|access[_-]?token|auth[_-]?token|bearer|password|passwd|secret|private[_-]?key|credential|ghp_|github_pat_|sk-[A-Za-z0-9]|AKIA[0-9A-Z]{16}|-----BEGIN)/i;
+const ASSIGNED_VALUE = /(["'`]?[A-Za-z0-9_.-]*(?:token|secret|password|passwd|key)["'`]?\s*[:=]\s*)(["'`]?)([^"'`\s,;]+)\2/i;
 const SKIPPED_DIRECTORIES = new Set([
   ".git", "node_modules", "dist", "build", "coverage", ".next", ".nuxt",
   ".cache", ".codex", "vendor", "output", ".doodle",
@@ -62,6 +65,14 @@ function isPrivateEntry(relative: string): boolean {
     segment.startsWith(".") || segment.toLowerCase().startsWith(".env"));
 }
 
+function safeEvidenceExcerpt(relative: string, line: string): string | null {
+  const trimmed = line.trim().slice(0, 160);
+  if (!trimmed || SENSITIVE_EVIDENCE.test(trimmed) || SENSITIVE_EVIDENCE.test(relative)) return null;
+  const assignment = trimmed.match(ASSIGNED_VALUE);
+  if (!assignment) return trimmed;
+  return `${assignment[1]}${assignment[2]}[redacted]${assignment[2]}`;
+}
+
 async function collectEvidence(root: string, absolute: string): Promise<ProjectEvidence[]> {
   const relative = relativePath(root, absolute);
   if (!SOURCE_EXTENSIONS.has(path.extname(absolute).toLowerCase())) return [];
@@ -78,12 +89,14 @@ async function collectEvidence(root: string, absolute: string): Promise<ProjectE
   for (const [index, line] of lines.entries()) {
     if (evidence.length >= 5) break;
     const trimmed = line.trim().slice(0, 160);
-    if (!trimmed) continue;
+    if (!trimmed || SENSITIVE_EVIDENCE.test(trimmed) || SENSITIVE_EVIDENCE.test(relative)) continue;
     let kind: ProjectEvidence["kind"] | null = null;
     if (/^(export\s+)?(async\s+)?(function|class|interface|type|const|enum)\b/.test(trimmed)) kind = "definition";
     else if (/^import\s.+\sfrom\s/.test(trimmed) || /^from\s.+\simport\s/.test(trimmed)) kind = "import";
     else if (/^#{1,6}\s/.test(trimmed)) kind = "heading";
-    if (kind) evidence.push({ path: relative, line: index + 1, kind, excerpt: trimmed });
+    if (!kind || !EVIDENCE_KINDS.has(kind)) continue;
+    const excerpt = safeEvidenceExcerpt(relative, line);
+    if (excerpt) evidence.push({ path: relative, line: index + 1, kind, excerpt });
   }
   return evidence;
 }

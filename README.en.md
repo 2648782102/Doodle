@@ -38,7 +38,7 @@ Add `dist/index.js` as a stdio MCP server in your MCP host. Config snippets are 
 
 ## Safety
 
-stdout carries only MCP JSON-RPC; logs go to stderr. The HTTP server binds to `127.0.0.1` by default. Non-GET `/api/board/*` requests require the random `X-AI-Draw-Token` and `confirmedBy: "human"`. Project scans return bounded workspace-relative paths and short evidence text only. Board communication never authorizes project writes.
+stdout carries only MCP JSON-RPC; logs go to stderr. The HTTP server binds to `127.0.0.1` by default. Non-GET `/api/board/*` requests require the random `X-AI-Draw-Token` and `confirmedBy: "human"`. Project scans return bounded workspace-relative paths and redacted evidence text only. Board writes take a local lock, reread the shared state, and are revision-checked so a stale snapshot cannot overwrite newer canvas work. Board communication never authorizes project writes.
 
 See `SECURITY.md`, `docs/ARCHITECTURE.md`, and `AGENTS.md` for details.
 

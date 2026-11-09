@@ -27,7 +27,15 @@ Reload `/` to obtain a fresh token. Browser write requests must include both `X-
 
 ### `scan_project` misses files
 
-The scan is bounded and deliberately skips generated directories, dot-private paths, `.env`-like files, and large text. Raise `max_depth` or `max_files` explicitly. It never follows outside the workspace root and never reads binary payloads.
+The scan is bounded and deliberately skips generated directories, dot-private paths, `.env`-like files, large text, and credential-like evidence. Raise `max_depth` or `max_files` explicitly. It never follows outside the workspace root and never reads binary payloads.
+
+### A board write reports a revision conflict
+
+Another human or AI edit reached the shared board first. Call `get_board` again, reapply the intended object IDs or drawing plan, and retry; Doodle intentionally rejects stale writes instead of overwriting newer canvas work.
+
+### A board write times out waiting for its lock
+
+Another local Doodle process held the board lock. Wait briefly and retry; Doodle removes stale lock files automatically and never clears the board to recover from a lock.
 
 ### Arrows point the wrong way
 

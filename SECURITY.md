@@ -21,7 +21,8 @@ Doodle is local-first. The MCP server uses stdio; a small HTTP server binds to `
 - The board state file lives under `OUTPUT_DIR/.doodle/board.json` and is ignored by Git.
 - Non-GET `/api/board/*` requests require the random `X-AI-Draw-Token` injected into the local HTML and `confirmedBy: "human"`. The token is not persisted.
 - Board objects, notes, and AI replies are communication context. They never become approval credentials or authority to write project files.
-- `scan_project` is read-only. It returns workspace-relative paths and bounded evidence excerpts, skips dot-private and `.env`-like paths, skips common generated directories, and does not follow paths outside the configured workspace root.
+- `scan_project` is read-only. It returns workspace-relative paths and bounded evidence excerpts, skips dot-private and `.env`-like paths, skips common generated directories, skips credential-like lines, redacts assigned evidence values, and does not follow paths outside the configured workspace root.
+- Board mutations take a local lock file, reread disk state, and are revision-checked so concurrent local writers cannot silently overwrite each other.
 - Normal MCP tools do not open browsers, launch IDEs, execute workspace commands, or write workspace files.
 - Code changes remain a separate coding-agent action with its own human review process.
 
