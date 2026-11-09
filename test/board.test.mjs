@@ -120,6 +120,40 @@ describe("simple shared board", () => {
       await fs.rm(outputDir, { recursive: true, force: true });
     }
   });
+
+  it("serializes simultaneous writes from independent board stores", async () => {
+    const outputDir = await fs.mkdtemp(path.join(os.tmpdir(), "doodle-board-process-lock-"));
+    try {
+      const stores = Array.from({ length: 6 }, () => new BoardStore(outputDir));
+      await Promise.all(stores.map((store) => store.init()));
+      await Promise.all(stores.map((store, index) => store.mutate((current) =>
+        addBoardItem(current, { type: "text", x: index * 20, y: 0, text: `process ${index}` }))));
+      const current = await stores[0].snapshot();
+      expect(current.items.filter((item) => /^process \d$/.test(item.text))).toHaveLength(6);
+      expect(current.revision).toBe(7);
+    } finally {
+      await fs.rm(outputDir, { recursive: true, force: true });
+    }
+  });
+
+  it("recovers from a stale board lock without losing state", async () => {
+    const outputDir = await fs.mkdtemp(path.join(os.tmpdir(), "doodle-board-stale-lock-"));
+    try {
+      const store = new BoardStore(outputDir);
+      await store.init();
+      const initial = await store.snapshot();
+      const lockFile = path.join(outputDir, ".doodle", "board.json.lock");
+      await fs.writeFile(lockFile, `${process.pid}\n`, "utf8");
+      await fs.utimes(lockFile, new Date(0), new Date(0));
+      const current = await store.mutate((board) =>
+        addBoardItem(board, { type: "text", x: 10, y: 20, text: "after stale lock" }));
+      expect(current.revision).toBe(initial.revision + 1);
+      expect(current.items.some((item) => item.text === "after stale lock")).toBe(true);
+      expect(await fs.access(lockFile).then(() => true, () => false)).toBe(false);
+    } finally {
+      await fs.rm(outputDir, { recursive: true, force: true });
+    }
+  });
 });
 
 describe("read-only project scan", () => {

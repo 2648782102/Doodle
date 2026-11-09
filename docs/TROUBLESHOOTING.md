@@ -33,6 +33,10 @@ The scan is bounded and deliberately skips generated directories, dot-private pa
 
 Another human or AI edit reached the shared board first. Call `get_board` again, reapply the intended object IDs or drawing plan, and retry; Doodle intentionally rejects stale writes instead of overwriting newer canvas work.
 
+### A board write times out waiting for its lock
+
+Another local Doodle process held the board lock. Wait briefly and retry; Doodle removes stale lock files automatically and never clears the board to recover from a lock.
+
 ### Arrows point the wrong way
 
 `line` is directed: `(x,y)` is the start, `(x+w,y+h)` is the end. Use negative `w` or `h` for leftward/upward arrows. For a clean architecture diagram, call `get_board` first, remove old object IDs with `remove_ids`, then place objects and arrows on a strict grid.

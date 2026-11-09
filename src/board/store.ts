@@ -9,85 +9,92 @@ export class BoardStore {
   private revision: number;
   private file: string;
   private legacyFile: string;
-  private readonly mutex = new AsyncMutex();
+  private readonly mutex: AsyncMutex;
 
   constructor(outputDir: string) {
     this.file = path.join(outputDir, ".doodle", "board.json");
     this.legacyFile = path.join(outputDir, ".ai-draw", "board.json");
+    this.mutex = new AsyncMutex(this.file);
     this.board = createStarterBoard();
     this.revision = 0;
   }
 
   async init(): Promise<void> {
-    try {
-      await this.reload();
-    } catch (error) {
-      if ((error as NodeJS.ErrnoException).code !== "ENOENT") {
-        throw new Error(`Failed to read simple board: ${error instanceof Error ? error.message : String(error)}`);
+    await this.mutex.run(async () => {
+      try {
+        const current = await this.readState();
+        this.assign(current);
+      } catch (error) {
+        if (!isMissingFile(error)) {
+          throw new Error(`Failed to read simple board: ${error instanceof Error ? error.message : String(error)}`);
+        }
+        this.board = createStarterBoard();
+        this.revision = 0;
+        await this.persist(touchBoard(this.board));
       }
-      this.revision = 0;
-      this.board = createStarterBoard();
-      await this.commit(touchBoard(this.board));
-    }
-    await this.migrateLegacyState();
+      await this.migrateLegacyState();
+    });
   }
 
   get(): SimpleBoard {
     return this.board;
   }
 
-  async replace(board: SimpleBoard): Promise<SimpleBoard> {
-    return this.commit(board);
+  async replace(board: SimpleBoard, expectedRevision?: number): Promise<SimpleBoard> {
+    return this.mutex.run(() => this.persistIfRevision(board, expectedRevision));
   }
 
   async replaceIfRevision(board: SimpleBoard, expectedRevision: number): Promise<SimpleBoard> {
-    return this.mutex.run(async () => {
-      const current = await this.readFreshState();
-      if (current.revision !== expectedRevision) {
-        throw new BoardRevisionConflictError(expectedRevision, current.revision);
-      }
-      return this.persist(parseBoard(board));
-    });
+    return this.replace(board, expectedRevision);
   }
 
   async snapshot(): Promise<SimpleBoard> {
-    await this.reload().catch((error) => {
-      if ((error as NodeJS.ErrnoException).code !== "ENOENT") throw error;
-    });
+    try {
+      this.assign(await this.readState());
+    } catch (error) {
+      if (!isMissingFile(error)) throw error;
+    }
     return this.board;
   }
 
   async mutate(change: (board: SimpleBoard) => SimpleBoard): Promise<SimpleBoard> {
     return this.mutex.run(async () => {
-      const current = await this.readFreshState();
-      return this.persist(parseBoard(change(current)));
+      const current = await this.readState();
+      const next = parseBoard(change(current));
+      if (next.revision <= current.revision) {
+        throw new BoardRevisionConflictError(current.revision, next.revision);
+      }
+      return this.persist(next);
     });
   }
 
-  private async commit(board: SimpleBoard): Promise<SimpleBoard> {
-    return this.mutex.run(() => this.persist(parseBoard(board)));
+  private assign(board: SimpleBoard): void {
+    this.board = board;
+    this.revision = board.revision;
   }
 
-  private async reload(): Promise<void> {
-    const next = await this.readFreshState();
-    this.board = next;
-    this.revision = next.revision;
+  private async readState(): Promise<SimpleBoard> {
+    return parseBoard(JSON.parse(await this.readStateText()));
   }
 
-  private async readFreshState(): Promise<SimpleBoard> {
-    const next = parseBoard(JSON.parse(await this.readState()));
-    if (next.revision >= this.revision) {
-      this.board = next;
-      this.revision = next.revision;
+  private async persistIfRevision(board: SimpleBoard, expectedRevision?: number): Promise<SimpleBoard> {
+    const current = await this.readState();
+    const baseRevision = expectedRevision ?? current.revision;
+    if (current.revision !== baseRevision) {
+      throw new BoardRevisionConflictError(baseRevision, current.revision);
     }
-    return this.board;
+    const next = parseBoard(board);
+    if (next.revision <= baseRevision) {
+      throw new BoardRevisionConflictError(baseRevision, next.revision);
+    }
+    return this.persist(next);
   }
 
-  private async readState(): Promise<string> {
+  private async readStateText(): Promise<string> {
     try {
       return await fs.readFile(this.file, "utf-8");
     } catch (error) {
-      if ((error as NodeJS.ErrnoException).code !== "ENOENT") throw error;
+      if (!isMissingFile(error)) throw error;
       return fs.readFile(this.legacyFile, "utf-8");
     }
   }
@@ -98,19 +105,21 @@ export class BoardStore {
       await fs.access(this.file);
       return;
     } catch (error) {
-      if ((error as NodeJS.ErrnoException).code !== "ENOENT") throw error;
+      if (!isMissingFile(error)) throw error;
     }
-    await this.commit(this.board);
+    await this.persist(this.board);
   }
 
   private async persist(board: SimpleBoard): Promise<SimpleBoard> {
-    await fs.mkdir(path.dirname(this.file), { recursive: true });
     const temp = `${this.file}.tmp`;
     const serialized = JSON.stringify(board, null, 2);
     await fs.writeFile(temp, serialized, "utf-8");
     await fs.rename(temp, this.file);
-    this.board = board;
-    this.revision = board.revision;
+    this.assign(board);
     return board;
   }
+}
+
+function isMissingFile(error: unknown): error is NodeJS.ErrnoException {
+  return error instanceof Error && (error as NodeJS.ErrnoException).code === "ENOENT";
 }

@@ -43,6 +43,8 @@ src/
 ├── board/
 │   ├── types.ts                version 1 board state and pure mutations
 │   ├── store.ts                atomic board.json persistence and revision sync
+│   ├── errors.ts               board revision conflict error
+│   ├── mutex.ts                cross-process board write lock
 │   ├── project-scan.ts         bounded read-only workspace scan
 │   ├── http.ts                 local board API, HTML, and WebSocket updates
 │   ├── tools.ts                four MCP tools
@@ -69,7 +71,7 @@ docs/                           product, architecture, decisions, and maintenanc
 - The server version comes from `package.json`; do not hard-code it in `src/server.ts`.
 - The preview server binds to `127.0.0.1` by default.
 - Non-GET `/api/board/*` requests require the random HTML-injected `X-AI-Draw-Token` and `confirmedBy: "human"`.
-- Board writes are serialized and checked against the expected revision; a stale `draw_board` call fails instead of overwriting a newer canvas.
+- Board writes take a local lock file, reread disk state, and check the expected revision; a stale `draw_board` call fails instead of overwriting a newer canvas.
 - Human view settings belong only in browser localStorage. They are not board state or permission.
 - `scan_project` returns workspace-relative paths and short evidence only; it skips dot-private paths, `.env`-like files, generated directories, large text, and redacts credential-like evidence.
 - Board objects and notes are communication context. They never become approval credentials or project writes. Code changes remain a separate, explicitly reviewed coding-agent action.

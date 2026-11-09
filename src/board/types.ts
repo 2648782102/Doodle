@@ -73,6 +73,10 @@ function now(): string {
   return new Date().toISOString();
 }
 
+export function touchBoard(board: SimpleBoard): SimpleBoard {
+  return { ...board, revision: board.revision + 1, updatedAt: now() };
+}
+
 export function createEmptyBoard(): SimpleBoard {
   const timestamp = now();
   return {
@@ -314,10 +318,6 @@ export function addBoardNote(
     createdAt: now(),
   };
   return touchBoard({ ...board, notes: [...board.notes, note] });
-}
-
-export function touchBoard(board: SimpleBoard): SimpleBoard {
-  return { ...board, revision: board.revision + 1, updatedAt: now() };
 }
 
 export function boardCopyText(board: SimpleBoard): string {

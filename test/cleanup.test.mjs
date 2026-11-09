@@ -113,6 +113,8 @@ describe("post-cleanup repository shape", () => {
     const architecture = await fs.readFile(path.join(root, "docs", "ARCHITECTURE.md"), "utf8");
     expect(architecture).toContain("GET /api/board/project");
     expect(architecture).not.toContain("GET /project");
+    expect(architecture).toContain("mutex.ts");
+    expect(architecture).toContain("errors.ts");
     const stdioExample = JSON.parse(await fs.readFile(path.join(root, "examples", "mcp-config", "stdio.json"), "utf8"));
     expect(stdioExample.command).toBe("node");
     expect(stdioExample.args[0]).toContain("Doodle/dist/index.js");

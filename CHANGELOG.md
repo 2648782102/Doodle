@@ -18,7 +18,7 @@ All notable changes are documented here. Versions follow `VERSIONING.md`.
 - Reduced runtime dependencies to the MCP SDK, Express, WebSocket, and Zod.
 - Made a clean-checkout build recreate the template directory after pruning stale compiled files.
 - Renamed the browser title and brand to `Doodle`, and added a small welcome sketch for new board state without clearing existing boards.
-- Serialized board writes and added revision checks so a stale `draw_board` snapshot cannot overwrite newer human or AI work.
+- Serialized board writes with a cross-process lock file and revision checks so a stale `draw_board` snapshot cannot overwrite newer human or AI work.
 - Redacted credential-like `scan_project` evidence and updated the local generic MCP example until `doodle-mcp` is published.
 - Corrected the project-context HTTP endpoints in `docs/ARCHITECTURE.md`.
 

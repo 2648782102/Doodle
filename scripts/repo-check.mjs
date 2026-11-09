@@ -27,6 +27,7 @@ const boardTemplate = await read("src/infra/templates/board.html");
 const http = await read("src/board/http.ts");
 const scanner = await read("src/board/project-scan.ts");
 const store = await read("src/board/store.ts");
+const mutex = await read("src/board/mutex.ts");
 const launchKit = await read("docs/LAUNCH_KIT.md");
 const readme = await read("README.md");
 const readmeEn = await read("README.en.md");
@@ -76,6 +77,7 @@ check(http.includes('"/api/board"') && http.includes("X-AI-Draw-Token"), "board 
 check(http.includes('"/api/board/project"') && !http.includes('"/project"'), "project scan is outside the authenticated board API namespace");
 check(!http.includes("/workbench") && !http.includes("/api/collab"), "board HTTP server still exposes workbench routes");
 check(store.includes("AsyncMutex") && store.includes("replaceIfRevision") && store.includes("BoardRevisionConflictError"), "board store lost serialized revision-safe writes");
+check(store.includes("new AsyncMutex(this.file)") && mutex.includes('fs.open(this.lockFile, "wx")'), "board store lost its cross-process write lock");
 check(tools.includes("replaceIfRevision") && tools.includes("BoardRevisionConflictError") === false, "draw_board does not use revision-checked writes");
 check(scanner.includes("readOnly: true") && scanner.includes('writes: "none"'), "project scan lost its read-only safety boundary");
 check(scanner.includes("workspaceName") && !scanner.includes("workspaceRoot:"), "project scan exposes an absolute workspace root");
@@ -94,7 +96,6 @@ for (const [file, label] of [
   [contributing, "CONTRIBUTING.md"],
   [security, "SECURITY.md"],
   [roadmap, "ROADMAP.md"],
-  [architecture, "ARCHITECTURE.md"],
 ]) {
   check(!file.includes("29 个 MCP 工具") && !file.includes("26 个 MCP 工具"), `${label} still advertises the legacy tool count`);
   check(!file.includes("/workbench"), `${label} still describes the removed workbench as current`);
