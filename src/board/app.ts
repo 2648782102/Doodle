@@ -94,4 +94,3 @@ window.DoodleBoardInit?.({
     return app.requestDisplayMode({ mode: "fullscreen" });
   },
 });
-
