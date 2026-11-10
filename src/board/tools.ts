@@ -26,11 +26,26 @@ export interface BoardToolContext {
 }
 
 const APP_RESOURCE_URI = "ui://doodle/board/v1.html";
+const READ_ONLY_LOCAL_ANNOTATIONS = {
+  readOnlyHint: true,
+  destructiveHint: false,
+  openWorldHint: false,
+} as const;
+const BOARD_WRITE_ANNOTATIONS = {
+  readOnlyHint: false,
+  destructiveHint: true,
+  openWorldHint: false,
+} as const;
 const moduleDir = path.dirname(fileURLToPath(import.meta.url));
-const appBundleCandidates = [
-  path.resolve(moduleDir, "../infra/templates/board-app.js"),
-  path.resolve(moduleDir, "../../dist/infra/templates/board-app.js"),
-];
+function appBundleCandidates(config: AppConfig): string[] {
+  return [
+    path.resolve(config.cwd, "infra", "templates", "board-app.js"),
+    path.resolve(config.cwd, "server", "infra", "templates", "board-app.js"),
+    path.resolve(moduleDir, "../../../infra/templates/board-app.js"),
+    path.resolve(moduleDir, "../infra/templates/board-app.js"),
+    path.resolve(moduleDir, "../../dist/infra/templates/board-app.js"),
+  ];
+}
 
 function errorResult(tool: string, error: unknown): CallToolResult {
   const message = error instanceof Error ? error.message : String(error);
@@ -90,7 +105,7 @@ export function registerBoardTools(server: McpServer, ctx: BoardToolContext): vo
     _meta: { ui: { prefersBorder: true } },
   }, async () => {
     let bundle = "";
-    for (const candidate of appBundleCandidates) {
+    for (const candidate of appBundleCandidates(ctx.config)) {
       try {
         bundle = await fs.readFile(candidate, "utf8");
         break;
@@ -113,6 +128,7 @@ export function registerBoardTools(server: McpServer, ctx: BoardToolContext): vo
     {
       description: "读取人和 AI 共享画布的数据：revision、对象 ID、坐标、作者、BOARD_JSON 和画图规范。用于回答画布内容或给 Agent 提供视觉上下文；只读，不打开浏览器，也不写项目文件。想显示可编辑画布时调用 show_board。",
       inputSchema: z.object({}),
+      annotations: READ_ONLY_LOCAL_ANNOTATIONS,
     },
     async () => {
       try {
@@ -135,6 +151,8 @@ export function registerBoardTools(server: McpServer, ctx: BoardToolContext): vo
               ``,
               boardGuidance(),
               ``,
+              `PANEL_URL: ${ctx.preview.panelUrl ?? "unavailable (standalone preview not started)"}`,
+              ``,
               "BOARD_JSON is a read-only projection. Use draw_board to add or edit visual objects. Conversation belongs in the agent chat; put shared context on the canvas itself.",
             ].join("\n"),
           }],
@@ -151,6 +169,7 @@ export function registerBoardTools(server: McpServer, ctx: BoardToolContext): vo
     {
       description: "在人和 AI 的 Agent 对话旁显示共享无限画布，供用户直接查看和编辑。用户要求打开、查看、展示或编辑 Doodle 画布时调用。支持 MCP Apps 的宿主会嵌入交互式画布；其他宿主仍可通过普通工具读写画布。",
       inputSchema: z.object({}),
+      annotations: READ_ONLY_LOCAL_ANNOTATIONS,
       _meta: { ui: { resourceUri: APP_RESOURCE_URI } },
     },
     async () => {
@@ -179,6 +198,7 @@ export function registerBoardTools(server: McpServer, ctx: BoardToolContext): vo
         author: z.enum(["human", "ai"]).optional().describe("Author marker; AI responses should normally use ai"),
         expected_revision: z.number().int().nonnegative().optional().describe("Optional board revision for rejecting stale canvas edits"),
       }),
+      annotations: BOARD_WRITE_ANNOTATIONS,
     },
     async ({ items, remove_ids, author, expected_revision }) => {
       try {
@@ -234,13 +254,16 @@ export function registerBoardTools(server: McpServer, ctx: BoardToolContext): vo
     },
   );
 
-  server.tool(
+  server.registerTool(
     "scan_project",
-    "可选能力：只读扫描当前工作区的目录与文件路径，并返回少量 file:line 证据文本。项目结构只是画板可以讨论的内容之一；本工具不生成图、不改画板、不写文件，也不授权代码变更。需要可视化时用 draw_board 把路径画到共享画板。",
     {
-      max_depth: z.number().int().min(1).max(6).optional().describe("Maximum directory depth; defaults to 3, maximum 6"),
-      max_files: z.number().int().min(1).max(400).optional().describe("Maximum number of entries; defaults to 80, maximum 400"),
-      include_evidence: z.boolean().optional().describe("Include bounded file:line evidence; defaults to true"),
+      description: "可选能力：只读扫描当前工作区的目录与文件路径，并返回少量 file:line 证据文本。项目结构只是画板可以讨论的内容之一；本工具不生成图、不改画板、不写文件，也不授权代码变更。需要可视化时用 draw_board 把路径画到共享画板。",
+      inputSchema: z.object({
+        max_depth: z.number().int().min(1).max(6).optional().describe("Maximum directory depth; defaults to 3, maximum 6"),
+        max_files: z.number().int().min(1).max(400).optional().describe("Maximum number of entries; defaults to 80, maximum 400"),
+        include_evidence: z.boolean().optional().describe("Include bounded file:line evidence; defaults to true"),
+      }),
+      annotations: READ_ONLY_LOCAL_ANNOTATIONS,
     },
     async ({ max_depth, max_files, include_evidence }) => {
       try {

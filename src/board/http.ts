@@ -13,11 +13,16 @@ import type { BoardStore } from "./store.js";
 import { projectSnapshotText, scanProject, type ProjectScanOptions } from "./project-scan.js";
 
 const sourceDir = path.dirname(fileURLToPath(import.meta.url));
-const templateCandidates = [
-  path.resolve(sourceDir, "../../src/infra/templates/board.html"),
-  path.resolve(sourceDir, "../templates/board.html"),
-  path.resolve(sourceDir, "../../dist/infra/templates/board.html"),
-];
+function templateCandidates(config: AppConfig): string[] {
+  return [
+    path.resolve(config.cwd, "server", "infra", "templates", "board.html"),
+    path.resolve(config.cwd, "infra", "templates", "board.html"),
+    path.resolve(sourceDir, "../../../infra/templates/board.html"),
+    path.resolve(sourceDir, "../../src/infra/templates/board.html"),
+    path.resolve(sourceDir, "../templates/board.html"),
+    path.resolve(sourceDir, "../../dist/infra/templates/board.html"),
+  ];
+}
 
 function canvasSnapshot(board: SimpleBoard) {
   const { notes: _legacyNotes, ...snapshot } = board;
@@ -30,6 +35,7 @@ export class BoardHttpServer {
   private wss: WebSocketServer | null = null;
   private readonly panelToken = crypto.randomBytes(24).toString("hex");
   private appBundle = "";
+  private panelUrlValue: string | null = null;
 
   constructor(
     private board: BoardStore,
@@ -139,7 +145,7 @@ export class BoardHttpServer {
 
   private async serveBoard(res: express.Response): Promise<void> {
     res.set("Cache-Control", "no-store, max-age=0");
-    for (const candidate of templateCandidates) {
+    for (const candidate of templateCandidates(this.config)) {
       try {
         const html = (await fs.readFile(candidate, "utf8"))
           .replace("__DOODLE_PANEL_TOKEN__", this.panelToken)
@@ -154,7 +160,7 @@ export class BoardHttpServer {
   async getAppHtml(bundle?: string): Promise<string> {
     if (bundle !== undefined) this.appBundle = bundle;
     let template: string | undefined;
-    for (const candidate of templateCandidates) {
+    for (const candidate of templateCandidates(this.config)) {
       try {
         template = await fs.readFile(candidate, "utf8");
         break;
@@ -180,44 +186,24 @@ export class BoardHttpServer {
       const onError = (error: NodeJS.ErrnoException) => {
         this.server!.removeListener("error", onError);
         if (error.code === "EADDRINUSE") {
-          logger.error(`Port ${this.config.previewPort} in use. Set PREVIEW_PORT to another port.`);
+          logger.error(`Port ${this.config.previewPort ?? "auto"} in use. Set PREVIEW_PORT to another port.`);
         }
         reject(error);
       };
       this.server!.once("error", onError);
-      this.server!.listen(this.config.previewPort, this.config.previewHost, () => {
+      this.server!.listen(this.config.previewPort ?? 0, this.config.previewHost, () => {
         this.server!.removeListener("error", onError);
-        logger.info(`Board preview at http://${this.config.previewHost}:${this.config.previewPort}/`);
+        const address = this.server!.address();
+        const activePort = typeof address === "object" && address ? address.port : this.config.previewPort ?? 0;
+        this.panelUrlValue = `http://${this.config.previewHost}:${activePort}/`;
+        logger.info(`Board preview at ${this.panelUrlValue}`);
         resolve();
       });
     });
   }
 
-  async loadBoard() {
-    return this.board.snapshot();
-  }
-
-  async updateBoard(input: {
-    items?: BoardItemInput[];
-    remove_ids?: string[];
-    author?: "human" | "ai";
-  }) {
-    const board = await this.board.mutate((current) => {
-      let next = current;
-      for (const raw of input.items ?? []) {
-        const item = { ...raw, author: input.author ?? "human" as const };
-        if (raw.id) {
-          const { id, ...patch } = item;
-          next = updateBoardItem(next, id!, patch);
-        } else {
-          next = addBoardItem(next, item);
-        }
-      }
-      for (const id of new Set(input.remove_ids ?? [])) next = removeBoardItem(next, id);
-      return next;
-    });
-    this.broadcast({ type: "board_updated", revision: board.revision });
-    return board;
+  get panelUrl(): string | null {
+    return this.panelUrlValue;
   }
 
   broadcast(message: Record<string, unknown>): void {

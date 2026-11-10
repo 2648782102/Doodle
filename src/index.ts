@@ -6,10 +6,15 @@ import { logger } from "./infra/logger.js";
 
 async function main() {
   const { mcp, preview } = await createServer();
-  await preview.start();
   const transport = new StdioServerTransport();
   await mcp.connect(transport);
-  logger.info("doodle-mcp is running (stdio + preview server)");
+  try {
+    await preview.start();
+    logger.info("doodle-mcp is running (stdio + preview server)");
+  } catch (error) {
+    logger.error(`Preview unavailable: ${error instanceof Error ? error.message : String(error)}`);
+    logger.info("doodle-mcp is running (stdio only)");
+  }
 }
 
 main().catch((err) => {

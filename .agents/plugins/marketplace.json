@@ -1,0 +1,20 @@
+{
+  "name": "doodle",
+  "interface": {
+    "displayName": "Doodle"
+  },
+  "plugins": [
+    {
+      "name": "doodle",
+      "source": {
+        "source": "local",
+        "path": "./.doodle-plugin/doodle"
+      },
+      "policy": {
+        "installation": "AVAILABLE",
+        "authentication": "ON_INSTALL"
+      },
+      "category": "Developer Tools"
+    }
+  ]
+}

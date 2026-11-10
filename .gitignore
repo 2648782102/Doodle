@@ -1,5 +1,8 @@
 node_modules/
 dist/
+.doodle-plugin/
+.doodle-data/
+doodle-plugin-submission/
 output/*.svg
 output/*.png
 output/diagrams.json

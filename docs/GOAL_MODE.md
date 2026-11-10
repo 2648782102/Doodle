@@ -16,7 +16,7 @@ This document explains how to give a coding agent a long-running maintenance obj
 ## Default red lines
 
 - No force push, history rewrite, tag movement, or deletion of user data.
-- No committed secrets, `.env` files, generated `dist/`, or private `output/` state.
+- No committed secrets, `.env` files, generated `dist/`, generated `.doodle-plugin/`, or private `output/` / `.doodle-data/` state.
 - No npm publish, external mass messaging, or repository metadata change without explicit authority.
 - No project-file write triggered by a board drawing, note, or scan.
 - No tool that opens a browser or IDE as a side effect.

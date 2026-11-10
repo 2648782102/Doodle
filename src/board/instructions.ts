@@ -1,6 +1,7 @@
 export const MCP_INSTRUCTIONS = [
-  "Doodle is a shared infinite canvas embedded beside the agent conversation in MCP Apps-compatible hosts. The agent conversation stays in the host; the canvas is for shared visual context. Normal tool calls never open a browser or write project files.",
+  "Doodle is a local-first shared infinite canvas for people and AI. MCP stdio is the AI's normal access channel inside an agent; a plugin is the preferred install path for Codex-compatible hosts. Compatible MCP Apps hosts can show an optional interactive canvas. Normal tool calls never open a browser or write project files.",
   "Use get_board to read BOARD_JSON, current object IDs, coordinates, authors, and the drawing guide. Use show_board when the user asks to open, see, display, or edit the canvas; it renders the interactive app in compatible hosts without duplicating the conversation.",
+  "get_board also reports PANEL_URL, the active local human-facing address. Mention it only when a person asks where to look; never open a browser from a normal tool call.",
   "Board writes are serialized against the latest state; embedded canvas edits include expected_revision so stale edits are rejected and refreshed before retry.",
   "Use draw_board to add, update, or remove notes, text, rectangles, ellipses, and directed arrows. Keep conversation in the agent chat; use canvas objects for visual context rather than posting chat replies onto the board.",
   "Drawing contract: a line is an arrow from (x,y) to (x+w,y+h); w/h are signed endpoint deltas and may be negative. Other items use (x,y) as the top-left corner with positive width/height.",

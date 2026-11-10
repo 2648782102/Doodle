@@ -5,14 +5,14 @@ import {
   MCP_INSTRUCTIONS,
   registerBoardTools,
 } from "./board/index.js";
-import { loadConfig, ensureOutputDirWritable } from "./infra/config.js";
+import { ensureOutputDirWritable, loadRuntimeConfig } from "./infra/config.js";
 import { logger } from "./infra/logger.js";
 import { SERVER_VERSION } from "./infra/version.js";
 
 const TOOL_COUNT = 4;
 
 export async function createServer() {
-  const config = loadConfig();
+  const config = await loadRuntimeConfig();
   await ensureOutputDirWritable(config.outputDir);
 
   const board = new BoardStore(config.outputDir);

@@ -1,0 +1,30 @@
+{
+  "mcpServers": {
+    "doodle": {
+      "type": "stdio",
+      "command": "node",
+      "args": ["${PLUGIN_ROOT}/server/index.mjs"],
+      "env": {
+        "LOG_LEVEL": "info"
+      },
+      "env_vars": [
+        "AI_DRAW_WORKSPACE_ROOT",
+        "CLAUDE_PLUGIN_DATA",
+        "CODEX_PROJECT_ROOT",
+        "DOODLE_WORKSPACE_ROOT",
+        "HOME",
+        "LANG",
+        "LOG_LEVEL",
+        "OUTPUT_DIR",
+        "PATH",
+        "PLUGIN_DATA",
+        "PLUGIN_ROOT",
+        "PREVIEW_HOST",
+        "PREVIEW_PORT",
+        "PWD"
+      ],
+      "startup_timeout_sec": 30,
+      "tool_timeout_sec": 90
+    }
+  }
+}

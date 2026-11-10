@@ -5,19 +5,21 @@ Doodle is a small MIT-licensed open-source project. The repository is the canoni
 ## Maintainer checklist
 
 - Keep the default product small; reject changes that make project structure, dashboards, or approval workflows the product again.
-- Keep exactly four MCP tools unless a product decision in `DECISIONS.md` says otherwise; keep MCP App rendering optional for text-only hosts.
+- Keep exactly four MCP tools unless a product decision in `DECISIONS.md` says otherwise; keep MCP App rendering optional for text-only hosts and keep the plugin as a distribution layer around the same server.
 - Keep the board state versioned, bounded, and independent of project files.
 - Keep normal MCP calls free of browser, IDE, and project-write side effects.
 - Keep dependencies minimal and verify with `npm run check`.
-- Keep the README, English quickstart, `AGENTS.md`, architecture, tests, examples, CI, and offline guards synchronized.
+- Keep the README, English quickstart, `AGENTS.md`, architecture, plugin goal, tests, examples, CI, and offline guards synchronized.
 - Preserve tool-only workflows for MCP hosts that do not render Apps.
-- Never commit `dist/`, `output/.doodle/`, `.env`, credentials, or private board state.
+- Never commit `dist/`, `.doodle-plugin/`, `.doodle-data/`, `output/.doodle/`, `.env`, credentials, or private board state.
+- Keep `PRIVACY.md`, `SUPPORT.md`, `TERMS.md`, `docs/FAQ.md`, `docs/SUBMISSION.md`, tool annotations, and the versioned submission ZIP synchronized with plugin metadata.
 
 ## Public surfaces
 
 - GitHub repository: `https://github.com/2648782102/Doodle`
 - Issues: bug reports, feature requests, and private security advisories.
 - Releases: version tags and changelog sections; already published tags and releases are immutable.
+- Plugin review: a versioned submission ZIP may be attached to a release, but public directory eligibility stays an external approved-partner process.
 - npm: published only through an explicit maintainer action, never by CI automatically.
 
 ## Metadata drift

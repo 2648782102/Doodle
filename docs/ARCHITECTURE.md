@@ -1,6 +1,6 @@
 # Architecture
 
-Doodle is a local-first shared infinite canvas. Compatible MCP Apps hosts render its interactive canvas beside the agent conversation; the host retains its existing chat surface. A standalone local HTTP page provides the same canvas when the host does not render MCP Apps. Both views and the AI tools share one independent version 1 board state file.
+Doodle is a local-first shared infinite canvas. The repository builds two distribution paths from the same source: the npm CLI/direct MCP server and a desktop-only Codex plugin with a bundled stdio server. Compatible MCP Apps hosts may render its interactive canvas beside the agent conversation as an optional enhancement; the host retains its existing chat surface. A standalone local HTTP page provides the same canvas when the host does not render MCP Apps. Both views and the AI tools share one independent version 1 board state file.
 
 ## Source layout
 
@@ -22,17 +22,22 @@ src/
 ├── infra/
 │   ├── config.ts               PREVIEW_HOST / PREVIEW_PORT / OUTPUT_DIR / workspace
 │   ├── logger.ts               stderr-only logger
+│   ├── project-workspace.ts    plugin-safe workspace resolution
 │   ├── workspace.ts            DOODLE_WORKSPACE_ROOT resolution
 │   ├── version.ts              package version read
 │   └── templates/board.html    shared standalone and embedded infinite canvas
-scripts/build.mjs               copies HTML and bundles the MCP Apps client
+plugins/doodle/                 compatibility manifest, MCP config, skill, assets
+.agents/plugins/                repository-scoped plugin marketplace
+scripts/build.mjs               copies HTML and bundles the optional MCP Apps client
+scripts/build-plugin.mjs        bundles the self-contained plugin server and templates
+scripts/plugin-check.mjs        validates plugin manifests, skill, marketplace, and build output
 ```
 
-There is no `src/domain/` workbench model, Mermaid renderer, session store, proposal store, or legacy panel template in `0.5.0`.
+There is no `src/domain/` workbench model, Mermaid renderer, session store, proposal store, or legacy panel template in `0.6.0`. The plugin uses only the supported Codex compatibility layout; generated `.doodle-plugin/` output is ignored.
 
 ## MCP surface
 
-`src/server.ts` registers exactly four tools:
+Both runtime paths register exactly four tools:
 
 | Tool | Effect | Output |
 |---|---|---|
@@ -41,13 +46,15 @@ There is no `src/domain/` workbench model, Mermaid renderer, session store, prop
 | `draw_board` | Adds / updates / removes visual objects under the board lock; can reject stale app edits by expected revision | revision, counts, authoritative structured snapshot |
 | `scan_project` | Reads bounded project paths and evidence | `PROJECT_JSON` and `PROJECT_TEXT` |
 
-The canvas resource uses `text/html;profile=mcp-app` and is attached only to the separate `show_board` render tool, so routine data reads and mutations do not remount the iframe. The app calls `get_board` and `draw_board` through the host bridge, refreshes at a low rate while visible, and sends the revision it has rendered so a concurrent model edit cannot be overwritten. This keeps browser HTTP credentials inside the standalone page while the embedded canvas uses the host's authenticated MCP connection. Text-only hosts retain the complete tool workflow.
+All tools are registered through the MCP SDK config API with explicit annotations: `get_board`, `show_board`, and `scan_project` are read-only, non-destructive, and local-scope; `draw_board` is destructive because it can remove or overwrite visual objects. These values are integration-tested and guarded by the offline repository checks.
+
+The optional canvas resource uses `text/html;profile=mcp-app` and is attached only to the separate `show_board` render tool, following the official decoupled data/render pattern. The app calls `get_board` and `draw_board` through the host bridge, refreshes at a low rate while visible, and sends the revision it has rendered so a concurrent model edit cannot be overwritten. This keeps browser HTTP credentials inside the standalone page while the embedded canvas uses the host's authenticated MCP connection. Text-only hosts retain the complete tool workflow.
 
 No tool opens a browser, writes a project file, launches an IDE, or emits approval credentials. MCP initialization instructions and `get_board` describe the directed-arrow contract and strict-grid workflow.
 
 ## Board state
 
-`BoardStore` persists `output/.doodle/board.json` through a uniquely named temporary file and atomic rename. A filesystem lock serializes mutations across processes; mutations always read the latest board while holding the lock. Snapshot-based browser edits require the expected revision and fail instead of overwriting a concurrent update. Stale-lock recovery checks the recorded process ID. It can read the legacy `output/.ai-draw/board.json` once when the new file does not exist.
+`BoardStore` persists `.doodle/board.json` under the configured output directory through a uniquely named temporary file and atomic rename. A filesystem lock serializes mutations across processes; mutations always read the latest board while holding the lock. Snapshot-based browser edits require the expected revision and fail instead of overwriting a concurrent update. Stale-lock recovery checks the recorded process ID. It can read the legacy `.ai-draw/board.json` under the same output directory once when the new file does not exist.
 
 `SimpleBoard` remains version 1 and contains bounded `items` and `notes`. Existing note data is retained only for persisted-state compatibility and is not exposed in the current tool projection or UI. Items have finite coordinates, one of five simple types, a hex color, a `human` / `ai` author, and timestamps. For `line`, `(x,y)` is the start point and `(x+w,y+h)` is the end point; `w` and `h` are signed endpoint deltas. Other types use `(x,y)` as the top-left corner and positive width/height.
 
@@ -55,7 +62,7 @@ All board mutations are pure functions in `src/board/types.ts`. They validate fi
 
 ## Human HTTP surface
 
-The HTTP server binds to `127.0.0.1` by default and serves the standalone canvas:
+The HTTP server binds to `127.0.0.1` by default and a free loopback port when `PREVIEW_PORT` is unset. MCP stdio is connected first; preview startup failure is logged on stderr and leaves the tools usable. `get_board` reports the active `PANEL_URL`. The server serves the standalone canvas:
 
 | Endpoint | Purpose |
 |---|---|
@@ -86,9 +93,9 @@ Project scanning does not modify the board. If the AI wants to show structure, i
 - Board mutations acquire a cross-process lock, read current state inside the lock, and persist with a unique temporary file plus atomic rename.
 - Project-scan evidence filters common credential lines and is capped at 40 lines total.
 - `scan_project` never writes files; board writes never write project files.
-- Offline guards in `scripts/repo-check.mjs` verify the four-tool surface, MCP App registration, dependency setup, docs alignment, arrow contract, HTTP authentication, and read-only scan boundary. `scripts/build.mjs` prunes stale compiled files, copies the canvas template, and bundles the embedded App.
-- `npm run check` runs lint, build, tests, example syntax, offline guards, doctor, and package dry-run.
+- Offline guards in `scripts/repo-check.mjs` verify the four-tool surface, optional MCP App registration, dependency setup, plugin packaging, docs alignment, arrow contract, HTTP authentication, and read-only scan boundary. `scripts/plugin-check.mjs` validates the plugin identity, marketplace, skill, bundle template paths, generated runtime, and desktop-only flag. `scripts/build.mjs` prunes stale compiled files, copies the canvas template, and bundles the embedded App.
+- `npm run check` runs lint, build, plugin build, tests, example syntax, offline guards, plugin guard, doctor, and package dry-run.
 
 ## Compatibility
 
-Existing version 1 `output/.ai-draw/board.json` files remain readable, including their notes. `AI_DRAW_WORKSPACE_ROOT` remains a legacy alias for `DOODLE_WORKSPACE_ROOT`. The removed `0.3.x` workbench, 29-tool catalogue, session proposals, Mermaid diagram library, and VS Code extension remain only as historical records under `docs/archive/adr-legacy/`.
+Existing version 1 `.ai-draw/board.json` files under the configured output directory remain readable, including their notes. `AI_DRAW_WORKSPACE_ROOT` remains a legacy alias for `DOODLE_WORKSPACE_ROOT`. Explicit `OUTPUT_DIR`, plugin data, and workspace-local `.doodle-data` all point at the same board-state layout. `CODEX_PROJECT_ROOT`/`PWD` help the plugin find the launched workspace without exposing plugin-internal paths. The removed `0.3.x` workbench, 29-tool catalogue, session proposals, Mermaid diagram library, and VS Code extension remain only as historical records under `docs/archive/adr-legacy/`.

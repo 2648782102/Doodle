@@ -9,17 +9,25 @@ npm run check
 npm run doctor
 ```
 
-Then configure the MCP host using a snippet from `examples/mcp-config/`. Set `DOODLE_WORKSPACE_ROOT` to the project the agent is working on and `OUTPUT_DIR` to a writable location. Older `AI_DRAW_WORKSPACE_ROOT` settings still work as a legacy alias.
+For Codex, build first and add this repository as a local plugin marketplace with `codex plugin marketplace add . --json`; then install `doodle@doodle`. For direct MCP hosts, configure the stdio server using a snippet from `examples/mcp-config/`. Set `DOODLE_WORKSPACE_ROOT` to the project the agent is working on and `OUTPUT_DIR` to a writable location. Older `AI_DRAW_WORKSPACE_ROOT` settings still work as a legacy alias.
 
 ## Common issues
 
-### `PREVIEW_PORT` is already in use
+### `PREVIEW_PORT` or the local panel is unavailable
 
-Another MCP host may already run the board. Pick another port with `PREVIEW_PORT=3402`, or stop the old process. The MCP stdio server still works if its own HTTP listener can bind.
+The plugin uses a free loopback port by default and reports it as `PANEL_URL` from `get_board`. If you set a fixed `PREVIEW_PORT`, another process may already own it; pick another port with `PREVIEW_PORT=3402`. The MCP stdio server remains usable even when its optional HTTP listener cannot bind.
 
 ### The browser panel does not update
 
-Check that the browser is on `http://127.0.0.1:<PREVIEW_PORT>/` and that the WebSocket `/ws` connection is open. Click 「适应」 to fit all objects. The board state itself can always be verified with `get_board`.
+Check that the browser is on the `PANEL_URL` reported by `get_board` and that the WebSocket `/ws` connection is open. Click 「适应」 to fit all objects. The board state itself can always be verified with `get_board`.
+
+### The plugin is not discovered
+
+Run `npm run build` so `.doodle-plugin/doodle/` exists, then `codex plugin marketplace add . --json` and `codex plugin list --marketplace doodle --available --json`. The marketplace is local/repository-scoped; it is not a public plugin directory submission.
+
+### Public plugin submission is blocked
+
+`npm run build:submission` can prepare a versioned ZIP, and `docs/SUBMISSION.md` lists the repository-side materials. Public local-MCP directory review still requires an allowlisted organization, a verified identity, portal policy attestations, clean desktop testing, and approval. See `docs/FAQ.md` and `docs/SUBMISSION.md`.
 
 ### `X-AI-Draw-Token` or human confirmation fails
 

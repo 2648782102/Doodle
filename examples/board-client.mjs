@@ -12,6 +12,7 @@ try {
   await client.connect(transport);
   const { tools } = await client.listTools();
   console.log(`Registered board tools: ${tools.map((tool) => tool.name).join(", ")}`);
+  console.log(`Tool annotations: ${JSON.stringify(Object.fromEntries(tools.map((tool) => [tool.name, tool.annotations])))}`);
   const board = await client.callTool({ name: "get_board", arguments: {} });
   console.log(board.content.map((item) => item.text ?? "").join("\n").slice(0, 400));
   const view = await client.callTool({ name: "show_board", arguments: {} });

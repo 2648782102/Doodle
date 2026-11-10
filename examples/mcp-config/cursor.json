@@ -6,6 +6,7 @@
       "env": {
         "DOODLE_WORKSPACE_ROOT": "<absolute-path-to-your-project>",
         "OUTPUT_DIR": "<absolute-path-to>/Doodle/output",
+        "PREVIEW_HOST": "127.0.0.1",
         "PREVIEW_PORT": "3399",
         "LOG_LEVEL": "info"
       }

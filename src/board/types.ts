@@ -102,7 +102,7 @@ export function createStarterBoard(): SimpleBoard {
     },
     {
       id: "starter_hint", type: "text", x: 40, y: 82, w: 680, h: 32,
-      text: "画一个对象、写一句短留言，AI 会从同一张画布继续", color: "#ffffff", author: "ai",
+      text: "画一个对象或写一句短标签，AI 会从同一张画布继续", color: "#ffffff", author: "ai",
       createdAt: timestamp, updatedAt: timestamp,
     },
     {
@@ -117,7 +117,7 @@ export function createStarterBoard(): SimpleBoard {
     },
     {
       id: "starter_ai", type: "note", x: 640, y: 150, w: 210, h: 120,
-      text: "AI\n用 MCP 画 / 回应", color: "#b8e0d2", author: "ai",
+      text: "AI\n用 MCP 读 / 画", color: "#b8e0d2", author: "ai",
       createdAt: timestamp, updatedAt: timestamp,
     },
     {
@@ -144,7 +144,7 @@ export function createStarterBoard(): SimpleBoard {
   const notes: BoardNote[] = [{
     id: `note_${authorStamp}`,
     author: "ai",
-    body: "欢迎来到 Doodle。随手画，或写一句，AI 会从同一张画布继续。",
+    body: "欢迎来到 Doodle。随手画，AI 会从同一张画布继续。",
     createdAt: timestamp,
   }];
   return { version: 1, id: `board_${authorStamp}`, title, revision: 0, updatedAt: timestamp, items, notes };

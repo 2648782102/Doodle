@@ -19,7 +19,11 @@ const distIndex = path.join(root, "dist", "index.js");
 if (fs.existsSync(distIndex)) pass("已构建 dist/index.js");
 else warn("未找到 dist/index.js — 请先运行 npm run build");
 
-const outputDir = process.env.OUTPUT_DIR ? path.resolve(process.env.OUTPUT_DIR) : path.join(root, "output");
+const outputDir = process.env.OUTPUT_DIR
+  ? path.resolve(process.env.OUTPUT_DIR)
+  : process.env.PLUGIN_DATA
+    ? path.join(path.resolve(process.env.PLUGIN_DATA), "doodle")
+    : path.join(root, "output");
 try {
   fs.mkdirSync(outputDir, { recursive: true });
   const probe = path.join(outputDir, ".doctor-write-probe");
@@ -30,14 +34,25 @@ try {
   fail(`OUTPUT_DIR 不可写: ${outputDir} — ${error instanceof Error ? error.message : String(error)}`);
 }
 
-const port = Number.parseInt(process.env.PREVIEW_PORT ?? "3399", 10);
-const inUse = await new Promise((resolve) => {
-  const socket = net.createConnection({ port, host: "127.0.0.1" }, () => { socket.end(); resolve(true); });
-  socket.on("error", () => resolve(false));
-});
-if (inUse) warn(`端口 ${port} 已被占用（可能 MCP 已在运行）`);
-else pass(`端口 ${port} 空闲`);
+const port = Number.parseInt(process.env.PREVIEW_PORT?.trim() || "0", 10);
+if (process.env.PREVIEW_PORT?.trim()) {
+  const inUse = await new Promise((resolve) => {
+    const socket = net.createConnection({ port, host: "127.0.0.1" }, () => { socket.end(); resolve(true); });
+    socket.on("error", () => resolve(false));
+  });
+  if (inUse) warn(`端口 ${port} 已被占用（可能 MCP 已在运行）`);
+  else pass(`端口 ${port} 空闲`);
+} else {
+  pass("PREVIEW_PORT 未设置；启动时会自动选择空闲本地端口");
+}
 
 const configPath = path.join(os.homedir(), ".codex", "config.toml");
-console.log(`ℹ️  MCP 配置示例：examples/mcp-config/；本机 Codex 配置：${configPath}`);
+const pluginServer = path.join(root, ".doodle-plugin", "doodle", "server", "index.mjs");
+if (fs.existsSync(pluginServer)) pass("已构建插件 server/index.mjs");
+else warn("未找到插件 server/index.mjs — 请先运行 npm run build:plugin");
+const packageVersion = JSON.parse(fs.readFileSync(path.join(root, "package.json"), "utf8")).version;
+const submissionZip = path.join(root, "doodle-plugin-submission", `doodle-${packageVersion}.zip`);
+if (fs.existsSync(submissionZip)) pass(`已构建插件提交包 doodle-${packageVersion}.zip`);
+else warn(`未找到插件提交包 doodle-${packageVersion}.zip — 请先运行 npm run build:submission`);
+console.log(`ℹ️  MCP 配置示例：examples/mcp-config/；插件构建产物：.doodle-plugin/doodle/；本机 Codex 配置：${configPath}`);
 process.exit(ok ? 0 : 1);

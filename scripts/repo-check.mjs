@@ -38,12 +38,46 @@ const changelog = await read("CHANGELOG.md");
 const contributing = await read("CONTRIBUTING.md");
 const security = await read("SECURITY.md");
 const roadmap = await read("ROADMAP.md");
+const goalPlugin = await read("docs/GOAL_PLUGIN.md");
+const pluginManifest = JSON.parse(await read("plugins/doodle/.codex-plugin/plugin.json"));
+const pluginMcp = JSON.parse(await read("plugins/doodle/.mcp.json"));
+const marketplace = JSON.parse(await read(".agents/plugins/marketplace.json"));
+const pluginSkill = await read("plugins/doodle/skills/doodle/SKILL.md");
+const ci = await read(".github/workflows/ci.yml");
+const gitignore = await read(".gitignore");
+const index = await read("src/index.ts");
+const privacy = await read("PRIVACY.md");
+const support = await read("SUPPORT.md");
+const terms = await read("TERMS.md");
+const faq = await read("docs/FAQ.md");
+const submission = await read("docs/SUBMISSION.md");
+const submissionScript = await read("scripts/build-submission.mjs");
+const config = await read("src/infra/config.ts");
+const projectWorkspace = await read("src/infra/project-workspace.ts");
+const version = await read("src/infra/version.ts");
 const sourceFiles = (await fs.readdir(path.join(root, "src", "board"), { recursive: true }))
+  .filter((name) => typeof name === "string" && name.endsWith(".ts"));
+const totalSourceFiles = (await fs.readdir(path.join(root, "src"), { recursive: true }))
   .filter((name) => typeof name === "string" && name.endsWith(".ts"));
 const canonicalDescription = "A shared canvas for people and AI to draw together through MCP.";
 const canonicalTopics = ["ai", "canvas", "developer-tools", "drawing", "local-first", "mcp", "typescript", "whiteboard"];
 
-check(packageJson.version === "0.5.0", "package.json is not version 0.5.0");
+check(packageJson.version === "0.6.0", "package.json is not version 0.6.0");
+check(pluginManifest.version === packageJson.version, "plugin version does not match package.json");
+check(pluginManifest.requires_local_executor === true, "plugin is not marked desktop-only");
+check(pluginMcp.mcpServers.doodle.args[0] === "${PLUGIN_ROOT}/server/index.mjs", "plugin MCP entrypoint is not self-contained");
+check(marketplace.plugins[0].source.path === "./.doodle-plugin/doodle", "marketplace does not point at the plugin build output");
+check(pluginSkill.includes("get_board") && pluginSkill.includes("show_board") && !pluginSkill.includes("reply_on_board"), "plugin skill does not describe the current board workflow");
+check(goalPlugin.includes("## Objective") && goalPlugin.includes("plugin") && goalPlugin.includes("MCP Apps"), "plugin goal document is missing or stale");
+check(packageJson.scripts.build.includes("build-plugin.mjs") && packageJson.scripts.check.includes("repo:plugin-check"), "npm scripts do not build and check the plugin");
+check(ci.includes("npm run repo:plugin-check"), "CI does not run the plugin guard");
+check(ci.includes("npm run build:submission"), "CI does not build the submission ZIP");
+check(gitignore.includes(".doodle-plugin/") && gitignore.includes(".doodle-data/") && gitignore.includes("doodle-plugin-submission/"), "generated plugin output, data, or submission ZIP is not ignored");
+check(index.indexOf("await mcp.connect(transport);") < index.indexOf("await preview.start();"), "MCP stdio is not connected before optional preview startup");
+check(index.includes("Preview unavailable"), "preview failure does not keep the MCP server alive");
+check(config.includes("previewPort: rawPort ? parsePort(rawPort) : null") && config.includes("PLUGIN_DATA"), "runtime config is not plugin-safe");
+check(version.includes("__DOODLE_PLUGIN_VERSION__"), "bundled server cannot report the injected version");
+check(projectWorkspace.includes("CODEX_PROJECT_ROOT"), "plugin-safe workspace resolution is missing");
 check(packageJson.name === "doodle-mcp", "npm package name is not doodle-mcp");
 check(packageJson.repository.url.includes("/Doodle.git") && packageJson.homepage.includes("/Doodle#readme"), "repository URLs do not use the Doodle project name");
 check(packageJson.bin["doodle-mcp"] === "dist/index.js", "doodle-mcp CLI entrypoint is missing");
@@ -63,12 +97,15 @@ check(!buildScript.includes('fs.rm(path.join(root, "dist")'), "build.mjs deletes
 check(buildScript.includes("pruneCompiledFiles"), "build.mjs does not prune stale compiled artifacts");
 check(buildScript.indexOf("await pruneCompiledFiles(distDir, expected);") < buildScript.indexOf("await fs.mkdir(targetDir, { recursive: true });"), "build.mjs creates the template target before pruning empty dist directories");
 check(instructions.includes("get_board") && instructions.includes("show_board") && instructions.includes("scan_project is optional"), "MCP instructions do not describe the canvas data and render tools");
+check(instructions.includes("PANEL_URL") && !instructions.includes("reply_on_board"), "MCP instructions do not describe the local panel URL correctly");
 check(instructions.includes("Doodle is"), "MCP instructions do not introduce Doodle");
 check(sourceFiles.length === 10, `src/board has ${sourceFiles.length} TypeScript modules; expected the focused ten-module structure`);
 check(!boardIndex.includes("preview-server") && !boardIndex.includes("session-store"), "board index re-exports legacy infrastructure");
-check((tools.match(/server\.registerTool\(|server\.tool\(/g) ?? []).length === 4, "tools.ts does not register exactly four MCP tools");
+check((tools.match(/server\.registerTool\(/g) ?? []).length === 4 && !tools.includes("server.tool("), "tools.ts does not register exactly four annotated MCP tools");
+check(tools.includes("readOnlyHint: true") && tools.includes("destructiveHint: true") && tools.includes("openWorldHint: false"), "tool annotations are incomplete");
 check(tools.includes("registerAppResource") && tools.includes('"ui://doodle/board/v1.html"'), "MCP App canvas resource is missing");
 check(tools.includes('"show_board"') && tools.includes('"get_board"'), "canvas render and data tools are not separated");
+check(tools.includes("appBundleCandidates(ctx.config)") && tools.includes("PANEL_URL"), "MCP App resources are not plugin-safe and the panel URL is missing");
 check(tools.includes("structuredContent: boardJson(board)"), "board tools do not return an authoritative structured snapshot");
 check(tools.includes('"scan_project"') && tools.includes("Use draw_board to visualize"), "scan_project is not a read-only board-context tool");
 check(boardTypes.includes("signedWidth") && boardTypes.includes("signedHeight"), "board types lost signed directed-arrow deltas");
@@ -82,6 +119,7 @@ check(boardTemplate.includes("DoodleBoardInit") && boardTemplate.includes("MCP_A
 check(buildScript.includes('entryPoints: [path.join(sourceRoot, "board", "app.ts")]') && buildScript.includes("minify: true"), "build does not bundle a compact MCP App client");
 check(instructions.includes("conversation") && !instructions.includes("reply_on_board"), "MCP instructions duplicate the host conversation");
 check(http.includes('"/api/board"') && http.includes("X-AI-Draw-Token"), "board HTTP server lost its authenticated API");
+check(http.includes("templateCandidates(this.config)") && http.includes("panelUrlValue"), "plugin bundle template resolution and dynamic panel URL are missing");
 check(http.includes("canvasSnapshot") && http.includes("notes: _legacyNotes"), "HTTP canvas API still exposes the retired message feed");
 check(http.includes('"/api/board/project"') && !http.includes('"/project"'), "project scan is outside the authenticated board API namespace");
 check(!http.includes("/workbench") && !http.includes("/api/collab"), "board HTTP server still exposes workbench routes");
@@ -112,9 +150,20 @@ for (const [file, label] of [
 }
 check(await exists("LICENSE"), "LICENSE is missing");
 check(await exists("SECURITY.md"), "SECURITY.md is missing");
+check(await exists("PRIVACY.md") && await exists("SUPPORT.md") && await exists("TERMS.md"), "public plugin policy documents are missing");
+check(await exists("docs/FAQ.md") && await exists("docs/SUBMISSION.md"), "public plugin support or submission docs are missing");
+check(packageJson.scripts["build:submission"]?.includes("build-submission.mjs"), "submission ZIP build script is missing");
+check(packageJson.scripts.check.includes("build:submission"), "npm check does not build the submission ZIP");
+check(packageJson.files.includes("PRIVACY.md") && packageJson.files.includes("SUPPORT.md") && packageJson.files.includes("TERMS.md"), "npm package omits public policy documents");
+check(privacy.includes("Retention") && privacy.includes("Recipients") && privacy.includes("User controls"), "privacy policy is incomplete");
+check(support.includes("GitHub Issue") && terms.includes("MIT License"), "support or terms document is incomplete");
+check(faq.includes("plugin directory") && submission.includes("Required outside this repository"), "plugin publication docs are incomplete");
+check(submissionScript.includes("zip") && submissionScript.includes("doodle-${packageJson.version}.zip"), "submission ZIP script is incomplete");
 check(await exists("CODE_OF_CONDUCT.md"), "CODE_OF_CONDUCT.md is missing");
 check(await exists(".github/workflows/ci.yml"), "CI workflow is missing");
 check(await exists("examples/board-client.mjs"), "board MCP client example is missing");
+check(await exists("plugins/doodle/skills/doodle/SKILL.md") && await exists("scripts/build-plugin.mjs") && await exists("scripts/plugin-check.mjs"), "plugin packaging files are incomplete");
+check(totalSourceFiles.length === 17, `src has ${totalSourceFiles.length} TypeScript modules; expected the focused plugin-ready structure`);
 
 if (failures.length) {
   console.error("❌ Offline repository checks failed:");

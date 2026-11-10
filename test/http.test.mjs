@@ -28,6 +28,7 @@ const preview = new BoardHttpServer(board, {
   previewPort: port,
   outputDir: path.join(tempDir, "output"),
   workspaceRoot: tempDir,
+  cwd: tempDir,
 });
 await preview.start();
 
@@ -39,11 +40,33 @@ afterAll(async () => {
 describe("board HTTP surface", () => {
   it("serves the human board and the read-only board API", async () => {
     const html = await fetch(base).then((response) => response.text());
+    expect(preview.panelUrl).toBe(`${base}/`);
     expect(html).toContain("Doodle");
     expect(html).toContain("/api/board");
     expect(html).not.toContain("/workbench");
     const snapshot = await fetch(`${base}/api/board`).then((response) => response.json());
     expect(snapshot).toMatchObject({ version: 1 });
+  });
+
+  it("uses a free loopback port when previewPort is null", async () => {
+    const dynamicBoard = new BoardStore(path.join(tempDir, "dynamic"));
+    await dynamicBoard.init();
+    const dynamicPreview = new BoardHttpServer(dynamicBoard, {
+      previewHost: "127.0.0.1",
+      previewPort: null,
+      outputDir: path.join(tempDir, "dynamic"),
+      workspaceRoot: tempDir,
+      cwd: tempDir,
+    });
+    try {
+      await dynamicPreview.start();
+      const url = new URL(dynamicPreview.panelUrl);
+      expect(url.hostname).toBe("127.0.0.1");
+      expect(Number.parseInt(url.port, 10)).toBeGreaterThan(0);
+      expect(await fetch(url).then((response) => response.status)).toBe(200);
+    } finally {
+      await dynamicPreview.stop();
+    }
   });
 
   it("requires the panel token and human confirmation for writes", async () => {

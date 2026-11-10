@@ -50,14 +50,21 @@ describe("post-cleanup repository shape", () => {
     const forbidden = [
       /src\/domain\//, /src\/tools\//, /session-store/, /preview-server/, /renderer/,
       /render-/, /capture-panel/, /generate-doc-assets/, /github-maintenance/,
-      /\.vsix$/, /\.svg$/, /\.png$/, /\.mmd$/, /collaboration-workflow/,
+      /\.vsix$/, /\.png$/, /\.mmd$/, /collaboration-workflow/,
     ];
     for (const pattern of forbidden) {
       expect(current.some((name) => pattern.test(name)), `unexpected legacy path matching ${pattern}`).toBe(false);
     }
     expect(extensions).toBe(false);
-    expect(source.filter((name) => name.endsWith(".ts"))).toHaveLength(16);
-    expect(scripts.filter((name) => name.endsWith(".mjs"))).toHaveLength(3);
+    expect(source.filter((name) => name.endsWith(".ts"))).toHaveLength(17);
+    expect(scripts.filter((name) => name.endsWith(".mjs")).sort()).toEqual([
+      "scripts/build-plugin.mjs",
+      "scripts/build-submission.mjs",
+      "scripts/build.mjs",
+      "scripts/doctor.mjs",
+      "scripts/plugin-check.mjs",
+      "scripts/repo-check.mjs",
+    ]);
     expect(tests.filter((name) => name.endsWith(".test.mjs"))).toHaveLength(4);
     const compiled = await listFiles(path.join(root, "dist"));
     expect(compiled.some((name) => /^dist\/(domain|tools)\//.test(name))).toBe(false);
@@ -69,7 +76,7 @@ describe("post-cleanup repository shape", () => {
     const files = [
       "README.md", "README.en.md", "AGENTS.md", "CHANGELOG.md", "CONTRIBUTING.md",
       "SECURITY.md", "ROADMAP.md", "docs/PRODUCT_DIRECTION.md", "docs/ARCHITECTURE.md",
-      "docs/DECISIONS.md", "docs/README.md", "docs/TROUBLESHOOTING.md",
+      "docs/DECISIONS.md", "docs/GOAL_PLUGIN.md", "docs/README.md", "docs/TROUBLESHOOTING.md",
     ];
     for (const relative of files) {
       const text = await fs.readFile(path.join(root, relative), "utf8");
@@ -85,12 +92,13 @@ describe("post-cleanup repository shape", () => {
   it("uses one product name and one npm package name", async () => {
     const packageJson = JSON.parse(await fs.readFile(path.join(root, "package.json"), "utf8"));
     expect(packageJson.name).toBe("doodle-mcp");
+    expect(packageJson.version).toBe("0.6.0");
     expect(packageJson.bin["doodle-mcp"]).toBe("dist/index.js");
     expect(packageJson.repository.url).toContain("/Doodle.git");
     const strictFiles = [
       "AGENTS.md", "CONTRIBUTING.md",
       "SECURITY.md", "ROADMAP.md", "docs/PRODUCT_DIRECTION.md",
-      "docs/DECISIONS.md", "src/board/instructions.ts", "src/server.ts",
+      "docs/DECISIONS.md", "docs/GOAL_PLUGIN.md", "src/board/instructions.ts", "src/server.ts",
     ];
     for (const relative of strictFiles) {
       const text = await fs.readFile(path.join(root, relative), "utf8");
@@ -126,6 +134,7 @@ describe("post-cleanup repository shape", () => {
       "ROADMAP.md", "RELEASING.md", "VERSIONING.md", "CHANGELOG.md",
       "docs/README.md", "docs/PRODUCT_DIRECTION.md", "docs/ARCHITECTURE.md",
       "docs/DECISIONS.md", "docs/TROUBLESHOOTING.md", "docs/GOAL_MODE.md",
+      "docs/GOAL_PLUGIN.md",
       "docs/GOVERNANCE.md", "docs/COMPETITIVE_RESEARCH.md",
       "docs/DEPENDENCY_MAINTENANCE.md", "docs/LAUNCH_KIT.md",
     ];
@@ -140,5 +149,22 @@ describe("post-cleanup repository shape", () => {
       }
     }
     expect(missing).toEqual([]);
+  });
+
+  it("keeps one Codex plugin layout and its generated artifacts ignored", async () => {
+    const manifest = JSON.parse(await fs.readFile(path.join(root, "plugins", "doodle", ".codex-plugin", "plugin.json"), "utf8"));
+    const mcp = JSON.parse(await fs.readFile(path.join(root, "plugins", "doodle", ".mcp.json"), "utf8"));
+    const marketplace = JSON.parse(await fs.readFile(path.join(root, ".agents", "plugins", "marketplace.json"), "utf8"));
+    const gitignore = await fs.readFile(path.join(root, ".gitignore"), "utf8");
+    expect(manifest.version).toBe("0.6.0");
+    expect(manifest.requires_local_executor).toBe(true);
+    expect(manifest.mcpServers).toBe("./.mcp.json");
+    expect(mcp.mcpServers.doodle.type).toBe("stdio");
+    expect(mcp.mcpServers.doodle.args[0]).toBe("${PLUGIN_ROOT}/server/index.mjs");
+    expect(marketplace.plugins[0].source.path).toBe("./.doodle-plugin/doodle");
+    expect(await fs.access(path.join(root, "plugins", "doodle", "plugin.json")).then(() => true).catch(() => false)).toBe(false);
+    expect(await fs.access(path.join(root, "plugins", "doodle", "mcp.json")).then(() => true).catch(() => false)).toBe(false);
+    expect(gitignore).toContain(".doodle-plugin/");
+    expect(gitignore).toContain(".doodle-data/");
   });
 });
