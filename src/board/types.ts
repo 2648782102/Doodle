@@ -132,7 +132,7 @@ export function createStarterBoard(): SimpleBoard {
     },
     {
       id: "starter_loop", type: "text", x: 40, y: 320, w: 810, h: 32,
-      text: "get_board  →  draw_board / reply_on_board  →  人继续画", color: "#ffffff", author: "ai",
+      text: "get_board  →  show_board / draw_board  →  人继续画", color: "#ffffff", author: "ai",
       createdAt: timestamp, updatedAt: timestamp,
     },
     {
