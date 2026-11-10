@@ -22,3 +22,35 @@ jobs:
       - run: npm run check
       - run: npm run build:submission
       - run: npm pack --dry-run
+
+  publish-npm-once:
+    if: github.event_name == 'workflow_dispatch'
+    needs: verify
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          registry-url: https://registry.npmjs.org
+      - run: npm ci
+      - run: npm run check
+      - name: Check npm token secret
+        id: npm_token
+        env:
+          NPM_TOKEN: ${{ secrets.NPM_TOKEN }}
+        run: |
+          if [ -n "$NPM_TOKEN" ]; then
+            echo "available=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "available=false" >> "$GITHUB_OUTPUT"
+          fi
+      - name: Publish doodle-mcp 0.6.0 to npm
+        if: steps.npm_token.outputs.available == 'true'
+        env:
+          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
+        run: npm publish --access public
+      - name: Report missing npm token
+        if: steps.npm_token.outputs.available != 'true'
+        run: echo "::warning::NPM_TOKEN is not configured; npm publication was skipped"
