@@ -46,6 +46,8 @@ const pluginSkill = await read("plugins/doodle/skills/doodle/SKILL.md");
 const ci = await read(".github/workflows/ci.yml");
 const gitignore = await read(".gitignore");
 const index = await read("src/index.ts");
+const releasing = await read("RELEASING.md");
+const publishWorkflow = await read(".github/workflows/publish-release.yml");
 const privacy = await read("PRIVACY.md");
 const support = await read("SUPPORT.md");
 const terms = await read("TERMS.md");
@@ -72,6 +74,9 @@ check(goalPlugin.includes("## Objective") && goalPlugin.includes("plugin") && go
 check(packageJson.scripts.build.includes("build-plugin.mjs") && packageJson.scripts.check.includes("repo:plugin-check"), "npm scripts do not build and check the plugin");
 check(ci.includes("npm run repo:plugin-check"), "CI does not run the plugin guard");
 check(ci.includes("npm run build:submission"), "CI does not build the submission ZIP");
+check(publishWorkflow.includes("contents: write") && publishWorkflow.includes("gh release create"), "publish workflow cannot create a release");
+check(publishWorkflow.includes("npm run check") && publishWorkflow.includes("--notes-file"), "publish workflow does not verify the package or use changelog notes");
+check(releasing.includes("publish workflow") && !releasing.includes("does not create a Release automatically"), "releasing guide does not describe release automation");
 check(gitignore.includes(".doodle-plugin/") && gitignore.includes(".doodle-data/") && gitignore.includes("doodle-plugin-submission/"), "generated plugin output, data, or submission ZIP is not ignored");
 check(index.indexOf("await mcp.connect(transport);") < index.indexOf("await preview.start();"), "MCP stdio is not connected before optional preview startup");
 check(index.includes("Preview unavailable"), "preview failure does not keep the MCP server alive");

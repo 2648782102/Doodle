@@ -15,6 +15,7 @@ This document separates what the repository can prepare from what only an approv
 - Explicit `readOnlyHint`, `destructiveHint`, and `openWorldHint` values on every MCP tool.
 - `npm run check`, including repository and plugin guards, MCP integration tests, and package dry-run.
 - A clean isolated `CODEX_HOME` marketplace/installation smoke test and a bundled stdio MCP SDK smoke test.
+- An idempotent publish workflow that attaches `doodle-<version>.zip` to the matching GitHub Release after `npm run check`.
 
 ## Required outside this repository
 

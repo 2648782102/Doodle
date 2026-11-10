@@ -1,0 +1,63 @@
+name: Publish Release
+
+on:
+  push:
+    branches: [master]
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: Tag to publish; defaults to the current package version
+        required: false
+        default: ""
+
+permissions:
+  contents: write
+
+concurrency:
+  group: publish-release-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  publish:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+      - run: npm run check
+      - name: Write release notes
+        run: |
+          node --input-type=module <<'NODE'
+          import fs from "node:fs";
+          const version = JSON.parse(fs.readFileSync("package.json", "utf8")).version;
+          const changelog = fs.readFileSync("CHANGELOG.md", "utf8");
+          const start = changelog.indexOf(`## ${version} —`);
+          if (start < 0) throw new Error(`Missing changelog section for ${version}`);
+          const next = changelog.indexOf("\n## ", start + 1);
+          const section = (next < 0 ? changelog.slice(start) : changelog.slice(start, next)).trim();
+          fs.writeFileSync("release-notes.md", `${section}\n`);
+          NODE
+      - name: Publish release
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          REQUESTED_TAG: ${{ github.event.inputs.tag }}
+          TARGET_BRANCH: ${{ github.event.repository.default_branch }}
+        run: |
+          version=$(node -p "require('./package.json').version")
+          tag="${REQUESTED_TAG:-v$version}"
+          if gh release view "$tag" >/dev/null 2>&1; then
+            echo "Release $tag already exists; leaving it unchanged"
+            exit 0
+          fi
+          gh release create "$tag" \
+            --target "$TARGET_BRANCH" \
+            --verify-tag \
+            --title "$tag — Doodle Shared Board plugin" \
+            --notes-file release-notes.md \
+            "doodle-plugin-submission/doodle-$version.zip#doodle-$version.zip"

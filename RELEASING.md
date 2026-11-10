@@ -1,6 +1,6 @@
 # Releasing
 
-Releases are made from `master` by a maintainer. CI verifies; it does not publish to npm or create a Release automatically.
+Releases are made from `master` by a maintainer. CI and the publish workflow verify the package; the publish workflow creates an idempotent GitHub Release with the versioned submission ZIP. npm publishing remains an explicit maintainer action.
 
 ## Pre-release checklist
 
@@ -14,12 +14,12 @@ Releases are made from `master` by a maintainer. CI verifies; it does not publis
 
 ## Release steps
 
-1. Merge the reviewed branch into `master`.
+1. Merge the reviewed release changes into `master`.
 2. Push the versioned `vX.Y.Z` tag from `master`.
 3. The tag workflow in `.github/workflows/release.yml` runs the full check and package dry-run.
-4. After verification, create a GitHub Release from the matching `CHANGELOG.md` section and attach the generated submission ZIP when preparing a public plugin review. Check for an existing release on the tag first; do not recreate or edit published releases.
+4. `.github/workflows/publish-release.yml` runs on `master` after a full `npm run check`, creates the GitHub Release from the matching `CHANGELOG.md` section when absent, and attaches the versioned submission ZIP. It leaves existing releases unchanged; `workflow_dispatch` can retry with an explicit tag.
 5. Publish to npm only through an explicit maintainer action with the configured release environment.
-6. Verify that `npx doodle-mcp` starts, `npm run doctor` passes, and the changelog version matches the published package.
+6. Verify that `npx doodle-mcp` starts, `npm run doctor` passes, the release asset is attached, and the changelog version matches the published package.
 
 ## Rollback
 

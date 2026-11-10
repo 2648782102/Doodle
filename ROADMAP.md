@@ -12,6 +12,7 @@ Doodle is a simple shared infinite board. The roadmap protects that boundary rat
 - Clean MCP stdio, stderr-only logs, minimal runtime dependencies, and offline repository guards.
 - A desktop-only Codex plugin with one compatibility manifest, one bundled stdio server, a repository marketplace, plugin-safe data/workspace resolution, an optional loopback port, and a plugin guard in `npm run check` and CI.
 - Explicit MCP tool annotations, published privacy/support/terms pages, a versioned submission ZIP, and documented public-directory eligibility gates.
+- An idempotent publish workflow that creates the GitHub Release and attaches the submission ZIP after the full check.
 
 ## Near-term work
 

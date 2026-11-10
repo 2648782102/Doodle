@@ -28,6 +28,7 @@ The plugin is a distribution layer around this product. It must not turn Doodle 
 - Preserve version 1 board state, the four-tool contract, drawing guide, HTTP authorization, stderr-only logging, tokenized human edits, revision-safe writes, and read-only project-scan safety.
 - Synchronize the agent handbook, READMEs, product direction, architecture, decisions, changelog, release notes, examples, tests, CI, and offline repository/plugin guards.
 - Prepare review-facing publication materials: explicit tool annotations, a published privacy policy, support and terms URLs, a versioned submission ZIP, and a maintained record of OpenAI-side eligibility gates.
+- Automate idempotent GitHub Release publication and submission-ZIP attachment after the full check, using the built-in `GITHUB_TOKEN`.
 
 ## Out of scope
 
@@ -67,7 +68,7 @@ The plugin is a distribution layer around this product. It must not turn Doodle 
 7. `show_board` remains the only tool linked to the optional MCP App resource; all tools remain usable in text-only hosts.
 8. `scan_project` stays bounded, read-only, workspace-relative, and secret-conservative.
 9. `npm run check` passes, including lint, build, tests, example syntax, offline guards, plugin guard, doctor, and package dry-run.
-10. CI runs the same plugin guard and builds the versioned submission ZIP; the guard rejects conflicting portable manifests, missing policy URLs, missing tool annotations, and uncommitted generated artifacts.
+10. CI runs the same plugin guard, builds the versioned submission ZIP, and the publish workflow creates a Release only when the current version is missing; the guard rejects conflicting portable manifests, missing policy URLs, missing tool annotations, and uncommitted generated artifacts.
 11. `git status` contains only intended tracked changes; no generated runtime, submission ZIP, or private board state is staged.
 12. Final audit lists changed files, validation evidence, known limitations, public-directory eligibility gates, and any manual desktop-app reload required for the current session.
 

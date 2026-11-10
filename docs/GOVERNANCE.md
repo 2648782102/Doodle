@@ -18,8 +18,8 @@ Doodle is a small MIT-licensed open-source project. The repository is the canoni
 
 - GitHub repository: `https://github.com/2648782102/Doodle`
 - Issues: bug reports, feature requests, and private security advisories.
-- Releases: version tags and changelog sections; already published tags and releases are immutable.
-- Plugin review: a versioned submission ZIP may be attached to a release, but public directory eligibility stays an external approved-partner process.
+- Releases: version tags, changelog sections, and an idempotent publish workflow using the built-in `GITHUB_TOKEN`; already published tags and releases are not edited.
+- Plugin review: the publish workflow attaches the versioned submission ZIP to the GitHub Release, but public directory eligibility remains an external approved-partner process.
 - npm: published only through an explicit maintainer action, never by CI automatically.
 
 ## Metadata drift
