@@ -4,7 +4,7 @@ Doodle follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 During the `0.x` series:
 
-- Breaking changes increment the minor version: `0.3.4` → `0.4.0`.
+- Breaking changes increment the minor version: `0.4.0` → `0.5.0`.
 - Backward-compatible features increment the minor version.
 - Fixes and documentation-only corrections increment the patch version.
 
@@ -17,4 +17,4 @@ A breaking change includes, but is not limited to:
 - Changing the local REST/WebSocket contract in a way an active panel cannot ignore.
 - Raising the minimum supported Node.js version.
 
-The MCP server reports its version from `package.json`. Keep package version, `CHANGELOG.md`, and release tags in sync. Only the latest `0.4.x` release receives fixes.
+The MCP server reports its version from `package.json`. Keep package version, `CHANGELOG.md`, and release tags in sync. Only the latest `0.5.x` release receives fixes.

@@ -7,13 +7,8 @@ import { fileURLToPath } from "node:url";
 import { WebSocketServer } from "ws";
 import type { AppConfig } from "../infra/config.js";
 import { logger } from "../infra/logger.js";
-import {
-  addBoardItem,
-  addBoardNote,
-  removeBoardItem,
-  updateBoardItem,
-  type BoardItemInput,
-} from "./types.js";
+import { addBoardItem, removeBoardItem, updateBoardItem, type BoardItemInput, type SimpleBoard } from "./types.js";
+import { BoardRevisionConflictError } from "./errors.js";
 import type { BoardStore } from "./store.js";
 import { projectSnapshotText, scanProject, type ProjectScanOptions } from "./project-scan.js";
 
@@ -24,17 +19,23 @@ const templateCandidates = [
   path.resolve(sourceDir, "../../dist/infra/templates/board.html"),
 ];
 
+function canvasSnapshot(board: SimpleBoard) {
+  const { notes: _legacyNotes, ...snapshot } = board;
+  return snapshot;
+}
+
 export class BoardHttpServer {
   private app = express();
   private server: http.Server | null = null;
   private wss: WebSocketServer | null = null;
   private readonly panelToken = crypto.randomBytes(24).toString("hex");
+  private appBundle = "";
 
   constructor(
     private board: BoardStore,
     private config: AppConfig,
   ) {
-    this.app.use(express.json());
+    this.app.use(express.json({ limit: "32kb" }));
     this.setupRoutes();
   }
 
@@ -48,7 +49,7 @@ export class BoardHttpServer {
     });
 
     this.app.get("/api/board", async (_req, res) => {
-      res.json(await this.board.snapshot());
+      res.json(canvasSnapshot(await this.board.snapshot()));
     });
 
     const commit = async (
@@ -57,16 +58,37 @@ export class BoardHttpServer {
     ) => {
       let board: Awaited<ReturnType<BoardStore["snapshot"]>>;
       try {
-        board = await this.board.mutate(change);
+        const revisionHeader = res.req.header("If-Match-Revision");
+        if (revisionHeader === undefined) {
+          board = await this.board.mutate(change);
+        } else {
+          const expectedRevision = Number(revisionHeader);
+          if (!Number.isInteger(expectedRevision) || expectedRevision < 0) {
+            throw new BoardRevisionConflictError(-1, expectedRevision);
+          }
+          const current = await this.board.snapshot();
+          if (current.revision !== expectedRevision) {
+            throw new BoardRevisionConflictError(expectedRevision, current.revision);
+          }
+          board = await this.board.replaceIfRevision(change(current), expectedRevision);
+        }
       } catch (error) {
-        return res.status(400).json({ error: error instanceof Error ? error.message : String(error) });
+        const message = error instanceof Error ? error.message : String(error);
+        if (error instanceof BoardRevisionConflictError) return res.status(409).json({ error: message });
+        if (message.toLowerCase().includes("timed out waiting")) return res.status(503).json({ error: message });
+        if ((error as NodeJS.ErrnoException).code) {
+          logger.error(`Board persistence failed: ${message}`);
+          return res.status(500).json({ error: "Unable to persist board changes" });
+        }
+        return res.status(400).json({ error: message });
       }
       this.broadcast({ type: "board_updated", revision: board.revision });
-      return res.json({ ok: true, board });
+      return res.json({ ok: true, board: canvasSnapshot(board) });
     };
 
     this.app.post("/api/board/items", async (req, res) => {
       const body = req.body as { item?: BoardItemInput; confirmedBy?: string };
+      if (!body || typeof body !== "object") return res.status(400).json({ error: "JSON object is required" });
       if (body.confirmedBy !== "human") return res.status(403).json({ error: "Human confirmation is required" });
       if (!body.item) return res.status(400).json({ error: "item is required" });
       await commit(res, (current) => addBoardItem(current, { ...body.item!, author: "human" }));
@@ -74,6 +96,7 @@ export class BoardHttpServer {
 
     this.app.patch("/api/board/items/:id", async (req, res) => {
       const body = req.body as { patch?: Partial<BoardItemInput>; confirmedBy?: string };
+      if (!body || typeof body !== "object") return res.status(400).json({ error: "JSON object is required" });
       if (body.confirmedBy !== "human") return res.status(403).json({ error: "Human confirmation is required" });
       if (!body.patch) return res.status(400).json({ error: "patch is required" });
       await commit(res, (current) => updateBoardItem(current, req.params.id, body.patch!));
@@ -81,19 +104,9 @@ export class BoardHttpServer {
 
     this.app.delete("/api/board/items/:id", async (req, res) => {
       const body = req.body as { confirmedBy?: string };
+      if (!body || typeof body !== "object") return res.status(400).json({ error: "JSON object is required" });
       if (body.confirmedBy !== "human") return res.status(403).json({ error: "Human confirmation is required" });
       await commit(res, (current) => removeBoardItem(current, req.params.id));
-    });
-
-    this.app.post("/api/board/notes", async (req, res) => {
-      const body = req.body as { body?: string; itemId?: string; confirmedBy?: string };
-      if (body.confirmedBy !== "human") return res.status(403).json({ error: "Human confirmation is required" });
-      if (typeof body.body !== "string") return res.status(400).json({ error: "body is required" });
-      await commit(res, (current) => addBoardNote(current, {
-        body: body.body!,
-        author: "human",
-        itemId: body.itemId,
-      }));
     });
 
     this.app.get("/api/board/project", async (req, res) => {
@@ -112,6 +125,16 @@ export class BoardHttpServer {
     });
 
     this.app.get("/", (_req, res) => this.serveBoard(res));
+
+    this.app.use((error: unknown, _req: express.Request, res: express.Response, _next: express.NextFunction) => {
+      const parserError = (error as { type?: string }).type;
+      if (parserError === "entity.parse.failed" || parserError === "entity.too.large") {
+        return res.status(parserError === "entity.too.large" ? 413 : 400)
+          .json({ error: "Invalid or oversized JSON request" });
+      }
+      logger.error(`HTTP request failed: ${error instanceof Error ? error.message : String(error)}`);
+      return res.status(500).json({ error: "Internal server error" });
+    });
   }
 
   private async serveBoard(res: express.Response): Promise<void> {
@@ -126,6 +149,24 @@ export class BoardHttpServer {
       } catch {}
     }
     res.status(500).send("Board template not found");
+  }
+
+  async getAppHtml(bundle?: string): Promise<string> {
+    if (bundle !== undefined) this.appBundle = bundle;
+    let template: string | undefined;
+    for (const candidate of templateCandidates) {
+      try {
+        template = await fs.readFile(candidate, "utf8");
+        break;
+      } catch {}
+    }
+    if (!template) throw new Error("Board template not found");
+    return template
+      .replace(/\s*<aside class="side"[\s\S]*?<\/aside>/, "")
+      .replace('const MCP_APP_BUNDLE = "";', 'const MCP_APP_BUNDLE = "embedded";')
+      .replace("/*__DOODLE_MCP_APP_BUNDLE__*/", () => this.appBundle.replace(/<\/script/gi, "<\\/script"))
+      .replace("__DOODLE_PANEL_TOKEN__", "")
+      .replace("__AI_DRAW_PANEL_TOKEN__", "");
   }
 
   async start(): Promise<void> {
@@ -150,6 +191,33 @@ export class BoardHttpServer {
         resolve();
       });
     });
+  }
+
+  async loadBoard() {
+    return this.board.snapshot();
+  }
+
+  async updateBoard(input: {
+    items?: BoardItemInput[];
+    remove_ids?: string[];
+    author?: "human" | "ai";
+  }) {
+    const board = await this.board.mutate((current) => {
+      let next = current;
+      for (const raw of input.items ?? []) {
+        const item = { ...raw, author: input.author ?? "human" as const };
+        if (raw.id) {
+          const { id, ...patch } = item;
+          next = updateBoardItem(next, id!, patch);
+        } else {
+          next = addBoardItem(next, item);
+        }
+      }
+      for (const id of new Set(input.remove_ids ?? [])) next = removeBoardItem(next, id);
+      return next;
+    });
+    this.broadcast({ type: "board_updated", revision: board.revision });
+    return board;
   }
 
   broadcast(message: Record<string, unknown>): void {

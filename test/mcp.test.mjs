@@ -5,7 +5,7 @@ import { afterAll, describe, expect, it } from "vitest";
 import { Client } from "@modelcontextprotocol/sdk/client/index.js";
 import { StdioClientTransport } from "@modelcontextprotocol/sdk/client/stdio.js";
 
-const EXPECTED_TOOLS = ["get_board", "draw_board", "reply_on_board", "scan_project"];
+const EXPECTED_TOOLS = ["get_board", "show_board", "draw_board", "scan_project"];
 const tempDir = await fs.mkdtemp(path.join(os.tmpdir(), "doodle-mcp-test-"));
 
 afterAll(async () => {
@@ -61,12 +61,27 @@ function jsonAfter(text, marker) {
 }
 
 describe("MCP board server", () => {
-  it("registers exactly four agent-first tools and no browser-opening tool", async () => {
+  it("registers four agent-first tools and an embedded board app", async () => {
     await withClient(3421, async (client) => {
       const { tools } = await client.listTools();
       expect(tools.map((tool) => tool.name).sort()).toEqual([...EXPECTED_TOOLS].sort());
-      expect(client.getInstructions()).toContain("Start with get_board");
+      expect(tools.find((tool) => tool.name === "get_board")._meta).toBeUndefined();
+      expect(tools.find((tool) => tool.name === "show_board")._meta.ui.resourceUri).toBe("ui://doodle/board/v1.html");
+      expect(client.getInstructions()).toContain("Use get_board");
+      expect(client.getInstructions()).toContain("show_board");
       expect(client.getInstructions()).toContain("scan_project is optional");
+    });
+  }, 30_000);
+
+  it("serves the embedded board app only through the render tool", async () => {
+    await withClient(3442, async (client) => {
+      const appResource = await client.readResource({ uri: "ui://doodle/board/v1.html" });
+      expect(appResource.contents[0].mimeType).toBe("text/html;profile=mcp-app");
+      expect(appResource.contents[0].text).toContain("DoodleBoardInit");
+      expect(appResource.contents[0].text).not.toContain('id="noteInput"');
+      const shown = await client.callTool({ name: "show_board", arguments: {} });
+      expect(shown.structuredContent).toMatchObject({ version: 1 });
+      expect(shown.structuredContent.itemCount).toBeGreaterThan(0);
     });
   }, 30_000);
 
@@ -83,7 +98,7 @@ describe("MCP board server", () => {
     });
   }, 30_000);
 
-  it("draws a directed board arrow and replies on the same canvas", async () => {
+  it("draws a directed board arrow and returns an authoritative canvas snapshot", async () => {
     await withClient(3422, async (client) => {
       const before = jsonAfter(textOf(await client.callTool({ name: "get_board", arguments: {} })), "BOARD_JSON:");
       const drawn = textOf(await client.callTool({
@@ -97,18 +112,23 @@ describe("MCP board server", () => {
         },
       }));
       expect(drawn).toContain("新增 2");
-      const reply = textOf(await client.callTool({
-        name: "reply_on_board",
-        arguments: { body: "这是同一张画板上的一句回应" },
-      }));
-      expect(reply).toContain("AI 回应已放到画板旁");
+      const snapshot = (await client.callTool({
+        name: "draw_board",
+        arguments: { items: [{ type: "text", x: 320, y: 0, text: "共享画布" }] },
+      })).structuredContent;
+      expect(snapshot.items.some((item) => item.text === "共享画布")).toBe(true);
+      const stale = await client.callTool({
+        name: "draw_board",
+        arguments: { expected_revision: before.revision, items: [{ type: "text", x: 500, y: 0, text: "stale" }] },
+      });
+      expect(stale.isError).toBe(true);
       const after = jsonAfter(textOf(await client.callTool({ name: "get_board", arguments: {} })), "BOARD_JSON:");
       expect(after.items.filter((item) => item.text === "MCP test")).toHaveLength(1);
-      expect(after.notes.at(-1).body).toContain("同一张画板");
+      expect(after.items.some((item) => item.text === "共享画布")).toBe(true);
       await client.callTool({
         name: "draw_board",
         arguments: {
-          remove_ids: after.items.filter((item) => item.text === "MCP test" || item.text === "→").map((item) => item.id),
+          remove_ids: after.items.filter((item) => item.text === "MCP test" || item.text === "→" || item.text === "共享画布").map((item) => item.id),
         },
       });
       expect(before.revision).toBeLessThan(after.revision);

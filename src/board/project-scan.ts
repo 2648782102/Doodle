@@ -4,13 +4,14 @@ import path from "node:path";
 const DEFAULT_MAX_FILES = 80;
 const DEFAULT_MAX_DEPTH = 3;
 const MAX_TEXT_BYTES = 64 * 1024;
+const MAX_EVIDENCE_PER_FILE = 5;
+const MAX_EVIDENCE_TOTAL = 40;
+const SENSITIVE_NAME = /(?:api.?key|access.?key|secret|token|password|passwd|credential|private.?key|client.?secret)/;
+const SENSITIVE_VALUE = /(?:AKIA[0-9A-Z]{16}|gh[pousr]_[A-Za-z0-9_]{20,}|github_pat_[A-Za-z0-9_]{20,}|sk-(?:proj-)?[A-Za-z0-9_-]{20,}|-----BEGIN (?:RSA |EC |OPENSSH )?PRIVATE KEY-----|\b(?:Bearer|Basic)\s+[A-Za-z0-9+/=_-]{12,}|:\/\/[^\s/:]+:[^\s/@]+@)/i;
 const SOURCE_EXTENSIONS = new Set([
   ".ts", ".tsx", ".js", ".jsx", ".mjs", ".cjs", ".json", ".md",
   ".css", ".scss", ".html", ".yml", ".yaml", ".toml", ".py", ".go", ".rs",
 ]);
-const EVIDENCE_KINDS = new Set(["definition", "heading", "import"]);
-const SENSITIVE_EVIDENCE = /(api[_-]?key|access[_-]?token|auth[_-]?token|bearer|password|passwd|secret|private[_-]?key|credential|ghp_|github_pat_|sk-[A-Za-z0-9]|AKIA[0-9A-Z]{16}|-----BEGIN)/i;
-const ASSIGNED_VALUE = /(["'`]?[A-Za-z0-9_.-]*(?:token|secret|password|passwd|key)["'`]?\s*[:=]\s*)(["'`]?)([^"'`\s,;]+)\2/i;
 const SKIPPED_DIRECTORIES = new Set([
   ".git", "node_modules", "dist", "build", "coverage", ".next", ".nuxt",
   ".cache", ".codex", "vendor", "output", ".doodle",
@@ -60,17 +61,16 @@ function relativePath(root: string, absolute: string): string {
   return path.relative(root, absolute).split(path.sep).join("/");
 }
 
+function containsSecret(line: string): boolean {
+  if (SENSITIVE_VALUE.test(line)) return true;
+  const assignment = line.match(/^\s*(?:export\s+)?(?:const|let|var)\s+([A-Za-z_$][\w$-]*)\s*[:=]/i);
+  if (assignment && SENSITIVE_NAME.test(assignment[1].replace(/[^a-z0-9]/gi, "").toLowerCase())) return true;
+  return /["']?[A-Za-z0-9_$.-]*(?:api.?key|access.?key|secret|token|password|passwd|credential|private.?key|client.?secret)[A-Za-z0-9_$.-]*["']?\s*[:=]/i.test(line);
+}
+
 function isPrivateEntry(relative: string): boolean {
   return relative.split("/").some((segment) =>
     segment.startsWith(".") || segment.toLowerCase().startsWith(".env"));
-}
-
-function safeEvidenceExcerpt(relative: string, line: string): string | null {
-  const trimmed = line.trim().slice(0, 160);
-  if (!trimmed || SENSITIVE_EVIDENCE.test(trimmed) || SENSITIVE_EVIDENCE.test(relative)) return null;
-  const assignment = trimmed.match(ASSIGNED_VALUE);
-  if (!assignment) return trimmed;
-  return `${assignment[1]}${assignment[2]}[redacted]${assignment[2]}`;
 }
 
 async function collectEvidence(root: string, absolute: string): Promise<ProjectEvidence[]> {
@@ -87,16 +87,14 @@ async function collectEvidence(root: string, absolute: string): Promise<ProjectE
   const evidence: ProjectEvidence[] = [];
   const lines = source.split(/\r?\n/);
   for (const [index, line] of lines.entries()) {
-    if (evidence.length >= 5) break;
+    if (evidence.length >= MAX_EVIDENCE_PER_FILE) break;
     const trimmed = line.trim().slice(0, 160);
-    if (!trimmed || SENSITIVE_EVIDENCE.test(trimmed) || SENSITIVE_EVIDENCE.test(relative)) continue;
+    if (!trimmed || containsSecret(trimmed)) continue;
     let kind: ProjectEvidence["kind"] | null = null;
     if (/^(export\s+)?(async\s+)?(function|class|interface|type|const|enum)\b/.test(trimmed)) kind = "definition";
     else if (/^import\s.+\sfrom\s/.test(trimmed) || /^from\s.+\simport\s/.test(trimmed)) kind = "import";
     else if (/^#{1,6}\s/.test(trimmed)) kind = "heading";
-    if (!kind || !EVIDENCE_KINDS.has(kind)) continue;
-    const excerpt = safeEvidenceExcerpt(relative, line);
-    if (excerpt) evidence.push({ path: relative, line: index + 1, kind, excerpt });
+    if (kind) evidence.push({ path: relative, line: index + 1, kind, excerpt: trimmed });
   }
   return evidence;
 }
@@ -143,7 +141,10 @@ export async function scanProject(root: string, options: ProjectScanOptions = {}
         } catch {
           continue;
         }
-        const fileEvidence = includeEvidence ? await collectEvidence(workspaceRoot, child) : [];
+        const candidates = includeEvidence && evidence.length < MAX_EVIDENCE_TOTAL
+          ? await collectEvidence(workspaceRoot, child)
+          : [];
+        const fileEvidence = candidates.slice(0, MAX_EVIDENCE_TOTAL - evidence.length);
         evidence.push(...fileEvidence);
         files.push({ path: relative, kind: "file", depth, size, evidence: fileEvidence });
       }

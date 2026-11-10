@@ -5,7 +5,7 @@ Thanks for helping keep Doodle small, predictable, and useful inside an agent.
 ## Ground rules
 
 - The shared infinite canvas is the product. Do not make project structure, a dashboard, a chat app, or an approval workflow the main subject again.
-- Keep the MCP tool surface at four tools unless `docs/DECISIONS.md` records an explicit change.
+- Keep the MCP tool surface at four tools unless `docs/DECISIONS.md` records an explicit change. Keep the shared canvas UI optional so tools remain usable in text-only hosts.
 - Keep normal MCP calls free of browser, IDE, editor, and project-write side effects.
 - Keep `SimpleBoard` versioned, bounded, and independent of project files.
 - stdout is reserved for MCP JSON-RPC; logs go to stderr.

@@ -1,13 +1,13 @@
 # Dependency Maintenance
 
-The `0.4.0` cleanup removed Mermaid CLI, Mermaid, sharp, open, nanoid, the VS Code extension, and all browser-rendering dependencies. The runtime dependency set is intentionally small: the MCP SDK, Express, WebSocket, and Zod. Development uses TypeScript, tsx, Vitest, and type packages.
+The `0.5.0` cleanup removed Mermaid CLI, Mermaid, sharp, open, nanoid, and the VS Code extension. The runtime uses the MCP SDK, MCP Apps bridge, Express, WebSocket, and Zod. Development also uses esbuild to bundle the self-contained browser canvas and its MCP Apps adapter.
 
 ## Verification order
 
 1. Read the Dependabot diff and identify whether it changes runtime behavior, MCP protocol, or package size.
 2. Run `npm install` to regenerate `package-lock.json`.
 3. Run `npm run check`.
-4. Start the MCP server and verify `listTools` returns exactly four tools.
+4. Start the MCP server and verify `listTools` returns exactly four tools; check that only `show_board` advertises the optional shared UI resource.
 5. Confirm that no dependency reintroduces browser launching, image rendering, or a second state model.
 
 ## Current audit note

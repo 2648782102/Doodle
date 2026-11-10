@@ -19,10 +19,10 @@ Doodle is local-first. The MCP server uses stdio; a small HTTP server binds to `
 
 - stdout carries only MCP JSON-RPC; logs go to stderr.
 - The board state file lives under `OUTPUT_DIR/.doodle/board.json` and is ignored by Git.
-- Non-GET `/api/board/*` requests require the random `X-AI-Draw-Token` injected into the local HTML and `confirmedBy: "human"`. The token is not persisted.
-- Board objects, notes, and AI replies are communication context. They never become approval credentials or authority to write project files.
-- `scan_project` is read-only. It returns workspace-relative paths and bounded evidence excerpts, skips dot-private and `.env`-like paths, skips common generated directories, skips credential-like lines, redacts assigned evidence values, and does not follow paths outside the configured workspace root.
-- Board mutations take a local lock file, reread disk state, and are revision-checked so concurrent local writers cannot silently overwrite each other.
+- Non-GET `/api/board/*` requests require the random `X-AI-Draw-Token` injected into the local HTML and `confirmedBy: "human"`. The human canvas sends a matching board revision so stale edits are rejected; legacy clients without it are serialized against the latest state. The token is not persisted.
+- Board objects are visual context. They never become approval credentials or authority to write project files. The MCP App calls the server's normal tools through the host bridge; it has no separate project-write capability.
+- `scan_project` is read-only. It returns workspace-relative paths and bounded evidence excerpts, skips dot-private and `.env`-like paths, skips common generated directories, caps evidence at 40 lines, filters common secret names and credential formats, and does not follow symlinks outside the configured workspace root.
+- Board writes use a cross-process filesystem lock and atomic rename. Snapshot replacements with stale or non-advancing revisions are rejected.
 - Normal MCP tools do not open browsers, launch IDEs, execute workspace commands, or write workspace files.
 - Code changes remain a separate coding-agent action with its own human review process.
 

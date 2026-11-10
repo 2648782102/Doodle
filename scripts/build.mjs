@@ -1,6 +1,7 @@
 import fs from "node:fs/promises";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
+import { build as bundle } from "esbuild";
 
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
 const sourceRoot = path.join(root, "src");
@@ -15,7 +16,7 @@ async function expectedCompiledFiles(directory) {
     if (entry.isDirectory()) {
       for (const file of await expectedCompiledFiles(absolute)) result.add(file);
     } else if (entry.isFile() && entry.name.endsWith(".ts")) {
-      const relative = path.relative(sourceRoot, absolute).replace(/\.ts$/, "");
+      const relative = path.relative(sourceRoot, absolute).split(path.sep).join("/").replace(/\.ts$/, "");
       for (const extension of [".js", ".js.map", ".d.ts", ".d.ts.map"]) {
         result.add(`${relative}${extension}`);
       }
@@ -50,4 +51,15 @@ for (const name of await fs.readdir(targetDir)) {
 for (const name of await fs.readdir(sourceDir)) {
   await fs.copyFile(path.join(sourceDir, name), path.join(targetDir, name));
 }
+const appBundle = await bundle({
+  entryPoints: [path.join(sourceRoot, "board", "app.ts")],
+  bundle: true,
+  format: "esm",
+  platform: "browser",
+  target: "es2022",
+  minify: true,
+  write: false,
+});
+await fs.writeFile(path.join(targetDir, "board-app.js"), appBundle.outputFiles[0].text);
+console.log(`📦 Bundled MCP App (${Buffer.byteLength(appBundle.outputFiles[0].text)} bytes)`);
 console.log("✅ Copied board template");

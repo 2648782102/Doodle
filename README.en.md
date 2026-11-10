@@ -1,19 +1,21 @@
 # Doodle
 
-> A tiny shared board for people and AI to doodle, draw, and leave short notes through MCP.
+> A shared canvas for people and AI to draw together through MCP.
 
-Doodle is a small local MCP server, not a hosted whiteboard, static diagram generator, chat product, or code-change approval system. It keeps only the shared canvas: a person can draw, move, edit, and leave a short note; an AI can read and draw on the same canvas from inside its coding agent.
+Doodle is a local MCP canvas, not a project workbench, static diagram generator, chat product, or code approval system. In hosts that support MCP Apps, `show_board` presents the interactive canvas beside the existing agent conversation. Conversation stays in the host chat. Other hosts can use the standalone local canvas at `http://127.0.0.1:3399/`.
+
+Choose a tool to click-place or drag-size objects. Space or middle-button drag pans; the wheel pans and Ctrl/Command-wheel zooms. Double-click an object to edit its text. The embedded UI calls the same `get_board` and `draw_board` tools through the host bridge; it needs no separate chat service.
 
 ## Four tools
 
 | Tool | Purpose |
 |---|---|
-| `get_board` | Read `BOARD_JSON`, object IDs and coordinates, recent notes, and the drawing guide. Start here. |
-| `draw_board` | Add, update, or remove notes, text, rectangles, ellipses, and directed arrows. |
-| `reply_on_board` | Leave one short AI response beside the board, optionally linked to an object. |
+| `get_board` | Read `BOARD_JSON`, object IDs and coordinates, authors, and the drawing guide. |
+| `show_board` | Open the interactive shared canvas beside the agent conversation when a user wants to see or edit it. |
+| `draw_board` | Add, update, or remove notes, text, rectangles, ellipses, and directed arrows; writes are serialized against the latest state. |
 | `scan_project` | Optional read-only project paths and bounded `file:line` evidence. It does not draw or write files. |
 
-The default loop is `get_board → draw_board / reply_on_board → person edits the canvas → AI reads it again`. Project structure is only one possible subject; `scan_project` is optional and must be visualized with `draw_board` if needed.
+The loop is `agent conversation ↔ embedded canvas: get_board → show_board → draw_board → person edits the canvas`. Project structure is only one possible subject; `scan_project` is optional and must be visualized with `draw_board` if needed.
 
 ## Quick start
 
@@ -24,9 +26,9 @@ npm run check
 npm run doctor
 ```
 
-Add `dist/index.js` as a stdio MCP server in your MCP host. Config snippets are in `examples/mcp-config/`. Use `DOODLE_WORKSPACE_ROOT` for the project that `scan_project` should inspect and `OUTPUT_DIR` for the board state directory. The default local panel is `http://127.0.0.1:3399/`; normal MCP calls do not open a browser.
+Add `dist/index.js` as a stdio MCP server in your MCP host. Config snippets are in `examples/mcp-config/`. Use `DOODLE_WORKSPACE_ROOT` for the project that `scan_project` should inspect and `OUTPUT_DIR` for the board state directory. The default local canvas is `http://127.0.0.1:3399/`; normal MCP calls do not open a browser.
 
-`AI_DRAW_WORKSPACE_ROOT` and the old `output/.ai-draw/board.json` path remain read-only compatibility aliases. New setups should use `DOODLE_WORKSPACE_ROOT`.
+Version 1 board files may contain old notes. They remain readable for compatibility, but new canvas UI and agent tools do not display or write a message feed.
 
 ## Drawing contract
 
@@ -38,7 +40,7 @@ Add `dist/index.js` as a stdio MCP server in your MCP host. Config snippets are 
 
 ## Safety
 
-stdout carries only MCP JSON-RPC; logs go to stderr. The HTTP server binds to `127.0.0.1` by default. Non-GET `/api/board/*` requests require the random `X-AI-Draw-Token` and `confirmedBy: "human"`. Project scans return bounded workspace-relative paths and redacted evidence text only. Board writes take a local lock, reread the shared state, and are revision-checked so a stale snapshot cannot overwrite newer canvas work. Board communication never authorizes project writes.
+stdout carries only MCP JSON-RPC; logs go to stderr. The HTTP server binds to `127.0.0.1` by default. Non-GET `/api/board/*` requests require the random `X-AI-Draw-Token`, `confirmedBy: "human"`, and a matching board revision. Project scans return bounded workspace-relative paths and short evidence text only, filter common credential lines, and cap evidence at 40 lines. Board mutations are serialized across processes. Board content never authorizes project writes; the embedded UI uses only normal canvas tools through the MCP Apps host bridge.
 
 See `SECURITY.md`, `docs/ARCHITECTURE.md`, and `AGENTS.md` for details.
 

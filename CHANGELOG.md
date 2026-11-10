@@ -2,12 +2,32 @@
 
 All notable changes are documented here. Versions follow `VERSIONING.md`.
 
+## 0.5.0 — Canvas embedded in the agent
+
+### Added
+
+- Added an optional MCP Apps canvas resource linked from `get_board` and `draw_board`. Its UI reads and edits the board through the host's normal MCP bridge.
+
+### Changed
+
+- Removed the duplicate canvas-side conversation pane and message composer. Agent discussion stays in the host conversation; the canvas fills the available surface.
+- Split canvas data and UI rendering into `get_board` and `show_board`; the four tools are `get_board`, `show_board`, `draw_board`, and optional `scan_project`.
+- Kept version 1 persisted notes readable for compatibility while excluding them from current tool output and canvas UI.
+- Kept the standalone local HTTP canvas as a fallback for hosts that do not render MCP Apps.
+
+### Removed
+
+- Removed `reply_on_board` and the human message endpoint from the active workflow.
+- Removed the MCP tool/UI pattern that presented Doodle as a separate chat product.
+
 ## 0.4.0 — Simple shared board cleanup
 
 ### Added
 
 - Renamed the product to **Doodle**. The npm package and CLI are `doodle-mcp`; the GitHub repository is `Doodle`.
 - `DOODLE_WORKSPACE_ROOT` is the preferred workspace variable. `AI_DRAW_WORKSPACE_ROOT` remains a legacy alias so existing MCP host configs keep working.
+- Improved canvas gestures: click-to-place, drag-to-size shapes and draw directional arrows, Space/middle-button panning, wheel panning, modifier-wheel zoom, and cancellable pointer gestures.
+- Cross-process serialized board mutations, revision-checked browser writes, project-scan secret filtering, and persisted-text validation.
 
 ### Changed
 
@@ -17,10 +37,6 @@ All notable changes are documented here. Versions follow `VERSIONING.md`.
 - Rewrote `AGENTS.md`, architecture, product direction, decisions, troubleshooting, governance, launch copy, contribution docs, and offline repository guards around the simplified product.
 - Reduced runtime dependencies to the MCP SDK, Express, WebSocket, and Zod.
 - Made a clean-checkout build recreate the template directory after pruning stale compiled files.
-- Renamed the browser title and brand to `Doodle`, and added a small welcome sketch for new board state without clearing existing boards.
-- Serialized board writes with a cross-process lock file and revision checks so a stale `draw_board` snapshot cannot overwrite newer human or AI work.
-- Redacted credential-like `scan_project` evidence and updated the local generic MCP example until `doodle-mcp` is published.
-- Corrected the project-context HTTP endpoints in `docs/ARCHITECTURE.md`.
 
 ### Removed
 

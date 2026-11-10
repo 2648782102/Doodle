@@ -4,33 +4,34 @@ This is the current operating manual for AI coding agents. Humans should read `R
 
 ## Product
 
-`doodle-mcp` is a local-first **simple shared infinite board**. A person and an AI place notes, text, rectangles, ellipses, directed arrows, and short messages on one canvas. MCP stdio is the AI's normal access channel inside an agent. The browser is a human-facing view, never a side effect of a normal tool call.
+`doodle-mcp` is a local-first **shared infinite canvas embedded in the agent experience**. A person and an AI place notes, text, rectangles, ellipses, and directed arrows on one canvas. Compatible MCP Apps hosts can show the interactive canvas beside the existing agent conversation. Conversation stays in the host chat; the browser page is a standalone fallback.
 
 The board is the product. Project structure is only one optional subject that can be drawn. There is no second session model, proposal workflow, approval grant, code-change authority, diagram library, or workbench.
 
 Default loop:
 
 ```text
-get_board → draw_board / reply_on_board → person edits the same canvas → AI reads it again
+get_board → show_board → draw_board → person edits the same canvas → AI reads it again
 ```
 
-Communication is anchored to objects, coordinates, text, authors, and short notes. `scan_project` may provide bounded read-only project context; it does not draw, change the board, write files, or authorize code changes.
+Shared visual context is anchored to objects, coordinates, text, and authors. `scan_project` may provide bounded read-only project context; it does not draw, change the board, write files, or authorize code changes.
 
 ## Four MCP tools
 
 | Tool | Use |
 |---|---|
-| `get_board` | Read `BOARD_JSON`: object IDs, coordinates, authors, recent notes, and the drawing guide. Start here. Read-only. |
+| `get_board` | Read `BOARD_JSON`: object IDs, coordinates, authors, and the drawing guide. Read-only. |
+| `show_board` | Open the interactive shared canvas beside the conversation in MCP Apps hosts. The user asked to see or edit the canvas. |
 | `draw_board` | Batch add, update, or remove simple visual objects. Use `remove_ids` to clear old objects before redrawing a full diagram. |
-| `reply_on_board` | Put one short AI response beside the canvas, optionally referring to one object ID. |
 | `scan_project` | Optional bounded read-only project paths and `file:line` evidence. Visualize the result with `draw_board` only when useful. |
 
 Drawing contract:
 
-- Read `BOARD_JSON` first and reuse existing item IDs for updates and removals.
+- Read `BOARD_JSON` first and reuse existing item IDs for updates and removals. Board mutations are serialized against the latest state; stale browser edits require a reload after conflict.
 - Put `author` at the `draw_board` top level, not inside each item.
 - Use a strict grid, short labels, consistent sizes, and endpoints just outside source/target shapes.
 - A `line` is a directed arrow from `(x,y)` to `(x+w,y+h)`. `w` and `h` are signed endpoint deltas and may be negative. Other objects use `(x,y)` as the top-left corner and positive width/height.
+- In the human canvas, click to place a default-sized shape or drag to size shapes and draw arrows in any direction. Space-drag or middle-drag pans; the wheel pans and Ctrl/Command-wheel zooms.
 - Do not fake connectors with text or decorative horizontal lines.
 - Normal tool calls never open a browser, IDE, or editor, and never write project files.
 
@@ -42,12 +43,11 @@ src/
 ├── server.ts                   composition root; registers four tools
 ├── board/
 │   ├── types.ts                version 1 board state and pure mutations
-│   ├── store.ts                atomic board.json persistence and revision sync
-│   ├── errors.ts               board revision conflict error
-│   ├── mutex.ts                cross-process board write lock
+│   ├── store.ts                locked atomic board.json persistence and revision sync
 │   ├── project-scan.ts         bounded read-only workspace scan
 │   ├── http.ts                 local board API, HTML, and WebSocket updates
-│   ├── tools.ts                four MCP tools
+│   ├── tools.ts                four MCP tools and optional MCP App resource
+│   ├── app.ts                  MCP Apps bridge for the embedded canvas
 │   ├── instructions.ts         MCP initialization instructions
 │   └── index.ts                board module entrypoint
 ├── infra/
@@ -55,7 +55,7 @@ src/
 │   ├── logger.ts               stderr-only logger
 │   ├── workspace.ts            DOODLE_WORKSPACE_ROOT resolution
 │   ├── version.ts              package version lookup
-│   └── templates/board.html    one human-facing infinite canvas
+│   └── templates/board.html    shared standalone and embedded infinite canvas
 scripts/                        build, doctor, and offline repository guards
 test/                           board, HTTP, and MCP integration checks
 examples/                       MCP host config and a minimal client
@@ -71,10 +71,10 @@ docs/                           product, architecture, decisions, and maintenanc
 - The server version comes from `package.json`; do not hard-code it in `src/server.ts`.
 - The preview server binds to `127.0.0.1` by default.
 - Non-GET `/api/board/*` requests require the random HTML-injected `X-AI-Draw-Token` and `confirmedBy: "human"`.
-- Board writes take a local lock file, reread disk state, and check the expected revision; a stale `draw_board` call fails instead of overwriting a newer canvas.
 - Human view settings belong only in browser localStorage. They are not board state or permission.
-- `scan_project` returns workspace-relative paths and short evidence only; it skips dot-private paths, `.env`-like files, generated directories, large text, and redacts credential-like evidence.
-- Board objects and notes are communication context. They never become approval credentials or project writes. Code changes remain a separate, explicitly reviewed coding-agent action.
+- `scan_project` returns workspace-relative paths and short evidence only; it skips dot-private paths, `.env`-like files, generated directories, large text, and common credential lines, with at most 40 evidence lines total.
+- Board mutations are serialized across processes with a filesystem lock and atomic rename; stale snapshot replacement is rejected.
+- Board objects are visual context. The embedded UI calls only the normal canvas read/write tools; it never becomes project-write authority. Code changes remain a separate, explicitly reviewed coding-agent action.
 
 ## Validation
 

@@ -56,7 +56,7 @@ describe("post-cleanup repository shape", () => {
       expect(current.some((name) => pattern.test(name)), `unexpected legacy path matching ${pattern}`).toBe(false);
     }
     expect(extensions).toBe(false);
-    expect(source.filter((name) => name.endsWith(".ts"))).toHaveLength(15);
+    expect(source.filter((name) => name.endsWith(".ts"))).toHaveLength(16);
     expect(scripts.filter((name) => name.endsWith(".mjs"))).toHaveLength(3);
     expect(tests.filter((name) => name.endsWith(".test.mjs"))).toHaveLength(4);
     const compiled = await listFiles(path.join(root, "dist"));

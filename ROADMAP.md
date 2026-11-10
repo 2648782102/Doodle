@@ -2,12 +2,12 @@
 
 Doodle is a simple shared infinite board. The roadmap protects that boundary rather than listing a large feature catalogue.
 
-## Shipped baseline — 0.4.0
+## Shipped baseline — 0.5.0
 
 - One version 1 board state shared by MCP tools and the local human canvas.
-- Four AI-first tools: `get_board`, `draw_board`, `reply_on_board`, and optional `scan_project`.
-- Notes, text, rectangles, ellipses, directed arrows, object authors, short messages, and object references.
-- One restrained local web surface with pan/zoom, local viewport memory, inline text editing, delete, and fit-to-content.
+- Four tools: `get_board`, `show_board`, `draw_board`, and optional `scan_project`.
+- Notes, text, rectangles, ellipses, directed arrows, and object authors. Persisted messages remain only for old-state compatibility.
+- One canvas UI that works as an optional MCP App beside the agent conversation and as a standalone local fallback, with click-to-place and drag-to-size drawing, directional arrows, pan/zoom gestures, local viewport memory, inline text editing, delete, and fit-to-content.
 - Read-only project scanning with bounded relative paths and `file:line` evidence.
 - Clean MCP stdio, stderr-only logs, minimal runtime dependencies, and offline repository guards.
 
@@ -17,7 +17,6 @@ Doodle is a simple shared infinite board. The roadmap protects that boundary rat
 - Improve agent-facing guidance with concrete, tested layout conventions for architecture sketches.
 - Keep project scan evidence bounded, private-path safe, and useful without making structure the product.
 - Strengthen tests around atomic board persistence, HTTP authorization, MCP instructions, and package contents.
-- Keep concurrent human and AI writes revision-safe, and keep default board content aligned with the Doodle product name.
 
 ## Explicit non-goals
 

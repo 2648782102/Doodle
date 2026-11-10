@@ -48,8 +48,8 @@
     #status { color: var(--muted); margin-left: auto; font-size: 12px; }
     .text-link { color: var(--accent); text-decoration: none; }
     .text-link:hover { text-decoration: underline; }
-    .app { height: calc(100% - var(--header-height)); display: grid; grid-template-columns: 1fr 300px; }
-    .canvas-region { position: relative; min-width: 0; overflow: hidden; }
+    .app { height: calc(100% - var(--header-height)); display: block; }
+    .canvas-region { position: relative; width: 100%; height: 100%; min-width: 0; overflow: hidden; }
     #canvas {
       position: absolute;
       inset: 0;
@@ -62,6 +62,8 @@
     }
     #canvas.panning { cursor: grabbing; }
     #canvas.creating { cursor: crosshair; }
+    #canvas.space-pan { cursor: grab; }
+    #canvas.space-pan .board-item { cursor: grab; pointer-events: none; }
     #world { position: absolute; left: 0; top: 0; transform-origin: 0 0; width: 1px; height: 1px; }
     .toolbar {
       position: absolute;
@@ -86,6 +88,7 @@
     }
     .tool:hover { background: #f1f3f6; }
     .tool[aria-pressed="true"] { background: var(--accent-soft); color: var(--accent); }
+    .tool-hint { padding: 0 8px; align-self: center; color: var(--muted); font-size: 11px; white-space: nowrap; }
     .tool.danger:hover { background: #fff1f1; color: #b91c1c; }
     .viewbar {
       position: absolute;
@@ -130,6 +133,9 @@
     }
     .board-item:hover { border-color: #8d99a9; }
     .board-item.selected { outline: 2px solid var(--accent); outline-offset: 2px; }
+    .board-item.preview { border-color: var(--accent); border-style: dashed; background: var(--accent-soft); opacity: .65; pointer-events: none; }
+    .board-item.preview[data-type="text"] { background: transparent; }
+    .board-item.preview[data-type="line"] { background: transparent; border: 0; }
     .board-item[data-type="text"] { border-color: transparent; background: transparent; justify-content: flex-start; padding: 4px; font-size: 18px; }
     .board-item[data-type="rect"] { background: var(--item-color, #c7d8ff); }
     .board-item[data-type="ellipse"] { background: var(--item-color, #b8e0d2); border-radius: 50%; }
@@ -162,39 +168,15 @@
     .board-item[data-type="line"] .item-text:empty { display: none; }
     .item-author { position: absolute; right: 5px; bottom: 3px; color: rgba(31, 41, 55, 0.55); font-size: 10px; }
     .board-item[data-type="text"] .item-author, .board-item[data-type="line"] .item-author { display: none; }
-    .side {
-      display: flex;
-      flex-direction: column;
-      min-width: 0;
-      border-left: 1px solid var(--line);
-      background: var(--surface);
-    }
-    .side-header { padding: 14px 16px 10px; border-bottom: 1px solid var(--line); }
-    .side-header h2 { margin: 0 0 4px; font-size: 15px; }
-    .side-header p { margin: 0; color: var(--muted); font-size: 12px; line-height: 1.5; }
-    #notes { flex: 1; min-height: 0; overflow: auto; padding: 12px 16px; }
-    .note { margin: 0 0 12px; padding: 9px 10px; border: 1px solid var(--line); border-radius: var(--radius); }
-    .note.human { border-left: 3px solid var(--human); }
-    .note.ai { border-left: 3px solid var(--ai); }
-    .note-meta { display: flex; justify-content: space-between; gap: 8px; margin-bottom: 4px; color: var(--muted); font-size: 11px; }
-    .note-body { white-space: pre-wrap; word-break: break-word; line-height: 1.5; }
-    .note-anchor { margin-top: 5px; color: var(--muted); font-size: 11px; }
-    .composer { padding: 12px 16px 16px; border-top: 1px solid var(--line); }
-    .composer label { display: block; margin-bottom: 6px; color: var(--muted); font-size: 12px; }
-    #noteInput { width: 100%; min-height: 62px; resize: vertical; padding: 9px 10px; border: 1px solid var(--line); border-radius: var(--radius); color: var(--text); background: #fff; }
-    .composer-row { display: flex; align-items: center; gap: 8px; margin-top: 8px; }
-    #anchorHint { color: var(--muted); font-size: 11px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-    #btnSend { margin-left: auto; padding: 7px 13px; border: 0; border-radius: 6px; color: #fff; background: var(--accent); cursor: pointer; }
-    #btnSend:hover { background: #1d4ed8; }
     #toast { position: absolute; left: 50%; bottom: 18px; z-index: 8; transform: translateX(-50%); padding: 7px 12px; border-radius: 6px; color: #fff; background: #334155; opacity: 0; pointer-events: none; transition: opacity .18s ease; }
     #toast.visible { opacity: 1; }
+    body[data-mcp-app="true"] .topbar { display: none; }
+    body[data-mcp-app="true"] .app { height: 100%; }
+    body[data-mcp-app="true"] #btnExpand:not([hidden]) { display: inline-block; }
     @media (max-width: 760px) {
-      .app { grid-template-columns: 1fr; grid-template-rows: 1fr 220px; }
-      .side { border-left: 0; border-top: 1px solid var(--line); }
       .brand small, #boardTitle, #status { display: none; }
-      #notes { padding: 8px 12px; }
-      .composer { padding: 8px 12px 12px; }
       .toolbar { max-width: calc(100vw - 24px); overflow-x: auto; }
+      .tool-hint { display: none; }
     }
     @media (prefers-reduced-motion: reduce) {
       #toast { transition: none; }
@@ -216,11 +198,13 @@
         <button class="tool" data-tool="rect" aria-pressed="false" title="矩形 (R)">矩形</button>
         <button class="tool" data-tool="ellipse" aria-pressed="false" title="椭圆 (E)">椭圆</button>
         <button class="tool" data-tool="line" aria-pressed="false" title="箭头 (L)">箭头</button>
+        <button class="tool" id="btnExpand" hidden title="在 Agent 中展开画布">展开</button>
         <button class="tool danger" id="btnDelete" title="删除选中对象 (Delete)">删除</button>
+        <span class="tool-hint" aria-hidden="true">点按放置 · 拖拽定形 · Space 平移</span>
       </div>
       <div id="canvas" tabindex="0" aria-label="可平移缩放的无限画布">
         <div id="world"></div>
-        <div id="emptyState">选一个工具，点一下画布开始画</div>
+        <div id="emptyState">点按快速放置 · 拖拽定尺寸 · Space + 拖动画布</div>
       </div>
       <div class="viewbar" aria-label="视图控制">
         <button id="btnZoomOut" title="缩小" aria-label="缩小">−</button>
@@ -230,30 +214,13 @@
       </div>
       <div id="toast" role="status" aria-live="polite"></div>
     </section>
-    <aside class="side" aria-label="画板交流">
-      <div class="side-header">
-        <h2>和 AI 说</h2>
-        <p>留言和画布存在一起。AI 通过 MCP 读取、画图和回应。</p>
-      </div>
-      <div id="notes" aria-live="polite"></div>
-      <div class="composer">
-        <label for="noteInput">写一句给 AI</label>
-        <textarea id="noteInput" maxlength="1200" placeholder="例如：把这三个想法连起来，或在这里补一张图"></textarea>
-        <div class="composer-row">
-          <span id="anchorHint">未关联对象</span>
-          <button id="btnSend">放到画板</button>
-        </div>
-      </div>
-    </aside>
   </main>
   <script>
     const PANEL_TOKEN = "__DOODLE_PANEL_TOKEN__";
+    const MCP_APP_BUNDLE = "";
     const canvas = document.querySelector("#canvas");
     const world = document.querySelector("#world");
     const emptyState = document.querySelector("#emptyState");
-    const notesElement = document.querySelector("#notes");
-    const noteInput = document.querySelector("#noteInput");
-    const anchorHint = document.querySelector("#anchorHint");
     const statusElement = document.querySelector("#status");
     const boardTitle = document.querySelector("#boardTitle");
     const toastElement = document.querySelector("#toast");
@@ -270,22 +237,32 @@
       rect: { w: 180, h: 110 }, ellipse: { w: 180, h: 110 }, line: { w: 180, h: 0 },
     };
     const colorCycle = ["#f6d365", "#b8e0d2", "#c7d8ff", "#ffd1dc", "#e8e8e8", "#ffffff"];
-    let board = { version: 1, title: "Doodle · 和 AI 一起画", revision: 0, items: [], notes: [] };
+    let board = { version: 1, title: "和 AI 一起画", revision: 0, items: [], notes: [] };
     let tool = "select";
     let selectedId = null;
     let viewport = { x: 0, y: 0, scale: 1 };
-    const viewportKey = "doodleBoardViewport";
-    const userViewportKey = "doodleBoardUserViewport";
-    const legacyViewport = localStorage.getItem("aiDrawBoardViewport");
-    if (legacyViewport && !localStorage.getItem(viewportKey)) localStorage.setItem(viewportKey, legacyViewport);
-    if (localStorage.getItem("aiDrawBoardUserViewport") === "1") localStorage.setItem(userViewportKey, "1");
-    let userAdjustedViewport = localStorage.getItem(userViewportKey) === "1";
+    let userAdjustedViewport = storageGet("aiDrawBoardUserViewport") === "1";
     let pointerState = null;
+    let boardRenderPending = false;
+    let editingId = null;
     let toastTimer = 0;
+    let viewportSaveTimer = 0;
+    let spacePressed = false;
+    let mcpApp = null;
+
+    function storageGet(key) {
+      try { return localStorage.getItem(key); } catch { return null; }
+    }
+    function storageSet(key, value) {
+      try { localStorage.setItem(key, value); } catch {}
+    }
+    function storageRemove(key) {
+      try { localStorage.removeItem(key); } catch {}
+    }
 
     function markUserViewport() {
       userAdjustedViewport = true;
-      localStorage.setItem(userViewportKey, "1");
+      storageSet("aiDrawBoardUserViewport", "1");
     }
 
     function showToast(message) {
@@ -303,14 +280,17 @@
       world.style.transform = `translate(${viewport.x}px, ${viewport.y}px) scale(${viewport.scale})`;
       const grid = 24 * viewport.scale;
       canvas.style.backgroundSize = `${grid}px ${grid}px`;
-      canvas.style.backgroundPosition = `${viewport.x}px ${viewport.y}px`;
+      canvas.style.backgroundPosition = `${viewport.x % grid}px ${viewport.y % grid}px`;
       document.querySelector("#btnZoomReset").textContent = `${Math.round(viewport.scale * 100)}%`;
-      localStorage.setItem(viewportKey, JSON.stringify(viewport));
+      clearTimeout(viewportSaveTimer);
+      viewportSaveTimer = window.setTimeout(() => {
+        storageSet("doodleBoardViewport", JSON.stringify(viewport));
+      }, 120);
     }
 
     function restoreViewport() {
       try {
-        const saved = JSON.parse(localStorage.getItem(viewportKey) || "null");
+        const saved = JSON.parse(storageGet("doodleBoardViewport") || "null");
         if (saved && Number.isFinite(saved.x) && Number.isFinite(saved.y) && Number.isFinite(saved.scale)) {
           viewport = { x: saved.x, y: saved.y, scale: Math.max(0.25, Math.min(3, saved.scale)) };
         }
@@ -345,6 +325,60 @@
       canvas.classList.toggle("creating", nextTool !== "select");
     }
 
+    function placeItemElement(element, item) {
+      if (item.type === "line") {
+        const left = Math.min(item.x, item.x + item.w) - 12;
+        const top = Math.min(item.y, item.y + item.h) - 12;
+        element.style.left = `${left}px`;
+        element.style.top = `${top}px`;
+      } else {
+        element.style.left = `${item.x}px`;
+        element.style.top = `${item.y}px`;
+      }
+    }
+
+    function getItemBounds(item) {
+      return item.type === "line" ? {
+        left: Math.min(item.x, item.x + item.w) - 12,
+        top: Math.min(item.y, item.y + item.h) - 12,
+        right: Math.max(item.x, item.x + item.w) + 12,
+        bottom: Math.max(item.y, item.y + item.h) + 12,
+      } : { left: item.x, top: item.y, right: item.x + item.w, bottom: item.y + item.h };
+    }
+
+    function fitBounds(bounds) {
+      if (!bounds.length) return;
+      const left = Math.min(...bounds.map((bound) => bound.left));
+      const top = Math.min(...bounds.map((bound) => bound.top));
+      const right = Math.max(...bounds.map((bound) => bound.right));
+      const bottom = Math.max(...bounds.map((bound) => bound.bottom));
+      const padding = 80;
+      const scale = Math.max(0.25, Math.min(1.4,
+        Math.min(canvas.clientWidth / Math.max(1, right - left + padding * 2),
+          canvas.clientHeight / Math.max(1, bottom - top + padding * 2))));
+      viewport.scale = scale;
+      viewport.x = (canvas.clientWidth - (right - left) * scale) / 2 - left * scale;
+      viewport.y = (canvas.clientHeight - (bottom - top) * scale) / 2 - top * scale;
+      applyViewport();
+    }
+
+    function ensureVisible(item) {
+      const bounds = getItemBounds(item);
+      const margin = 56;
+      const left = bounds.left * viewport.scale + viewport.x;
+      const top = bounds.top * viewport.scale + viewport.y;
+      const right = bounds.right * viewport.scale + viewport.x;
+      const bottom = bounds.bottom * viewport.scale + viewport.y;
+      if (left >= margin && top >= margin && right <= canvas.clientWidth - margin
+        && bottom <= canvas.clientHeight - margin) return;
+      fitBounds([
+        { left: -viewport.x / viewport.scale, top: -viewport.y / viewport.scale,
+          right: (canvas.clientWidth - viewport.x) / viewport.scale,
+          bottom: (canvas.clientHeight - viewport.y) / viewport.scale },
+        bounds,
+      ]);
+    }
+
     function renderBoard() {
       boardTitle.textContent = board.title;
       setStatus(`已保存 · rev ${board.revision}`);
@@ -358,10 +392,11 @@
         element.classList.toggle("selected", item.id === selectedId);
         let lineGeometry = null;
         if (item.type === "line") {
-          const left = Math.min(item.x, item.x + item.w);
-          const top = Math.min(item.y, item.y + item.h);
-          const width = Math.max(1, Math.abs(item.w));
-          const height = Math.max(1, Math.abs(item.h));
+          const hitPadding = 12;
+          const left = Math.min(item.x, item.x + item.w) - hitPadding;
+          const top = Math.min(item.y, item.y + item.h) - hitPadding;
+          const width = Math.max(1, Math.abs(item.w)) + hitPadding * 2;
+          const height = Math.max(1, Math.abs(item.h)) + hitPadding * 2;
           lineGeometry = {
             width,
             height,
@@ -424,91 +459,105 @@
         }
         world.append(element);
       }
-      renderNotes();
-      updateAnchorHint();
-    }
-
-    function renderNotes() {
-      notesElement.replaceChildren();
-      const recentNotes = board.notes.slice(-50);
-      if (recentNotes.length === 0) {
-        const empty = document.createElement("p");
-        empty.style.color = "var(--muted)";
-        empty.textContent = "还没有留言。画点什么，或者直接写一句。";
-        notesElement.append(empty);
-        return;
-      }
-      for (const note of recentNotes) {
-        const card = document.createElement("article");
-        card.className = `note ${note.author}`;
-        const meta = document.createElement("div");
-        meta.className = "note-meta";
-        const author = document.createElement("span");
-        author.textContent = note.author === "ai" ? "AI" : "人";
-        const time = document.createElement("span");
-        time.textContent = new Date(note.createdAt).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" });
-        meta.append(author, time);
-        const body = document.createElement("div");
-        body.className = "note-body";
-        body.textContent = note.body;
-        card.append(meta, body);
-        if (note.itemId) {
-          const anchor = document.createElement("div");
-          anchor.className = "note-anchor";
-          anchor.textContent = `关联对象：${note.itemId.slice(0, 12)}`;
-          card.append(anchor);
-        }
-        notesElement.append(card);
-      }
-      notesElement.scrollTop = notesElement.scrollHeight;
-    }
-
-    function updateAnchorHint() {
-      anchorHint.textContent = selectedId ? `关联：${selectedId.slice(0, 12)}` : "未关联对象";
     }
 
     async function loadBoard() {
+      if (mcpApp) {
+        const next = await mcpApp.getBoard();
+        if (next.revision < board.revision) return;
+        board = next;
+        if (selectedId && !board.items.some((item) => item.id === selectedId)) selectedId = null;
+        renderBoard();
+        return;
+      }
       const response = await fetch("/api/board");
       if (!response.ok) throw new Error(`HTTP ${response.status}`);
-      board = await response.json();
+      const next = await response.json();
+      if (next.revision < board.revision) return;
+      board = next;
       if (selectedId && !board.items.some((item) => item.id === selectedId)) selectedId = null;
+      if (pointerState || editingId) {
+        boardRenderPending = true;
+        return;
+      }
+      boardRenderPending = false;
       renderBoard();
     }
 
-    async function boardWrite(path, method, payload) {
-      const response = await fetch(path, { method, headers, body: JSON.stringify(payload) });
-      const result = await response.json();
-      if (!response.ok) throw new Error(result.error || `HTTP ${response.status}`);
-      board = result.board;
+    async function boardWrite(path, method, payload, expectedRevision = board.revision) {
+      if (mcpApp) {
+        let args;
+        if (method === "POST") args = { items: [payload.item], author: "human" };
+        else if (method === "PATCH") {
+          const id = decodeURIComponent(path.split("/").at(-1));
+          const existing = board.items.find((item) => item.id === id);
+          if (!existing) throw new Error("Board item not found");
+          args = { items: [{ ...existing, ...payload.patch, id }], author: "human" };
+        } else {
+          const id = decodeURIComponent(path.split("/").at(-1));
+          args = { remove_ids: [id] };
+        }
+        const updated = await mcpApp.drawBoard(args);
+        if (updated.revision >= board.revision) board = updated;
+        boardRenderPending = false;
+        renderBoard();
+        return { board: updated };
+      }
+      const requestHeaders = { ...headers, "If-Match-Revision": String(expectedRevision) };
+      const response = await fetch(path, { method, headers: requestHeaders, body: JSON.stringify(payload) });
+      let result;
+      try {
+        result = await response.json();
+      } catch {
+        throw new Error(`HTTP ${response.status}`);
+      }
+      if (!response.ok) {
+        if (response.status === 409) {
+          await loadBoard().catch(() => {});
+          throw Object.assign(new Error("画板已更新；你的文字草稿已保留，请再次保存"), { status: 409 });
+        }
+        throw new Error(result.error || `HTTP ${response.status}`);
+      }
+      if (result.board.revision >= board.revision) board = result.board;
+      boardRenderPending = false;
       renderBoard();
+      return result.board;
     }
 
-    async function createItem(itemType, point) {
-      const size = defaultSize[itemType];
+    async function createItem(itemType, point, expectedRevision = board.revision) {
+      const size = point.size || defaultSize[itemType];
+      const x = point.size ? point.x : point.x - size.w / 2;
+      const y = point.size ? point.y : point.y - size.h / 2;
+      const existingIds = new Set(board.items.map((item) => item.id));
       const color = colorCycle[board.items.length % colorCycle.length];
-      await boardWrite(boardEndpoints.addItem, "POST", {
+      const updatedBoard = await boardWrite(boardEndpoints.addItem, "POST", {
         confirmedBy: "human",
         item: {
           type: itemType,
-          x: point.x - size.w / 2,
-          y: point.y - size.h / 2,
+          x,
+          y,
           w: size.w,
           h: size.h,
           text: defaultText[itemType],
           color,
         },
-      });
-      const newest = board.items[board.items.length - 1];
+      }, expectedRevision);
+      const createdItem = updatedBoard.items.find((item) => !existingIds.has(item.id));
+      const newest = createdItem && board.items.find((item) => item.id === createdItem.id);
       if (newest) {
         selectedId = newest.id;
+        ensureVisible(newest);
         renderBoard();
         beginTextEdit(newest.id);
       }
     }
 
-    function beginTextEdit(itemId) {
+    function beginTextEdit(itemId, draftText) {
+      const expectedRevision = board.revision;
       const element = world.querySelector(`[data-id="${CSS.escape(itemId)}"] .item-text`);
       if (!element) return;
+      editingId = itemId;
+      if (draftText !== undefined) element.textContent = draftText;
       element.contentEditable = "true";
       element.focus();
       const range = document.createRange();
@@ -516,40 +565,56 @@
       const selection = window.getSelection();
       selection.removeAllRanges();
       selection.addRange(range);
-      const finish = async (save) => {
+      let shouldSave = true;
+      let finished = false;
+      const onEditorKeyDown = (event) => {
+        if (event.key === "Escape") { event.preventDefault(); shouldSave = false; element.blur(); }
+        if (event.key === "Enter" && (event.metaKey || event.ctrlKey)) { event.preventDefault(); element.blur(); }
+      };
+      const finish = async () => {
+        if (finished) return;
+        finished = true;
+        editingId = null;
         element.contentEditable = "false";
+        element.removeEventListener("keydown", onEditorKeyDown);
         const item = board.items.find((candidate) => candidate.id === itemId);
         const nextText = element.textContent || "";
-        if (save && item && nextText !== item.text) {
-          await boardWrite(boardEndpoints.patchItem(itemId), "PATCH", {
-            confirmedBy: "human", patch: { text: nextText },
-          }).catch((error) => showToast(error.message));
+        if (shouldSave && item && nextText !== item.text) {
+          try {
+            await boardWrite(boardEndpoints.patchItem(itemId), "PATCH", {
+              confirmedBy: "human", patch: { text: nextText },
+            }, expectedRevision);
+          } catch (error) {
+            showToast(error.message);
+            if (error.status === 409) {
+              boardRenderPending = false;
+              renderBoard();
+              beginTextEdit(itemId, nextText);
+            }
+          }
+          if (boardRenderPending && editingId === null && document.activeElement !== element) {
+            boardRenderPending = false;
+            renderBoard();
+          }
         } else {
           element.textContent = item?.text ?? "";
+          if (boardRenderPending) {
+            boardRenderPending = false;
+            renderBoard();
+          }
         }
       };
-      element.addEventListener("blur", () => finish(true), { once: true });
-      element.addEventListener("keydown", (event) => {
-        if (event.key === "Escape") { event.preventDefault(); element.blur(); }
-        if (event.key === "Enter" && (event.metaKey || event.ctrlKey)) { event.preventDefault(); element.blur(); }
-      }, { once: true });
+      element.addEventListener("blur", finish, { once: true });
+      element.addEventListener("keydown", onEditorKeyDown);
     }
 
     async function deleteSelected() {
       if (!selectedId) { showToast("先选中一个对象"); return; }
-      await boardWrite(boardEndpoints.deleteItem(selectedId), "DELETE", { confirmedBy: "human" });
-      selectedId = null;
+      const deletedId = selectedId;
+      const expectedRevision = board.revision;
+      const updatedBoard = await boardWrite(boardEndpoints.deleteItem(deletedId), "DELETE", { confirmedBy: "human" }, expectedRevision);
+      if (!board.items.some((item) => item.id === deletedId)) selectedId = null;
       renderBoard();
-    }
-
-    async function sendNote() {
-      const body = noteInput.value.trim();
-      if (!body) return;
-      await boardWrite("/api/board/notes", "POST", {
-        confirmedBy: "human", body, itemId: selectedId || undefined,
-      });
-      noteInput.value = "";
-      noteInput.focus();
     }
 
     function fitToContent() {
@@ -558,29 +623,11 @@
         applyViewport();
         return;
       }
-      const bounds = board.items.map((item) => item.type === "line" ? {
-        left: Math.min(item.x, item.x + item.w),
-        top: Math.min(item.y, item.y + item.h),
-        right: Math.max(item.x, item.x + item.w),
-        bottom: Math.max(item.y, item.y + item.h),
-      } : { left: item.x, top: item.y, right: item.x + item.w, bottom: item.y + item.h });
-      const left = Math.min(...bounds.map((bound) => bound.left));
-      const top = Math.min(...bounds.map((bound) => bound.top));
-      const right = Math.max(...bounds.map((bound) => bound.right));
-      const bottom = Math.max(...bounds.map((bound) => bound.bottom));
-      const padding = 80;
-      const scale = Math.max(0.25, Math.min(1.4,
-        Math.min(canvas.clientWidth / Math.max(1, right - left + padding * 2),
-          canvas.clientHeight / Math.max(1, bottom - top + padding * 2))));
-      viewport.scale = scale;
-      viewport.x = (canvas.clientWidth - (right - left) * scale) / 2 - left * scale;
-      viewport.y = (canvas.clientHeight - (bottom - top) * scale) / 2 - top * scale;
-      applyViewport();
+      fitBounds(board.items.map(getItemBounds));
     }
 
     for (const button of toolButtons) button.addEventListener("click", () => selectTool(button.dataset.tool));
     document.querySelector("#btnDelete").addEventListener("click", deleteSelected);
-    document.querySelector("#btnSend").addEventListener("click", sendNote);
     document.querySelector("#btnZoomOut").addEventListener("click", () => zoomAt(canvas.getBoundingClientRect().left + canvas.clientWidth / 2, canvas.getBoundingClientRect().top + canvas.clientHeight / 2, viewport.scale / 1.2));
     document.querySelector("#btnZoomIn").addEventListener("click", () => zoomAt(canvas.getBoundingClientRect().left + canvas.clientWidth / 2, canvas.getBoundingClientRect().top + canvas.clientHeight / 2, viewport.scale * 1.2));
     document.querySelector("#btnZoomReset").addEventListener("click", () => {
@@ -590,41 +637,126 @@
     });
     document.querySelector("#btnFit").addEventListener("click", () => {
       userAdjustedViewport = false;
-      localStorage.removeItem(userViewportKey);
+      storageRemove("aiDrawBoardUserViewport");
       fitToContent();
     });
 
-    noteInput.addEventListener("keydown", (event) => {
-      if (event.key === "Enter" && !event.shiftKey) {
-        event.preventDefault();
-        sendNote().catch((error) => showToast(error.message));
-      }
-    });
-
     canvas.addEventListener("wheel", (event) => {
+      if (event.target.closest(".toolbar, .viewbar")) return;
       event.preventDefault();
-      zoomAt(event.clientX, event.clientY, viewport.scale * (event.deltaY > 0 ? 0.9 : 1.1));
+      if (event.ctrlKey || event.metaKey) {
+        zoomAt(event.clientX, event.clientY, viewport.scale * (event.deltaY > 0 ? 0.9 : 1.1));
+      } else {
+        viewport.x -= event.deltaX;
+        viewport.y -= event.deltaY;
+        markUserViewport();
+        applyViewport();
+      }
     }, { passive: false });
 
-    canvas.addEventListener("pointerdown", (event) => {
-      if (event.button !== 0) return;
-      const itemElement = event.target.closest(".board-item");
-      const point = screenToWorld(event.clientX, event.clientY);
-      if (tool !== "select") {
-        createItem(tool, point).catch((error) => showToast(error.message));
+    function makePreview(type) {
+      const element = document.createElement("div");
+      element.className = "board-item preview";
+      element.dataset.type = type;
+      if (type === "ellipse") element.style.borderRadius = "50%";
+      if (type === "line") {
+        const svg = document.createElementNS("http://www.w3.org/2000/svg", "svg");
+        svg.style.cssText = "position:absolute;inset:0;width:100%;height:100%;overflow:visible";
+        const defs = document.createElementNS("http://www.w3.org/2000/svg", "defs");
+        const marker = document.createElementNS("http://www.w3.org/2000/svg", "marker");
+        marker.setAttribute("id", "board-preview-arrow");
+        marker.setAttribute("viewBox", "0 0 10 10");
+        marker.setAttribute("refX", "9");
+        marker.setAttribute("refY", "5");
+        marker.setAttribute("markerWidth", "7");
+        marker.setAttribute("markerHeight", "7");
+        marker.setAttribute("orient", "auto");
+        const arrowHead = document.createElementNS("http://www.w3.org/2000/svg", "path");
+        arrowHead.setAttribute("d", "M 0 0 L 10 5 L 0 10 z");
+        arrowHead.setAttribute("fill", "var(--accent)");
+        marker.append(arrowHead);
+        defs.append(marker);
+        const path = document.createElementNS("http://www.w3.org/2000/svg", "path");
+        path.setAttribute("data-preview-path", "true");
+        path.setAttribute("fill", "none");
+        path.setAttribute("stroke", "var(--accent)");
+        path.setAttribute("stroke-width", "3");
+        path.setAttribute("stroke-dasharray", "6 4");
+        path.setAttribute("marker-end", "url(#board-preview-arrow)");
+        svg.append(defs, path);
+        element.append(svg);
+      }
+      world.append(element);
+      return element;
+    }
+
+    function updatePreview(element, type, start, end) {
+      const deltaX = end.x - start.x;
+      const deltaY = end.y - start.y;
+      if (type === "line") {
+        const hitPadding = 12;
+        const left = Math.min(start.x, end.x) - hitPadding;
+        const top = Math.min(start.y, end.y) - hitPadding;
+        const width = Math.max(1, Math.abs(deltaX)) + hitPadding * 2;
+        const height = Math.max(1, Math.abs(deltaY)) + hitPadding * 2;
+        element.style.left = `${left}px`;
+        element.style.top = `${top}px`;
+        element.style.width = `${width}px`;
+        element.style.height = `${height}px`;
+        const svg = element.querySelector("svg");
+        svg.setAttribute("viewBox", `0 0 ${width} ${height}`);
+        svg.querySelector("path").setAttribute("d", `M ${start.x - left} ${start.y - top} L ${end.x - left} ${end.y - top}`);
         return;
       }
-      if (itemElement) {
+      element.style.left = `${Math.min(start.x, end.x)}px`;
+      element.style.top = `${Math.min(start.y, end.y)}px`;
+      element.style.width = `${Math.max(16, Math.abs(deltaX))}px`;
+      element.style.height = `${Math.max(16, Math.abs(deltaY))}px`;
+    }
+
+    function cancelGesture() {
+      if (pointerState?.preview) pointerState.preview.remove();
+      if (pointerState?.kind === "move" || boardRenderPending) renderBoard();
+      boardRenderPending = false;
+      pointerState = null;
+      canvas.classList.remove("panning");
+    }
+
+    function placeCreatedItem(item, view) {
+      const current = board.items.find((candidate) => candidate.id === item.id);
+      const element = current && world.querySelector(`[data-id="${CSS.escape(item.id)}"]`);
+      if (element) placeItemElement(element, { ...current, ...item });
+      if (board.revision === view.revision) {
+        viewport.scale = view.scale;
+        viewport.x = view.x;
+        viewport.y = view.y;
+        applyViewport();
+      }
+    }
+
+    canvas.addEventListener("pointerdown", (event) => {
+      if (event.target.closest(".toolbar, .viewbar")) return;
+      const panGesture = event.button === 1 || (event.button === 0 && spacePressed);
+      if (event.button !== 0 && !panGesture) return;
+      if (event.button === 1) event.preventDefault();
+      const itemElement = event.target.closest(".board-item");
+      const point = screenToWorld(event.clientX, event.clientY);
+      if (!panGesture && tool !== "select") {
+        pointerState = {
+          kind: "create", type: tool, startX: event.clientX, startY: event.clientY,
+          start: point, revision: board.revision, moved: false, preview: makePreview(tool),
+        };
+      } else if (!panGesture && itemElement) {
         const item = board.items.find((candidate) => candidate.id === itemElement.dataset.id);
         if (!item) return;
         selectedId = item.id;
         renderBoard();
         pointerState = {
-          kind: "move", id: item.id, startX: event.clientX, startY: event.clientY,
-          originX: item.x, originY: item.y, moved: false,
+          kind: "move", id: item.id, item, startX: event.clientX, startY: event.clientY,
+          originX: item.x, originY: item.y, revision: board.revision, moved: false,
         };
       } else {
-        selectedId = null;
+        if (!panGesture) selectedId = null;
         renderBoard();
         pointerState = {
           kind: "pan", startX: event.clientX, startY: event.clientY,
@@ -645,12 +777,15 @@
         viewport.x = pointerState.originX + deltaX;
         viewport.y = pointerState.originY + deltaY;
         applyViewport();
-      } else if (pointerState.moved) {
+      } else if (pointerState.kind === "create" && pointerState.moved) {
+        updatePreview(pointerState.preview, pointerState.type, pointerState.start, screenToWorld(event.clientX, event.clientY));
+      } else if (pointerState.kind === "move" && pointerState.moved) {
         const element = world.querySelector(`[data-id="${CSS.escape(pointerState.id)}"]`);
-        if (element) {
-          element.style.left = `${pointerState.originX + deltaX / viewport.scale}px`;
-          element.style.top = `${pointerState.originY + deltaY / viewport.scale}px`;
-        }
+        if (element) placeItemElement(element, {
+          ...pointerState.item,
+          x: pointerState.originX + deltaX / viewport.scale,
+          y: pointerState.originY + deltaY / viewport.scale,
+        });
       }
     });
 
@@ -659,27 +794,82 @@
       const state = pointerState;
       pointerState = null;
       canvas.classList.remove("panning");
-      if (state.kind === "move" && state.moved) {
+      if (boardRenderPending && (state.kind === "pan" || !state.moved)) {
+        boardRenderPending = false;
+        renderBoard();
+      }
+      if (state.kind === "create") {
+        state.preview.remove();
+        const end = screenToWorld(event.clientX, event.clientY);
+        const dragged = Math.abs(event.clientX - state.startX) + Math.abs(event.clientY - state.startY) > 3;
+        if (state.type === "line" && dragged
+          && Math.abs(end.x - state.start.x) + Math.abs(end.y - state.start.y) < 1) return;
+        let point = state.start;
+        if (dragged && state.type === "line") {
+          point = { ...state.start, size: { w: end.x - state.start.x, h: end.y - state.start.y } };
+        } else if (dragged) {
+          point = {
+            x: Math.min(state.start.x, end.x),
+            y: Math.min(state.start.y, end.y),
+            size: { w: Math.abs(end.x - state.start.x), h: Math.abs(end.y - state.start.y) },
+          };
+        }
+        createItem(state.type, point, state.revision).catch((error) => showToast(error.message));
+      } else if (state.kind === "move" && state.moved) {
         const deltaX = (event.clientX - state.startX) / viewport.scale;
         const deltaY = (event.clientY - state.startY) / viewport.scale;
+        const movedItem = {
+          ...state.item,
+          x: state.originX + deltaX,
+          y: state.originY + deltaY,
+        };
+      const view = { ...viewport, revision: board.revision };
+        view.revision = board.revision;
         boardWrite(boardEndpoints.patchItem(state.id), "PATCH", {
-          confirmedBy: "human", patch: { x: state.originX + deltaX, y: state.originY + deltaY },
-        }).catch((error) => showToast(error.message));
+          confirmedBy: "human", patch: { x: movedItem.x, y: movedItem.y },
+        }, state.revision).then(() => placeCreatedItem(movedItem, view))
+          .catch((error) => { showToast(error.message); renderBoard(); });
+      } else if (state.kind === "pan" && boardRenderPending) {
+        boardRenderPending = false;
+        renderBoard();
       }
+    });
+
+    canvas.addEventListener("pointercancel", cancelGesture);
+    canvas.addEventListener("lostpointercapture", cancelGesture);
+
+    window.addEventListener("keydown", (event) => {
+      const activeElement = document.activeElement;
+      const typing = /^(INPUT|TEXTAREA)$/.test(activeElement?.tagName || "") || activeElement?.isContentEditable;
+      const interactive = typing || activeElement?.tagName === "BUTTON";
+      if (event.code === "Space" && !interactive) {
+        spacePressed = true;
+        canvas.classList.add("space-pan");
+        if (event.repeat) return;
+        event.preventDefault();
+        return;
+      }
+      if (interactive) return;
+      const shortcut = { v: "select", n: "note", t: "text", r: "rect", e: "ellipse", l: "line" }[event.key.toLowerCase()];
+      if (shortcut) { selectTool(shortcut); return; }
+      if (event.key === "Delete" || event.key === "Backspace") { event.preventDefault(); deleteSelected().catch((error) => showToast(error.message)); }
+      if (event.key === "Escape") { cancelGesture(); selectedId = null; selectTool("select"); renderBoard(); }
+    });
+    window.addEventListener("keyup", (event) => {
+      if (event.code === "Space") {
+        spacePressed = false;
+        canvas.classList.remove("space-pan");
+      }
+    });
+    window.addEventListener("blur", () => {
+      spacePressed = false;
+      canvas.classList.remove("space-pan");
+      cancelGesture();
     });
 
     canvas.addEventListener("dblclick", (event) => {
       const itemElement = event.target.closest(".board-item");
       if (itemElement) beginTextEdit(itemElement.dataset.id);
-    });
-
-    window.addEventListener("keydown", (event) => {
-      const typing = /^(INPUT|TEXTAREA)$/.test(document.activeElement?.tagName || "") || document.activeElement?.isContentEditable;
-      if (typing) return;
-      const shortcut = { v: "select", n: "note", t: "text", r: "rect", e: "ellipse", l: "line" }[event.key.toLowerCase()];
-      if (shortcut) { selectTool(shortcut); return; }
-      if (event.key === "Delete" || event.key === "Backspace") { event.preventDefault(); deleteSelected().catch((error) => showToast(error.message)); }
-      if (event.key === "Escape") { selectedId = null; selectTool("select"); renderBoard(); }
     });
 
     function connectUpdates() {
@@ -694,16 +884,34 @@
       socket.addEventListener("close", () => window.setTimeout(connectUpdates, 1500));
     }
 
-    restoreViewport();
-    loadBoard().then(() => {
+    async function startBoard() {
+      restoreViewport();
+      await loadBoard();
       if (board.items.length === 0 && !userAdjustedViewport) {
         viewport = { x: canvas.clientWidth / 2, y: canvas.clientHeight / 2, scale: 1 };
         applyViewport();
       } else if (board.items.length > 0 && !userAdjustedViewport) {
         fitToContent();
       }
-      connectUpdates();
-    }).catch((error) => setStatus(`连接失败：${error.message}`));
+      if (!mcpApp) connectUpdates();
+    }
+    window.DoodleBoardInit = (adapter) => {
+      mcpApp = adapter;
+      document.body.dataset.mcpApp = "true";
+      document.querySelector("#btnExpand").hidden = !adapter.canFullscreen;
+      startBoard().catch((error) => setStatus(`连接失败：${error.message}`));
+    };
+    document.querySelector("#btnExpand").addEventListener("click", () => {
+      mcpApp?.requestFullscreen().catch((error) => showToast(error.message));
+    });
+    window.DoodleBoardUpdate = (snapshot) => {
+      if (!snapshot || snapshot.revision < board.revision) return;
+      board = snapshot;
+      if (pointerState || editingId) { boardRenderPending = true; return; }
+      renderBoard();
+    };
+    if (!MCP_APP_BUNDLE) startBoard().catch((error) => setStatus(`连接失败：${error.message}`));
   </script>
+  <script type="module">/*__DOODLE_MCP_APP_BUNDLE__*/</script>
 </body>
 </html>

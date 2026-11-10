@@ -42,7 +42,6 @@ describe("board HTTP surface", () => {
     expect(html).toContain("Doodle");
     expect(html).toContain("/api/board");
     expect(html).not.toContain("/workbench");
-    expect(html).not.toContain("<title>AI 画板</title>");
     const snapshot = await fetch(`${base}/api/board`).then((response) => response.json());
     expect(snapshot).toMatchObject({ version: 1 });
   });

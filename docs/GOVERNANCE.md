@@ -5,11 +5,12 @@ Doodle is a small MIT-licensed open-source project. The repository is the canoni
 ## Maintainer checklist
 
 - Keep the default product small; reject changes that make project structure, dashboards, or approval workflows the product again.
-- Keep exactly four MCP tools unless a product decision in `DECISIONS.md` says otherwise.
+- Keep exactly four MCP tools unless a product decision in `DECISIONS.md` says otherwise; keep MCP App rendering optional for text-only hosts.
 - Keep the board state versioned, bounded, and independent of project files.
 - Keep normal MCP calls free of browser, IDE, and project-write side effects.
 - Keep dependencies minimal and verify with `npm run check`.
 - Keep the README, English quickstart, `AGENTS.md`, architecture, tests, examples, CI, and offline guards synchronized.
+- Preserve tool-only workflows for MCP hosts that do not render Apps.
 - Never commit `dist/`, `output/.doodle/`, `.env`, credentials, or private board state.
 
 ## Public surfaces

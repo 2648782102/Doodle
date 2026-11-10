@@ -14,6 +14,8 @@ try {
   console.log(`Registered board tools: ${tools.map((tool) => tool.name).join(", ")}`);
   const board = await client.callTool({ name: "get_board", arguments: {} });
   console.log(board.content.map((item) => item.text ?? "").join("\n").slice(0, 400));
+  const view = await client.callTool({ name: "show_board", arguments: {} });
+  console.log(view.content.map((item) => item.text ?? "").join("\n"));
   const drawn = await client.callTool({
     name: "draw_board",
     arguments: {
@@ -22,11 +24,6 @@ try {
     },
   });
   console.log(drawn.content.map((item) => item.text ?? "").join("\n"));
-  const reply = await client.callTool({
-    name: "reply_on_board",
-    arguments: { body: "我已经把这张便签放在共享画板上。" },
-  });
-  console.log(reply.content.map((item) => item.text ?? "").join("\n"));
 } finally {
   await client.close();
 }

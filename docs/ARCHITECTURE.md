@@ -1,6 +1,6 @@
 # Architecture
 
-Doodle is a local-first shared infinite board. The AI uses MCP stdio inside its coding agent; the human uses one small HTTP canvas. Both sides read and write one independent version 1 board state file. The project source remains the source of truth for code.
+Doodle is a local-first shared infinite canvas. Compatible MCP Apps hosts render its interactive canvas beside the agent conversation; the host retains its existing chat surface. A standalone local HTTP page provides the same canvas when the host does not render MCP Apps. Both views and the AI tools share one independent version 1 board state file.
 
 ## Source layout
 
@@ -11,22 +11,24 @@ src/
 ├── board/
 │   ├── types.ts                version 1 board state and pure object mutations
 │   ├── store.ts                atomic board.json persistence and revision sync
-│   ├── errors.ts               board revision conflict error
-│   ├── mutex.ts                cross-process lock around board writes
+│   ├── errors.ts               revision conflict error
+│   ├── mutex.ts                cross-process board write lock
 │   ├── project-scan.ts         bounded read-only workspace path/evidence scan
-│   ├── http.ts                 local board API, HTML template, WebSocket updates
-│   ├── tools.ts                get / draw / reply / scan MCP tools
+│   ├── http.ts                 local board API, HTML and WebSocket updates
+│   ├── tools.ts                get / draw / scan tools and MCP App resource
+│   ├── app.ts                  MCP Apps bridge client for embedded canvas edits
 │   ├── instructions.ts         MCP initialization guidance for agents
 │   └── index.ts                board module entrypoint
 ├── infra/
 │   ├── config.ts               PREVIEW_HOST / PREVIEW_PORT / OUTPUT_DIR / workspace
 │   ├── logger.ts               stderr-only logger
 │   ├── workspace.ts            DOODLE_WORKSPACE_ROOT resolution
-│   ├── version.ts              version read from package.json
-│   └── templates/board.html    one human-facing infinite canvas
+│   ├── version.ts              package version read
+│   └── templates/board.html    shared standalone and embedded infinite canvas
+scripts/build.mjs               copies HTML and bundles the MCP Apps client
 ```
 
-There is no `src/domain/` workbench model, `src/tools/render-*`, Mermaid renderer, session store, proposal store, or legacy panel template in `0.4.0`.
+There is no `src/domain/` workbench model, Mermaid renderer, session store, proposal store, or legacy panel template in `0.5.0`.
 
 ## MCP surface
 
@@ -34,42 +36,45 @@ There is no `src/domain/` workbench model, `src/tools/render-*`, Mermaid rendere
 
 | Tool | Effect | Output |
 |---|---|---|
-| `get_board` | Reads one shared version 1 board | `BOARD_JSON`, drawing guide, recent notes |
-| `draw_board` | Adds / updates / removes visual objects | revision and counts |
-| `reply_on_board` | Adds one short AI note beside the board | note ID and revision |
+| `get_board` | Reads one shared version 1 board | `BOARD_JSON`, drawing guide, structured board snapshot |
+| `show_board` | Returns the optional MCP App resource beside the conversation | initial structured board snapshot and interactive UI |
+| `draw_board` | Adds / updates / removes visual objects under the board lock; can reject stale app edits by expected revision | revision, counts, authoritative structured snapshot |
 | `scan_project` | Reads bounded project paths and evidence | `PROJECT_JSON` and `PROJECT_TEXT` |
 
-No tool opens a browser, writes a project file, launches an IDE, or emits approval credentials. MCP initialization instructions and `get_board` both describe the directed-arrow contract and the recommended strict-grid workflow.
+The canvas resource uses `text/html;profile=mcp-app` and is attached only to the separate `show_board` render tool, so routine data reads and mutations do not remount the iframe. The app calls `get_board` and `draw_board` through the host bridge, refreshes at a low rate while visible, and sends the revision it has rendered so a concurrent model edit cannot be overwritten. This keeps browser HTTP credentials inside the standalone page while the embedded canvas uses the host's authenticated MCP connection. Text-only hosts retain the complete tool workflow.
+
+No tool opens a browser, writes a project file, launches an IDE, or emits approval credentials. MCP initialization instructions and `get_board` describe the directed-arrow contract and strict-grid workflow.
 
 ## Board state
 
-`BoardStore` persists `output/.doodle/board.json` through a temporary file and atomic rename. It can read the legacy `output/.ai-draw/board.json` once when the new file does not exist. Every read uses the on-disk revision as the current state, so a long-lived HTTP process and short-lived MCP clients stay synchronized. A fresh state starts from a small Doodle welcome sketch; existing boards are never reset. Writes take `output/.doodle/board.json.lock`, reread disk state, and `draw_board` commits only when the revision it read is still current.
+`BoardStore` persists `output/.doodle/board.json` through a uniquely named temporary file and atomic rename. A filesystem lock serializes mutations across processes; mutations always read the latest board while holding the lock. Snapshot-based browser edits require the expected revision and fail instead of overwriting a concurrent update. Stale-lock recovery checks the recorded process ID. It can read the legacy `output/.ai-draw/board.json` once when the new file does not exist.
 
-`SimpleBoard` is version 1 and contains bounded `items` and `notes`. Items have finite coordinates, one of five simple types, a hex color, a `human` / `ai` author, and timestamps. For `line`, `(x,y)` is the start point and `(x+w,y+h)` is the end point; `w` and `h` are signed endpoint deltas. Other types use `(x,y)` as the top-left corner and positive width/height.
+`SimpleBoard` remains version 1 and contains bounded `items` and `notes`. Existing note data is retained only for persisted-state compatibility and is not exposed in the current tool projection or UI. Items have finite coordinates, one of five simple types, a hex color, a `human` / `ai` author, and timestamps. For `line`, `(x,y)` is the start point and `(x+w,y+h)` is the end point; `w` and `h` are signed endpoint deltas. Other types use `(x,y)` as the top-left corner and positive width/height.
 
-All board mutations are pure functions in `src/board/types.ts`. They validate finite numbers, bound text and collection sizes, reject unknown authors, and raise the board revision once per change.
+All board mutations are pure functions in `src/board/types.ts`. They validate finite numbers, bound text and collection sizes, reject unknown authors, and raise the board revision once per change. Persisted text is revalidated against the same limits.
 
 ## Human HTTP surface
 
-The HTTP server binds to `127.0.0.1` by default and serves only the board:
+The HTTP server binds to `127.0.0.1` by default and serves the standalone canvas:
 
 | Endpoint | Purpose |
 |---|---|
-| `GET /` | Thin local infinite canvas |
+| `GET /` | Standalone infinite canvas |
 | `GET /api/board` | Current version 1 board state |
 | `POST /api/board/items` | Human-confirmed object creation |
 | `PATCH /api/board/items/:id` | Human-confirmed object update |
 | `DELETE /api/board/items/:id` | Human-confirmed object deletion |
-| `POST /api/board/notes` | Human-confirmed short message |
 | `GET /api/board/project` | Bounded read-only project structure JSON |
 | `GET /api/board/project/text` | Plain-text projection of the same scan |
 | `WS /ws` | `board_updated` revision broadcasts |
 
-Non-GET `/api/board/*` requests require the random `X-AI-Draw-Token` injected into the HTML and `confirmedBy: "human"`. The token exists only in the local browser session and never enters persisted state.
+Non-GET `/api/board/*` requests require the random `X-AI-Draw-Token` injected into the HTML and `confirmedBy: "human"`. The human canvas also sends `If-Match-Revision` equal to its last read board revision; a conflict returns HTTP 409. Legacy clients without the revision header are serialized against the latest state. Oversized JSON returns HTTP 413. The token exists only in the local browser session and never enters persisted state.
 
 ## Read-only project scan
 
-`scan_project` walks the configured workspace root with bounded depth and entry count, skips common generated/private directories, ignores dot-private files including `.env`, and reads only small text files for at most five safe `file:line` evidence lines. It skips credential-like lines and redacts assigned values in evidence. Paths are workspace-relative. It returns no file contents beyond short evidence excerpts, no absolute workspace path, and no write capability.
+`scan_project` walks the configured workspace root with bounded depth and entry count, skips common generated/private directories, ignores dot-private files including `.env`, and reads only small text files for at most five evidence lines per file and 40 total. Candidate lines containing common secret names or credential formats are omitted. Paths are workspace-relative. It returns no file contents beyond short evidence excerpts, no absolute workspace path, and no write capability.
+
+The canvas supports click-to-place defaults, drag-to-size shapes, directional drag-to-draw arrows, Space or middle-button panning, wheel panning, and Ctrl/Command-wheel zoom. Pointer cancellation discards an in-progress drawing. Dragging arrows uses their bounds so negative endpoint deltas do not make them jump. In MCP Apps hosts, a small `展开` control appears when fullscreen is available.
 
 Project scanning does not modify the board. If the AI wants to show structure, it calls `draw_board` with a layout derived from the scan result.
 
@@ -77,12 +82,13 @@ Project scanning does not modify the board. If the AI wants to show structure, i
 
 - stdout is reserved for MCP JSON-RPC; all logs go to stderr.
 - The preview server defaults to `127.0.0.1`; use `PREVIEW_HOST` only for explicit local configuration.
-- The board is communication context, never an authorization channel.
+- The board is visual context, never an authorization channel.
+- Board mutations acquire a cross-process lock, read current state inside the lock, and persist with a unique temporary file plus atomic rename.
+- Project-scan evidence filters common credential lines and is capped at 40 lines total.
 - `scan_project` never writes files; board writes never write project files.
-- Board writes are serialized by a local lock file; stale locks are removed without clearing board state.
-- Offline guards in `scripts/repo-check.mjs` verify the four-tool surface, dependency cleanup, docs alignment, arrow contract, HTTP authentication, Doodle branding, revision concurrency, and read-only scan boundary. `scripts/build.mjs` removes known stale compiled directories and templates so a local rebuild cannot package deleted source modules.
+- Offline guards in `scripts/repo-check.mjs` verify the four-tool surface, MCP App registration, dependency setup, docs alignment, arrow contract, HTTP authentication, and read-only scan boundary. `scripts/build.mjs` prunes stale compiled files, copies the canvas template, and bundles the embedded App.
 - `npm run check` runs lint, build, tests, example syntax, offline guards, doctor, and package dry-run.
 
 ## Compatibility
 
-Existing `output/.ai-draw/board.json` version 1 files remain readable. `AI_DRAW_WORKSPACE_ROOT` is a legacy alias for `DOODLE_WORKSPACE_ROOT`. The removed `0.3.x` workbench, 29-tool catalogue, session proposals, Mermaid diagram library, and VS Code extension are intentionally not part of `0.4.0`; their ADRs are historical records under `docs/archive/adr-legacy/`.
+Existing version 1 `output/.ai-draw/board.json` files remain readable, including their notes. `AI_DRAW_WORKSPACE_ROOT` remains a legacy alias for `DOODLE_WORKSPACE_ROOT`. The removed `0.3.x` workbench, 29-tool catalogue, session proposals, Mermaid diagram library, and VS Code extension remain only as historical records under `docs/archive/adr-legacy/`.
