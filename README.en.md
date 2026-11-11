@@ -28,8 +28,6 @@ The complete path is `npm run setup:codex → new session → first prompt → s
 
 **Any MCP host**: add the `npx -y doodle-mcp` snippet from `examples/mcp-config/` to your host configuration, restart the MCP session, and use the same first prompt. `show_board` / `draw_board` still present the canvas; if the host cannot render it, ask for `PANEL_URL`. This path needs no repository clone and does not imply public plugin-directory publication.
 
-> Version status: the source tree and GitHub Release are `0.6.3`; until `npm view doodle-mcp version` reports that version, `npx -y doodle-mcp` resolves to an older published release. Use `npm run setup:codex` for the complete `0.6.3` experience now, or wait for the maintainer's npm 2FA publication before using the direct-MCP snippet. See [docs/EXPERIENCE_AUDIT.md](docs/EXPERIENCE_AUDIT.md#closure-log).
-
 ## Four tools
 
 | Tool | Purpose |

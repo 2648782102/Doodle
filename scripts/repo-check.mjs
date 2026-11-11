@@ -88,8 +88,8 @@ check(publishWorkflow.includes("npm run check") && publishWorkflow.includes("--n
 check(publishWorkflow.includes('git tag -a "$tag"') && publishWorkflow.includes('git push origin "$tag"') && publishWorkflow.includes('--target "$GITHUB_SHA"'), "publish workflow does not create the matching tag before verifying it");
 check(releasing.includes("publish workflow") && !releasing.includes("does not create a Release automatically"), "releasing guide does not describe release automation");
 check(releasing.includes("npm stage approve") && releasing.includes("npm view doodle-mcp@<version> version"), "releasing guide does not describe the npm 2FA and version verification gates");
-check(experienceAudit.includes("| E12 | P1 | external |") && experienceAudit.includes("doodle-mcp@0.6.3"), "experience audit does not record the pending npm publication");
-check(readme.includes("npm view doodle-mcp version") && readmeEn.includes("npm view doodle-mcp version"), "READMEs do not explain the npm version status");
+check(experienceAudit.includes("| E12 | P1 | fixed |") && experienceAudit.includes("doodle-mcp@0.6.3"), "experience audit does not record the closed npm publication");
+check(!readme.includes("尚未更新") && !readmeEn.includes("until `npm view doodle-mcp version`"), "READMEs still warn about a resolved npm version gap");
 check(gitignore.includes(".doodle-plugin/") && gitignore.includes(".doodle-data/") && gitignore.includes("doodle-plugin-submission/"), "generated plugin output, data, or submission ZIP is not ignored");
 check(index.indexOf("await mcp.connect(transport);") < index.indexOf("await preview.start();"), "MCP stdio is not connected before optional preview startup");
 check(index.includes("Preview unavailable"), "preview failure does not keep the MCP server alive");

@@ -9,8 +9,6 @@ These examples are small, zero-configuration, and contain no secrets or absolute
 
 The stdio snippets start the published package with `npx -y doodle-mcp`. The server chooses plugin data or workspace-local `.doodle-data` for board state, a free loopback port for the fallback page, and the launched workspace for bounded project scans. Set `DOODLE_WORKSPACE_ROOT` only when the host starts the MCP server outside the project you want to scan; `OUTPUT_DIR`, `PREVIEW_HOST`, `PREVIEW_PORT`, and `LOG_LEVEL` remain optional overrides.
 
-Check `npm view doodle-mcp version` before relying on `npx -y doodle-mcp`: if it lags behind the source version, use `npm run setup:codex` or `node dist/index.js` from a local checkout until the maintainer completes the npm release. The exact publication state is recorded in `../docs/EXPERIENCE_AUDIT.md`.
-
 For a Codex plugin install from a repository checkout, run `npm run setup:codex` instead. It builds the ignored `.doodle-plugin/doodle/` package, adds the repository marketplace, installs the plugin, and prints the first prompt. The plugin is desktop-only; public plugin directory submission is separate and described in `../docs/SUBMISSION.md`.
 
 To run the minimal client against a local checkout, build the server first:

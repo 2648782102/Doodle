@@ -26,7 +26,7 @@
 19. **New boards start empty.** A clean server writes a version 1 empty board with one initial revision. The retained `createStarterBoard` function remains only for compatibility and tests; the first visual object should come from a person or the AI's first prompt.
 20. **Visual edits record their current author.** Human HTTP writes set `author: "human"`; AI `draw_board` updates set the top-level author, defaulting to `ai`. This prevents the canvas badge and `copyText` from contradicting the last edit.
 21. **Live experience is audited.** [`EXPERIENCE_AUDIT.md`](EXPERIENCE_AUDIT.md) records the end-to-end AI/human test, priorities, acceptance, and closure. Product changes update it rather than adding a parallel roadmap.
-22. **Distribution status is explicit.** A GitHub Release and source plugin install do not imply that `npx -y doodle-mcp` serves the same version. Until the npm registry reports the current package version, first-use docs point new users to `npm run setup:codex`; the 2FA-gated npm approval remains an external maintainer action recorded in `EXPERIENCE_AUDIT.md`.
+22. **Distribution status is explicit.** A GitHub Release and source plugin install do not imply that `npx -y doodle-mcp` serves the same version. Maintainers verify `npm view doodle-mcp@<version> version` and one `npx` startup after the 2FA-gated approval; `EXPERIENCE_AUDIT.md` records the current publication state. For `0.6.3`, both the plugin checkout path and npm direct-MCP path resolve to the same version.
 
 ## MCP App boundary
 

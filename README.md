@@ -30,8 +30,6 @@ npm run setup:codex
 
 **任意 MCP 宿主**：把 [examples/mcp-config/](examples/mcp-config/) 的 `npx -y doodle-mcp` 片段加入宿主配置，重启 MCP 会话后使用同一句提示；画布仍通过 `show_board` / `draw_board` 自动呈现，宿主不渲染时询问 `PANEL_URL`。这条路径不需要 clone 仓库，也不等于公共插件目录发布。
 
-> 版本状态：当前源码与 GitHub Release 是 `0.6.3`；若 `npm view doodle-mcp version` 尚未更新，`npx -y doodle-mcp` 会拿到旧的已发布版本。需要完整 `0.6.3` 体验时请先使用 `npm run setup:codex`，或由维护者完成 npm 2FA 发布后再使用直接 MCP 片段。状态见 [docs/EXPERIENCE_AUDIT.md](docs/EXPERIENCE_AUDIT.md#closure-log)。
-
 ## 四个 MCP 工具
 
 | 工具 | 用途 |
