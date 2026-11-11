@@ -35,6 +35,7 @@ All notable changes are documented here. Versions follow `VERSIONING.md`.
 - `npm test` passes with 31 tests; `npm run check` covers the repository and plugin guards, setup dry-run, submission ZIP, doctor, and npm package dry-run.
 - An isolated `CODEX_HOME` marketplace/installation smoke test discovers and enables `doodle@doodle` version `0.6.3`.
 - A fresh AI/human/AI loop reached revision 7 with browser auto-refresh, human author changes, concise `get_board`, and distinct local/remote status; see `docs/EXPERIENCE_AUDIT.md`.
+- The WebSocket regression test uses the project's `ws` client so the Node 20 CI matrix does not depend on a global `WebSocket`, and the release workflow creates its version tag before publishing a verified release.
 
 ## 0.6.2 — Automatic canvas presentation
 

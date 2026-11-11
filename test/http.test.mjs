@@ -2,6 +2,7 @@ import fs from "node:fs/promises";
 import net from "node:net";
 import os from "node:os";
 import path from "node:path";
+import WebSocket from "ws";
 import { afterAll, describe, expect, it } from "vitest";
 import { BoardHttpServer } from "../dist/board/http.js";
 import { BoardStore } from "../dist/board/store.js";
@@ -122,12 +123,12 @@ describe("board HTTP surface", () => {
   it("broadcasts board updates to the standalone canvas", async () => {
     const socket = new WebSocket(`ws://127.0.0.1:${port}/ws`);
     const update = new Promise((resolve, reject) => {
-      socket.addEventListener("message", (event) => resolve(JSON.parse(event.data)));
-      socket.addEventListener("error", reject);
+      socket.on("message", (data) => resolve(JSON.parse(data.toString())));
+      socket.on("error", reject);
     });
     await new Promise((resolve, reject) => {
-      socket.addEventListener("open", resolve, { once: true });
-      socket.addEventListener("error", reject, { once: true });
+      socket.once("open", resolve);
+      socket.once("error", reject);
     });
     const next = await board.mutate((current) => addBoardItem(current, {
       type: "text", x: 10, y: 10, text: "broadcast", author: "ai",
