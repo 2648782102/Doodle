@@ -95,6 +95,7 @@ describe("MCP board server", () => {
       expect(tools.map((tool) => tool.name).sort()).toEqual([...EXPECTED_TOOLS].sort());
       expect(tools.find((tool) => tool.name === "get_board")._meta).toBeUndefined();
       expect(tools.find((tool) => tool.name === "show_board")._meta.ui.resourceUri).toBe("ui://doodle/board/v1.html");
+      expect(tools.find((tool) => tool.name === "draw_board")._meta.ui.resourceUri).toBe("ui://doodle/board/v1.html");
       const readOnly = { readOnlyHint: true, destructiveHint: false, openWorldHint: false };
       expect(tools.find((tool) => tool.name === "get_board").annotations).toEqual(readOnly);
       expect(tools.find((tool) => tool.name === "show_board").annotations).toEqual(readOnly);
@@ -106,7 +107,7 @@ describe("MCP board server", () => {
     });
   }, 30_000);
 
-  it("serves the embedded board app only through the render tool", async () => {
+  it("serves the embedded board app and advertises it after drawing", async () => {
     await withClient(3442, async (client) => {
       const appResource = await client.readResource({ uri: "ui://doodle/board/v1.html" });
       expect(appResource.contents[0].mimeType).toBe("text/html;profile=mcp-app");

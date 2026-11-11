@@ -65,7 +65,7 @@ The plugin is a distribution layer around this product. It must not turn Doodle 
 4. The marketplace entry can be discovered by `codex plugin list` or an equivalent local CLI check.
 5. `get_board` returns `BOARD_JSON`, the drawing guide, and the active loopback `PANEL_URL`; it does not open a browser.
 6. The plugin uses isolated writable board state and a free loopback port by default; explicit `OUTPUT_DIR` and `PREVIEW_PORT` continue to override defaults.
-7. `show_board` remains the only tool linked to the optional MCP App resource; all tools remain usable in text-only hosts.
+7. `show_board` remains the explicit render tool, and successful `draw_board` results also advertise the optional MCP App so compatible hosts show completed AI drawings; all tools remain usable in text-only hosts.
 8. `scan_project` stays bounded, read-only, workspace-relative, and secret-conservative.
 9. `npm run check` passes, including lint, build, tests, example syntax, offline guards, plugin guard, doctor, and package dry-run.
 10. CI runs the same plugin guard, builds the versioned submission ZIP, and the publish workflow creates a Release only when the current version is missing; the guard rejects conflicting portable manifests, missing policy URLs, missing tool annotations, and uncommitted generated artifacts.

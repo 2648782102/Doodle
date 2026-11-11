@@ -30,8 +30,8 @@ The loop can pause or repeat at any point. `scan_project` is an optional read-on
 2. Make plugin installation the preferred Codex path while preserving direct MCP configuration.
 3. Keep conversation in the host. Do not reproduce its composer or message feed inside Doodle.
 4. Keep drawing obvious, with direct click and drag gestures.
-5. Keep the MCP App optional and attach UI rendering only to `show_board`.
-6. Keep the local browser page as a standalone fallback; normal MCP tool calls do not open it.
+5. Keep the MCP App optional, attach it to `show_board`, and advertise it on successful `draw_board` results so AI drawings are visible immediately in compatible hosts.
+6. Keep the local browser page as a standalone fallback; normal MCP tool calls do not open the system browser.
 7. Keep project context optional, bounded, read-only, and free of absolute paths or secrets.
 8. Keep the server local-first, plugin-safe, and dependencies small.
 9. Keep publication metadata honest: review-facing policies describe local data, explicit tool annotations classify effects, and public directory approval is never implied by a repository marketplace.

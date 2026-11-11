@@ -4,7 +4,7 @@
 
 Doodle 不是项目工作台、静态图生成器、聊天产品或批准系统。它提供一张共享画布，AI 通过 MCP stdio 在 Agent 内自然地读写；Codex 用户可以从本仓库的 plugin marketplace 安装桌面插件。支持 MCP Apps 的宿主可把同一张画布作为可选增强显示在对话旁；日常对话仍留在 Agent 自己的聊天里。项目结构可以画，但不是产品主体。
 
-用户要求看画布时，`show_board` 会在支持 MCP Apps 的宿主对话旁呈现可交互画布。宿主不渲染 App 时，`get_board` 返回的 `PANEL_URL` 指向本地画布；普通 MCP 工具不会主动打开浏览器。选工具后点按快速放置或拖拽定尺寸，Space / 中键拖动画布，滚轮平移、Ctrl/⌘+滚轮缩放，双击改字。AI 用 `get_board` 读取画布、用 `draw_board` 画便签 / 形状 / 有方向箭头；回复和讨论留在 Agent 对话。MCP Apps UI 通过 Agent 宿主调用同一组工具，不依赖独立聊天服务。
+用户要求看画布时，`show_board` 会在支持 MCP Apps 的宿主对话旁呈现可交互画布；AI 成功调用 `draw_board` 后，兼容宿主也会从结果自动呈现或刷新画布，让用户直接看到刚画的内容。宿主不渲染 App 时，`get_board` 返回的 `PANEL_URL` 指向本地画布；普通 MCP 工具不会主动打开系统浏览器。选工具后点按快速放置或拖拽定尺寸，Space / 中键拖动画布，滚轮平移、Ctrl/⌘+滚轮缩放，双击改字。AI 用 `get_board` 读取画布、用 `draw_board` 画便签 / 形状 / 有方向箭头；回复和讨论留在 Agent 对话。MCP Apps UI 通过 Agent 宿主调用同一组工具，不依赖独立聊天服务。
 
 产品定义见 [docs/PRODUCT_DIRECTION.md](docs/PRODUCT_DIRECTION.md)，plugin 目标见 [docs/GOAL_PLUGIN.md](docs/GOAL_PLUGIN.md)，架构见 [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md)，AI 操作手册见 [AGENTS.md](AGENTS.md)。
 
@@ -44,7 +44,7 @@ codex plugin list --marketplace doodle --available --json
 codex plugin add doodle@doodle --json
 ```
 
-插件包由 `scripts/build-plugin.mjs` 生成到忽略的 `.doodle-plugin/doodle/`。它使用同一个自包含 stdio MCP server，不依赖仓库里的 `dist/` 或绝对路径。`npm run build:submission` 会生成忽略的 `doodle-plugin-submission/doodle-0.6.0.zip` 供提交审核；本仓库提供本地 / repo marketplace 安装路径，公共插件目录发布仍需要 OpenAI 侧资格、身份验证和审核。材料清单见 [docs/SUBMISSION.md](docs/SUBMISSION.md)。
+插件包由 `scripts/build-plugin.mjs` 生成到忽略的 `.doodle-plugin/doodle/`。它使用同一个自包含 stdio MCP server，不依赖仓库里的 `dist/` 或绝对路径。`npm run build:submission` 会生成忽略的 `doodle-plugin-submission/doodle-0.6.1.zip` 供提交审核；本仓库提供本地 / repo marketplace 安装路径，公共插件目录发布仍需要 OpenAI 侧资格、身份验证和审核。材料清单见 [docs/SUBMISSION.md](docs/SUBMISSION.md)。
 
 ### 直接 MCP stdio
 
@@ -103,7 +103,7 @@ npm run doctor
 | [产品方向](docs/PRODUCT_DIRECTION.md) | 定义、边界与验收 |
 | [Plugin 目标](docs/GOAL_PLUGIN.md) | Codex plugin 的目标、范围与验收 |
 | [架构](docs/ARCHITECTURE.md) | 源码结构、协议、HTTP 与安全模型 |
-| [当前决策](docs/DECISIONS.md) | 0.6.0 收束决策与历史 ADR 状态 |
+| [当前决策](docs/DECISIONS.md) | 0.6.1 收束决策与历史 ADR 状态 |
 | [文档地图](docs/README.md) | 全部文档入口 |
 | [故障排查](docs/TROUBLESHOOTING.md) | 首用自检与常见问题 |
 | [贡献指南](CONTRIBUTING.md) | 本地验证与 PR 规范 |

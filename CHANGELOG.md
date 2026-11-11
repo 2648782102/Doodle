@@ -2,6 +2,18 @@
 
 All notable changes are documented here. Versions follow `VERSIONING.md`.
 
+## 0.6.1 — Automatic canvas presentation
+
+### Changed
+
+- Successful `draw_board` results now advertise the shared MCP App canvas so compatible hosts automatically show or refresh the canvas after an AI drawing.
+- Updated agent instructions and the Doodle plugin skill to keep the canvas visible after drawing, with `show_board` as the fallback for hosts that do not render the draw result.
+- Made submission ZIP generation work on Windows by using the built-in `tar.exe` archive command when Unix `zip` is unavailable.
+
+### Validation
+
+- `npm run check` passes with 27 tests, repository and plugin guards, the Windows submission ZIP, doctor, and npm package dry-run.
+
 ## 0.6.0 — Codex plugin distribution
 
 ### Added

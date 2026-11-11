@@ -2,7 +2,7 @@
 
 Doodle is a simple shared infinite board. The roadmap protects that boundary rather than listing a large feature catalogue.
 
-## Shipped baseline — 0.6.0
+## Shipped baseline — 0.6.1
 
 - One version 1 board state shared by MCP tools and the local human canvas.
 - Four tools: `get_board`, `show_board`, `draw_board`, and optional `scan_project`.

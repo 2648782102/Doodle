@@ -11,10 +11,16 @@ const archive = path.join(root, "doodle-plugin-submission", `doodle-${packageJso
 await fs.mkdir(path.dirname(archive), { recursive: true });
 await fs.rm(archive, { force: true });
 await fs.access(pluginRoot);
-const result = spawnSync("zip", ["-q", "-r", archive, "doodle"], {
+const archiveCommand = process.platform === "win32" ? "tar" : "zip";
+const archiveArgs = process.platform === "win32"
+  ? ["-a", "-c", "-f", archive, "doodle"]
+  : ["-q", "-r", archive, "doodle"];
+const result = spawnSync(archiveCommand, archiveArgs, {
   cwd: path.join(root, ".doodle-plugin"),
   stdio: "inherit",
 });
-if (result.status !== 0) throw new Error(`Failed to build submission ZIP: ${result.status}`);
+if (result.error || result.status !== 0) {
+  throw new Error(`Failed to build submission ZIP: ${result.error?.message ?? result.status}`);
+}
 const stats = await fs.stat(archive);
 console.log(`✅ Built submission ZIP at ${path.relative(root, archive)} (${stats.size} bytes)`);

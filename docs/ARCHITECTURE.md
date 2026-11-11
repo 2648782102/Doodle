@@ -33,7 +33,7 @@ scripts/build-plugin.mjs        bundles the self-contained plugin server and tem
 scripts/plugin-check.mjs        validates plugin manifests, skill, marketplace, and build output
 ```
 
-There is no `src/domain/` workbench model, Mermaid renderer, session store, proposal store, or legacy panel template in `0.6.0`. The plugin uses only the supported Codex compatibility layout; generated `.doodle-plugin/` output is ignored.
+There is no `src/domain/` workbench model, Mermaid renderer, session store, proposal store, or legacy panel template in `0.6.1`. The plugin uses only the supported Codex compatibility layout; generated `.doodle-plugin/` output is ignored.
 
 ## MCP surface
 
@@ -48,7 +48,7 @@ Both runtime paths register exactly four tools:
 
 All tools are registered through the MCP SDK config API with explicit annotations: `get_board`, `show_board`, and `scan_project` are read-only, non-destructive, and local-scope; `draw_board` is destructive because it can remove or overwrite visual objects. These values are integration-tested and guarded by the offline repository checks.
 
-The optional canvas resource uses `text/html;profile=mcp-app` and is attached only to the separate `show_board` render tool, following the official decoupled data/render pattern. The app calls `get_board` and `draw_board` through the host bridge, refreshes at a low rate while visible, and sends the revision it has rendered so a concurrent model edit cannot be overwritten. This keeps browser HTTP credentials inside the standalone page while the embedded canvas uses the host's authenticated MCP connection. Text-only hosts retain the complete tool workflow.
+The optional canvas resource uses `text/html;profile=mcp-app` and is attached to `show_board` and to successful `draw_board` results. `show_board` remains the explicit render tool; the write result also advertises the canvas so compatible hosts automatically show the board after an AI drawing. The app calls `get_board` and `draw_board` through the host bridge, refreshes at a low rate while visible, and sends the revision it has rendered so a concurrent model edit cannot be overwritten. This keeps browser HTTP credentials inside the standalone page while the embedded canvas uses the host's authenticated MCP connection. Text-only hosts retain the complete tool workflow and should call `show_board` after drawing when they support it.
 
 No tool opens a browser, writes a project file, launches an IDE, or emits approval credentials. MCP initialization instructions and `get_board` describe the directed-arrow contract and strict-grid workflow.
 

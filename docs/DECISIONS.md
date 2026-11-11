@@ -1,6 +1,6 @@
 # Current Decisions
 
-`0.6.0` keeps the simple shared infinite board and makes an installable desktop-only Codex plugin the preferred distribution path. The plugin wraps the same four-tool MCP stdio server; direct MCP configuration remains supported. MCP Apps rendering is an optional host enhancement. A standalone local page remains available. Discussion stays in the host conversation; Doodle owns only shared visual context.
+`0.6.1` continues the simple shared infinite board and installable desktop-only Codex plugin from `0.6.0`. The plugin wraps the same four-tool MCP stdio server; direct MCP configuration remains supported. MCP Apps rendering is an optional host enhancement and now appears automatically after successful AI drawings in compatible hosts. A standalone local page remains available. Discussion stays in the host conversation; Doodle owns only shared visual context.
 
 ## Decisions in force
 
@@ -24,7 +24,7 @@
 
 ## MCP App boundary
 
-Official OpenAI documentation describes custom MCP UI as optional, recommends separating data tools from render tools, confirms the `.codex-plugin/plugin.json` compatibility layout, and marks local stdio MCP plugins desktop-only. Doodle attaches its canvas only to `show_board`; its UI refreshes through `get_board`. Text-only hosts and plugin installs use the same tools without the UI. See [Add UI to your MCP server](https://developers.openai.com/plugins/build/chatgpt-ui), [Package your plugin](https://developers.openai.com/plugins/build/plugins), and [Submit desktop-only plugins](https://developers.openai.com/plugins/deploy/desktop-only).
+Official OpenAI documentation describes custom MCP UI as optional, recommends separating data tools from render tools, confirms the `.codex-plugin/plugin.json` compatibility layout, and marks local stdio MCP plugins desktop-only. Doodle attaches its canvas to `show_board` and to successful `draw_board` results so a completed AI drawing is visible immediately in compatible hosts; its UI refreshes through `get_board`. Text-only hosts and plugin installs use the same tools and should call `show_board` after drawing when supported. See [Add UI to your MCP server](https://developers.openai.com/plugins/build/chatgpt-ui), [Package your plugin](https://developers.openai.com/plugins/build/plugins), and [Submit desktop-only plugins](https://developers.openai.com/plugins/deploy/desktop-only).
 
 ## Historical records
 

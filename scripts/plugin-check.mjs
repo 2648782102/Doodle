@@ -38,7 +38,7 @@ const terms = await read("TERMS.md");
 const submission = await read("docs/SUBMISSION.md");
 const submissionScript = await read("scripts/build-submission.mjs");
 
-check(packageJson.version === "0.6.0" && manifest.version === packageJson.version, "plugin version does not match package.json 0.6.0");
+check(packageJson.version === "0.6.1" && manifest.version === packageJson.version, "plugin version does not match package.json 0.6.1");
 check(packageJson.scripts.build.includes("build-plugin.mjs"), "npm build does not produce the plugin package");
 check(packageJson.scripts.check.includes("repo:plugin-check"), "npm check does not run the plugin guard");
 check(manifest.name === "doodle", "plugin identity is not doodle");
@@ -73,6 +73,7 @@ check(buildScript.includes("__DOODLE_PLUGIN_VERSION__"), "plugin build does not 
 check(pluginCheckScript.includes("requires_local_executor"), "plugin guard does not verify desktop-only status");
 check(httpSource.includes("templateCandidates(this.config)") && httpSource.includes('"server", "infra", "templates", "board.html"'), "bundled server cannot resolve plugin board templates");
 check(toolsSource.includes("appBundleCandidates(ctx.config)") && toolsSource.includes('"server", "infra", "templates", "board-app.js"'), "bundled server cannot resolve the MCP App bundle");
+check(toolsSource.includes("CANVAS_UI_META") && toolsSource.includes("_meta: CANVAS_UI_META"), "bundled draw_board path does not advertise automatic post-draw rendering");
 check(toolsSource.includes("PANEL_URL") && instructions.includes("PANEL_URL"), "active local panel URL is not exposed to the agent");
 check(!instructions.includes("reply_on_board"), "MCP instructions reference the removed reply tool");
 check(configSource.includes("previewPort: rawPort ? parsePort(rawPort) : null") && configSource.includes("PLUGIN_DATA"), "runtime config is not plugin-safe");

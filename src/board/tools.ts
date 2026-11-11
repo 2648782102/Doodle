@@ -26,6 +26,9 @@ export interface BoardToolContext {
 }
 
 const APP_RESOURCE_URI = "ui://doodle/board/v1.html";
+const CANVAS_UI_META = {
+  ui: { resourceUri: APP_RESOURCE_URI, prefersBorder: true },
+} as const;
 const READ_ONLY_LOCAL_ANNOTATIONS = {
   readOnlyHint: true,
   destructiveHint: false,
@@ -199,6 +202,7 @@ export function registerBoardTools(server: McpServer, ctx: BoardToolContext): vo
         expected_revision: z.number().int().nonnegative().optional().describe("Optional board revision for rejecting stale canvas edits"),
       }),
       annotations: BOARD_WRITE_ANNOTATIONS,
+      _meta: CANVAS_UI_META,
     },
     async ({ items, remove_ids, author, expected_revision }) => {
       try {

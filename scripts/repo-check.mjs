@@ -64,7 +64,7 @@ const totalSourceFiles = (await fs.readdir(path.join(root, "src"), { recursive: 
 const canonicalDescription = "A shared canvas for people and AI to draw together through MCP.";
 const canonicalTopics = ["ai", "canvas", "developer-tools", "drawing", "local-first", "mcp", "typescript", "whiteboard"];
 
-check(packageJson.version === "0.6.0", "package.json is not version 0.6.0");
+check(packageJson.version === "0.6.1", "package.json is not version 0.6.1");
 check(pluginManifest.version === packageJson.version, "plugin version does not match package.json");
 check(pluginManifest.requires_local_executor === true, "plugin is not marked desktop-only");
 check(pluginMcp.mcpServers.doodle.args[0] === "${PLUGIN_ROOT}/server/index.mjs", "plugin MCP entrypoint is not self-contained");
@@ -110,6 +110,7 @@ check((tools.match(/server\.registerTool\(/g) ?? []).length === 4 && !tools.incl
 check(tools.includes("readOnlyHint: true") && tools.includes("destructiveHint: true") && tools.includes("openWorldHint: false"), "tool annotations are incomplete");
 check(tools.includes("registerAppResource") && tools.includes('"ui://doodle/board/v1.html"'), "MCP App canvas resource is missing");
 check(tools.includes('"show_board"') && tools.includes('"get_board"'), "canvas render and data tools are not separated");
+check(tools.includes("CANVAS_UI_META") && tools.includes("_meta: CANVAS_UI_META"), "draw_board does not advertise the canvas for automatic post-draw rendering");
 check(tools.includes("appBundleCandidates(ctx.config)") && tools.includes("PANEL_URL"), "MCP App resources are not plugin-safe and the panel URL is missing");
 check(tools.includes("structuredContent: boardJson(board)"), "board tools do not return an authoritative structured snapshot");
 check(tools.includes('"scan_project"') && tools.includes("Use draw_board to visualize"), "scan_project is not a read-only board-context tool");

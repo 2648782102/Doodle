@@ -19,7 +19,7 @@ Most visual tools for agents are either static diagram generators or full dashbo
 ## Release notes starter
 
 ```text
-0.6.0 packages the simple shared board as a desktop-only Codex plugin while keeping direct MCP stdio. It adds a repository marketplace, a self-contained bundled server, plugin-safe local state, an optional free loopback port, explicit tool annotations, public policy URLs, and a reproducible submission ZIP. MCP Apps rendering remains optional; the four tools, bounded read-only project scan, and local-only safety boundary are unchanged. Public directory approval remains a separate approved-partner process.
+0.6.1 packages the simple shared board as a desktop-only Codex plugin while keeping direct MCP stdio. It adds automatic post-draw canvas presentation in compatible MCP Apps hosts, a Windows-compatible submission ZIP build, and the 0.6.0 plugin distribution materials. MCP Apps rendering remains optional; the four tools, bounded read-only project scan, and local-only safety boundary are unchanged. Public directory approval remains a separate approved-partner process.
 ```
 
 Do not claim hosted collaboration, approval workflows, static diagram export, or automatic code changes.

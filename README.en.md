@@ -2,7 +2,7 @@
 
 > A shared canvas for people and AI to draw together through MCP.
 
-Doodle is a local-first MCP canvas, not a project workbench, static diagram generator, chat product, or code approval system. Install the desktop-only Codex plugin from this repository's marketplace, or connect the same four-tool stdio server directly. In hosts that support MCP Apps, `show_board` optionally presents the interactive canvas beside the existing agent conversation. Conversation stays in the host chat. `get_board` reports the active local `PANEL_URL` as a standalone fallback; normal MCP calls never open a browser.
+Doodle is a local-first MCP canvas, not a project workbench, static diagram generator, chat product, or code approval system. Install the desktop-only Codex plugin from this repository's marketplace, or connect the same four-tool stdio server directly. In hosts that support MCP Apps, `show_board` optionally presents the interactive canvas beside the existing agent conversation, and successful `draw_board` results advertise the same UI so completed AI drawings appear immediately. Conversation stays in the host chat. `get_board` reports the active local `PANEL_URL` as a standalone fallback; normal MCP calls never open the system browser.
 
 Choose a tool to click-place or drag-size objects. Space or middle-button drag pans; the wheel pans and Ctrl/Command-wheel zooms. Double-click an object to edit its text. The embedded UI calls the same `get_board` and `draw_board` tools through the host bridge; it needs no separate chat service.
 
@@ -15,7 +15,7 @@ Choose a tool to click-place or drag-size objects. Space or middle-button drag p
 | `draw_board` | Add, update, or remove notes, text, rectangles, ellipses, and directed arrows; writes are serialized against the latest state. |
 | `scan_project` | Optional read-only project paths and bounded `file:line` evidence. It does not draw or write files. |
 
-The loop is `agent conversation ↔ shared canvas: get_board → draw_board → person edits the canvas → AI reads it again`. `show_board` is an optional render tool, and project structure is only one possible subject; `scan_project` is optional and must be visualized with `draw_board` if needed.
+The loop is `agent conversation ↔ shared canvas: get_board → draw_board → person sees or edits the canvas → AI reads it again`. `show_board` is the explicit render tool, while successful `draw_board` results also advertise the optional UI in compatible hosts. Project structure is only one possible subject; `scan_project` is optional and must be visualized with `draw_board` if needed.
 
 ## Quick start
 
@@ -35,7 +35,7 @@ codex plugin marketplace add . --json
 codex plugin add doodle@doodle --json
 ```
 
-`npm run build:submission` also produces an ignored `doodle-plugin-submission/doodle-0.6.0.zip` for review. Public plugin-directory publication remains a separate approved OpenAI submission; see `docs/SUBMISSION.md`, `PRIVACY.md`, `SUPPORT.md`, `TERMS.md`, and `docs/FAQ.md`.
+`npm run build:submission` also produces an ignored `doodle-plugin-submission/doodle-0.6.1.zip` for review. Public plugin-directory publication remains a separate approved OpenAI submission; see `docs/SUBMISSION.md`, `PRIVACY.md`, `SUPPORT.md`, `TERMS.md`, and `docs/FAQ.md`.
 
 For direct MCP hosts, add `dist/index.js` as a stdio server. Config snippets are in `examples/mcp-config/`. Use `DOODLE_WORKSPACE_ROOT` for the project that `scan_project` should inspect and `OUTPUT_DIR` for the board state directory. When `PREVIEW_PORT` is unset, the server chooses a free loopback port and reports it as `PANEL_URL`; normal MCP calls do not open a browser.
 
