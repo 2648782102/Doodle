@@ -2,7 +2,7 @@
 
 All notable changes are documented here. Versions follow `VERSIONING.md`.
 
-## 0.6.1 — Automatic canvas presentation
+## 0.6.2 — Automatic canvas presentation
 
 ### Changed
 

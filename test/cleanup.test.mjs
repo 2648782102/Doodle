@@ -92,7 +92,7 @@ describe("post-cleanup repository shape", () => {
   it("uses one product name and one npm package name", async () => {
     const packageJson = JSON.parse(await fs.readFile(path.join(root, "package.json"), "utf8"));
     expect(packageJson.name).toBe("doodle-mcp");
-    expect(packageJson.version).toBe("0.6.1");
+    expect(packageJson.version).toBe("0.6.2");
     expect(packageJson.bin["doodle-mcp"]).toBe("dist/index.js");
     expect(packageJson.repository.url).toContain("/Doodle.git");
     const strictFiles = [
@@ -156,7 +156,7 @@ describe("post-cleanup repository shape", () => {
     const mcp = JSON.parse(await fs.readFile(path.join(root, "plugins", "doodle", ".mcp.json"), "utf8"));
     const marketplace = JSON.parse(await fs.readFile(path.join(root, ".agents", "plugins", "marketplace.json"), "utf8"));
     const gitignore = await fs.readFile(path.join(root, ".gitignore"), "utf8");
-    expect(manifest.version).toBe("0.6.1");
+    expect(manifest.version).toBe("0.6.2");
     expect(manifest.requires_local_executor).toBe(true);
     expect(manifest.mcpServers).toBe("./.mcp.json");
     expect(mcp.mcpServers.doodle.type).toBe("stdio");

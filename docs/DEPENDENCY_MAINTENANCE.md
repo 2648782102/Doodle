@@ -1,6 +1,6 @@
 # Dependency Maintenance
 
-The `0.5.0` cleanup removed Mermaid CLI, Mermaid, sharp, open, nanoid, and the VS Code extension. The runtime uses the MCP SDK, optional MCP Apps bridge, Express, WebSocket, and Zod. Development also uses esbuild to bundle the self-contained browser canvas, its MCP Apps adapter, and the `0.6.1` plugin server.
+The `0.5.0` cleanup removed Mermaid CLI, Mermaid, sharp, open, nanoid, and the VS Code extension. The runtime uses the MCP SDK, optional MCP Apps bridge, Express, WebSocket, and Zod. Development also uses esbuild to bundle the self-contained browser canvas, its MCP Apps adapter, and the `0.6.2` plugin server.
 
 ## Verification order
 

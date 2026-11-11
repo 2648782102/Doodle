@@ -35,7 +35,7 @@ codex plugin marketplace add . --json
 codex plugin add doodle@doodle --json
 ```
 
-`npm run build:submission` also produces an ignored `doodle-plugin-submission/doodle-0.6.1.zip` for review. Public plugin-directory publication remains a separate approved OpenAI submission; see `docs/SUBMISSION.md`, `PRIVACY.md`, `SUPPORT.md`, `TERMS.md`, and `docs/FAQ.md`.
+`npm run build:submission` also produces an ignored `doodle-plugin-submission/doodle-0.6.2.zip` for review. Public plugin-directory publication remains a separate approved OpenAI submission; see `docs/SUBMISSION.md`, `PRIVACY.md`, `SUPPORT.md`, `TERMS.md`, and `docs/FAQ.md`.
 
 For direct MCP hosts, add `dist/index.js` as a stdio server. Config snippets are in `examples/mcp-config/`. Use `DOODLE_WORKSPACE_ROOT` for the project that `scan_project` should inspect and `OUTPUT_DIR` for the board state directory. When `PREVIEW_PORT` is unset, the server chooses a free loopback port and reports it as `PANEL_URL`; normal MCP calls do not open a browser.
 

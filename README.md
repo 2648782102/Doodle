@@ -44,7 +44,7 @@ codex plugin list --marketplace doodle --available --json
 codex plugin add doodle@doodle --json
 ```
 
-插件包由 `scripts/build-plugin.mjs` 生成到忽略的 `.doodle-plugin/doodle/`。它使用同一个自包含 stdio MCP server，不依赖仓库里的 `dist/` 或绝对路径。`npm run build:submission` 会生成忽略的 `doodle-plugin-submission/doodle-0.6.1.zip` 供提交审核；本仓库提供本地 / repo marketplace 安装路径，公共插件目录发布仍需要 OpenAI 侧资格、身份验证和审核。材料清单见 [docs/SUBMISSION.md](docs/SUBMISSION.md)。
+插件包由 `scripts/build-plugin.mjs` 生成到忽略的 `.doodle-plugin/doodle/`。它使用同一个自包含 stdio MCP server，不依赖仓库里的 `dist/` 或绝对路径。`npm run build:submission` 会生成忽略的 `doodle-plugin-submission/doodle-0.6.2.zip` 供提交审核；本仓库提供本地 / repo marketplace 安装路径，公共插件目录发布仍需要 OpenAI 侧资格、身份验证和审核。材料清单见 [docs/SUBMISSION.md](docs/SUBMISSION.md)。
 
 ### 直接 MCP stdio
 
@@ -103,7 +103,7 @@ npm run doctor
 | [产品方向](docs/PRODUCT_DIRECTION.md) | 定义、边界与验收 |
 | [Plugin 目标](docs/GOAL_PLUGIN.md) | Codex plugin 的目标、范围与验收 |
 | [架构](docs/ARCHITECTURE.md) | 源码结构、协议、HTTP 与安全模型 |
-| [当前决策](docs/DECISIONS.md) | 0.6.1 收束决策与历史 ADR 状态 |
+| [当前决策](docs/DECISIONS.md) | 0.6.2 收束决策与历史 ADR 状态 |
 | [文档地图](docs/README.md) | 全部文档入口 |
 | [故障排查](docs/TROUBLESHOOTING.md) | 首用自检与常见问题 |
 | [贡献指南](CONTRIBUTING.md) | 本地验证与 PR 规范 |

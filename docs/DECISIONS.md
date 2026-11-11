@@ -1,6 +1,6 @@
 # Current Decisions
 
-`0.6.1` continues the simple shared infinite board and installable desktop-only Codex plugin from `0.6.0`. The plugin wraps the same four-tool MCP stdio server; direct MCP configuration remains supported. MCP Apps rendering is an optional host enhancement and now appears automatically after successful AI drawings in compatible hosts. A standalone local page remains available. Discussion stays in the host conversation; Doodle owns only shared visual context.
+`0.6.2` continues the simple shared infinite board and installable desktop-only Codex plugin from `0.6.0`. The plugin wraps the same four-tool MCP stdio server; direct MCP configuration remains supported. MCP Apps rendering is an optional host enhancement and now appears automatically after successful AI drawings in compatible hosts. A standalone local page remains available. Discussion stays in the host conversation; Doodle owns only shared visual context.
 
 ## Decisions in force
 

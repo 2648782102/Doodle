@@ -64,7 +64,7 @@ const totalSourceFiles = (await fs.readdir(path.join(root, "src"), { recursive: 
 const canonicalDescription = "A shared canvas for people and AI to draw together through MCP.";
 const canonicalTopics = ["ai", "canvas", "developer-tools", "drawing", "local-first", "mcp", "typescript", "whiteboard"];
 
-check(packageJson.version === "0.6.1", "package.json is not version 0.6.1");
+check(packageJson.version === "0.6.2", "package.json is not version 0.6.2");
 check(pluginManifest.version === packageJson.version, "plugin version does not match package.json");
 check(pluginManifest.requires_local_executor === true, "plugin is not marked desktop-only");
 check(pluginMcp.mcpServers.doodle.args[0] === "${PLUGIN_ROOT}/server/index.mjs", "plugin MCP entrypoint is not self-contained");

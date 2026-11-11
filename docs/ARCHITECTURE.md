@@ -33,7 +33,7 @@ scripts/build-plugin.mjs        bundles the self-contained plugin server and tem
 scripts/plugin-check.mjs        validates plugin manifests, skill, marketplace, and build output
 ```
 
-There is no `src/domain/` workbench model, Mermaid renderer, session store, proposal store, or legacy panel template in `0.6.1`. The plugin uses only the supported Codex compatibility layout; generated `.doodle-plugin/` output is ignored.
+There is no `src/domain/` workbench model, Mermaid renderer, session store, proposal store, or legacy panel template in `0.6.2`. The plugin uses only the supported Codex compatibility layout; generated `.doodle-plugin/` output is ignored.
 
 ## MCP surface
 
