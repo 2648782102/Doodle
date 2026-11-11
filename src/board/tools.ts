@@ -150,7 +150,7 @@ export function registerBoardTools(server: McpServer, ctx: BoardToolContext): vo
         ] : [
           "NEXT:",
           "- 读取 BOARD_JSON 中的对象与坐标；用 show_board 显示、用 draw_board 修改。",
-          "- 人改完后再次调用 get_board；完整画图规范见 MCP instructions。",
+          "- 人改完后再次调用 get_board；兼容宿主会自动同步最终状态差量，点「通知 Agent」可发一句短提醒。",
           ``,
         ];
         return {

@@ -8,6 +8,7 @@ Doodle is a local-first shared canvas for people and AI. This policy describes t
 - **Local project context:** when `scan_project` is called, bounded workspace-relative file paths and short `file:line` evidence excerpts. The scan skips dot-private paths, `.env`-like files, common generated directories, large text files, and credential-like evidence.
 - **Local connection metadata:** the loopback address and selected `PREVIEW_PORT`, a random per-page `X-AI-Draw-Token`, WebSocket update messages, and an in-memory `confirmedBy: "human"` marker required for non-GET board writes.
 - **Browser view preferences:** camera position and zoom saved by the standalone canvas in browser localStorage.
+- **Embedded model context:** in MCP Apps hosts that support context updates, the current board snapshot and final-state differences are passed to that host for the current conversation's model context. A user-initiated notification adds one short message to the same host conversation. Doodle does not create a separate chat history or hosted transcript.
 - **Support data:** information a person voluntarily sends through GitHub Issues or private vulnerability reporting.
 
 Doodle does not require an account, hosted profile, payment data, precise location, advertising identifier, or conversation transcript. The plugin has no telemetry, analytics SDK, hosted endpoint, or third-party data receiver.
@@ -18,7 +19,7 @@ Board content provides shared visual context between a person and an AI. Local p
 
 ## Recipients and disclosure
 
-Doodle keeps board and scan data on the user's machine. Normal operation sends no board content, project evidence, telemetry, or credentials to Doodle contributors, OpenAI, or another hosted third party. MCP tool results are returned to the connected agent host as part of the user's active conversation. If a person opens a GitHub Issue or private vulnerability report, the information they choose to include is visible to repository maintainers and GitHub according to that reporting channel.
+Doodle keeps board and scan data on the user's machine. Normal operation sends no board content, project evidence, telemetry, or credentials to Doodle contributors or another hosted third party. MCP tool results are returned to the connected agent host as part of the user's active conversation; compatible embedded Apps may also pass local board state into that same host conversation's model context through the MCP Apps bridge, and the notification button may add one short message. Whether the host subsequently processes conversation data under its own policy is controlled by that host. If a person opens a GitHub Issue or private vulnerability report, the information they choose to include is visible to repository maintainers and GitHub according to that reporting channel.
 
 ## Retention
 

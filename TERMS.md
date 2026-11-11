@@ -4,7 +4,7 @@ Doodle is open-source software distributed under the [MIT License](LICENSE). The
 
 ## Local software
 
-Doodle runs locally through a direct MCP stdio server or a desktop-only plugin. It has no hosted account, remote service, uptime commitment, or warranty. You are responsible for choosing the workspace root and output directory, protecting local board files and logs, and reviewing any code changes separately. Board objects and scan results are shared visual context; they do not approve, authorize, or perform project writes.
+Doodle runs locally through a direct MCP stdio server or a desktop-only plugin. It has no hosted account, remote service, uptime commitment, or warranty. You are responsible for choosing the workspace root and output directory, protecting local board files and logs, and reviewing any code changes separately. Board objects and scan results are shared visual context; they do not approve, authorize, or perform project writes. In capable MCP Apps hosts, final board state may be attached to the current host conversation's model context and one user-initiated short notification may be sent; the host's own conversation policies still apply.
 
 ## Project surfaces
 

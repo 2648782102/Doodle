@@ -118,6 +118,7 @@ describe("MCP board server", () => {
       expect(appResource.contents[0].text).toContain('return updated;');
       expect(appResource.contents[0].text).toContain('lastChange: "remote"');
       expect(appResource.contents[0].text).toContain('id="btnEdit"');
+      expect(appResource.contents[0].text).toContain('id="btnNotifyAgent"');
       await client.callTool({
         name: "draw_board",
         arguments: { author: "ai", items: [{ type: "note", x: 0, y: 0, w: 160, h: 90, text: "embedded app" }] },

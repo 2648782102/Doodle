@@ -51,6 +51,8 @@ describe("board HTTP surface", () => {
     expect(html).toContain('socket.addEventListener("open"');
     expect(html).toContain('id="btnEdit"');
     expect(html).toContain('function editSelected()');
+    expect(html).toContain('id="btnNotifyAgent"');
+    expect(html).toContain('notifyButton.hidden = !adapter.canNotifyAgent');
     expect(html).not.toContain("helpCloseButton.focus()");
     const snapshot = await fetch(`${base}/api/board`).then((response) => response.json());
     expect(snapshot).toMatchObject({ version: 1 });

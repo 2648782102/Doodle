@@ -13,6 +13,7 @@ This document separates what the repository can prepare from what only an approv
   - `https://github.com/2648782102/Doodle/blob/master/PRIVACY.md`
   - `https://github.com/2648782102/Doodle/blob/master/TERMS.md`
 - Explicit `readOnlyHint`, `destructiveHint`, and `openWorldHint` values on every MCP tool.
+- An embedded MCP App that uses host capability detection for optional final-state model context updates and one user-initiated short notification, without adding a Doodle chat service or a fifth MCP tool.
 - `npm run check`, including repository and plugin guards, MCP integration tests, and package dry-run.
 - A clean isolated `CODEX_HOME` marketplace/installation smoke test and a bundled stdio MCP SDK smoke test.
 - An idempotent publish workflow that attaches `doodle-<version>.zip` to the matching GitHub Release after `npm run check`.

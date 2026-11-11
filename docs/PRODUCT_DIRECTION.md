@@ -12,7 +12,8 @@ one-command install → new agent session → one first prompt
   → show_board optionally renders the canvas in a compatible host
   → AI draws or edits with draw_board
   → person edits the canvas or continues the conversation
-  → AI reads the same board again
+  → final-state delta is attached to the current host conversation's model context
+  → short notification or explicit AI reread closes the loop
 ```
 
 The loop can pause or repeat at any point. `scan_project` is an optional read-only helper: when project structure is useful, the AI receives bounded paths and evidence, then uses `draw_board` to show relevant context.
@@ -20,7 +21,7 @@ The loop can pause or repeat at any point. `scan_project` is an optional read-on
 ## Product model
 
 - **Canvas:** an infinite surface with bounded simple objects: notes, text, rectangles, ellipses, and directed arrow lines. A line runs from `(x,y)` to `(x+w,y+h)`. Click to place a default-sized shape or drag to size shapes and draw arrows in any direction. Space-drag or middle-drag pans; the wheel pans and Ctrl/Command-wheel zooms.
-- **Human input:** clicking, dragging, editing text, and deleting canvas objects. Discussion happens in the agent host conversation.
+- **Human input:** clicking, dragging, editing text, and deleting canvas objects. Discussion happens in the agent host conversation; an optional `通知 Agent` button adds one short message there, never a second chat surface.
 - **AI input:** `get_board` reads progressive first-use or concise next-step guidance, canvas data, and the active loopback `PANEL_URL`; `show_board` returns the optional MCP App view; `draw_board` adds, edits, or removes objects and can reject stale UI edits by revision. The visible App refreshes the shared board so Agent drawings appear in place. `scan_project` optionally reads bounded project structure.
 - **Authors:** every object records whether a person or AI created it. Legacy board notes remain in version 1 state for compatibility but are hidden from current tools and UI.
 - **Approval:** this product has no built-in code-change approval protocol. Board content never authorizes project writes.
@@ -31,7 +32,7 @@ The loop can pause or repeat at any point. `scan_project` is an optional read-on
 2. Make plugin installation one command and first use one prompt, while preserving zero-configuration direct MCP configuration.
 3. Keep conversation in the host. Do not reproduce its composer or message feed inside Doodle.
 4. Keep drawing obvious, with direct click and drag gestures and one dismissible three-line help popover.
-5. Keep the MCP App optional, attach it to `show_board`, and advertise it on successful `draw_board` results so AI drawings are visible immediately in compatible hosts.
+5. Keep the MCP App optional, attach it to `show_board`, and advertise it on successful `draw_board` results so AI drawings are visible immediately in compatible hosts. In capable hosts, publish the latest final board snapshot plus a delta from the last published state to the current session's model context without triggering a turn.
 6. Keep the local browser page as a standalone fallback; normal MCP tool calls do not open the system browser.
 7. Keep project context optional, bounded, read-only, and free of absolute paths or secrets.
 8. Keep the server local-first, plugin-safe, and dependencies small.
@@ -41,7 +42,7 @@ The loop can pause or repeat at any point. `scan_project` is an optional read-on
 ## Boundaries
 
 - No hosted accounts, multi-user SaaS, social presence, or mandatory turn-taking workflow.
-- No duplicate chat product or board message feed.
+- No duplicate chat product, second session model, or board message feed. A host notification is one short message in the existing conversation.
 - No project dashboard, Mermaid diagram library, IDE extension, or static image exporter.
 - No `SessionSnapshot`, `VisualGraph`, annotation threads, proposals, diff review, approval receipts, or derived context catalogues.
 - No AI project writes triggered by drawing or scans. Code changes remain a separately reviewed coding-agent action.
@@ -49,7 +50,7 @@ The loop can pause or repeat at any point. `scan_project` is an optional read-on
 
 ## Acceptance
 
-A fresh checkout installs through `npm run setup:codex`, and any MCP host can use the zero-configuration `npx -y doodle-mcp` CLI. Both paths build or expose exactly four tools. Text-only hosts can use all tools without rendering UI. MCP Apps-compatible hosts can show and edit the shared canvas beside their conversation; the UI reads and writes only through the host's `get_board` and `draw_board` calls. A person can open the standalone local page at the reported `PANEL_URL`, move objects, edit text, and see agent changes on the same board. Official OpenAI documentation says local marketplace installs are separate from the public directory and should be used in a new session.
+A fresh checkout installs through `npm run setup:codex`, and any MCP host can use the zero-configuration `npx -y doodle-mcp` CLI. Both paths build or expose exactly four tools. Text-only hosts can use all tools without rendering UI. MCP Apps-compatible hosts can show and edit the shared canvas beside their conversation; the UI reads and writes only through the host's `get_board` and `draw_board` calls. Hosts that advertise `updateModelContext` receive a complete current structured snapshot plus `added` / `updated` / `removed` final-state differences, never an operation log; `sendMessage` is used only by the user-initiated notification button. A person can open the standalone local page at the reported `PANEL_URL`, move objects, edit text, and see agent changes on the same board; this fallback has no current-host-session bridge. Official OpenAI documentation says local marketplace installs are separate from the public directory and should be used in a new session.
 
 ## Next work
 

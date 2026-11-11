@@ -2,6 +2,30 @@
 
 All notable changes are documented here. Versions follow `VERSIONING.md`.
 
+## 0.7.0 — Current-session board context sync
+
+### Added
+
+- The embedded MCP App now detects `updateModelContext` after connecting to a compatible host. Each newly observed board revision publishes the complete current final board snapshot plus `added` / `updated` / `removed` differences from the last successfully published snapshot. The delta contains final object values or removed IDs, never click, drag, text-input, or tool-call operations.
+- `structuredContent` preserves the untruncated current board, final-state delta, and fixed read-only flags; the text projection is bounded for model context size and points the agent back to `get_board` as the authoritative reread tool.
+- A `通知 Agent` button appears only in embedded hosts that support both model context updates and `sendMessage`. It ensures the latest context has been published, then sends one short message into the existing host conversation: 「我改了 Doodle 画板，你看下图。」 It does not add a Doodle chat, session, message feed, or automatic model turn.
+- Added `src/board/app-context.ts` and `test/app-context.test.mjs` for pure final-state deltas, complete structured snapshots, updates, removals, and bounded text projections.
+
+### Changed
+
+- Documented the current-session loop in Chinese and English READMEs, the agent handbook, product direction, architecture, decisions, plugin goal, MCP instructions, skill, privacy, FAQ, troubleshooting, examples, launch copy, roadmap, and release notes.
+- Repository and plugin guards now verify capability detection, `updateModelContext` / `sendMessage`, final-state delta language, the notification button, and the bundled MCP App bridge. MCP integration and HTTP tests check the embedded template surface.
+- Bumped the package, lockfile, and plugin manifest to `0.7.0`; the published `0.6.3` npm package and GitHub Release remain immutable.
+
+### Compatibility
+
+- The four MCP tools, their schemas and annotations, version 1 persisted board state, `BOARD_JSON`, `PANEL_URL`, HTTP authorization, and revision-safe writes are unchanged.
+- Hosts without MCP Apps context capabilities and the standalone `PANEL_URL` page continue to use `get_board` rereading; the notification button remains hidden there and never claims a host-session bridge.
+
+### Validation
+
+- `npm run check` covers the new pure-function tests, TypeScript, build, plugin build, example syntax, repository and plugin guards, setup dry-run, submission ZIP, doctor, and npm package dry-run. Live host-context delivery remains an MCP Apps host capability and is documented as an external surface.
+
 ## 0.6.3 — Complete install-to-use experience
 
 ### Added

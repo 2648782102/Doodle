@@ -1,6 +1,6 @@
 {
   "name": "doodle",
-  "version": "0.6.3",
+  "version": "0.7.0",
   "description": "A local-first shared infinite board for people and AI, packaged as a desktop-only Codex plugin and MCP server.",
   "homepage": "https://github.com/2648782102/Doodle#readme",
   "repository": "https://github.com/2648782102/Doodle",

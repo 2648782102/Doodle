@@ -19,3 +19,5 @@ node examples/board-client.mjs
 ```
 
 Normal MCP calls do not open a browser. Ask the agent for `PANEL_URL` and open that local address only when a human wants to see the shared canvas.
+
+In MCP Apps-compatible hosts, the embedded canvas can also attach its latest final board state and final-state delta to the current host conversation's model context; a `通知 Agent` button sends one short reminder through the existing host chat. The standalone page has no current-session bridge, so ask the agent to call `get_board` after edits there.

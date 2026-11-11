@@ -27,6 +27,7 @@ jobs:
       - run: npm run lint
       - run: npm run build
       - run: npm test
+      - run: node --input-type=module -e "import { buildBoardModelContext } from './dist/board/app-context.js'; const board = { version: 1, id: 'ci', title: 'CI', revision: 1, updatedAt: new Date(0).toISOString(), items: [] }; const context = buildBoardModelContext(board); if (context.structuredContent.type !== 'doodle_board_context' || context.structuredContent.board.revision !== 1) process.exit(1);"
       - run: npm run test:examples
       - run: npm run repo:check
       - run: npm run repo:plugin-check

@@ -4,14 +4,14 @@ This is the current operating manual for AI coding agents. Humans should read `R
 
 ## Product
 
-`doodle-mcp` is a local-first **simple shared infinite board**. A person and an AI place notes, text, rectangles, ellipses, and directed arrows on one canvas. MCP stdio is the AI's normal access channel inside an agent; the repository also builds an installable desktop-only Codex plugin around the same four-tool MCP server. Compatible MCP Apps hosts may show the interactive canvas beside the existing agent conversation as an optional enhancement. Conversation stays in the host chat; the standalone local page is a fallback, never a side effect of a normal tool call.
+`doodle-mcp` is a local-first **simple shared infinite board**. A person and an AI place notes, text, rectangles, ellipses, and directed arrows on one canvas. MCP stdio is the AI's normal access channel inside an agent; the repository also builds an installable desktop-only Codex plugin around the same four-tool MCP server. Compatible MCP Apps hosts may show the interactive canvas beside the existing agent conversation as an optional enhancement and attach the board's final-state delta to that conversation's model context. Conversation stays in the host chat; the standalone local page is a fallback, never a side effect of a normal tool call.
 
 The board is the product. Project structure is only one optional subject that can be drawn. There is no second session model, proposal workflow, approval grant, code-change authority, diagram library, or workbench.
 
 Default loop:
 
 ```text
-install once → new agent session → get_board → show_board → draw_board → person edits the same canvas → AI reads it again
+install once → new agent session → get_board → show_board → draw_board → person edits the same canvas → final-state context sync / short notification → AI reads it again
 ```
 
 Install and first-use experience:
@@ -21,6 +21,7 @@ Install and first-use experience:
 - Direct MCP examples use zero-configuration `npx -y doodle-mcp`; `DOODLE_WORKSPACE_ROOT` and other environment variables are optional overrides, not installation prerequisites.
 - `get_board` uses progressive guidance: an empty board returns `FIRST_USE` / `NEXT_STEPS` and the drawing guide; a board with objects returns a concise `NEXT`. It always retains `BOARD_JSON`, `PANEL_URL`, the structured snapshot, and version 1 board state.
 - The canvas exposes a dismissible `?` help popover with three human gestures. It is UI state in browser localStorage, never board state or permission.
+- In MCP Apps hosts that advertise `updateModelContext`, the embedded canvas publishes the current final board snapshot and a delta from the last published snapshot. This is final state, not an operation log, and it does not trigger a model turn. A `通知 Agent` button appears only when `sendMessage` is also supported; it sends one short user message in the host's existing conversation. Neither path creates a Doodle chat, session, or message feed. `get_board` remains authoritative; a standalone `PANEL_URL` page has no bridge to the current host session.
 
 Shared visual context is anchored to objects, coordinates, text, and authors. `scan_project` may provide bounded read-only project context; it does not draw, change the board, write files, or authorize code changes. `get_board` also reports `PANEL_URL`, the active local human-facing address; mention it when a person asks where to look or when the host cannot render an embedded canvas.
 
@@ -56,6 +57,7 @@ src/
 │   ├── http.ts                 local board API, HTML, and WebSocket updates
 │   ├── tools.ts                four MCP tools and optional MCP App resource
 │   ├── app.ts                  MCP Apps bridge for the embedded canvas
+│   ├── app-context.ts          final-state board delta and model context projection
 │   ├── instructions.ts         MCP initialization instructions
 │   └── index.ts                board module entrypoint
 ├── infra/
@@ -89,6 +91,7 @@ docs/                           product, architecture, decisions, and maintenanc
 - `scan_project` returns workspace-relative paths and short evidence only; it skips dot-private paths, `.env`-like files, generated directories, large text, and common credential lines, with at most 40 evidence lines total.
 - Board mutations are serialized across processes with a filesystem lock and atomic rename; stale snapshot replacement is rejected.
 - Board objects are visual context. The embedded UI calls only the normal canvas read/write tools; it never becomes project-write authority. Code changes remain a separate, explicitly reviewed coding-agent action.
+- The embedded canvas calls `updateModelContext` only after host capability detection and `app.connect()`. Each update overwrites the prior context and includes the complete current structured snapshot plus `added` / `updated` / `removed` final-state differences. Automatic updates never call `sendMessage`; the button alone sends the short notification. Failures are logged in the app and never break canvas editing.
 - The plugin package uses one Codex-compatible `.codex-plugin/plugin.json` and `.mcp.json` layout; portable Agent Plugins manifests are not mixed into the same package.
 - `OUTPUT_DIR` is the explicit board state directory. Without it, plugin data is preferred; direct MCP launches may use workspace-local `.doodle-data`. `DOODLE_WORKSPACE_ROOT` still controls bounded `scan_project` context.
 - `scripts/build-plugin.mjs` bundles the same source into `.doodle-plugin/doodle/server/index.mjs` with its board template, MCP App bundle, and package-version constant. Generated `.doodle-plugin/` output is never committed.

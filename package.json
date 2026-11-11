@@ -1,6 +1,6 @@
 {
   "name": "doodle-mcp",
-  "version": "0.6.3",
+  "version": "0.7.0",
   "description": "A shared canvas for people and AI to draw together through MCP.",
   "type": "module",
   "bin": {

@@ -24,6 +24,7 @@ const skill = await read("plugins/doodle/skills/doodle/SKILL.md");
 const buildScript = await read("scripts/build-plugin.mjs");
 const pluginCheckScript = await read("scripts/plugin-check.mjs");
 const boardTemplate = await read(".doodle-plugin/doodle/server/infra/templates/board.html");
+const appBundle = await read(".doodle-plugin/doodle/server/infra/templates/board-app.js");
 const httpSource = await read("src/board/http.ts");
 const toolsSource = await read("src/board/tools.ts");
 const configSource = await read("src/infra/config.ts");
@@ -39,7 +40,7 @@ const terms = await read("TERMS.md");
 const submission = await read("docs/SUBMISSION.md");
 const submissionScript = await read("scripts/build-submission.mjs");
 
-check(packageJson.version === "0.6.3" && manifest.version === packageJson.version, "plugin version does not match package.json 0.6.3");
+check(packageJson.version === "0.7.0" && manifest.version === packageJson.version, "plugin version does not match package.json 0.7.0");
 check(packageJson.scripts.build.includes("build-plugin.mjs"), "npm build does not produce the plugin package");
 check(packageJson.scripts.check.includes("repo:plugin-check"), "npm check does not run the plugin guard");
 check(manifest.name === "doodle", "plugin identity is not doodle");
@@ -81,6 +82,7 @@ check(toolsSource.includes("CANVAS_UI_META") && toolsSource.includes("_meta: CAN
 check(toolsSource.includes("FIRST_USE") && toolsSource.includes("NEXT_STEPS") && toolsSource.includes('"NEXT:"'), "bundled get_board path lacks progressive first-use guidance");
 check(toolsSource.includes("PANEL_URL") && instructions.includes("PANEL_URL"), "active local panel URL is not exposed to the agent");
 check(!instructions.includes("reply_on_board"), "MCP instructions reference the removed reply tool");
+check(instructions.includes("updateModelContext") && instructions.includes("sendMessage"), "MCP instructions do not describe host context and notification boundaries");
 check(configSource.includes("previewPort: rawPort ? parsePort(rawPort) : null") && configSource.includes("PLUGIN_DATA"), "runtime config is not plugin-safe");
 check(versionSource.includes("__DOODLE_PLUGIN_VERSION__"), "bundled server cannot report the injected version");
 check(indexSource.indexOf("await mcp.connect(transport);") < indexSource.indexOf("await preview.start();"), "MCP stdio is not connected before optional preview startup");
@@ -107,6 +109,9 @@ check(boardTemplate.includes('selectTool("select");\n      if (newest)'), "bundl
 check(boardTemplate.includes('tool !== "select" && !itemElement'), "bundled board template creates objects when clicking an existing item");
 check(boardTemplate.includes("window.doodleBoardSocket") && boardTemplate.includes('socket.addEventListener("open"'), "bundled board template lacks singleton live updates");
 check(boardTemplate.includes('id="btnEdit"') && boardTemplate.includes('function editSelected()'), "bundled board template lacks the explicit text-edit entry point");
+check(boardTemplate.includes('id="btnNotifyAgent"') && boardTemplate.includes("notifyAgent()"), "bundled board template lacks the host notification button");
+check(appBundle.includes("updateModelContext") && appBundle.includes("sendMessage"), "bundled MCP App bridge lacks host context and notification support");
+check(appBundle.includes("doodle_board_context") && appBundle.includes("finalStateNotOperationLog"), "bundled MCP App context is not a final-state delta");
 
 const generatedFiles = [
   ".doodle-plugin/doodle/.codex-plugin/plugin.json",

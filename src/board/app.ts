@@ -1,20 +1,22 @@
 import { App } from "@modelcontextprotocol/ext-apps";
+import { buildBoardModelContext, type BoardContextSnapshot } from "./app-context.js";
 
-type BoardSnapshot = {
-  revision: number;
-  items: Array<Record<string, unknown> & { id: string }>;
-};
+type BoardSnapshot = BoardContextSnapshot;
+
+interface DoodleBoardAdapter {
+  getBoard: () => Promise<BoardSnapshot>;
+  drawBoard: (args: Record<string, unknown>) => Promise<BoardSnapshot>;
+  readonly revision: number;
+  readonly canFullscreen: boolean;
+  readonly canNotifyAgent: boolean;
+  requestFullscreen: () => Promise<unknown>;
+  notifyAgent: () => Promise<void>;
+}
 
 declare global {
   interface Window {
     DoodleBoardUpdate?: (snapshot: BoardSnapshot) => void;
-    DoodleBoardInit?: (adapter: {
-      getBoard: () => Promise<BoardSnapshot>;
-      drawBoard: (args: Record<string, unknown>) => Promise<BoardSnapshot>;
-      readonly revision: number;
-      readonly canFullscreen: boolean;
-      requestFullscreen: () => Promise<unknown>;
-    }) => void;
+    DoodleBoardInit?: (adapter: DoodleBoardAdapter) => void;
   }
 }
 
@@ -23,27 +25,64 @@ const app = new App(
   { availableDisplayModes: ["inline", "fullscreen"] },
 );
 let snapshot: BoardSnapshot | null = null;
+let publishedSnapshot: BoardSnapshot | null = null;
+let contextUpdate: Promise<void> | null = null;
+const hostCapabilities = { updateText: false, updateStructured: false, notify: false };
 
 function readSnapshot(result: { structuredContent?: unknown }): BoardSnapshot {
   const data = result.structuredContent as BoardSnapshot | undefined;
-  if (!data || !Array.isArray(data.items) || typeof data.revision !== "number") {
+  if (!data || !Array.isArray(data.items) || typeof data.revision !== "number" || typeof data.title !== "string") {
     throw new Error("The Doodle server returned an invalid board snapshot");
   }
   if (snapshot && data.revision <= snapshot.revision) return snapshot;
   snapshot = data;
   window.DoodleBoardUpdate?.(data);
+  void publishBoardContext(data);
   return data;
+}
+
+async function publishBoardContext(current: BoardSnapshot): Promise<void> {
+  if (!hostCapabilities.updateText) return;
+  if (publishedSnapshot?.revision === current.revision) {
+    if (contextUpdate) await contextUpdate;
+    return;
+  }
+  const previous = publishedSnapshot;
+  const request = buildBoardModelContext(current, previous, {
+    includeStructuredContent: hostCapabilities.updateStructured,
+  });
+  const params = {
+    content: request.content,
+    ...(hostCapabilities.updateStructured ? { structuredContent: request.structuredContent } : {}),
+  };
+  const pending = app.updateModelContext(params).then(() => {
+    publishedSnapshot = current;
+  }).catch((error) => {
+    console.debug("Doodle board context update skipped", error);
+    throw error;
+  });
+  contextUpdate = pending;
+  try {
+    await pending;
+  } finally {
+    if (contextUpdate === pending) contextUpdate = null;
+  }
 }
 
 app.ontoolresult = (result) => {
   if (result.isError) return;
   const structured = result.structuredContent as Record<string, unknown> | undefined;
-  if (structured && Array.isArray(structured.items) && typeof structured.revision === "number") {
+  if (structured && Array.isArray(structured.items) && typeof structured.revision === "number" && typeof structured.title === "string") {
     try { readSnapshot(result); } catch (error) { console.error(error); }
   }
 };
 
 await app.connect();
+const capabilities = app.getHostCapabilities();
+hostCapabilities.updateText = Boolean(capabilities?.updateModelContext?.text);
+hostCapabilities.updateStructured = Boolean(capabilities?.updateModelContext?.structuredContent);
+hostCapabilities.notify = Boolean(capabilities?.message?.text);
+if (snapshot) void publishBoardContext(snapshot).catch(() => {});
 
 const refreshTimer = window.setInterval(async () => {
   if (document.visibilityState === "hidden") return;
@@ -92,5 +131,24 @@ window.DoodleBoardInit?.({
   },
   requestFullscreen() {
     return app.requestDisplayMode({ mode: "fullscreen" });
+  },
+  get canNotifyAgent() {
+    return hostCapabilities.updateText && hostCapabilities.notify;
+  },
+  async notifyAgent() {
+    if (!hostCapabilities.updateText || !hostCapabilities.notify) {
+      throw new Error("当前宿主不支持通知 Agent");
+    }
+    const current = snapshot ?? readSnapshot(await app.callServerTool({ name: "get_board", arguments: {} }));
+    if (publishedSnapshot?.revision !== current.revision) {
+      await publishBoardContext(current);
+    } else if (contextUpdate) {
+      await contextUpdate;
+    }
+    const result = await app.sendMessage({
+      role: "user",
+      content: [{ type: "text", text: "我改了 Doodle 画板，你看下图。" }],
+    });
+    if (result.isError) throw new Error("宿主拒绝了通知消息");
   },
 });

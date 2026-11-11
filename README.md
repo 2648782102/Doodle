@@ -4,7 +4,7 @@
 
 Doodle 不是项目工作台、静态图生成器、聊天产品或批准系统。它提供一张共享画布，AI 通过 MCP stdio 在 Agent 内自然地读写；Codex 用户可以从本仓库的 plugin marketplace 安装桌面插件。支持 MCP Apps 的宿主可把同一张画布作为可选增强显示在对话旁；日常对话仍留在 Agent 自己的聊天里。项目结构可以画，但不是产品主体。
 
-用户要求看画布时，`show_board` 会在支持 MCP Apps 的宿主对话旁呈现可交互画布；AI 成功调用 `draw_board` 后，兼容宿主也会从结果自动呈现或刷新画布，让用户直接看到刚画的内容。宿主不渲染 App 时，`get_board` 返回的 `PANEL_URL` 指向本地画布；普通 MCP 工具不会主动打开系统浏览器。选工具后点按快速放置或拖拽定尺寸，Space / 中键拖动画布，滚轮平移、Ctrl/⌘+滚轮缩放，双击改字。AI 用 `get_board` 读取画布、用 `draw_board` 画便签 / 形状 / 有方向箭头；回复和讨论留在 Agent 对话。MCP Apps UI 通过 Agent 宿主调用同一组工具，不依赖独立聊天服务。
+用户要求看画布时，`show_board` 会在支持 MCP Apps 的宿主对话旁呈现可交互画布；AI 成功调用 `draw_board` 后，兼容宿主也会从结果自动呈现或刷新画布，让用户直接看到刚画的内容。支持 `updateModelContext` 的宿主会在每次画布 revision 前进时，自动把「当前最终快照 + 相对上次同步的最终状态差量」挂到**当前会话**的模型上下文；它不是操作记录，也不会自动触发一轮对话。支持 `sendMessage` 的宿主还会显示「通知 Agent」按钮，点击只发一句「我改了 Doodle 画板，你看下图。」到宿主现有聊天，不新增 Doodle 会话或聊天窗口。宿主不渲染 App 时，`get_board` 返回的 `PANEL_URL` 指向本地画布，改完后请让 AI 调用 `get_board` 再读；普通 MCP 工具不会主动打开系统浏览器。选工具后点按快速放置或拖拽定尺寸，Space / 中键拖动画布，滚轮平移、Ctrl/⌘+滚轮缩放，双击改字。AI 用 `get_board` 读取画布、用 `draw_board` 画便签 / 形状 / 有方向箭头；回复和讨论留在 Agent 对话。MCP Apps UI 通过 Agent 宿主调用同一组工具，不依赖独立聊天服务。
 
 产品定义见 [docs/PRODUCT_DIRECTION.md](docs/PRODUCT_DIRECTION.md)，plugin 目标见 [docs/GOAL_PLUGIN.md](docs/GOAL_PLUGIN.md)，架构见 [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md)，AI 操作手册见 [AGENTS.md](AGENTS.md)。
 
@@ -24,9 +24,9 @@ npm run setup:codex
 打开 Doodle 画板，放一张便签，我来改给你看。
 ```
 
-兼容 MCP Apps 的宿主会直接显示画布；AI 会先读画板，再放一个起步对象。你可以选工具点按 / 拖拽、双击或选中后按 `Enter` / 点「编辑」改字，画板右上角的 `?` 或键盘 `?` 可随时查看提示。改完后在聊天里说「读一下画板」，AI 用 `get_board` 读取你的修改。若宿主不显示嵌入画布，就问 AI 要 `PANEL_URL`，再打开这个本地地址；正常 MCP 调用不会擅自打开浏览器。
+兼容 MCP Apps 的宿主会直接显示画布；AI 会先读画板，再放一个起步对象。你可以选工具点按 / 拖拽、双击或选中后按 `Enter` / 点「编辑」改字，画板右上角的 `?` 或键盘 `?` 可随时查看提示。支持宿主上下文能力的嵌入画布会自动同步最终状态；改完后点「通知 Agent」发一句短提醒，或在聊天里说「读一下画板」让 AI 用 `get_board` 复核。若宿主不显示嵌入画布或不具备这些能力，就问 AI 要 `PANEL_URL`，打开本地地址并在聊天里让 AI 重读；正常 MCP 调用不会擅自打开浏览器。
 
-完整链路：`npm run setup:codex → 新会话 → 首句提示 → 看 / 改同一张画布 → AI 再读`。
+完整链路：`npm run setup:codex → 新会话 → 首句提示 → 看 / 改同一张画布 → 最终状态同步 / 通知 Agent → AI 再读`。
 
 **任意 MCP 宿主**：把 [examples/mcp-config/](examples/mcp-config/) 的 `npx -y doodle-mcp` 片段加入宿主配置，重启 MCP 会话后使用同一句提示；画布仍通过 `show_board` / `draw_board` 自动呈现，宿主不渲染时询问 `PANEL_URL`。这条路径不需要 clone 仓库，也不等于公共插件目录发布。
 
@@ -42,7 +42,7 @@ npm run setup:codex
 默认闭环：
 
 ```text
-Agent 对话 ↔ 共享画布：get_board → draw_board → 人继续画 → AI 再读
+Agent 对话 ↔ 共享画布：get_board → draw_board → 人继续画 → 最终状态差量进入当前会话上下文 → 通知 Agent / AI 再读
 ```
 
 `show_board` 只是在兼容宿主里显示这张画布的可选工具；`scan_project` 只是「项目结构」这个主题的能力之一。AI 决定是否需要它们，并用 `draw_board` 把结果画到同一张画布；它们不创建图库、不改会话、不授权代码变更。
@@ -57,7 +57,7 @@ Agent 对话 ↔ 共享画布：get_board → draw_board → 人继续画 → AI
 npm run setup:codex
 ```
 
-`scripts/setup-codex.mjs` 只会在你主动运行时调用 Codex CLI：`npm install`（首次）、`npm run build`、`codex plugin marketplace add . --json`、`codex plugin add doodle@doodle --json`。重复运行是安全的；可用 `npm run setup:codex -- --dry-run` 预览命令。官方 OpenAI 文档说明本地 marketplace 与[公共插件目录](https://developers.openai.com/plugins/build/plugins)是不同路径，安装后应[开启新会话](https://learn.chatgpt.com/docs/plugins)再使用插件的 MCP 工具和 skill。插件包由 `scripts/build-plugin.mjs` 生成到忽略的 `.doodle-plugin/doodle/`，使用同一个自包含 stdio MCP server，不依赖仓库里的 `dist/` 或绝对路径。`npm run build:submission` 会生成忽略的 `doodle-plugin-submission/doodle-0.6.3.zip` 供提交审核；本仓库提供本地 / repo marketplace 安装路径，公共插件目录发布仍需要 OpenAI 侧资格、身份验证和审核。材料清单见 [docs/SUBMISSION.md](docs/SUBMISSION.md)。
+`scripts/setup-codex.mjs` 只会在你主动运行时调用 Codex CLI：`npm install`（首次）、`npm run build`、`codex plugin marketplace add . --json`、`codex plugin add doodle@doodle --json`。重复运行是安全的；可用 `npm run setup:codex -- --dry-run` 预览命令。官方 OpenAI 文档说明本地 marketplace 与[公共插件目录](https://developers.openai.com/plugins/build/plugins)是不同路径，安装后应[开启新会话](https://learn.chatgpt.com/docs/plugins)再使用插件的 MCP 工具和 skill。插件包由 `scripts/build-plugin.mjs` 生成到忽略的 `.doodle-plugin/doodle/`，使用同一个自包含 stdio MCP server，不依赖仓库里的 `dist/` 或绝对路径。`npm run build:submission` 会生成忽略的 `doodle-plugin-submission/doodle-0.7.0.zip` 供提交审核；本仓库提供本地 / repo marketplace 安装路径，公共插件目录发布仍需要 OpenAI 侧资格、身份验证和审核。材料清单见 [docs/SUBMISSION.md](docs/SUBMISSION.md)。
 
 ### 直接 MCP stdio
 
@@ -100,6 +100,7 @@ npm run doctor
 - 非 GET `/api/board/*` 需要页面随机 `X-AI-Draw-Token`、`confirmedBy: "human"` 和匹配的画板 revision。
 - `scan_project` 跳过常见生成目录、dot-private 文件、`.env`-like 文件和大文件，过滤常见凭据行，证据总数最多 40 条；只返回工作区相对路径与短证据。
 - 画布对象只是视觉上下文，不签发凭据，不写项目文件。嵌入 UI 通过 MCP Apps 宿主桥调用正常画布工具。
+- 支持上下文能力的嵌入 UI 还会把当前画板最终状态挂到宿主当前会话的模型上下文；这只是本地视觉上下文，不是操作日志、聊天记录或项目写入授权。独立 `PANEL_URL` 页面没有宿主会话桥，也不会伪装成已同步。
 
 ## 开发
 
@@ -125,7 +126,7 @@ npm run doctor
 | [体验审计](docs/EXPERIENCE_AUDIT.md) | 双身份实测、问题优先级与闭环状态 |
 | [Plugin 目标](docs/GOAL_PLUGIN.md) | Codex plugin 的目标、范围与验收 |
 | [架构](docs/ARCHITECTURE.md) | 源码结构、协议、HTTP 与安全模型 |
-| [当前决策](docs/DECISIONS.md) | 0.6.3 体验链路与历史 ADR 状态 |
+| [当前决策](docs/DECISIONS.md) | 0.7.0 会话上下文同步与历史 ADR 状态 |
 | [文档地图](docs/README.md) | 全部文档入口 |
 | [故障排查](docs/TROUBLESHOOTING.md) | 首用自检与常见问题 |
 | [贡献指南](CONTRIBUTING.md) | 本地验证与 PR 规范 |

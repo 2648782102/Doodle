@@ -1,6 +1,6 @@
-# Experience Audit — 2026-11-11
+# Experience Audit — 2026-11-12
 
-This is a maintained, task-scoped audit of the complete Doodle experience chain: install the plugin, open a new agent session, let the AI read and draw, let a person edit the same canvas, and let the AI read it again. It is based on a live local session where the assistant acted as both the MCP-side AI and the browser-side human. The board was started with a temporary `OUTPUT_DIR` and `PANEL_URL=http://127.0.0.1:3411/`; no private board state was written to the repository.
+This is a maintained, task-scoped audit of the complete Doodle experience chain: install the plugin, open a new agent session, let the AI read and draw, let a person edit the same canvas, let the final state reach the current host conversation, and let the AI read it again. It is based on a live local session where the assistant acted as both the MCP-side AI and the browser-side human. The board was started with a temporary `OUTPUT_DIR` and `PANEL_URL=http://127.0.0.1:3411/`; no private board state was written to the repository.
 
 ## Product direction
 
@@ -9,7 +9,8 @@ Doodle remains one simple shared infinite board for people and AI. It is not a c
 ```text
 one-command install → new agent session → one first prompt
   → AI reads shared board → canvas visible → AI draws
-  → person sees and edits → AI rereads → person sees the AI response
+  → person sees and edits → final-state context sync / short notification
+  → AI rereads → person sees the AI response
 ```
 
 Any fix below must reduce friction in that loop without adding a fifth MCP tool, a second state model, a chat surface, a browser-opening side effect, or project-write authority.
@@ -40,6 +41,8 @@ Observed friction, ordered by user harm:
 | E10 | P2 | fixed | The one-command install is still checkout-centric. | README and English README present `npm run setup:codex` and zero-configuration `npx -y doodle-mcp` side by side; isolated `CODEX_HOME` smoke installed `doodle@doodle 0.6.3` without touching the active user config. | Document one first-class npm direct-MCP path and one plugin path in the 30-second start; do not claim public directory availability. |
 | E11 | P2 | external | Agent-internal use still depends on host support. | `show_board` and post-draw `_meta` are guarded in `scripts/plugin-check.mjs`; README, FAQ, product direction, and architecture explain that MCP Apps hosts render the canvas and text-only hosts use `PANEL_URL` as fallback. | `show_board` and post-draw `_meta` remain the agent-first render path; standalone is explicitly fallback. A guide explains what to do when the host does not render MCP Apps. |
 | E12 | P1 | fixed | The documented `npx -y doodle-mcp` path initially resolved to npm `0.6.0`, so a new user did not receive the `0.6.3` experience fixes. | The staged `doodle-mcp@0.6.3` was approved after maintainer security-key confirmation, `npm view doodle-mcp version` now returns `0.6.3`, the staged queue is empty, and a clean `npm exec --yes doodle-mcp` startup exposed exactly four tools with `FIRST_USE`, `BOARD_JSON`, and a loopback `PANEL_URL`. | Publish `doodle-mcp@0.6.3` through an authenticated npm token or one explicit maintainer OTP/web confirmation, then verify `npm view doodle-mcp@0.6.3 version` and one `npx -y doodle-mcp` startup. |
+| E13 | P0 | fixed | A human edit on the embedded canvas was not automatically available to the current host conversation's model; the 4-second `get_board` refresh updated only the App UI. | `0.7.0` detects `updateModelContext` after `app.connect()` and publishes a final-state delta plus the complete current structured snapshot whenever a new revision is observed. `test/app-context.test.mjs`, repository guards, and plugin bundle guards cover additions, final-value updates, removals, and bounded text; automatic updates never call `sendMessage`. | In compatible hosts, the next model turn can read the latest final board state and final-object differences without a separate chat or operation log; `get_board` remains authoritative. |
+| E14 | P1 | fixed | Users had no one-click way to tell the current conversation that a visual edit was ready to inspect. | A `通知 Agent` button appears only when both `updateModelContext` and `sendMessage` are advertised. It ensures the latest context is published, then sends one short user message into the existing host chat: 「我改了 Doodle 画板，你看下图。」 The standalone fallback hides the button and does not claim a session bridge. | One click produces one short host-chat notification, no Doodle chat window, no automatic model response, and no false success on unsupported hosts. |
 
 ## Execution plan
 
@@ -49,6 +52,7 @@ Observed friction, ordered by user harm:
 4. Fix P2 feedback and visual clutter without adding product surface.
 5. Re-run the same AI/human loop from a clean temporary board, update each row's status, then run `npm run check`, isolated plugin install smoke, direct-MCP smoke, and `git diff --check`.
 6. Commit and push only after the audit rows are either closed or explicitly marked as an external limitation.
+7. Recheck E13/E14 in an actual MCP Apps host that advertises `updateModelContext` and `sendMessage`; local guards can verify the bundle but not a host's context delivery policy.
 
 ## Closure log
 
@@ -61,6 +65,7 @@ Observed friction, ordered by user harm:
 - 2026-11-11: The final documentation-only closure passed `npm run check` again: TypeScript, build, 31 tests, examples, repository/plugin guards, setup dry-run, submission ZIP, doctor, and npm package dry-run; `git diff --check` also passed.
 - E11 is external because MCP Apps rendering is a host capability. It is closed as a documented fallback rather than a code change; the product does not add a fifth tool, browser-opening side effect, or second canvas session.
 - E12 is closed after maintainer proof of presence. No npm credential, one-time password, or auth URL is recorded in this repository; both `npm run setup:codex` and `npx -y doodle-mcp` now resolve to the current source version.
+- 2026-11-12: E13/E14 are closed at the product-code boundary by the `0.7.0` final-state context bridge, pure diff tests, capability checks, and bundled App guards. Host-side deferral of `updateModelContext` and user-message delivery remain external behavior of each MCP Apps host; the standalone `PANEL_URL` path is explicitly documented as requiring `get_board`.
 
 ## Boundaries
 

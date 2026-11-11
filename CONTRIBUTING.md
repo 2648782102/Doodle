@@ -24,7 +24,7 @@ npm run check
 
 ## Protocol and safety changes
 
-A change to an MCP tool schema, the version 1 board state, the HTTP API, project scanning, or a security boundary must update all of these together:
+A change to an MCP tool schema, the version 1 board state, the HTTP API, project scanning, the embedded host context bridge, or a security boundary must update all of these together:
 
 - `AGENTS.md`, `README.md`, and `README.en.md`
 - `docs/PRODUCT_DIRECTION.md`, `docs/GOAL_PLUGIN.md`, `docs/ARCHITECTURE.md`, and `docs/DECISIONS.md`

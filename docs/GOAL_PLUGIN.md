@@ -21,7 +21,7 @@ The plugin is a distribution layer around this product. It must not turn Doodle 
 - Add one Codex-compatible `.codex-plugin/plugin.json` and `.mcp.json` layout with a `${PLUGIN_ROOT}` server entrypoint, a concise agent skill, presentation metadata, and simple local-only assets.
 - Add a repository-scoped marketplace at `.agents/plugins/marketplace.json` that points at the generated `.doodle-plugin/doodle` package.
 - Add `npm run setup:codex` as the recommended install path. It installs dependencies when needed, builds the plugin, adds the local marketplace, installs the plugin, and prints one first-use prompt. Official OpenAI documentation treats local marketplaces as separate from the public directory and recommends a new session after installation.
-- Build a self-contained `server/index.mjs` with the same four tools, the shared `board.html`, the MCP App `board-app.js`, and an injected package version.
+- Build a self-contained `server/index.mjs` with the same four tools, the shared `board.html`, the MCP App `board-app.js` with optional final-state host context sync, and an injected package version.
 - Keep the direct npm CLI and direct MCP host examples as supported development paths.
 - Connect MCP stdio before the optional local HTTP preview; a preview failure must not disable MCP.
 - Use a free loopback port when `PREVIEW_PORT` is unset and report the active `PANEL_URL` through `get_board`, without opening a browser.
@@ -67,11 +67,12 @@ The plugin is a distribution layer around this product. It must not turn Doodle 
 5. `get_board` returns progressive guidance, `BOARD_JSON`, and the active loopback `PANEL_URL`; it does not open a browser.
 6. The plugin uses isolated writable board state and a free loopback port by default; explicit `OUTPUT_DIR` and `PREVIEW_PORT` continue to override defaults.
 7. `show_board` remains the explicit render tool, and successful `draw_board` results also advertise the optional MCP App so compatible hosts show completed AI drawings; all tools remain usable in text-only hosts.
-8. `scan_project` stays bounded, read-only, workspace-relative, and secret-conservative.
-9. `npm run check` passes, including lint, build, tests, example syntax, offline guards, plugin guard, doctor, and package dry-run.
-10. CI runs the same plugin guard and a dry-run setup guard, builds the versioned submission ZIP, and the publish workflow creates a Release only when the current version is missing; the guard rejects conflicting portable manifests, missing policy URLs, missing tool annotations, and uncommitted generated artifacts.
-11. `git status` contains only intended tracked changes; no generated runtime, submission ZIP, or private board state is staged.
-12. Final audit lists changed files, validation evidence, known limitations, public-directory eligibility gates, and any manual desktop-app reload required for the current session.
+8. MCP Apps hosts with `updateModelContext` receive the current final board state and final-state delta in the current session's model context; `sendMessage` is reserved for one user-initiated short notification. The standalone fallback does not claim a host-session bridge.
+9. `scan_project` stays bounded, read-only, workspace-relative, and secret-conservative.
+10. `npm run check` passes, including lint, build, tests, example syntax, offline guards, plugin guard, doctor, and package dry-run. Tests cover final-state deltas and the context/notification bundle.
+11. CI runs the same plugin guard and a dry-run setup guard, builds the versioned submission ZIP, and the publish workflow creates a Release only when the current version is missing; the guard rejects conflicting portable manifests, missing policy URLs, missing tool annotations, and uncommitted generated artifacts.
+12. `git status` contains only intended tracked changes; no generated runtime, submission ZIP, or private board state is staged.
+13. Final audit lists changed files, validation evidence, known limitations, public-directory eligibility gates, and any manual desktop-app reload required for the current session.
 
 ## Evidence
 

@@ -17,6 +17,7 @@ try {
   console.log(board.content.map((item) => item.text ?? "").join("\n").slice(0, 400));
   const view = await client.callTool({ name: "show_board", arguments: {} });
   console.log(view.content.map((item) => item.text ?? "").join("\n"));
+  console.log("Embedded hosts may publish final-state board context to the current session; standalone PANEL_URL edits require get_board rereading.");
   const drawn = await client.callTool({
     name: "draw_board",
     arguments: {

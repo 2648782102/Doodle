@@ -27,4 +27,4 @@ Start with [`../README.md`](../README.md) for installation and the product overv
 | [`../CHANGELOG.md`](../CHANGELOG.md) | Users | Versioned release notes |
 | [`../examples/README.md`](../examples/README.md) | New users | MCP config snippets and a minimal client |
 
-Run `npm run check` before publishing. Documentation is versioned with the source; a change to the MCP tool surface, board protocol, plugin packaging, or security boundary must update the architecture, agent handbook, plugin goal, tests, CI, and offline guards together.
+Run `npm run check` before publishing. Documentation is versioned with the source; a change to the MCP tool surface, board protocol, plugin packaging, embedded host context bridge, or security boundary must update the architecture, agent handbook, plugin goal, tests, CI, and offline guards together.

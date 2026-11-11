@@ -19,7 +19,7 @@ Most visual tools for agents are either static diagram generators or full dashbo
 ## Release notes starter
 
 ```text
-0.6.3 shortens the complete product experience to one install command, one first prompt, one shared canvas, and one reread loop. It adds `npm run setup:codex`, zero-configuration direct MCP snippets, progressive `get_board` guidance, and a dismissible canvas help popover. The desktop-only plugin, automatic post-draw canvas presentation, four tools, bounded read-only project scan, version 1 board state, and local-only safety boundary are unchanged. Public directory approval remains a separate approved-partner process.
+0.7.0 keeps one install command, one first prompt, and one shared canvas while making the loop feel native inside an agent: compatible MCP Apps hosts receive the latest final board state and final-state delta in the current conversation's model context, and a `通知 Agent` button sends one short reminder. The four tools, bounded read-only project scan, version 1 board state, local-only safety boundary, and `get_board` fallback are unchanged. Public directory approval remains a separate approved-partner process.
 ```
 
 Do not claim hosted collaboration, approval workflows, static diagram export, or automatic code changes.

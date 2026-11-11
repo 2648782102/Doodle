@@ -8,13 +8,17 @@ No. The repository provides a local/repo marketplace for desktop installation. P
 
 No hosted upload is part of the product. Board state stays on the local machine. `get_board` and `scan_project` return their results to the connected agent host as part of the active MCP conversation; they do not call a Doodle backend. See [PRIVACY.md](../PRIVACY.md).
 
+## How does the AI learn about my canvas edits?
+
+In an MCP Apps host that supports `updateModelContext`, the embedded canvas publishes the newest final board state and a final-state delta to the current host conversation's model context automatically; it is not an action log and does not start a new model turn. Click `通知 Agent` where available to send one short reminder in the existing host chat, or ask the AI to call `get_board`. On a standalone `PANEL_URL` page or a host without these capabilities, nothing is silently attached to the agent session: ask the AI to reread the board.
+
 ## Why is `show_board` separate from `get_board`?
 
 `get_board` is the data tool for every MCP host and now also leads with `FIRST_USE` / `NEXT_STEPS`. `show_board` is an optional render tool for hosts that support MCP Apps. Text-only hosts retain the complete four-tool workflow and can use the `PANEL_URL` reported by `get_board` as a human-facing local fallback.
 
 ## What do I say after installing?
 
-Start a new Codex session and say 「打开 Doodle 画板，放一张便签，我来改给你看。」 The AI reads the board, shows it where supported, draws one starter note, and you edit the same canvas. Double-click a shape, or select it and press `Enter` / click `Edit`, then ask the AI to read the board again. Use the `?` button for short gestures.
+Start a new Codex session and say 「打开 Doodle 画板，放一张便签，我来改给你看。」 The AI reads the board, shows it where supported, draws one starter note, and you edit the same canvas. Double-click a shape, or select it and press `Enter` / click `Edit`. In supported embedded hosts the final board state syncs to the current session; click `通知 Agent` or ask the AI to read the board again. Use the `?` button for short gestures.
 
 ## Does a drawing change my source code?
 

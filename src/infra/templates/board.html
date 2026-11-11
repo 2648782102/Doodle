@@ -88,6 +88,12 @@
     }
     .tool:hover { background: #f1f3f6; }
     .tool[aria-pressed="true"] { background: var(--accent-soft); color: var(--accent); }
+    .tool.notify {
+      background: var(--accent-soft);
+      color: var(--accent);
+      font-weight: 600;
+    }
+    .tool.notify:hover { background: #dce8ff; }
     .tool-hint { padding: 0 8px; align-self: center; color: var(--muted); font-size: 11px; white-space: nowrap; }
     .tool.danger:hover { background: #fff1f1; color: #b91c1c; }
     .help-button {
@@ -233,6 +239,7 @@
         <button class="tool" data-tool="ellipse" aria-pressed="false" title="椭圆 (E)">椭圆</button>
         <button class="tool" data-tool="line" aria-pressed="false" title="箭头 (L)">箭头</button>
         <button class="tool" id="btnExpand" hidden title="在 Agent 中展开画布">展开</button>
+        <button class="tool notify" id="btnNotifyAgent" hidden title="把当前画板状态同步给当前会话的 Agent">通知 Agent</button>
         <button class="tool" id="btnEdit" title="编辑选中对象文字 (Enter)">编辑</button>
         <button class="tool danger" id="btnDelete" title="删除选中对象 (Delete)">删除</button>
         <span class="tool-hint" aria-hidden="true">点按放置 · 拖拽定形 · Space 平移</span>
@@ -243,6 +250,7 @@
         <strong>和 AI 共用这张画布</strong>
         <ul>
           <li>在 Agent 聊天里让 AI 画；改完后说「读一下画板」。</li>
+          <li>嵌入画布会自动同步最终状态；点「通知 Agent」发一句短提醒。</li>
           <li>选工具后点按放置或拖拽定形，双击对象改字。</li>
           <li>选中对象后按 Enter，或点「编辑」，也能改字。</li>
           <li>Space / 中键拖动平移，滚轮平移，Ctrl/⌘ + 滚轮缩放。</li>
@@ -273,6 +281,7 @@
     const helpButton = document.querySelector("#btnHelp");
     const helpPopover = document.querySelector("#helpPopover");
     const helpCloseButton = document.querySelector("#btnHelpClose");
+    const notifyButton = document.querySelector("#btnNotifyAgent");
     const toolButtons = [...document.querySelectorAll(".tool[data-tool]")];
     const headers = { "Content-Type": "application/json", "X-AI-Draw-Token": PANEL_TOKEN };
     const boardEndpoints = {
@@ -1076,10 +1085,19 @@
       mcpApp = adapter;
       document.body.dataset.mcpApp = "true";
       document.querySelector("#btnExpand").hidden = !adapter.canFullscreen;
+      notifyButton.hidden = !adapter.canNotifyAgent;
       startBoard().catch((error) => setStatus(`连接失败：${error.message}`));
     };
     document.querySelector("#btnExpand").addEventListener("click", () => {
       mcpApp?.requestFullscreen().catch((error) => showToast(error.message));
+    });
+    notifyButton.addEventListener("click", () => {
+      if (!mcpApp?.canNotifyAgent) { showToast("当前宿主不支持通知 Agent"); return; }
+      notifyButton.disabled = true;
+      mcpApp.notifyAgent()
+        .then(() => showToast("已通知 Agent 看画板"))
+        .catch((error) => showToast(error.message || "通知失败"))
+        .finally(() => { notifyButton.disabled = false; });
     });
     window.DoodleBoardUpdate = (snapshot) => {
       if (!snapshot || snapshot.revision < board.revision) return;

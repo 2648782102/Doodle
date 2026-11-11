@@ -56,7 +56,7 @@ describe("post-cleanup repository shape", () => {
       expect(current.some((name) => pattern.test(name)), `unexpected legacy path matching ${pattern}`).toBe(false);
     }
     expect(extensions).toBe(false);
-    expect(source.filter((name) => name.endsWith(".ts"))).toHaveLength(17);
+    expect(source.filter((name) => name.endsWith(".ts"))).toHaveLength(18);
     expect(scripts.filter((name) => name.endsWith(".mjs")).sort()).toEqual([
       "scripts/build-plugin.mjs",
       "scripts/build-submission.mjs",
@@ -66,7 +66,7 @@ describe("post-cleanup repository shape", () => {
       "scripts/repo-check.mjs",
       "scripts/setup-codex.mjs",
     ]);
-    expect(tests.filter((name) => name.endsWith(".test.mjs"))).toHaveLength(4);
+    expect(tests.filter((name) => name.endsWith(".test.mjs"))).toHaveLength(5);
     const compiled = await listFiles(path.join(root, "dist"));
     expect(compiled.some((name) => /^dist\/(domain|tools)\//.test(name))).toBe(false);
     expect(compiled.some((name) => name === "dist/infra/templates/index.html")).toBe(false);
@@ -93,7 +93,7 @@ describe("post-cleanup repository shape", () => {
   it("uses one product name and one npm package name", async () => {
     const packageJson = JSON.parse(await fs.readFile(path.join(root, "package.json"), "utf8"));
     expect(packageJson.name).toBe("doodle-mcp");
-    expect(packageJson.version).toBe("0.6.3");
+    expect(packageJson.version).toBe("0.7.0");
     expect(packageJson.bin["doodle-mcp"]).toBe("dist/index.js");
     expect(packageJson.repository.url).toContain("/Doodle.git");
     const strictFiles = [
@@ -157,7 +157,7 @@ describe("post-cleanup repository shape", () => {
     const mcp = JSON.parse(await fs.readFile(path.join(root, "plugins", "doodle", ".mcp.json"), "utf8"));
     const marketplace = JSON.parse(await fs.readFile(path.join(root, ".agents", "plugins", "marketplace.json"), "utf8"));
     const gitignore = await fs.readFile(path.join(root, ".gitignore"), "utf8");
-    expect(manifest.version).toBe("0.6.3");
+    expect(manifest.version).toBe("0.7.0");
     expect(manifest.requires_local_executor).toBe(true);
     expect(manifest.mcpServers).toBe("./.mcp.json");
     expect(mcp.mcpServers.doodle.type).toBe("stdio");

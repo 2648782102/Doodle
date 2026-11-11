@@ -19,6 +19,10 @@ The plugin uses a free loopback port by default and reports it as `PANEL_URL` fr
 
 Check that the browser is on the `PANEL_URL` reported by `get_board` and that the WebSocket `/ws` connection is open. Click 「适应」 to fit all objects. The board state itself can always be verified with `get_board`.
 
+### The Agent does not see my canvas edits automatically
+
+Automatic final-state context sync works only in an embedded MCP Apps view when the host advertises `updateModelContext`. Hosts normally deliver the latest context on the next conversation turn; click 「通知 Agent」 where available, or ask the AI to call `get_board`. If you are using the standalone `PANEL_URL` page, there is no bridge to the current host session: rereading through `get_board` is required. Hosts without `sendMessage` hide the notification button rather than reporting false success.
+
 ### The plugin is not discovered
 
 Run `npm run setup:codex` so `.doodle-plugin/doodle/` exists and the local marketplace is installed. To inspect discovery, run `codex plugin list --marketplace doodle --available --json`. The marketplace is local/repository-scoped; it is not a public plugin directory submission. Start a new session after installation.

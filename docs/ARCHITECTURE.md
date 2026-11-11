@@ -1,6 +1,6 @@
 # Architecture
 
-Doodle is a local-first shared infinite canvas. The repository builds two distribution paths from the same source: the npm CLI/direct MCP server and a desktop-only Codex plugin with a bundled stdio server. Compatible MCP Apps hosts may render its interactive canvas beside the agent conversation as an optional enhancement; the host retains its existing chat surface. A standalone local HTTP page provides the same canvas when the host does not render MCP Apps. Both views and the AI tools share one independent version 1 board state file.
+Doodle is a local-first shared infinite canvas. The repository builds two distribution paths from the same source: the npm CLI/direct MCP server and a desktop-only Codex plugin with a bundled stdio server. Compatible MCP Apps hosts may render its interactive canvas beside the agent conversation as an optional enhancement; the host retains its existing chat surface. Capable hosts also receive the board's final-state delta in that conversation's model context. A standalone local HTTP page provides the same canvas when the host does not render MCP Apps. Both views and the AI tools share one independent version 1 board state file.
 
 ## Source layout
 
@@ -17,6 +17,7 @@ src/
 │   ├── http.ts                 local board API, HTML and WebSocket updates
 │   ├── tools.ts                get / draw / scan tools and MCP App resource
 │   ├── app.ts                  MCP Apps bridge client for embedded canvas edits
+│   ├── app-context.ts          final-state delta and bounded model context projection
 │   ├── instructions.ts         MCP initialization guidance for agents
 │   └── index.ts                board module entrypoint
 ├── infra/
@@ -34,7 +35,7 @@ scripts/build-plugin.mjs        bundles the self-contained plugin server and tem
 scripts/plugin-check.mjs        validates plugin manifests, skill, marketplace, and build output
 ```
 
-There is no `src/domain/` workbench model, Mermaid renderer, session store, proposal store, or legacy panel template in `0.6.3`. The plugin uses only the supported Codex compatibility layout; generated `.doodle-plugin/` output is ignored.
+There is no `src/domain/` workbench model, Mermaid renderer, session store, proposal store, or legacy panel template in `0.7.0`. The plugin uses only the supported Codex compatibility layout; generated `.doodle-plugin/` output is ignored.
 
 ## MCP surface
 
@@ -50,6 +51,12 @@ Both runtime paths register exactly four tools:
 All tools are registered through the MCP SDK config API with explicit annotations: `get_board`, `show_board`, and `scan_project` are read-only, non-destructive, and local-scope; `draw_board` is destructive because it can remove or overwrite visual objects. These values are integration-tested and guarded by the offline repository checks.
 
 The optional canvas resource uses `text/html;profile=mcp-app` and is attached to `show_board` and to successful `draw_board` results. `show_board` remains the explicit render tool; the write result also advertises the canvas so compatible hosts automatically show the board after an AI drawing. The app calls `get_board` and `draw_board` through the host bridge, refreshes at a low rate while visible, and sends the revision it has rendered so a concurrent model edit cannot be overwritten. This keeps browser HTTP credentials inside the standalone page while the embedded canvas uses the host's authenticated MCP connection. Text-only hosts retain the complete tool workflow and should call `show_board` after drawing when they support it.
+
+### Host model context bridge
+
+After `app.connect()`, `src/board/app.ts` reads `getHostCapabilities()`. When `updateModelContext.text` is available, every newly observed board revision produces one context update. `src/board/app-context.ts` compares the current snapshot with the last successfully published snapshot by object ID and stable object fields; its `added`, `updated`, and `removed` arrays contain final object values or removed IDs, never click, drag, or edit events. Because `updateModelContext` overwrites prior context, the request also carries the complete current structured snapshot. The text content is a bounded Chinese projection; `structuredContent` preserves the untruncated final state and fixed read-only safety flags. A failed update is not marked as published, so the next refresh retries the latest delta.
+
+Context updates do not trigger a model turn. If `message.text` is also available, the embedded toolbar shows `通知 Agent`; its click handler ensures the latest context has been published, then sends exactly `我改了 Doodle 画板，你看下图。` through `app.sendMessage({ role: "user" })`. The button is hidden in the standalone fallback and in hosts lacking either capability. `get_board` remains the authoritative reread path, especially for standalone `PANEL_URL` pages that have no bridge to the current host session.
 
 No tool opens a browser, writes a project file, launches an IDE, or emits approval credentials. MCP initialization instructions and `get_board` describe the directed-arrow contract and strict-grid workflow.
 
@@ -95,6 +102,7 @@ Project scanning does not modify the board. If the AI wants to show structure, i
 - Project-scan evidence filters common credential lines and is capped at 40 lines total.
 - `scan_project` never writes files; board writes never write project files.
 - Offline guards in `scripts/repo-check.mjs` verify the four-tool surface, optional MCP App registration, dependency setup, plugin packaging, docs alignment, arrow contract, HTTP authentication, and read-only scan boundary. `scripts/plugin-check.mjs` validates the plugin identity, marketplace, skill, bundle template paths, generated runtime, and desktop-only flag. `scripts/build.mjs` prunes stale compiled files, copies the canvas template, and bundles the embedded App.
+- Offline guards also verify that the bundled App uses `updateModelContext` / `sendMessage`, that the shared template exposes the notification button, and that the context builder is a final-state delta rather than an operation log.
 - `npm run check` runs lint, build, plugin build, tests, example syntax, offline guards, plugin guard, doctor, and package dry-run.
 
 ## Compatibility

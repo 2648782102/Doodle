@@ -18,4 +18,4 @@ A breaking change includes, but is not limited to:
 - Changing the local REST/WebSocket contract in a way an active panel cannot ignore.
 - Raising the minimum supported Node.js version.
 
-The MCP server reports its version from `package.json`; the plugin bundle receives the same injected version. Keep package version, plugin manifest version, `CHANGELOG.md`, and release tags in sync. Only the latest `0.6.x` release receives fixes.
+The MCP server reports its version from `package.json`; the plugin bundle receives the same injected version. Keep package version, plugin manifest version, `CHANGELOG.md`, and release tags in sync. Only the latest `0.7.x` release receives fixes.
