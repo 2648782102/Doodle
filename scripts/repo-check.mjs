@@ -85,7 +85,7 @@ check(packageJson.scripts.check.includes("setup:codex -- --dry-run"), "npm check
 check(ci.includes("npm run repo:plugin-check"), "CI does not run the plugin guard");
 check(ci.includes("npm run setup:codex -- --dry-run"), "CI does not dry-run the Codex setup");
 check(ci.includes("npm run build:submission"), "CI does not build the submission ZIP");
-check(ci.includes("buildBoardModelContext") && ci.includes("doodle_board_context"), "CI does not verify the final-state context projection");
+check(ci.includes("Verify final-state board context projection") && ci.includes("buildBoardModelContext") && ci.includes("doodle_board_context"), "CI does not verify the final-state context projection");
 check(publishWorkflow.includes("contents: write") && publishWorkflow.includes("gh release create"), "publish workflow cannot create a release");
 check(publishWorkflow.includes("npm run check") && publishWorkflow.includes("--notes-file"), "publish workflow does not verify the package or use changelog notes");
 check(publishWorkflow.includes('git tag -a "$tag"') && publishWorkflow.includes('git push origin "$tag"') && publishWorkflow.includes('--target "$GITHUB_SHA"'), "publish workflow does not create the matching tag before verifying it");
