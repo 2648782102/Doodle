@@ -24,6 +24,7 @@ All notable changes are documented here. Versions follow `VERSIONING.md`.
 - Closed every locally actionable item in [`docs/EXPERIENCE_AUDIT.md`](docs/EXPERIENCE_AUDIT.md); MCP Apps host support remains an external limitation with the documented `PANEL_URL` fallback.
 - Documented the direct `npx -y doodle-mcp` path next to the Codex plugin path so the 30-second start no longer requires a repository clone for every MCP host.
 - Synchronized the product handbook, product direction, architecture, decisions, plugin goal, roadmap, launch copy, examples, guards, tests, and CI with the new install/first-use experience.
+- Recorded the remaining npm publication gap as `E12` in [`docs/EXPERIENCE_AUDIT.md`](docs/EXPERIENCE_AUDIT.md): GitHub Release `v0.6.3` is published, but the npm registry still serves `0.6.0` because the available token can only stage packages and account 2FA requires a maintainer OTP/web confirmation. READMEs now point source users to `npm run setup:codex` until the npm version is approved.
 
 ### Compatibility
 

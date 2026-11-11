@@ -18,8 +18,8 @@ Releases are made from `master` by a maintainer. CI and the publish workflow ver
 2. Push the versioned `vX.Y.Z` tag from `master`.
 3. The tag workflow in `.github/workflows/release.yml` runs the full check and package dry-run.
 4. `.github/workflows/publish-release.yml` runs on `master` after a full `npm run check`, creates the GitHub Release from the matching `CHANGELOG.md` section when absent, and attaches the versioned submission ZIP. It leaves existing releases unchanged; `workflow_dispatch` can retry with an explicit tag.
-5. Publish to npm only through an explicit maintainer action with the configured release environment.
-6. Verify that `npm run setup:codex -- --dry-run`, `npx doodle-mcp`, `npm run doctor`, the release asset, and the changelog version all pass or match the published package.
+5. Publish to npm only through an explicit maintainer action with the configured release environment. A bypass-2FA token can stage the package but `npm stage approve` still requires one OTP or web proof of presence; keep the `npx -y doodle-mcp` documentation honest until `npm view doodle-mcp@<version> version` resolves.
+6. Verify that `npm run setup:codex -- --dry-run`, `npm view doodle-mcp@<version> version`, one `npx -y doodle-mcp` startup, `npm run doctor`, the release asset, and the changelog version all pass or match the published package.
 
 ## Rollback
 

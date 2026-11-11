@@ -53,6 +53,7 @@ const support = await read("SUPPORT.md");
 const terms = await read("TERMS.md");
 const faq = await read("docs/FAQ.md");
 const submission = await read("docs/SUBMISSION.md");
+const experienceAudit = await read("docs/EXPERIENCE_AUDIT.md");
 const submissionScript = await read("scripts/build-submission.mjs");
 const config = await read("src/infra/config.ts");
 const projectWorkspace = await read("src/infra/project-workspace.ts");
@@ -86,6 +87,9 @@ check(publishWorkflow.includes("contents: write") && publishWorkflow.includes("g
 check(publishWorkflow.includes("npm run check") && publishWorkflow.includes("--notes-file"), "publish workflow does not verify the package or use changelog notes");
 check(publishWorkflow.includes('git tag -a "$tag"') && publishWorkflow.includes('git push origin "$tag"') && publishWorkflow.includes('--target "$GITHUB_SHA"'), "publish workflow does not create the matching tag before verifying it");
 check(releasing.includes("publish workflow") && !releasing.includes("does not create a Release automatically"), "releasing guide does not describe release automation");
+check(releasing.includes("npm stage approve") && releasing.includes("npm view doodle-mcp@<version> version"), "releasing guide does not describe the npm 2FA and version verification gates");
+check(experienceAudit.includes("| E12 | P1 | external |") && experienceAudit.includes("doodle-mcp@0.6.3"), "experience audit does not record the pending npm publication");
+check(readme.includes("npm view doodle-mcp version") && readmeEn.includes("npm view doodle-mcp version"), "READMEs do not explain the npm version status");
 check(gitignore.includes(".doodle-plugin/") && gitignore.includes(".doodle-data/") && gitignore.includes("doodle-plugin-submission/"), "generated plugin output, data, or submission ZIP is not ignored");
 check(index.indexOf("await mcp.connect(transport);") < index.indexOf("await preview.start();"), "MCP stdio is not connected before optional preview startup");
 check(index.includes("Preview unavailable"), "preview failure does not keep the MCP server alive");
