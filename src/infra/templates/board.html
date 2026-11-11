@@ -233,6 +233,7 @@
         <button class="tool" data-tool="ellipse" aria-pressed="false" title="椭圆 (E)">椭圆</button>
         <button class="tool" data-tool="line" aria-pressed="false" title="箭头 (L)">箭头</button>
         <button class="tool" id="btnExpand" hidden title="在 Agent 中展开画布">展开</button>
+        <button class="tool" id="btnEdit" title="编辑选中对象文字 (Enter)">编辑</button>
         <button class="tool danger" id="btnDelete" title="删除选中对象 (Delete)">删除</button>
         <span class="tool-hint" aria-hidden="true">点按放置 · 拖拽定形 · Space 平移</span>
       </div>
@@ -243,6 +244,7 @@
         <ul>
           <li>在 Agent 聊天里让 AI 画；改完后说「读一下画板」。</li>
           <li>选工具后点按放置或拖拽定形，双击对象改字。</li>
+          <li>选中对象后按 Enter，或点「编辑」，也能改字。</li>
           <li>Space / 中键拖动平移，滚轮平移，Ctrl/⌘ + 滚轮缩放。</li>
         </ul>
       </div>
@@ -278,7 +280,7 @@
       patchItem: (id) => `/api/board/items/${encodeURIComponent(id)}`,
       deleteItem: (id) => `/api/board/items/${encodeURIComponent(id)}`,
     };
-    const defaultText = { note: "写点什么", text: "文字", rect: "", ellipse: "", line: "" };
+    const defaultText = { note: "", text: "", rect: "", ellipse: "", line: "" };
     const defaultSize = {
       note: { w: 180, h: 120 }, text: { w: 220, h: 44 },
       rect: { w: 180, h: 110 }, ellipse: { w: 180, h: 110 }, line: { w: 180, h: 0 },
@@ -287,6 +289,8 @@
     let board = { version: 1, title: "和 AI 一起画", revision: 0, items: [], notes: [] };
     let tool = "select";
     let selectedId = null;
+    let pendingTextEditId = null;
+    let lastDoubleClick = 0;
     let viewport = { x: 0, y: 0, scale: 1 };
     let userAdjustedViewport = storageGet("aiDrawBoardUserViewport") === "1";
     let pointerState = null;
@@ -323,10 +327,16 @@
       statusElement.textContent = message;
     }
 
-    function setHelpOpen(open) {
+    function setHelpOpen(open, restoreFocus = true) {
+      const wasOpen = !helpPopover.hidden;
       helpPopover.hidden = !open;
       helpButton.setAttribute("aria-expanded", String(open));
-      if (open) storageSet("doodleHelpSeen", "1");
+      if (open) {
+        storageSet("doodleHelpSeen", "1");
+        canvas.focus();
+      } else if (wasOpen && restoreFocus) {
+        canvas.focus();
+      }
     }
 
     function applyViewport() {
@@ -434,8 +444,10 @@
 
     function renderBoard() {
       boardTitle.textContent = board.title;
-      setStatus(`已保存 · rev ${board.revision}`);
+      setStatus(board.lastChange === "remote" ? `AI 已更新 · rev ${board.revision}` : `已保存 · rev ${board.revision}`);
       emptyState.classList.toggle("hidden", board.items.length > 0);
+      const pendingEditId = pendingTextEditId;
+      pendingTextEditId = null;
       world.replaceChildren();
       for (const [index, item] of board.items.entries()) {
         const element = document.createElement("div");
@@ -512,14 +524,32 @@
         }
         world.append(element);
       }
+      if (pendingEditId && board.items.some((item) => item.id === pendingEditId)) {
+        queueMicrotask(() => beginTextEdit(pendingEditId));
+      }
     }
 
-    async function loadBoard() {
+    let revisionBeforeConflict = 0;
+
+    async function loadBoard(change = null) {
+      const previousRevision = board.revision;
+      const previousChange = board.lastChange;
       if (mcpApp) {
         const next = await mcpApp.getBoard();
         if (next.revision < board.revision) return;
-        board = next;
+        board = {
+          ...next,
+          lastChange: next.revision === previousRevision
+            ? previousChange
+            : change === "local" || revisionBeforeConflict === previousRevision
+              ? "local"
+              : change === "remote" || next.revision > previousRevision ? "remote" : next.lastChange,
+        };
         if (selectedId && !board.items.some((item) => item.id === selectedId)) selectedId = null;
+        if ((pointerState || editingId) && next.revision > previousRevision) {
+          boardRenderPending = true;
+          return;
+        }
         renderBoard();
         return;
       }
@@ -527,9 +557,16 @@
       if (!response.ok) throw new Error(`HTTP ${response.status}`);
       const next = await response.json();
       if (next.revision < board.revision) return;
-      board = next;
+      board = {
+        ...next,
+        lastChange: next.revision === previousRevision
+          ? previousChange
+          : change === "local" || revisionBeforeConflict === previousRevision
+            ? "local"
+            : change === "remote" || next.revision > previousRevision ? "remote" : next.lastChange,
+      };
       if (selectedId && !board.items.some((item) => item.id === selectedId)) selectedId = null;
-      if (pointerState || editingId) {
+      if ((pointerState || editingId) && next.revision > previousRevision) {
         boardRenderPending = true;
         return;
       }
@@ -551,10 +588,10 @@
           args = { remove_ids: [id] };
         }
         const updated = await mcpApp.drawBoard(args);
-        if (updated.revision >= board.revision) board = updated;
+        if (updated.revision >= board.revision) board = { ...updated, lastChange: "local" };
         boardRenderPending = false;
         renderBoard();
-        return { board: updated };
+        return updated;
       }
       const requestHeaders = { ...headers, "If-Match-Revision": String(expectedRevision) };
       const response = await fetch(path, { method, headers: requestHeaders, body: JSON.stringify(payload) });
@@ -566,12 +603,14 @@
       }
       if (!response.ok) {
         if (response.status === 409) {
-          await loadBoard().catch(() => {});
-          throw Object.assign(new Error("画板已更新；你的文字草稿已保留，请再次保存"), { status: 409 });
+          throw Object.assign(new Error("画板已更新；你的文字草稿已保留，请再次保存"), { status: 409, recoverable: true });
         }
         throw new Error(result.error || `HTTP ${response.status}`);
       }
-      if (result.board.revision >= board.revision) board = result.board;
+      if (result.board.revision >= board.revision) {
+        board = { ...result.board, lastChange: "local" };
+        revisionBeforeConflict = 0;
+      }
       boardRenderPending = false;
       renderBoard();
       return result.board;
@@ -579,8 +618,11 @@
 
     async function createItem(itemType, point, expectedRevision = board.revision) {
       const size = point.size || defaultSize[itemType];
-      const x = point.size ? point.x : point.x - size.w / 2;
-      const y = point.size ? point.y : point.y - size.h / 2;
+      const originX = point.size ? point.x : point.x - size.w / 2;
+      const originY = point.size ? point.y : point.y - size.h / 2;
+      const spot = findFreeSpot({ x: originX, y: originY, w: size.w, h: size.h });
+      const x = spot.x;
+      const y = spot.y;
       const existingIds = new Set(board.items.map((item) => item.id));
       const color = colorCycle[board.items.length % colorCycle.length];
       const updatedBoard = await boardWrite(boardEndpoints.addItem, "POST", {
@@ -597,15 +639,37 @@
       }, expectedRevision);
       const createdItem = updatedBoard.items.find((item) => !existingIds.has(item.id));
       const newest = createdItem && board.items.find((item) => item.id === createdItem.id);
+      selectTool("select");
       if (newest) {
         selectedId = newest.id;
         ensureVisible(newest);
         renderBoard();
-        beginTextEdit(newest.id);
+        if (itemType !== "line") beginTextEdit(newest.id);
       }
     }
 
-    function beginTextEdit(itemId, draftText) {
+    function findFreeSpot(candidate) {
+      const padding = 24;
+      const overlaps = (left, top) => board.items.some((item) => {
+        if (item.type === "line") return false;
+        return left < item.x + item.w + padding
+          && left + candidate.w + padding > item.x
+          && top < item.y + item.h + padding
+          && top + candidate.h + padding > item.y;
+      });
+      if (!overlaps(candidate.x, candidate.y)) return { x: candidate.x, y: candidate.y };
+      const step = Math.max(candidate.w, candidate.h) + padding;
+      for (let ring = 1; ring <= 4; ring += 1) {
+        for (const [dx, dy] of [[1, 0], [0, 1], [-1, 0], [0, -1], [1, 1], [-1, 1], [1, -1], [-1, -1]]) {
+          const x = candidate.x + dx * step * ring;
+          const y = candidate.y + dy * step * ring;
+          if (!overlaps(x, y)) return { x, y };
+        }
+      }
+      return { x: candidate.x, y: candidate.y };
+    }
+
+    function beginTextEdit(itemId, draftText, retry = false) {
       const expectedRevision = board.revision;
       const element = world.querySelector(`[data-id="${CSS.escape(itemId)}"] .item-text`);
       if (!element) return;
@@ -638,11 +702,18 @@
               confirmedBy: "human", patch: { text: nextText },
             }, expectedRevision);
           } catch (error) {
-            showToast(error.message);
-            if (error.status === 409) {
-              boardRenderPending = false;
-              renderBoard();
-              beginTextEdit(itemId, nextText);
+            if ((error.status === 409 || error.recoverable) && !retry) {
+              try {
+                revisionBeforeConflict = expectedRevision;
+                await loadBoard();
+                await boardWrite(boardEndpoints.patchItem(itemId), "PATCH", {
+                  confirmedBy: "human", patch: { text: nextText },
+                }, board.revision);
+              } catch (retryError) {
+                showToast(retryError.message);
+              }
+            } else {
+              showToast(error.message);
             }
           }
           if (boardRenderPending && editingId === null && document.activeElement !== element) {
@@ -680,6 +751,15 @@
     }
 
     for (const button of toolButtons) button.addEventListener("click", () => selectTool(button.dataset.tool));
+    function editSelected() {
+      if (!selectedId) { showToast("先选中一个对象"); return; }
+      const item = board.items.find((candidate) => candidate.id === selectedId);
+      if (!item || item.type === "line") { showToast("箭头没有文字可编辑"); return; }
+      pendingTextEditId = item.id;
+      canvas.focus();
+      renderBoard();
+    }
+    document.querySelector("#btnEdit").addEventListener("click", editSelected);
     document.querySelector("#btnDelete").addEventListener("click", deleteSelected);
     helpButton.addEventListener("click", () => setHelpOpen(helpPopover.hidden));
     helpCloseButton.addEventListener("click", () => setHelpOpen(false));
@@ -796,16 +876,23 @@
       if (event.button === 1) event.preventDefault();
       const itemElement = event.target.closest(".board-item");
       const point = screenToWorld(event.clientX, event.clientY);
-      if (!panGesture && tool !== "select") {
+      if (!panGesture && tool !== "select" && !itemElement) {
         pointerState = {
           kind: "create", type: tool, startX: event.clientX, startY: event.clientY,
           start: point, revision: board.revision, moved: false, preview: makePreview(tool),
         };
       } else if (!panGesture && itemElement) {
+        selectTool("select");
         const item = board.items.find((candidate) => candidate.id === itemElement.dataset.id);
         if (!item) return;
         selectedId = item.id;
         renderBoard();
+        if (event.detail >= 2 || event.shiftKey || Date.now() - lastDoubleClick < 350) {
+          pendingTextEditId = item.id;
+          renderBoard();
+          pointerState = null;
+          return;
+        }
         pointerState = {
           kind: "move", id: item.id, item, startX: event.clientX, startY: event.clientY,
           originX: item.x, originY: item.y, revision: board.revision, moved: false,
@@ -892,6 +979,9 @@
 
     canvas.addEventListener("pointercancel", cancelGesture);
     canvas.addEventListener("lostpointercapture", cancelGesture);
+    canvas.addEventListener("pointerleave", (event) => {
+      if (pointerState && event.buttons === 0) cancelGesture();
+    });
 
     window.addEventListener("keydown", (event) => {
       const activeElement = document.activeElement;
@@ -912,8 +1002,13 @@
       }
       const shortcut = { v: "select", n: "note", t: "text", r: "rect", e: "ellipse", l: "line" }[event.key.toLowerCase()];
       if (shortcut) { selectTool(shortcut); return; }
+      if (event.key === "Enter") { event.preventDefault(); editSelected(); return; }
       if (event.key === "Delete" || event.key === "Backspace") { event.preventDefault(); deleteSelected().catch((error) => showToast(error.message)); }
-      if (event.key === "Escape") { if (!helpPopover.hidden) setHelpOpen(false); cancelGesture(); selectedId = null; selectTool("select"); renderBoard(); }
+      if (event.key === "Escape") {
+        if (!helpPopover.hidden) setHelpOpen(false);
+        else { cancelGesture(); selectedId = null; selectTool("select"); renderBoard(); }
+        return;
+      }
     });
     window.addEventListener("keyup", (event) => {
       if (event.code === "Space") {
@@ -927,21 +1022,42 @@
       cancelGesture();
     });
 
-    canvas.addEventListener("dblclick", (event) => {
+    const beginDoubleClickEdit = (event) => {
       const itemElement = event.target.closest(".board-item");
-      if (itemElement) beginTextEdit(itemElement.dataset.id);
-    });
+      if (!itemElement || itemElement.dataset.type === "line") return;
+      const item = board.items.find((candidate) => candidate.id === itemElement.dataset.id);
+      if (!item) return;
+      event.preventDefault();
+      event.stopPropagation();
+      selectedId = item.id;
+      pendingTextEditId = item.id;
+      lastDoubleClick = Date.now();
+      selectTool("select");
+      canvas.focus();
+      renderBoard();
+    };
+    world.addEventListener("dblclick", beginDoubleClickEdit, true);
+    canvas.addEventListener("dblclick", beginDoubleClickEdit, true);
 
     function connectUpdates() {
       const protocol = location.protocol === "https:" ? "wss" : "ws";
+      if (window.doodleBoardSocket) return;
       const socket = new WebSocket(`${protocol}://${location.host}/ws`);
+      window.doodleBoardSocket = socket;
       socket.addEventListener("message", (event) => {
         try {
           const message = JSON.parse(event.data);
-          if (message.type === "board_updated") loadBoard().catch(() => {});
+          if (message.type === "board_updated") {
+            const isCurrent = Number.isFinite(message.revision) && message.revision <= board.revision;
+            loadBoard(isCurrent ? "local" : "remote").catch(() => {});
+          }
         } catch {}
       });
-      socket.addEventListener("close", () => window.setTimeout(connectUpdates, 1500));
+      socket.addEventListener("close", () => {
+        if (window.doodleBoardSocket === socket) window.doodleBoardSocket = null;
+        window.setTimeout(connectUpdates, 750);
+      });
+      socket.addEventListener("open", () => loadBoard("remote").catch(() => {}));
     }
 
     async function startBoard() {
@@ -953,7 +1069,7 @@
       } else if (board.items.length > 0 && !userAdjustedViewport) {
         fitToContent();
       }
-      if (storageGet("doodleHelpSeen") !== "1") setHelpOpen(true);
+      if (storageGet("doodleHelpSeen") !== "1") setHelpOpen(true, false);
       if (!mcpApp) connectUpdates();
     }
     window.DoodleBoardInit = (adapter) => {
@@ -967,7 +1083,7 @@
     });
     window.DoodleBoardUpdate = (snapshot) => {
       if (!snapshot || snapshot.revision < board.revision) return;
-      board = snapshot;
+      board = { ...snapshot, lastChange: "remote" };
       if (pointerState || editingId) { boardRenderPending = true; return; }
       renderBoard();
     };

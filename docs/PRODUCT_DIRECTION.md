@@ -21,7 +21,7 @@ The loop can pause or repeat at any point. `scan_project` is an optional read-on
 
 - **Canvas:** an infinite surface with bounded simple objects: notes, text, rectangles, ellipses, and directed arrow lines. A line runs from `(x,y)` to `(x+w,y+h)`. Click to place a default-sized shape or drag to size shapes and draw arrows in any direction. Space-drag or middle-drag pans; the wheel pans and Ctrl/Command-wheel zooms.
 - **Human input:** clicking, dragging, editing text, and deleting canvas objects. Discussion happens in the agent host conversation.
-- **AI input:** `get_board` reads `FIRST_USE` / `NEXT_STEPS`, canvas data, and the active loopback `PANEL_URL`; `show_board` returns the optional MCP App view; `draw_board` adds, edits, or removes objects and can reject stale UI edits by revision. The visible App refreshes the shared board so Agent drawings appear in place. `scan_project` optionally reads bounded project structure.
+- **AI input:** `get_board` reads progressive first-use or concise next-step guidance, canvas data, and the active loopback `PANEL_URL`; `show_board` returns the optional MCP App view; `draw_board` adds, edits, or removes objects and can reject stale UI edits by revision. The visible App refreshes the shared board so Agent drawings appear in place. `scan_project` optionally reads bounded project structure.
 - **Authors:** every object records whether a person or AI created it. Legacy board notes remain in version 1 state for compatibility but are hidden from current tools and UI.
 - **Approval:** this product has no built-in code-change approval protocol. Board content never authorizes project writes.
 
@@ -49,8 +49,12 @@ The loop can pause or repeat at any point. `scan_project` is an optional read-on
 
 ## Acceptance
 
-A fresh checkout installs through `npm run setup:codex` and builds both the npm CLI and a self-contained Codex plugin, each exposing exactly four tools. Text-only hosts can use all tools without rendering UI. MCP Apps-compatible hosts can show and edit the shared canvas beside their conversation; the UI reads and writes only through the host's `get_board` and `draw_board` calls. A person can open the standalone local page at the reported `PANEL_URL`, move objects, edit text, and see agent changes on the same board. Official OpenAI documentation says local marketplace installs are separate from the public directory and should be used in a new session.
+A fresh checkout installs through `npm run setup:codex`, and any MCP host can use the zero-configuration `npx -y doodle-mcp` CLI. Both paths build or expose exactly four tools. Text-only hosts can use all tools without rendering UI. MCP Apps-compatible hosts can show and edit the shared canvas beside their conversation; the UI reads and writes only through the host's `get_board` and `draw_board` calls. A person can open the standalone local page at the reported `PANEL_URL`, move objects, edit text, and see agent changes on the same board. Official OpenAI documentation says local marketplace installs are separate from the public directory and should be used in a new session.
 
 ## Next work
 
 Keep the core canvas stable. Improve drawing ergonomics, accessibility, install and reload ergonomics, and agent-facing layout guidance while keeping discussion in the agent host and shared visual context on the board.
+
+## Experience audit
+
+[`EXPERIENCE_AUDIT.md`](EXPERIENCE_AUDIT.md) is the maintained record of live AI/human tests, prioritized friction, and closure evidence. All locally actionable items are closed; update it with any end-to-end product change. External host limitations remain documented as fallback paths; they do not expand the product surface.

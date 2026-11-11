@@ -2,7 +2,7 @@ import fs from "node:fs/promises";
 import path from "node:path";
 import { BoardRevisionConflictError } from "./errors.js";
 import { AsyncMutex } from "./mutex.js";
-import { createStarterBoard, parseBoard, touchBoard, type SimpleBoard } from "./types.js";
+import { createEmptyBoard, parseBoard, touchBoard, type SimpleBoard } from "./types.js";
 
 export class BoardStore {
   private board: SimpleBoard;
@@ -15,7 +15,7 @@ export class BoardStore {
     this.file = path.join(outputDir, ".doodle", "board.json");
     this.legacyFile = path.join(outputDir, ".ai-draw", "board.json");
     this.mutex = new AsyncMutex(this.file);
-    this.board = createStarterBoard();
+    this.board = createEmptyBoard();
     this.revision = 0;
   }
 
@@ -28,7 +28,7 @@ export class BoardStore {
         if (!isMissingFile(error)) {
           throw new Error(`Failed to read simple board: ${error instanceof Error ? error.message : String(error)}`);
         }
-        this.board = createStarterBoard();
+        this.board = createEmptyBoard();
         this.revision = 0;
         await this.persist(touchBoard(this.board));
       }

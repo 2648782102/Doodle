@@ -44,6 +44,13 @@ describe("board HTTP surface", () => {
     expect(html).toContain("Doodle");
     expect(html).toContain("/api/board");
     expect(html).not.toContain("/workbench");
+    expect(html).toContain('defaultText = { note: "", text: "", rect: "", ellipse: "", line: "" }');
+    expect(html).toContain('selectTool("select");\n      if (newest)');
+    expect(html).toContain('tool !== "select" && !itemElement');
+    expect(html).toContain('socket.addEventListener("open"');
+    expect(html).toContain('id="btnEdit"');
+    expect(html).toContain('function editSelected()');
+    expect(html).not.toContain("helpCloseButton.focus()");
     const snapshot = await fetch(`${base}/api/board`).then((response) => response.json());
     expect(snapshot).toMatchObject({ version: 1 });
   });
@@ -93,6 +100,41 @@ describe("board HTTP surface", () => {
     expect(confirmed.status).toBe(200);
     const result = await confirmed.json();
     expect(result.board.items.at(-1)).toMatchObject({ text: "人画", author: "human" });
+  });
+
+  it("marks human edits to AI objects with the human author", async () => {
+    const html = await fetch(base).then((response) => response.text());
+    const token = html.match(/const PANEL_TOKEN = "([^"]+)"/)?.[1];
+    const created = await board.mutate((current) => addBoardItem(current, {
+      type: "note", x: 0, y: 0, text: "AI note", author: "ai",
+    }));
+    const id = created.items.at(-1).id;
+    const response = await fetch(`${base}/api/board/items/${id}`, {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json", "X-AI-Draw-Token": token },
+      body: JSON.stringify({ confirmedBy: "human", patch: { text: "人改过" } }),
+    });
+    expect(response.status).toBe(200);
+    const result = await response.json();
+    expect(result.board.items.find((item) => item.id === id)).toMatchObject({ text: "人改过", author: "human" });
+  });
+
+  it("broadcasts board updates to the standalone canvas", async () => {
+    const socket = new WebSocket(`ws://127.0.0.1:${port}/ws`);
+    const update = new Promise((resolve, reject) => {
+      socket.addEventListener("message", (event) => resolve(JSON.parse(event.data)));
+      socket.addEventListener("error", reject);
+    });
+    await new Promise((resolve, reject) => {
+      socket.addEventListener("open", resolve, { once: true });
+      socket.addEventListener("error", reject, { once: true });
+    });
+    const next = await board.mutate((current) => addBoardItem(current, {
+      type: "text", x: 10, y: 10, text: "broadcast", author: "ai",
+    }));
+    preview.broadcast({ type: "board_updated", revision: next.revision });
+    expect(await update).toMatchObject({ type: "board_updated", revision: next.revision });
+    socket.close();
   });
 
   it("exposes read-only project context without project writes", async () => {

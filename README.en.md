@@ -8,7 +8,9 @@ Choose a tool to click-place or drag-size objects. Space or middle-button drag p
 
 ## 30-second start
 
-From a Doodle checkout, run one command:
+Choose one path:
+
+**Codex desktop plugin**: from a Doodle checkout, run one command:
 
 ```bash
 npm run setup:codex
@@ -20,15 +22,17 @@ It installs dependencies when needed, builds the self-contained plugin, register
 Open the Doodle board and put one note on it so I can edit it.
 ```
 
-MCP Apps-compatible hosts show the canvas beside the chat. The AI reads the board first, then draws a starter object. Pick a tool to click or drag, double-click to edit text, and use the `?` button or press `?` for the three short human gestures. After editing, say “read the board again” in chat; the AI uses `get_board` to read your changes. If the host cannot embed the canvas, ask the agent for `PANEL_URL` and open that local address. Normal MCP calls never open a browser as a side effect.
+MCP Apps-compatible hosts show the canvas beside the chat. The AI reads the board first, then draws a starter object. Pick a tool to click or drag, then double-click or select an object and press `Enter` / click `Edit` to change its text. Use the `?` button or press `?` for the short human gestures. After editing, say “read the board again” in chat; the AI uses `get_board` to read your changes. If the host cannot embed the canvas, ask the agent for `PANEL_URL` and open that local address. Normal MCP calls never open a browser as a side effect.
 
 The complete path is `npm run setup:codex → new session → first prompt → see or edit one canvas → AI reads it again`.
+
+**Any MCP host**: add the `npx -y doodle-mcp` snippet from `examples/mcp-config/` to your host configuration, restart the MCP session, and use the same first prompt. `show_board` / `draw_board` still present the canvas; if the host cannot render it, ask for `PANEL_URL`. This path needs no repository clone and does not imply public plugin-directory publication.
 
 ## Four tools
 
 | Tool | Purpose |
 |---|---|
-| `get_board` | Read `FIRST_USE` / `NEXT_STEPS`, `BOARD_JSON`, object IDs and coordinates, authors, and the drawing guide. |
+| `get_board` | Read the shared canvas; an empty board returns `FIRST_USE` / `NEXT_STEPS` and the drawing guide, while later reads use a concise `NEXT`. `BOARD_JSON`, object IDs, coordinates, authors, and revision are always retained. |
 | `show_board` | Open the interactive shared canvas beside the agent conversation when a user wants to see or edit it. |
 | `draw_board` | Add, update, or remove notes, text, rectangles, ellipses, and directed arrows; writes are serialized against the latest state. |
 | `scan_project` | Optional read-only project paths and bounded `file:line` evidence. It does not draw or write files. |

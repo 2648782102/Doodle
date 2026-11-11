@@ -23,6 +23,7 @@ const marketplace = JSON.parse(await read(".agents/plugins/marketplace.json"));
 const skill = await read("plugins/doodle/skills/doodle/SKILL.md");
 const buildScript = await read("scripts/build-plugin.mjs");
 const pluginCheckScript = await read("scripts/plugin-check.mjs");
+const boardTemplate = await read(".doodle-plugin/doodle/server/infra/templates/board.html");
 const httpSource = await read("src/board/http.ts");
 const toolsSource = await read("src/board/tools.ts");
 const configSource = await read("src/infra/config.ts");
@@ -77,7 +78,7 @@ check(httpSource.includes("templateCandidates(this.config)") && httpSource.inclu
 check(httpSource.includes('"../infra/templates/board.html"'), "bundled server cannot resolve board templates relative to its own server bundle");
 check(toolsSource.includes("appBundleCandidates(ctx.config)") && toolsSource.includes('"server", "infra", "templates", "board-app.js"'), "bundled server cannot resolve the MCP App bundle");
 check(toolsSource.includes("CANVAS_UI_META") && toolsSource.includes("_meta: CANVAS_UI_META"), "bundled draw_board path does not advertise automatic post-draw rendering");
-check(toolsSource.includes("FIRST_USE") && toolsSource.includes("NEXT_STEPS"), "bundled get_board path lacks progressive first-use guidance");
+check(toolsSource.includes("FIRST_USE") && toolsSource.includes("NEXT_STEPS") && toolsSource.includes('"NEXT:"'), "bundled get_board path lacks progressive first-use guidance");
 check(toolsSource.includes("PANEL_URL") && instructions.includes("PANEL_URL"), "active local panel URL is not exposed to the agent");
 check(!instructions.includes("reply_on_board"), "MCP instructions reference the removed reply tool");
 check(configSource.includes("previewPort: rawPort ? parsePort(rawPort) : null") && configSource.includes("PLUGIN_DATA"), "runtime config is not plugin-safe");
@@ -102,6 +103,10 @@ check(privacy.includes("Retention") && privacy.includes("User controls"), "priva
 check(submissionScript.includes("doodle-${packageJson.version}.zip"), "submission ZIP does not use the package version");
 check(toolsSource.includes("READ_ONLY_LOCAL_ANNOTATIONS") && toolsSource.includes("BOARD_WRITE_ANNOTATIONS"), "tool annotations are missing");
 check((toolsSource.match(/server\.registerTool\(/g) ?? []).length === 4, "tools are not all registered through the annotated config API");
+check(boardTemplate.includes('selectTool("select");\n      if (newest)'), "bundled board template does not return to select after object creation");
+check(boardTemplate.includes('tool !== "select" && !itemElement'), "bundled board template creates objects when clicking an existing item");
+check(boardTemplate.includes("window.doodleBoardSocket") && boardTemplate.includes('socket.addEventListener("open"'), "bundled board template lacks singleton live updates");
+check(boardTemplate.includes('id="btnEdit"') && boardTemplate.includes('function editSelected()'), "bundled board template lacks the explicit text-edit entry point");
 
 const generatedFiles = [
   ".doodle-plugin/doodle/.codex-plugin/plugin.json",

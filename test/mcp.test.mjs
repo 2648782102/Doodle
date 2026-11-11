@@ -114,6 +114,14 @@ describe("MCP board server", () => {
       expect(appResource.contents[0].mimeType).toBe("text/html;profile=mcp-app");
       expect(appResource.contents[0].text).toContain("DoodleBoardInit");
       expect(appResource.contents[0].text).not.toContain('id="noteInput"');
+      expect(appResource.contents[0].text).toContain('selectTool("select");\n      if (newest)');
+      expect(appResource.contents[0].text).toContain('return updated;');
+      expect(appResource.contents[0].text).toContain('lastChange: "remote"');
+      expect(appResource.contents[0].text).toContain('id="btnEdit"');
+      await client.callTool({
+        name: "draw_board",
+        arguments: { author: "ai", items: [{ type: "note", x: 0, y: 0, w: 160, h: 90, text: "embedded app" }] },
+      });
       const shown = await client.callTool({ name: "show_board", arguments: {} });
       expect(shown.structuredContent).toMatchObject({ version: 1 });
       expect(shown.structuredContent.itemCount).toBeGreaterThan(0);
@@ -121,7 +129,20 @@ describe("MCP board server", () => {
   }, 30_000);
 
   it("returns the shared board and drawing guide through get_board", async () => {
-    await withClient(3441, async (client) => {
+    const transport = new StdioClientTransport({
+      command: "node",
+      args: ["dist/index.js"],
+      env: {
+        ...process.env,
+        PREVIEW_PORT: "3441",
+        LOG_LEVEL: "error",
+        OUTPUT_DIR: path.join(tempDir, "first-use"),
+        DOODLE_WORKSPACE_ROOT: process.cwd(),
+      },
+    });
+    const client = new Client({ name: "doodle-first-use-tests", version: "1.0.0" });
+    try {
+      await client.connect(transport);
       const text = textOf(await client.callTool({ name: "get_board", arguments: {} }));
       expect(text).toContain("BOARD_JSON:");
       expect(text).toContain("FIRST_USE:");
@@ -133,6 +154,23 @@ describe("MCP board server", () => {
       expect(board).toMatchObject({ version: 1, readOnly: true });
       expect(Array.isArray(board.items)).toBe(true);
       expect(board.safety).toMatchObject({ projectWritesRequireHumanApproval: true });
+    } finally {
+      await client.close();
+    }
+  }, 30_000);
+
+  it("uses concise guidance after a board has visual context", async () => {
+    await withClient(3443, async (client) => {
+      await client.callTool({
+        name: "draw_board",
+        arguments: { author: "ai", items: [{ type: "note", x: 0, y: 0, w: 160, h: 90, text: "context" }] },
+      });
+      const text = textOf(await client.callTool({ name: "get_board", arguments: {} }));
+      expect(text).toContain("NEXT:");
+      expect(text).not.toContain("FIRST_USE:");
+      expect(text).not.toContain("Drawing guide:");
+      expect(text).toContain("BOARD_JSON:");
+      expect(text).toContain('"text": "context"');
     });
   }, 30_000);
 
@@ -164,7 +202,7 @@ describe("MCP board server", () => {
   it("draws a directed board arrow and returns an authoritative canvas snapshot", async () => {
     await withClient(3422, async (client) => {
       const before = jsonAfter(textOf(await client.callTool({ name: "get_board", arguments: {} })), "BOARD_JSON:");
-      const drawn = textOf(await client.callTool({
+      const drawnResult = await client.callTool({
         name: "draw_board",
         arguments: {
           author: "ai",
@@ -173,9 +211,18 @@ describe("MCP board server", () => {
             { type: "line", x: 180, y: 50, w: 120, h: 0, text: "→", color: "#64748b" },
           ],
         },
-      }));
+      });
+      const drawn = textOf(drawnResult);
       expect(drawn).toContain("新增 2");
       expect(drawn).toContain("NEXT: 保持画布可见");
+      const updated = await client.callTool({
+        name: "draw_board",
+        arguments: {
+          author: "ai",
+          items: [{ id: drawnResult.structuredContent.items.find((item) => item.text === "MCP test")?.id, type: "note", x: 0, y: 0, w: 180, h: 100, text: "AI revised" }],
+        },
+      });
+      expect(updated.structuredContent.items.find((item) => item.text === "AI revised")).toMatchObject({ author: "ai" });
       const snapshot = (await client.callTool({
         name: "draw_board",
         arguments: { items: [{ type: "text", x: 320, y: 0, text: "共享画布" }] },
@@ -187,12 +234,12 @@ describe("MCP board server", () => {
       });
       expect(stale.isError).toBe(true);
       const after = jsonAfter(textOf(await client.callTool({ name: "get_board", arguments: {} })), "BOARD_JSON:");
-      expect(after.items.filter((item) => item.text === "MCP test")).toHaveLength(1);
+      expect(after.items.filter((item) => item.text === "AI revised")).toHaveLength(1);
       expect(after.items.some((item) => item.text === "共享画布")).toBe(true);
       await client.callTool({
         name: "draw_board",
         arguments: {
-          remove_ids: after.items.filter((item) => item.text === "MCP test" || item.text === "→" || item.text === "共享画布").map((item) => item.id),
+          remove_ids: after.items.filter((item) => item.text === "AI revised" || item.text === "→" || item.text === "共享画布").map((item) => item.id),
         },
       });
       expect(before.revision).toBeLessThan(after.revision);

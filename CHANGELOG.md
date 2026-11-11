@@ -16,6 +16,13 @@ All notable changes are documented here. Versions follow `VERSIONING.md`.
 - Replaced placeholder direct MCP examples with zero-configuration `npx -y doodle-mcp` snippets. `DOODLE_WORKSPACE_ROOT`, `OUTPUT_DIR`, `PREVIEW_HOST`, `PREVIEW_PORT`, and `LOG_LEVEL` are now clearly optional overrides.
 - Updated `doctor` to present user-facing first-use steps and avoid treating the submission ZIP as a routine installation warning.
 - Fixed the bundled plugin's standalone canvas template lookup so `PANEL_URL` returns a usable page even when the MCP host starts `server/index.mjs` from a project root.
+- Added [`docs/EXPERIENCE_AUDIT.md`](docs/EXPERIENCE_AUDIT.md) with live AI/human findings, priorities, and closure criteria. Fixed the first batch: new boards start empty, `get_board` becomes concise after content exists, human edits and AI updates now record the current author, and the standalone canvas refreshes on WebSocket open with a single reconnect loop and remote-update status.
+- Simplified human creation: blank default text, no editor for arrows, one automatic retry for revision conflicts, and a small free-placement search that avoids dropping a new shape on top of existing objects.
+- Made help focus reversible and limited `Escape` to closing help when help is open; double-click editing now re-renders and focuses the selected object before editing.
+- Added an explicit `编辑` button and `Enter` shortcut for selected objects, so text editing stays reliable in hosts that coalesce double-click events. Creating an object now returns to the select tool and clicking an existing object never starts a new drawing.
+- Distinguished local saves from remote AI updates in the standalone status using broadcast revisions, and aligned the MCP Apps write bridge with the shared board snapshot shape.
+- Closed every locally actionable item in [`docs/EXPERIENCE_AUDIT.md`](docs/EXPERIENCE_AUDIT.md); MCP Apps host support remains an external limitation with the documented `PANEL_URL` fallback.
+- Documented the direct `npx -y doodle-mcp` path next to the Codex plugin path so the 30-second start no longer requires a repository clone for every MCP host.
 - Synchronized the product handbook, product direction, architecture, decisions, plugin goal, roadmap, launch copy, examples, guards, tests, and CI with the new install/first-use experience.
 
 ### Compatibility
@@ -25,8 +32,9 @@ All notable changes are documented here. Versions follow `VERSIONING.md`.
 
 ### Validation
 
-- `npm run check` passes with 27 tests, repository and plugin guards, setup dry-run, submission ZIP, doctor, and npm package dry-run.
+- `npm test` passes with 31 tests; `npm run check` covers the repository and plugin guards, setup dry-run, submission ZIP, doctor, and npm package dry-run.
 - An isolated `CODEX_HOME` marketplace/installation smoke test discovers and enables `doodle@doodle` version `0.6.3`.
+- A fresh AI/human/AI loop reached revision 7 with browser auto-refresh, human author changes, concise `get_board`, and distinct local/remote status; see `docs/EXPERIENCE_AUDIT.md`.
 
 ## 0.6.2 — Automatic canvas presentation
 

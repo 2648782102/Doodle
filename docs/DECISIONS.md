@@ -7,7 +7,7 @@
 0. **The product is called Doodle.** The project and GitHub repository are `Doodle`; the npm package, CLI, and MCP server identity are `doodle-mcp`.
 1. **The board is the product.** `BOARD_JSON` is the only shared collaboration state. It is independent of project files, graph sessions, and proposal state.
 2. **The agent chat stays in the host.** Remove the duplicate composer and message feed from Doodle. The MCP App remains optional and calls existing board tools through the host bridge; text-only MCP clients retain their complete workflow.
-3. **Four MCP tools are enough.** `get_board` reads `FIRST_USE` / `NEXT_STEPS`, canvas data, and `PANEL_URL`, `show_board` renders the optional UI, and `draw_board` mutates objects. `scan_project` is an optional read-only project-structure helper. The chat-like `reply_on_board` tool remains removed.
+3. **Four MCP tools are enough.** `get_board` reads progressive guidance, canvas data, and `PANEL_URL`, `show_board` renders the optional UI, and `draw_board` mutates objects. `scan_project` is an optional read-only project-structure helper. The chat-like `reply_on_board` tool remains removed.
 4. **AI development stays inside the agent.** No tool opens a browser, IDE window, or editor. Logs stay on stderr; stdout remains clean for MCP JSON-RPC.
 5. **Project scanning is context, not authority.** `scan_project` returns bounded relative paths and `file:line` evidence text. It does not draw automatically, write files, or grant code-change authority.
 6. **Directed arrows are a canvas primitive.** A `line` goes from `(x,y)` to `(x+w,y+h)`; signed `w`/`h` are endpoint deltas. Both views render the same SVG arrow contract.
@@ -22,7 +22,10 @@
 15. **The plugin build is reproducible.** `scripts/build-plugin.mjs` copies both canvas templates and the MCP App bundle, injects the package version, and writes ignored `.doodle-plugin/` output. `npm run check` and CI run the plugin guard.
 16. **Public submission materials are separable from approval.** The repository prepares explicit tool annotations, privacy/support/terms URLs, a versioned ZIP, and `docs/SUBMISSION.md`; allowlisting, verified identity, portal attestations, clean desktop testing, and approval remain OpenAI-side conditions.
 17. **Install and first use are one path.** `npm run setup:codex` is the only recommended Codex install command; `npm run check` never changes global Codex configuration. Direct MCP snippets are zero-configuration `npx -y doodle-mcp`. The first prompt, visible canvas, human edit, and AI reread are documented together. The four-tool protocol and version 1 board state are unchanged.
-18. **Product guidance is progressive, not hidden.** `get_board` leads with short `FIRST_USE` and `NEXT_STEPS` text while preserving its structured snapshot; the canvas has one dismissible `?` popover. Help state lives only in browser localStorage.
+18. **Product guidance is progressive, not hidden.** An empty `get_board` leads with `FIRST_USE` and `NEXT_STEPS`; later reads use one short `NEXT` block and omit the repeated drawing guide. MCP initialization instructions retain the full contract. The canvas has one dismissible `?` popover; help state lives only in browser localStorage.
+19. **New boards start empty.** A clean server writes a version 1 empty board with one initial revision. The retained `createStarterBoard` function remains only for compatibility and tests; the first visual object should come from a person or the AI's first prompt.
+20. **Visual edits record their current author.** Human HTTP writes set `author: "human"`; AI `draw_board` updates set the top-level author, defaulting to `ai`. This prevents the canvas badge and `copyText` from contradicting the last edit.
+21. **Live experience is audited.** [`EXPERIENCE_AUDIT.md`](EXPERIENCE_AUDIT.md) records the end-to-end AI/human test, priorities, acceptance, and closure. Product changes update it rather than adding a parallel roadmap.
 
 ## MCP App boundary
 

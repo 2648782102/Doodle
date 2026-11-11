@@ -278,10 +278,15 @@ export function addBoardItem(board: SimpleBoard, input: BoardItemInput): SimpleB
   return touchBoard({ ...board, items: [...board.items, item] });
 }
 
-export function updateBoardItem(board: SimpleBoard, id: string, patch: Partial<BoardItemInput>): SimpleBoard {
+export function updateBoardItem(
+  board: SimpleBoard,
+  id: string,
+  patch: Partial<BoardItemInput>,
+  author: BoardAuthor = "human",
+): SimpleBoard {
   const existing = board.items.find((item) => item.id === id);
   if (!existing) throw new Error("Board item not found");
-  const normalized = normalizeItem({ ...existing, ...patch, id });
+  const normalized = normalizeItem({ ...existing, ...patch, id, author });
   const timestamp = now();
   return touchBoard({
     ...board,

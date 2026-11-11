@@ -10,7 +10,9 @@ Doodle 不是项目工作台、静态图生成器、聊天产品或批准系统�
 
 ## 30 秒上手
 
-在 Doodle 仓库里运行一条命令：
+选择一条路径：
+
+**Codex 桌面插件**：在 Doodle 仓库里运行一条命令：
 
 ```bash
 npm run setup:codex
@@ -22,15 +24,17 @@ npm run setup:codex
 打开 Doodle 画板，放一张便签，我来改给你看。
 ```
 
-兼容 MCP Apps 的宿主会直接显示画布；AI 会先读画板，再放一个起步对象。你可以选工具点按 / 拖拽、双击改字，画板右上角的 `?` 或键盘 `?` 可随时查看三条提示。改完后在聊天里说「读一下画板」，AI 用 `get_board` 读取你的修改。若宿主不显示嵌入画布，就问 AI 要 `PANEL_URL`，再打开这个本地地址；正常 MCP 调用不会擅自打开浏览器。
+兼容 MCP Apps 的宿主会直接显示画布；AI 会先读画板，再放一个起步对象。你可以选工具点按 / 拖拽、双击或选中后按 `Enter` / 点「编辑」改字，画板右上角的 `?` 或键盘 `?` 可随时查看提示。改完后在聊天里说「读一下画板」，AI 用 `get_board` 读取你的修改。若宿主不显示嵌入画布，就问 AI 要 `PANEL_URL`，再打开这个本地地址；正常 MCP 调用不会擅自打开浏览器。
 
 完整链路：`npm run setup:codex → 新会话 → 首句提示 → 看 / 改同一张画布 → AI 再读`。
+
+**任意 MCP 宿主**：把 [examples/mcp-config/](examples/mcp-config/) 的 `npx -y doodle-mcp` 片段加入宿主配置，重启 MCP 会话后使用同一句提示；画布仍通过 `show_board` / `draw_board` 自动呈现，宿主不渲染时询问 `PANEL_URL`。这条路径不需要 clone 仓库，也不等于公共插件目录发布。
 
 ## 四个 MCP 工具
 
 | 工具 | 用途 |
 |---|---|
-| `get_board` | 读取共享画布：`FIRST_USE` / `NEXT_STEPS` 摘要、revision、对象 ID、坐标、作者、`BOARD_JSON` 与画图规范；默认第一步，只读 |
+| `get_board` | 读取共享画布；空画板给 `FIRST_USE` / `NEXT_STEPS` 和画图规范，有内容后切到简短 `NEXT`，始终保留 revision、对象 ID、坐标、作者与 `BOARD_JSON`；默认第一步，只读 |
 | `show_board` | 在 Agent 对话旁打开可交互的共享画布；用户要求查看或编辑画布时使用 |
 | `draw_board` | 批量新增 / 更新 / 删除便签、文字、矩形、椭圆和有方向箭头；写入会串行应用到最新状态 |
 | `scan_project` | 可选只读扫描当前项目结构，返回有界相对路径和 `file:line` 证据文本；不写文件、不自动画图 |
@@ -118,6 +122,7 @@ npm run doctor
 | [English quickstart](README.en.md) | 英文安装和产品概览 |
 | [AGENTS.md](AGENTS.md) | 给 AI coding agent 的短操作手册 |
 | [产品方向](docs/PRODUCT_DIRECTION.md) | 定义、边界与验收 |
+| [体验审计](docs/EXPERIENCE_AUDIT.md) | 双身份实测、问题优先级与闭环状态 |
 | [Plugin 目标](docs/GOAL_PLUGIN.md) | Codex plugin 的目标、范围与验收 |
 | [架构](docs/ARCHITECTURE.md) | 源码结构、协议、HTTP 与安全模型 |
 | [当前决策](docs/DECISIONS.md) | 0.6.3 体验链路与历史 ADR 状态 |

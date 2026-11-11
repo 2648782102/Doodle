@@ -136,21 +136,30 @@ export function registerBoardTools(server: McpServer, ctx: BoardToolContext): vo
     async () => {
       try {
         const payload = boardJson(await ctx.board.snapshot());
+        const firstUse = payload.itemCount === 0;
+        const guidance = firstUse ? [
+          "FIRST_USE:",
+          "- 先在聊天里说明你想画什么；AI 用 draw_board 落在同一张画布。",
+          "- 人可直接点按、拖拽、双击改字；兼容宿主会显示画布，其他宿主用 PANEL_URL。",
+          ``,
+          "NEXT_STEPS:",
+          "- 用户说「打开画板」：调用 show_board。",
+          "- 需要画或改：调用 draw_board；成功后保持画布可见。",
+          "- 人改完后：再次调用 get_board 读取最新内容。",
+          ``,
+        ] : [
+          "NEXT:",
+          "- 读取 BOARD_JSON 中的对象与坐标；用 show_board 显示、用 draw_board 修改。",
+          "- 人改完后再次调用 get_board；完整画图规范见 MCP instructions。",
+          ``,
+        ];
         return {
           content: [{
             type: "text" as const,
             text: [
                 `🎨 共享画布 · revision ${payload.revision} · ${payload.itemCount} 个对象`,
               ``,
-              "FIRST_USE:",
-              "- 先在聊天里说明你想画什么；AI 用 draw_board 落在同一张画布。",
-              "- 人可直接点按、拖拽、双击改字；兼容宿主会显示画布，其他宿主用 PANEL_URL。",
-              ``,
-              "NEXT_STEPS:",
-              "- 用户说「打开画板」：调用 show_board。",
-              "- 需要画或改：调用 draw_board；成功后保持画布可见。",
-              "- 人改完后：再次调用 get_board 读取最新内容。",
-              ``,
+              ...guidance,
               jsonLine({
                 version: 1,
                 revision: payload.revision,
@@ -161,8 +170,7 @@ export function registerBoardTools(server: McpServer, ctx: BoardToolContext): vo
               "BOARD_JSON:",
               JSON.stringify(payload, null, 2),
               ``,
-              boardGuidance(),
-              ``,
+              ...(firstUse ? [boardGuidance(), ``] : []),
               `PANEL_URL: ${ctx.preview.panelUrl ?? "unavailable (standalone preview not started)"}`,
               ``,
               "BOARD_JSON is the read-only shared state. Use draw_board to add or edit visual objects. Conversation belongs in the agent chat; put shared context on the canvas itself.",
@@ -224,7 +232,7 @@ export function registerBoardTools(server: McpServer, ctx: BoardToolContext): vo
             const input = { ...raw, author: author ?? "ai" as const };
             if (raw.id) {
               const { id: _id, ...patch } = input;
-              next = updateBoardItem(next, raw.id, patch);
+              next = updateBoardItem(next, raw.id, patch, author ?? "ai");
               updated += 1;
             } else {
               next = addBoardItem(next, input);

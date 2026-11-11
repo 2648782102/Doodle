@@ -66,6 +66,16 @@ describe("simple shared board", () => {
     }
   });
 
+  it("records the author of the latest visual edit", () => {
+    let board = addBoardItem(createEmptyBoard(), { type: "note", x: 0, y: 0, text: "AI note", author: "ai" });
+    const id = board.items[0].id;
+    board = updateBoardItem(board, id, { text: "person edited" });
+    expect(board.items[0]).toMatchObject({ text: "person edited", author: "human" });
+    board = updateBoardItem(board, id, { text: "AI revised" }, "ai");
+    expect(board.items[0]).toMatchObject({ text: "AI revised", author: "ai" });
+    expect(boardCopyText(board)).toContain("AI revised · ai");
+  });
+
   it("reloads a newer board written by another process", async () => {
     const outputDir = await fs.mkdtemp(path.join(os.tmpdir(), "doodle-board-sync-"));
     try {
@@ -84,15 +94,15 @@ describe("simple shared board", () => {
     }
   });
 
-  it("starts new boards with a Doodle welcome sketch and rejects stale writes", async () => {
+  it("starts new boards empty and rejects stale writes", async () => {
     const outputDir = await fs.mkdtemp(path.join(os.tmpdir(), "doodle-board-cas-"));
     try {
       const store = new BoardStore(outputDir);
       await store.init();
       const initial = await store.snapshot();
-      expect(initial.title).toContain("Doodle");
-      expect(initial.items.length).toBeGreaterThan(0);
-      expect(initial.notes[0]?.body).toContain("Doodle");
+      expect(initial.title).toContain("和 AI");
+      expect(initial.items.length).toBe(0);
+      expect(initial.notes.length).toBe(0);
       expect(initial.revision).toBe(1);
 
       const stale = addBoardItem(initial, { type: "note", x: 900, y: 0, text: "stale" });

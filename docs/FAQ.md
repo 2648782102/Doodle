@@ -14,7 +14,7 @@ No hosted upload is part of the product. Board state stays on the local machine.
 
 ## What do I say after installing?
 
-Start a new Codex session and say 「打开 Doodle 画板，放一张便签，我来改给你看。」 The AI reads the board, shows it where supported, draws one starter note, and you edit the same canvas. Use the `?` button for three short gestures, then ask the AI to read the board again.
+Start a new Codex session and say 「打开 Doodle 画板，放一张便签，我来改给你看。」 The AI reads the board, shows it where supported, draws one starter note, and you edit the same canvas. Double-click a shape, or select it and press `Enter` / click `Edit`, then ask the AI to read the board again. Use the `?` button for short gestures.
 
 ## Does a drawing change my source code?
 

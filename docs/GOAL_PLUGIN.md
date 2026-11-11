@@ -61,10 +61,10 @@ The plugin is a distribution layer around this product. It must not turn Doodle 
 ## Acceptance
 
 1. `docs/GOAL_PLUGIN.md` remains accurate at completion.
-2. A fresh checkout installs with one command, builds the normal npm CLI and the plugin package without hand-written absolute paths, and uses zero-configuration direct MCP snippets.
+2. A fresh checkout installs with one command, builds the normal npm CLI and the plugin package without hand-written absolute paths, and uses zero-configuration direct MCP snippets. The 30-second guide presents the plugin and direct-MCP paths side by side.
 3. Direct MCP startup and plugin MCP startup expose exactly `get_board`, `show_board`, `draw_board`, and `scan_project`.
 4. The marketplace entry can be discovered by `codex plugin list` or an equivalent local CLI check.
-5. `get_board` returns `FIRST_USE` / `NEXT_STEPS`, `BOARD_JSON`, the drawing guide, and the active loopback `PANEL_URL`; it does not open a browser.
+5. `get_board` returns progressive guidance, `BOARD_JSON`, and the active loopback `PANEL_URL`; it does not open a browser.
 6. The plugin uses isolated writable board state and a free loopback port by default; explicit `OUTPUT_DIR` and `PREVIEW_PORT` continue to override defaults.
 7. `show_board` remains the explicit render tool, and successful `draw_board` results also advertise the optional MCP App so compatible hosts show completed AI drawings; all tools remain usable in text-only hosts.
 8. `scan_project` stays bounded, read-only, workspace-relative, and secret-conservative.

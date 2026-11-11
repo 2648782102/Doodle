@@ -42,7 +42,7 @@ Both runtime paths register exactly four tools:
 
 | Tool | Effect | Output |
 |---|---|---|
-| `get_board` | Reads one shared version 1 board | `FIRST_USE` / `NEXT_STEPS`, `BOARD_JSON`, drawing guide, `PANEL_URL`, structured board snapshot |
+| `get_board` | Reads one shared version 1 board | progressive `FIRST_USE` / `NEXT_STEPS` or `NEXT`, `BOARD_JSON`, `PANEL_URL`, structured board snapshot; drawing guide on an empty board |
 | `show_board` | Returns the optional MCP App resource beside the conversation | initial structured board snapshot and interactive UI |
 | `draw_board` | Adds / updates / removes visual objects under the board lock; can reject stale app edits by expected revision | revision, counts, authoritative structured snapshot |
 | `scan_project` | Reads bounded project paths and evidence | `PROJECT_JSON` and `PROJECT_TEXT` |
@@ -82,7 +82,7 @@ Non-GET `/api/board/*` requests require the random `X-AI-Draw-Token` injected in
 
 `scan_project` walks the configured workspace root with bounded depth and entry count, skips common generated/private directories, ignores dot-private files including `.env`, and reads only small text files for at most five evidence lines per file and 40 total. Candidate lines containing common secret names or credential formats are omitted. Paths are workspace-relative. It returns no file contents beyond short evidence excerpts, no absolute workspace path, and no write capability.
 
-The canvas supports click-to-place defaults, drag-to-size shapes, directional drag-to-draw arrows, Space or middle-button panning, wheel panning, and Ctrl/Command-wheel zoom. Pointer cancellation discards an in-progress drawing. Dragging arrows uses their bounds so negative endpoint deltas do not make them jump. In MCP Apps hosts, a small `展开` control appears when fullscreen is available.
+The canvas supports click-to-place defaults, drag-to-size shapes, directional drag-to-draw arrows, Space or middle-button panning, wheel panning, and Ctrl/Command-wheel zoom. Text editing is available through double-click, the `编辑` button, or `Enter` for a selected non-arrow object; creation returns to the select tool so a later click edits or moves an existing object rather than creating another one. Pointer cancellation discards an in-progress drawing. Dragging arrows uses their bounds so negative endpoint deltas do not make them jump. In MCP Apps hosts, a small `展开` control appears when fullscreen is available.
 
 Project scanning does not modify the board. If the AI wants to show structure, it calls `draw_board` with a layout derived from the scan result.
 
