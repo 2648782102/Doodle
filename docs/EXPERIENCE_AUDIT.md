@@ -54,6 +54,7 @@ Observed friction, ordered by user harm:
 - 2026-11-11: Rebuilt from the current source, restarted a clean temporary `OUTPUT_DIR`, and repeated the loop: `get_board` first-use guidance → `draw_board` → open browser auto-refresh → human create/edit/PATCH → `get_board` concise readback → `draw_board` response → second AI write. The open browser reached revision 7 without reload.
 - 2026-11-11: `npm run check` passed: TypeScript, build, 31 tests, examples, repository/plugin guards, setup dry-run, submission ZIP, doctor, and npm package dry-run. `git diff --check` also passed.
 - 2026-11-11: Isolated `CODEX_HOME` smoke ran `npm run setup:codex`, `codex plugin list --marketplace doodle --available --json`, and installed/enabled `doodle@doodle 0.6.3` without modifying the user's active `~/.codex` configuration.
+- 2026-11-11: The first remote run exposed two release-chain gaps: Node 20 lacks a global `WebSocket`, and `gh release create --verify-tag` requires an existing tag. The WebSocket test now uses the project's `ws` client, and the release workflow creates/pushes `v<version>` before creating the verified release. CI and Publish Release both passed on `08f000a`; `v0.6.3` was published with `doodle-0.6.3.zip`.
 - E11 is external because MCP Apps rendering is a host capability. It is closed as a documented fallback rather than a code change; the product does not add a fifth tool, browser-opening side effect, or second canvas session.
 
 ## Boundaries
