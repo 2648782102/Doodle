@@ -3,13 +3,11 @@
 ## First run
 
 ```bash
-npm install
-npm run build
-npm run check
+npm run setup:codex
 npm run doctor
 ```
 
-For Codex, build first and add this repository as a local plugin marketplace with `codex plugin marketplace add . --json`; then install `doodle@doodle`. For direct MCP hosts, configure the stdio server using a snippet from `examples/mcp-config/`. Set `DOODLE_WORKSPACE_ROOT` to the project the agent is working on and `OUTPUT_DIR` to a writable location. Older `AI_DRAW_WORKSPACE_ROOT` settings still work as a legacy alias.
+`npm run setup:codex` builds the plugin, adds this repository as a local marketplace, and installs `doodle@doodle`. Start a new Codex session and use one first prompt: 「打开 Doodle 画板，放一张便签，我来改给你看。」 If the host cannot embed the canvas, ask the agent for `PANEL_URL`. For direct MCP hosts, use a zero-configuration snippet from `examples/mcp-config/`; set `DOODLE_WORKSPACE_ROOT` only when the MCP server starts outside the project that `scan_project` should inspect. Older `AI_DRAW_WORKSPACE_ROOT` settings still work as a legacy alias.
 
 ## Common issues
 
@@ -23,7 +21,7 @@ Check that the browser is on the `PANEL_URL` reported by `get_board` and that th
 
 ### The plugin is not discovered
 
-Run `npm run build` so `.doodle-plugin/doodle/` exists, then `codex plugin marketplace add . --json` and `codex plugin list --marketplace doodle --available --json`. The marketplace is local/repository-scoped; it is not a public plugin directory submission.
+Run `npm run setup:codex` so `.doodle-plugin/doodle/` exists and the local marketplace is installed. To inspect discovery, run `codex plugin list --marketplace doodle --available --json`. The marketplace is local/repository-scoped; it is not a public plugin directory submission. Start a new session after installation.
 
 ### Public plugin submission is blocked
 

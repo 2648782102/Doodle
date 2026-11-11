@@ -19,6 +19,7 @@ function templateCandidates(config: AppConfig): string[] {
     path.resolve(config.cwd, "infra", "templates", "board.html"),
     path.resolve(sourceDir, "../../../infra/templates/board.html"),
     path.resolve(sourceDir, "../../src/infra/templates/board.html"),
+    path.resolve(sourceDir, "../infra/templates/board.html"),
     path.resolve(sourceDir, "../templates/board.html"),
     path.resolve(sourceDir, "../../dist/infra/templates/board.html"),
   ];

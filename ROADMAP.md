@@ -2,7 +2,7 @@
 
 Doodle is a simple shared infinite board. The roadmap protects that boundary rather than listing a large feature catalogue.
 
-## Shipped baseline — 0.6.2
+## Shipped baseline — 0.6.3
 
 - One version 1 board state shared by MCP tools and the local human canvas.
 - Four tools: `get_board`, `show_board`, `draw_board`, and optional `scan_project`.
@@ -13,6 +13,7 @@ Doodle is a simple shared infinite board. The roadmap protects that boundary rat
 - A desktop-only Codex plugin with one compatibility manifest, one bundled stdio server, a repository marketplace, plugin-safe data/workspace resolution, an optional loopback port, and a plugin guard in `npm run check` and CI.
 - Explicit MCP tool annotations, published privacy/support/terms pages, a versioned submission ZIP, and documented public-directory eligibility gates.
 - An idempotent publish workflow that creates the GitHub Release and attaches the submission ZIP after the full check.
+- A one-command `npm run setup:codex` install path, one first-use prompt, zero-configuration direct MCP examples, `FIRST_USE` / `NEXT_STEPS` agent guidance, and a dismissible canvas `?` help popover.
 
 ## Near-term work
 
@@ -20,7 +21,7 @@ Doodle is a simple shared infinite board. The roadmap protects that boundary rat
 - Improve agent-facing guidance with concrete, tested layout conventions for architecture sketches.
 - Keep project scan evidence bounded, private-path safe, and useful without making structure the product.
 - Strengthen tests around atomic board persistence, HTTP authorization, MCP instructions, and package contents.
-- Improve local plugin installation and reload ergonomics without changing the four-tool protocol or adding hosted infrastructure.
+- Measure whether first-session canvas visibility and host reload remain friction points, without changing the four-tool protocol or adding hosted infrastructure.
 
 ## Explicit non-goals
 

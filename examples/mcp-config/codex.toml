@@ -1,11 +1,5 @@
+# 在当前项目的 .codex/config.toml 中加入下面这段；无需填写绝对路径。
+# 首次运行会从 npm 下载 doodle-mcp，并自动选择空闲本地端口。
 [mcp_servers.doodle]
-command = "node"
-args = ["<absolute-path-to>/Doodle/dist/index.js"]
-cwd = "<absolute-path-to-your-project>"
-
-[mcp_servers.doodle.env]
-DOODLE_WORKSPACE_ROOT = "<absolute-path-to-your-project>"
-OUTPUT_DIR = "<absolute-path-to>/Doodle/output"
-PREVIEW_HOST = "127.0.0.1"
-PREVIEW_PORT = "3399"
-LOG_LEVEL = "info"
+command = "npx"
+args = ["-y", "doodle-mcp"]

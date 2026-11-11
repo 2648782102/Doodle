@@ -11,16 +11,24 @@ The board is the product. Project structure is only one optional subject that ca
 Default loop:
 
 ```text
-get_board → show_board → draw_board → person edits the same canvas → AI reads it again
+install once → new agent session → get_board → show_board → draw_board → person edits the same canvas → AI reads it again
 ```
 
-Shared visual context is anchored to objects, coordinates, text, and authors. `scan_project` may provide bounded read-only project context; it does not draw, change the board, write files, or authorize code changes. `get_board` also reports `PANEL_URL`, the active local human-facing address.
+Install and first-use experience:
+
+- `npm run setup:codex` is the one-command Codex install path. It runs `npm install` when needed, builds the self-contained plugin, adds the repository marketplace, installs `doodle@doodle`, and prints one first prompt. It never runs as a hidden side effect of validation.
+- Official OpenAI documentation distinguishes local marketplaces from the public plugin directory; installed plugin skills and MCP tools are used in a new session. See [Package your plugin](https://developers.openai.com/plugins/build/plugins) and [Developer commands](https://learn.chatgpt.com/docs/developer-commands).
+- Direct MCP examples use zero-configuration `npx -y doodle-mcp`; `DOODLE_WORKSPACE_ROOT` and other environment variables are optional overrides, not installation prerequisites.
+- `get_board` starts with `FIRST_USE` and `NEXT_STEPS`, then retains `BOARD_JSON`, the drawing guide, and `PANEL_URL`. Its structured snapshot and version 1 board state are unchanged.
+- The canvas exposes a dismissible `?` help popover with three human gestures. It is UI state in browser localStorage, never board state or permission.
+
+Shared visual context is anchored to objects, coordinates, text, and authors. `scan_project` may provide bounded read-only project context; it does not draw, change the board, write files, or authorize code changes. `get_board` also reports `PANEL_URL`, the active local human-facing address; mention it when a person asks where to look or when the host cannot render an embedded canvas.
 
 ## Four MCP tools
 
 | Tool | Use |
 |---|---|
-| `get_board` | Read `BOARD_JSON`: object IDs, coordinates, authors, `PANEL_URL`, and the drawing guide. Read-only. |
+| `get_board` | Read `FIRST_USE` / `NEXT_STEPS`, `BOARD_JSON`: object IDs, coordinates, authors, `PANEL_URL`, and the drawing guide. Read-only. |
 | `show_board` | Render the optional MCP App canvas in compatible hosts when the user asks to see or edit the board. |
 | `draw_board` | Batch add, update, or remove simple visual objects. Use `remove_ids` to clear old objects before redrawing a full diagram. |
 | `scan_project` | Optional bounded read-only project paths and `file:line` evidence. Visualize the result with `draw_board` only when useful. |
@@ -60,6 +68,7 @@ src/
 plugins/doodle/                 installable Codex plugin source: compatibility manifest, MCP config, skill, assets
 .agents/plugins/                repository-scoped plugin marketplace catalog
 scripts/                        build, plugin build, doctor, and offline repository guards
+scripts/setup-codex.mjs         one-command Codex plugin install and first-use guide
 test/                           board, HTTP, and MCP integration checks
 examples/                       MCP host config and a minimal client
 docs/                           product, architecture, decisions, and maintenance

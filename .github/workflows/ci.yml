@@ -30,6 +30,7 @@ jobs:
       - run: npm run test:examples
       - run: npm run repo:check
       - run: npm run repo:plugin-check
+      - run: npm run setup:codex -- --dry-run
       - run: npm run build:submission
       - run: npm run doctor
       - run: npm pack --dry-run

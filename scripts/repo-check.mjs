@@ -57,6 +57,10 @@ const submissionScript = await read("scripts/build-submission.mjs");
 const config = await read("src/infra/config.ts");
 const projectWorkspace = await read("src/infra/project-workspace.ts");
 const version = await read("src/infra/version.ts");
+const setupScript = await read("scripts/setup-codex.mjs");
+const stdioExample = JSON.parse(await read("examples/mcp-config/stdio.json"));
+const cursorExample = JSON.parse(await read("examples/mcp-config/cursor.json"));
+const codexExample = await read("examples/mcp-config/codex.toml");
 const sourceFiles = (await fs.readdir(path.join(root, "src", "board"), { recursive: true }))
   .filter((name) => typeof name === "string" && name.endsWith(".ts"));
 const totalSourceFiles = (await fs.readdir(path.join(root, "src"), { recursive: true }))
@@ -64,7 +68,7 @@ const totalSourceFiles = (await fs.readdir(path.join(root, "src"), { recursive: 
 const canonicalDescription = "A shared canvas for people and AI to draw together through MCP.";
 const canonicalTopics = ["ai", "canvas", "developer-tools", "drawing", "local-first", "mcp", "typescript", "whiteboard"];
 
-check(packageJson.version === "0.6.2", "package.json is not version 0.6.2");
+check(packageJson.version === "0.6.3", "package.json is not version 0.6.3");
 check(pluginManifest.version === packageJson.version, "plugin version does not match package.json");
 check(pluginManifest.requires_local_executor === true, "plugin is not marked desktop-only");
 check(pluginMcp.mcpServers.doodle.args[0] === "${PLUGIN_ROOT}/server/index.mjs", "plugin MCP entrypoint is not self-contained");
@@ -72,7 +76,10 @@ check(marketplace.plugins[0].source.path === "./.doodle-plugin/doodle", "marketp
 check(pluginSkill.includes("get_board") && pluginSkill.includes("show_board") && !pluginSkill.includes("reply_on_board"), "plugin skill does not describe the current board workflow");
 check(goalPlugin.includes("## Objective") && goalPlugin.includes("plugin") && goalPlugin.includes("MCP Apps"), "plugin goal document is missing or stale");
 check(packageJson.scripts.build.includes("build-plugin.mjs") && packageJson.scripts.check.includes("repo:plugin-check"), "npm scripts do not build and check the plugin");
+check(packageJson.scripts["setup:codex"] === "node scripts/setup-codex.mjs", "one-command Codex setup is missing");
+check(packageJson.scripts.check.includes("setup:codex -- --dry-run"), "npm check does not dry-run the Codex setup");
 check(ci.includes("npm run repo:plugin-check"), "CI does not run the plugin guard");
+check(ci.includes("npm run setup:codex -- --dry-run"), "CI does not dry-run the Codex setup");
 check(ci.includes("npm run build:submission"), "CI does not build the submission ZIP");
 check(publishWorkflow.includes("contents: write") && publishWorkflow.includes("gh release create"), "publish workflow cannot create a release");
 check(publishWorkflow.includes("npm run check") && publishWorkflow.includes("--notes-file"), "publish workflow does not verify the package or use changelog notes");
@@ -102,6 +109,7 @@ check(!buildScript.includes('fs.rm(path.join(root, "dist")'), "build.mjs deletes
 check(buildScript.includes("pruneCompiledFiles"), "build.mjs does not prune stale compiled artifacts");
 check(buildScript.indexOf("await pruneCompiledFiles(distDir, expected);") < buildScript.indexOf("await fs.mkdir(targetDir, { recursive: true });"), "build.mjs creates the template target before pruning empty dist directories");
 check(instructions.includes("get_board") && instructions.includes("show_board") && instructions.includes("scan_project is optional"), "MCP instructions do not describe the canvas data and render tools");
+check(instructions.includes("First use") && instructions.includes("FIRST_USE"), "MCP instructions do not include the first-use path");
 check(instructions.includes("PANEL_URL") && !instructions.includes("reply_on_board"), "MCP instructions do not describe the local panel URL correctly");
 check(instructions.includes("Doodle is"), "MCP instructions do not introduce Doodle");
 check(sourceFiles.length === 10, `src/board has ${sourceFiles.length} TypeScript modules; expected the focused ten-module structure`);
@@ -112,6 +120,7 @@ check(tools.includes("registerAppResource") && tools.includes('"ui://doodle/boar
 check(tools.includes('"show_board"') && tools.includes('"get_board"'), "canvas render and data tools are not separated");
 check(tools.includes("CANVAS_UI_META") && tools.includes("_meta: CANVAS_UI_META"), "draw_board does not advertise the canvas for automatic post-draw rendering");
 check(tools.includes("appBundleCandidates(ctx.config)") && tools.includes("PANEL_URL"), "MCP App resources are not plugin-safe and the panel URL is missing");
+check(tools.includes("FIRST_USE") && tools.includes("NEXT_STEPS"), "get_board does not lead with first-use and next-step guidance");
 check(tools.includes("structuredContent: boardJson(board)"), "board tools do not return an authoritative structured snapshot");
 check(tools.includes('"scan_project"') && tools.includes("Use draw_board to visualize"), "scan_project is not a read-only board-context tool");
 check(boardTypes.includes("signedWidth") && boardTypes.includes("signedHeight"), "board types lost signed directed-arrow deltas");
@@ -122,6 +131,7 @@ check(boardTemplate.includes("<title>Doodle</title>") && boardTemplate.includes(
 check(boardTemplate.includes("doodleBoardViewport") && !boardTemplate.includes('setItem("aiDrawBoardViewport"'), "board template does not use Doodle view-preference keys");
 check(!boardTemplate.includes('id="noteInput"') && !boardTemplate.includes('class="side"'), "board template still contains a duplicate conversation pane");
 check(boardTemplate.includes("DoodleBoardInit") && boardTemplate.includes("MCP_APP_BUNDLE") && boardTemplate.includes("btnExpand"), "board template is not connected to the MCP Apps adapter");
+check(boardTemplate.includes("btnHelp") && boardTemplate.includes("doodleHelpSeen") && boardTemplate.includes('event.key === "?"'), "board template lost its dismissible help popover");
 check(buildScript.includes('entryPoints: [path.join(sourceRoot, "board", "app.ts")]') && buildScript.includes("minify: true"), "build does not bundle a compact MCP App client");
 check(instructions.includes("conversation") && !instructions.includes("reply_on_board"), "MCP instructions duplicate the host conversation");
 check(http.includes('"/api/board"') && http.includes("X-AI-Draw-Token"), "board HTTP server lost its authenticated API");
@@ -168,6 +178,11 @@ check(submissionScript.includes("zip") && submissionScript.includes("doodle-${pa
 check(await exists("CODE_OF_CONDUCT.md"), "CODE_OF_CONDUCT.md is missing");
 check(await exists(".github/workflows/ci.yml"), "CI workflow is missing");
 check(await exists("examples/board-client.mjs"), "board MCP client example is missing");
+check(stdioExample.command === "npx" && stdioExample.args?.[0] === "-y" && stdioExample.args?.[1] === "doodle-mcp", "generic stdio example is not zero-configuration");
+check(cursorExample.mcpServers?.doodle?.command === "npx" && !JSON.stringify(cursorExample).includes("absolute-path"), "Cursor stdio example is not zero-configuration");
+check(codexExample.includes('args = ["-y", "doodle-mcp"]') && !codexExample.includes("absolute-path"), "Codex stdio example is not zero-configuration");
+check(setupScript.includes('"plugin", "marketplace", "add"') && setupScript.includes('"plugin", "add", "doodle@doodle"') && setupScript.includes("--dry-run"), "setup script does not safely install the local plugin");
+check(setupScript.includes('if (dryRun) return { status: 0 }') || setupScript.includes("if (dryRun) return { status: 0; }"), "setup dry-run can still execute commands");
 check(await exists("plugins/doodle/skills/doodle/SKILL.md") && await exists("scripts/build-plugin.mjs") && await exists("scripts/plugin-check.mjs"), "plugin packaging files are incomplete");
 check(totalSourceFiles.length === 17, `src has ${totalSourceFiles.length} TypeScript modules; expected the focused plugin-ready structure`);
 

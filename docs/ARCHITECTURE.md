@@ -28,12 +28,13 @@ src/
 │   └── templates/board.html    shared standalone and embedded infinite canvas
 plugins/doodle/                 compatibility manifest, MCP config, skill, assets
 .agents/plugins/                repository-scoped plugin marketplace
+scripts/setup-codex.mjs         one-command local Codex plugin install and first-use guide
 scripts/build.mjs               copies HTML and bundles the optional MCP Apps client
 scripts/build-plugin.mjs        bundles the self-contained plugin server and templates
 scripts/plugin-check.mjs        validates plugin manifests, skill, marketplace, and build output
 ```
 
-There is no `src/domain/` workbench model, Mermaid renderer, session store, proposal store, or legacy panel template in `0.6.2`. The plugin uses only the supported Codex compatibility layout; generated `.doodle-plugin/` output is ignored.
+There is no `src/domain/` workbench model, Mermaid renderer, session store, proposal store, or legacy panel template in `0.6.3`. The plugin uses only the supported Codex compatibility layout; generated `.doodle-plugin/` output is ignored.
 
 ## MCP surface
 
@@ -41,7 +42,7 @@ Both runtime paths register exactly four tools:
 
 | Tool | Effect | Output |
 |---|---|---|
-| `get_board` | Reads one shared version 1 board | `BOARD_JSON`, drawing guide, structured board snapshot |
+| `get_board` | Reads one shared version 1 board | `FIRST_USE` / `NEXT_STEPS`, `BOARD_JSON`, drawing guide, `PANEL_URL`, structured board snapshot |
 | `show_board` | Returns the optional MCP App resource beside the conversation | initial structured board snapshot and interactive UI |
 | `draw_board` | Adds / updates / removes visual objects under the board lock; can reject stale app edits by expected revision | revision, counts, authoritative structured snapshot |
 | `scan_project` | Reads bounded project paths and evidence | `PROJECT_JSON` and `PROJECT_TEXT` |
@@ -62,7 +63,7 @@ All board mutations are pure functions in `src/board/types.ts`. They validate fi
 
 ## Human HTTP surface
 
-The HTTP server binds to `127.0.0.1` by default and a free loopback port when `PREVIEW_PORT` is unset. MCP stdio is connected first; preview startup failure is logged on stderr and leaves the tools usable. `get_board` reports the active `PANEL_URL`. The server serves the standalone canvas:
+The HTTP server binds to `127.0.0.1` by default and a free loopback port when `PREVIEW_PORT` is unset. MCP stdio is connected first; preview startup failure is logged on stderr and leaves the tools usable. `get_board` reports the active `PANEL_URL`. The standalone and embedded canvas share one template with an optional `?` help popover; its dismissed state is browser localStorage only. The bundled plugin resolves both templates relative to its own `server/index.mjs`, so the human fallback works even when the host starts it from a project root. The server serves the standalone canvas:
 
 | Endpoint | Purpose |
 |---|---|

@@ -38,7 +38,7 @@ const terms = await read("TERMS.md");
 const submission = await read("docs/SUBMISSION.md");
 const submissionScript = await read("scripts/build-submission.mjs");
 
-check(packageJson.version === "0.6.2" && manifest.version === packageJson.version, "plugin version does not match package.json 0.6.2");
+check(packageJson.version === "0.6.3" && manifest.version === packageJson.version, "plugin version does not match package.json 0.6.3");
 check(packageJson.scripts.build.includes("build-plugin.mjs"), "npm build does not produce the plugin package");
 check(packageJson.scripts.check.includes("repo:plugin-check"), "npm check does not run the plugin guard");
 check(manifest.name === "doodle", "plugin identity is not doodle");
@@ -56,6 +56,7 @@ for (const [field, expected] of [
 check(manifest.interface.shortDescription.length <= 30, "short description exceeds directory limit");
 check(manifest.interface.longDescription.length <= 4000, "long description exceeds directory limit");
 check(manifest.interface.defaultPrompt.length <= 3 && manifest.interface.defaultPrompt.every((prompt) => prompt.length <= 128), "starter prompts exceed directory limits");
+check(manifest.interface.defaultPrompt.length === 1 && manifest.interface.defaultPrompt[0].includes("打开 Doodle 画板"), "plugin does not expose one natural first prompt");
 check(!await exists("plugins/doodle/plugin.json") && !await exists("plugins/doodle/mcp.json"), "portable manifests conflict with the single compatibility layout");
 check(mcp.mcpServers.doodle?.type === "stdio", "MCP transport type is not stdio");
 check(mcp.mcpServers.doodle?.command === "node", "MCP stdio command is missing");
@@ -66,14 +67,17 @@ check(mcp.mcpServers.doodle?.env_vars?.includes("PLUGIN_DATA") === true, "MCP en
 check(marketplace.plugins?.[0]?.name === "doodle", "marketplace does not expose doodle");
 check(marketplace.plugins?.[0]?.source?.path === "./.doodle-plugin/doodle", "marketplace does not point at the generated plugin package");
 check(skill.includes("get_board") && skill.includes("show_board") && skill.includes("draw_board") && skill.includes("scan_project"), "Doodle skill lacks the four-tool workflow");
+check(skill.includes("FIRST_USE") && skill.includes("NEXT_STEPS") && skill.includes("打开 Doodle 画板"), "Doodle skill does not lead with the first-use path");
 check(!skill.includes("reply_on_board"), "Doodle skill references the removed reply tool");
 check(skill.includes("PANEL_URL") && !skill.includes("Open a browser"), "Doodle skill mishandles the human panel URL");
 check(buildScript.includes("bundle: true") && buildScript.includes("board.html") && buildScript.includes("board-app.js"), "plugin build is not self-contained");
 check(buildScript.includes("__DOODLE_PLUGIN_VERSION__"), "plugin build does not inject the package version");
 check(pluginCheckScript.includes("requires_local_executor"), "plugin guard does not verify desktop-only status");
 check(httpSource.includes("templateCandidates(this.config)") && httpSource.includes('"server", "infra", "templates", "board.html"'), "bundled server cannot resolve plugin board templates");
+check(httpSource.includes('"../infra/templates/board.html"'), "bundled server cannot resolve board templates relative to its own server bundle");
 check(toolsSource.includes("appBundleCandidates(ctx.config)") && toolsSource.includes('"server", "infra", "templates", "board-app.js"'), "bundled server cannot resolve the MCP App bundle");
 check(toolsSource.includes("CANVAS_UI_META") && toolsSource.includes("_meta: CANVAS_UI_META"), "bundled draw_board path does not advertise automatic post-draw rendering");
+check(toolsSource.includes("FIRST_USE") && toolsSource.includes("NEXT_STEPS"), "bundled get_board path lacks progressive first-use guidance");
 check(toolsSource.includes("PANEL_URL") && instructions.includes("PANEL_URL"), "active local panel URL is not exposed to the agent");
 check(!instructions.includes("reply_on_board"), "MCP instructions reference the removed reply tool");
 check(configSource.includes("previewPort: rawPort ? parsePort(rawPort) : null") && configSource.includes("PLUGIN_DATA"), "runtime config is not plugin-safe");
@@ -81,6 +85,7 @@ check(versionSource.includes("__DOODLE_PLUGIN_VERSION__"), "bundled server canno
 check(indexSource.indexOf("await mcp.connect(transport);") < indexSource.indexOf("await preview.start();"), "MCP stdio is not connected before optional preview startup");
 check(indexSource.includes("Preview unavailable"), "preview failure does not keep the MCP server alive");
 check(ci.includes("npm run repo:plugin-check"), "CI does not run the plugin guard");
+check(ci.includes("npm run setup:codex -- --dry-run"), "CI does not dry-run the Codex setup");
 check(ci.includes("npm run build:submission"), "CI does not build the submission ZIP");
 check(gitignore.includes(".doodle-plugin/") && gitignore.includes(".doodle-data/") && gitignore.includes("doodle-plugin-submission/"), "generated plugin output, plugin data, or submission ZIP is not ignored");
 check(goal.includes("## Objective") && goal.includes("show_board") && goal.includes("plugin"), "plugin goal document is incomplete");

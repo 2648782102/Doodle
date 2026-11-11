@@ -2,6 +2,32 @@
 
 All notable changes are documented here. Versions follow `VERSIONING.md`.
 
+## 0.6.3 — Complete install-to-use experience
+
+### Added
+
+- Added `npm run setup:codex`: one command installs dependencies when needed, builds the self-contained plugin, registers the repository marketplace, installs `doodle@doodle`, and prints one first-use prompt. `--dry-run` previews every command without changing Codex configuration.
+- Added a short `FIRST_USE` / `NEXT_STEPS` preamble to `get_board`, a next-step line to `draw_board`, and matching initialization/skill guidance. The structured version 1 board snapshot is unchanged.
+- Added a dismissible `?` help button and `?` keyboard shortcut to the shared standalone and embedded canvas, with three concise human gestures. Help state is browser localStorage only.
+
+### Changed
+
+- Replaced the multi-command Codex plugin quickstart with a 30-second path: install once, start a new session, use one first prompt, see or edit the canvas, then ask the AI to read it again. README and English README now lead with this complete chain.
+- Replaced placeholder direct MCP examples with zero-configuration `npx -y doodle-mcp` snippets. `DOODLE_WORKSPACE_ROOT`, `OUTPUT_DIR`, `PREVIEW_HOST`, `PREVIEW_PORT`, and `LOG_LEVEL` are now clearly optional overrides.
+- Updated `doctor` to present user-facing first-use steps and avoid treating the submission ZIP as a routine installation warning.
+- Fixed the bundled plugin's standalone canvas template lookup so `PANEL_URL` returns a usable page even when the MCP host starts `server/index.mjs` from a project root.
+- Synchronized the product handbook, product direction, architecture, decisions, plugin goal, roadmap, launch copy, examples, guards, tests, and CI with the new install/first-use experience.
+
+### Compatibility
+
+- The four MCP tools, their schemas and annotations, version 1 persisted board state, HTTP authorization, and revision-safe writes are unchanged.
+- The setup script is user-invoked only; `npm run check` and CI never modify the active user's Codex configuration.
+
+### Validation
+
+- `npm run check` passes with 27 tests, repository and plugin guards, setup dry-run, submission ZIP, doctor, and npm package dry-run.
+- An isolated `CODEX_HOME` marketplace/installation smoke test discovers and enables `doodle@doodle` version `0.6.3`.
+
 ## 0.6.2 — Automatic canvas presentation
 
 ### Changed

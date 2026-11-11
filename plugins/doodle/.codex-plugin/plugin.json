@@ -1,6 +1,6 @@
 {
   "name": "doodle",
-  "version": "0.6.2",
+  "version": "0.6.3",
   "description": "A local-first shared infinite board for people and AI, packaged as a desktop-only Codex plugin and MCP server.",
   "homepage": "https://github.com/2648782102/Doodle#readme",
   "repository": "https://github.com/2648782102/Doodle",
@@ -27,8 +27,7 @@
     "logo": "./assets/doodle.svg",
     "logoDark": "./assets/doodle-dark.svg",
     "defaultPrompt": [
-      "Read the Doodle board, then sketch a simple explanation on the shared canvas.",
-      "Show the Doodle board and add a clean layout for the idea we are discussing."
+      "打开 Doodle 画板，放一张便签，我来改给你看。"
     ],
     "brandColor": "#f59e0b",
     "screenshots": []

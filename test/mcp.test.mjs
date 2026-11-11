@@ -104,6 +104,7 @@ describe("MCP board server", () => {
       expect(client.getInstructions()).toContain("Use get_board");
       expect(client.getInstructions()).toContain("show_board");
       expect(client.getInstructions()).toContain("scan_project is optional");
+      expect(client.getInstructions()).toContain("First use");
     });
   }, 30_000);
 
@@ -123,6 +124,8 @@ describe("MCP board server", () => {
     await withClient(3441, async (client) => {
       const text = textOf(await client.callTool({ name: "get_board", arguments: {} }));
       expect(text).toContain("BOARD_JSON:");
+      expect(text).toContain("FIRST_USE:");
+      expect(text).toContain("NEXT_STEPS:");
       expect(text).toContain("Drawing guide:");
       expect(text).toMatch(/PANEL_URL: http:\/\/127\.0\.0\.1:\d+\//);
       expect(text).toContain("(x,y) to (x+w,y+h)");
@@ -172,6 +175,7 @@ describe("MCP board server", () => {
         },
       }));
       expect(drawn).toContain("新增 2");
+      expect(drawn).toContain("NEXT: 保持画布可见");
       const snapshot = (await client.callTool({
         name: "draw_board",
         arguments: { items: [{ type: "text", x: 320, y: 0, text: "共享画布" }] },

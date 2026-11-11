@@ -52,7 +52,15 @@ if (fs.existsSync(pluginServer)) pass("已构建插件 server/index.mjs");
 else warn("未找到插件 server/index.mjs — 请先运行 npm run build:plugin");
 const packageVersion = JSON.parse(fs.readFileSync(path.join(root, "package.json"), "utf8")).version;
 const submissionZip = path.join(root, "doodle-plugin-submission", `doodle-${packageVersion}.zip`);
-if (fs.existsSync(submissionZip)) pass(`已构建插件提交包 doodle-${packageVersion}.zip`);
-else warn(`未找到插件提交包 doodle-${packageVersion}.zip — 请先运行 npm run build:submission`);
-console.log(`ℹ️  MCP 配置示例：examples/mcp-config/；插件构建产物：.doodle-plugin/doodle/；本机 Codex 配置：${configPath}`);
+if (fs.existsSync(submissionZip)) console.log(`ℹ️  已构建插件提交包 doodle-${packageVersion}.zip（仅审核发行需要）`);
+console.log([
+  "",
+  "首次使用：",
+  "  1. npm run setup:codex",
+  "  2. 开启一个新的 Codex 会话",
+  "  3. 说：「打开 Doodle 画板，放一张便签，我来改给你看。」",
+  "  4. 在画布上直接修改，再让 AI 读取画板",
+  "",
+  `ℹ️  零配置 MCP 示例：examples/mcp-config/；插件构建产物：.doodle-plugin/doodle/；本机 Codex 配置：${configPath}`,
+].join("\n"));
 process.exit(ok ? 0 : 1);

@@ -1,15 +1,8 @@
 {
   "mcpServers": {
     "doodle": {
-      "command": "node",
-      "args": ["<absolute-path-to>/Doodle/dist/index.js"],
-      "env": {
-        "DOODLE_WORKSPACE_ROOT": "<absolute-path-to-your-project>",
-        "OUTPUT_DIR": "<absolute-path-to>/Doodle/output",
-        "PREVIEW_HOST": "127.0.0.1",
-        "PREVIEW_PORT": "3399",
-        "LOG_LEVEL": "info"
-      }
+      "command": "npx",
+      "args": ["-y", "doodle-mcp"]
     }
   }
 }

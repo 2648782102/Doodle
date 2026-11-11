@@ -90,6 +90,40 @@
     .tool[aria-pressed="true"] { background: var(--accent-soft); color: var(--accent); }
     .tool-hint { padding: 0 8px; align-self: center; color: var(--muted); font-size: 11px; white-space: nowrap; }
     .tool.danger:hover { background: #fff1f1; color: #b91c1c; }
+    .help-button {
+      position: absolute;
+      top: 12px;
+      right: 12px;
+      z-index: 5;
+      width: 30px;
+      height: 30px;
+      border: 1px solid var(--line);
+      border-radius: 50%;
+      background: rgba(255, 255, 255, 0.96);
+      color: var(--muted);
+      cursor: pointer;
+    }
+    .help-button:hover { color: var(--accent); background: var(--surface); }
+    .help-popover {
+      position: absolute;
+      top: 50px;
+      right: 12px;
+      z-index: 6;
+      width: min(280px, calc(100vw - 24px));
+      padding: 12px 14px;
+      border: 1px solid var(--line);
+      border-radius: 10px;
+      background: var(--surface);
+      box-shadow: 0 12px 30px rgba(15, 23, 42, 0.12);
+      color: var(--text);
+      font-size: 12px;
+      line-height: 1.55;
+    }
+    .help-popover[hidden] { display: none; }
+    .help-popover strong { display: block; margin-bottom: 6px; font-size: 13px; }
+    .help-popover ul { margin: 0; padding-left: 18px; }
+    .help-popover li + li { margin-top: 4px; }
+    .help-popover .help-close { float: right; margin: -3px -4px 0 8px; border: 0; background: transparent; color: var(--muted); cursor: pointer; }
     .viewbar {
       position: absolute;
       left: 12px;
@@ -202,6 +236,16 @@
         <button class="tool danger" id="btnDelete" title="删除选中对象 (Delete)">删除</button>
         <span class="tool-hint" aria-hidden="true">点按放置 · 拖拽定形 · Space 平移</span>
       </div>
+      <button class="help-button" id="btnHelp" aria-label="查看 Doodle 使用提示" aria-expanded="false" title="使用提示 (?)">?</button>
+      <div class="help-popover" id="helpPopover" hidden role="dialog" aria-label="Doodle 使用提示">
+        <button class="help-close" id="btnHelpClose" aria-label="关闭提示">×</button>
+        <strong>和 AI 共用这张画布</strong>
+        <ul>
+          <li>在 Agent 聊天里让 AI 画；改完后说「读一下画板」。</li>
+          <li>选工具后点按放置或拖拽定形，双击对象改字。</li>
+          <li>Space / 中键拖动平移，滚轮平移，Ctrl/⌘ + 滚轮缩放。</li>
+        </ul>
+      </div>
       <div id="canvas" tabindex="0" aria-label="可平移缩放的无限画布">
         <div id="world"></div>
         <div id="emptyState">点按快速放置 · 拖拽定尺寸 · Space + 拖动画布</div>
@@ -224,6 +268,9 @@
     const statusElement = document.querySelector("#status");
     const boardTitle = document.querySelector("#boardTitle");
     const toastElement = document.querySelector("#toast");
+    const helpButton = document.querySelector("#btnHelp");
+    const helpPopover = document.querySelector("#helpPopover");
+    const helpCloseButton = document.querySelector("#btnHelpClose");
     const toolButtons = [...document.querySelectorAll(".tool[data-tool]")];
     const headers = { "Content-Type": "application/json", "X-AI-Draw-Token": PANEL_TOKEN };
     const boardEndpoints = {
@@ -274,6 +321,12 @@
 
     function setStatus(message) {
       statusElement.textContent = message;
+    }
+
+    function setHelpOpen(open) {
+      helpPopover.hidden = !open;
+      helpButton.setAttribute("aria-expanded", String(open));
+      if (open) storageSet("doodleHelpSeen", "1");
     }
 
     function applyViewport() {
@@ -628,6 +681,8 @@
 
     for (const button of toolButtons) button.addEventListener("click", () => selectTool(button.dataset.tool));
     document.querySelector("#btnDelete").addEventListener("click", deleteSelected);
+    helpButton.addEventListener("click", () => setHelpOpen(helpPopover.hidden));
+    helpCloseButton.addEventListener("click", () => setHelpOpen(false));
     document.querySelector("#btnZoomOut").addEventListener("click", () => zoomAt(canvas.getBoundingClientRect().left + canvas.clientWidth / 2, canvas.getBoundingClientRect().top + canvas.clientHeight / 2, viewport.scale / 1.2));
     document.querySelector("#btnZoomIn").addEventListener("click", () => zoomAt(canvas.getBoundingClientRect().left + canvas.clientWidth / 2, canvas.getBoundingClientRect().top + canvas.clientHeight / 2, viewport.scale * 1.2));
     document.querySelector("#btnZoomReset").addEventListener("click", () => {
@@ -841,7 +896,7 @@
     window.addEventListener("keydown", (event) => {
       const activeElement = document.activeElement;
       const typing = /^(INPUT|TEXTAREA)$/.test(activeElement?.tagName || "") || activeElement?.isContentEditable;
-      const interactive = typing || activeElement?.tagName === "BUTTON";
+      const interactive = typing || /^(BUTTON|A)$/.test(activeElement?.tagName || "");
       if (event.code === "Space" && !interactive) {
         spacePressed = true;
         canvas.classList.add("space-pan");
@@ -850,10 +905,15 @@
         return;
       }
       if (interactive) return;
+      if (event.key === "?" || (event.key === "/" && event.shiftKey)) {
+        event.preventDefault();
+        setHelpOpen(helpPopover.hidden);
+        return;
+      }
       const shortcut = { v: "select", n: "note", t: "text", r: "rect", e: "ellipse", l: "line" }[event.key.toLowerCase()];
       if (shortcut) { selectTool(shortcut); return; }
       if (event.key === "Delete" || event.key === "Backspace") { event.preventDefault(); deleteSelected().catch((error) => showToast(error.message)); }
-      if (event.key === "Escape") { cancelGesture(); selectedId = null; selectTool("select"); renderBoard(); }
+      if (event.key === "Escape") { if (!helpPopover.hidden) setHelpOpen(false); cancelGesture(); selectedId = null; selectTool("select"); renderBoard(); }
     });
     window.addEventListener("keyup", (event) => {
       if (event.code === "Space") {
@@ -893,6 +953,7 @@
       } else if (board.items.length > 0 && !userAdjustedViewport) {
         fitToContent();
       }
+      if (storageGet("doodleHelpSeen") !== "1") setHelpOpen(true);
       if (!mcpApp) connectUpdates();
     }
     window.DoodleBoardInit = (adapter) => {

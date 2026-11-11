@@ -20,7 +20,7 @@ npm run build
 npm run check
 ```
 
-`npm run check` runs TypeScript lint, build, plugin build, Vitest, example syntax checks, offline repository guards, plugin guards, `doctor`, and `npm pack --dry-run`. To inspect the human canvas, start `node dist/index.js`, read the `PANEL_URL` returned by `get_board`, and open that local address only when a person wants to see it.
+`npm run check` runs TypeScript lint, build, plugin build, Vitest, example syntax checks, offline repository guards, plugin guards, setup dry-run, `doctor`, and `npm pack --dry-run`. It never modifies the active user's Codex configuration. To inspect the human canvas, start `node dist/index.js`, read the `PANEL_URL` returned by `get_board`, and open that local address only when a person wants to see it.
 
 ## Protocol and safety changes
 

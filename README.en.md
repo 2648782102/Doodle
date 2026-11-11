@@ -6,38 +6,58 @@ Doodle is a local-first MCP canvas, not a project workbench, static diagram gene
 
 Choose a tool to click-place or drag-size objects. Space or middle-button drag pans; the wheel pans and Ctrl/Command-wheel zooms. Double-click an object to edit its text. The embedded UI calls the same `get_board` and `draw_board` tools through the host bridge; it needs no separate chat service.
 
+## 30-second start
+
+From a Doodle checkout, run one command:
+
+```bash
+npm run setup:codex
+```
+
+It installs dependencies when needed, builds the self-contained plugin, registers this repository as a local marketplace, installs `doodle@doodle`, and prints the first prompt. **Start a new Codex session**, then say:
+
+```text
+Open the Doodle board and put one note on it so I can edit it.
+```
+
+MCP Apps-compatible hosts show the canvas beside the chat. The AI reads the board first, then draws a starter object. Pick a tool to click or drag, double-click to edit text, and use the `?` button or press `?` for the three short human gestures. After editing, say “read the board again” in chat; the AI uses `get_board` to read your changes. If the host cannot embed the canvas, ask the agent for `PANEL_URL` and open that local address. Normal MCP calls never open a browser as a side effect.
+
+The complete path is `npm run setup:codex → new session → first prompt → see or edit one canvas → AI reads it again`.
+
 ## Four tools
 
 | Tool | Purpose |
 |---|---|
-| `get_board` | Read `BOARD_JSON`, object IDs and coordinates, authors, and the drawing guide. |
+| `get_board` | Read `FIRST_USE` / `NEXT_STEPS`, `BOARD_JSON`, object IDs and coordinates, authors, and the drawing guide. |
 | `show_board` | Open the interactive shared canvas beside the agent conversation when a user wants to see or edit it. |
 | `draw_board` | Add, update, or remove notes, text, rectangles, ellipses, and directed arrows; writes are serialized against the latest state. |
 | `scan_project` | Optional read-only project paths and bounded `file:line` evidence. It does not draw or write files. |
 
 The loop is `agent conversation ↔ shared canvas: get_board → draw_board → person sees or edits the canvas → AI reads it again`. `show_board` is the explicit render tool, while successful `draw_board` results also advertise the optional UI in compatible hosts. Project structure is only one possible subject; `scan_project` is optional and must be visualized with `draw_board` if needed.
 
-## Quick start
+## Install
+
+### Codex plugin (recommended)
+
+Run one command from a Doodle checkout:
+
+```bash
+npm run setup:codex
+```
+
+`scripts/setup-codex.mjs` modifies Codex configuration only when you invoke it: it runs `npm install` when needed, `npm run build`, `codex plugin marketplace add . --json`, and `codex plugin add doodle@doodle --json`. It is safe to repeat; use `npm run setup:codex -- --dry-run` to preview the commands. Official OpenAI documentation distinguishes local marketplaces from the [universal public plugin directory](https://developers.openai.com/plugins/build/plugins) and says to [start a new session](https://learn.chatgpt.com/docs/plugins) before using installed plugin skills and MCP tools. `npm run build:submission` also produces an ignored `doodle-plugin-submission/doodle-0.6.3.zip` for review. Public plugin-directory publication remains a separate approved OpenAI submission; see `docs/SUBMISSION.md`, `PRIVACY.md`, `SUPPORT.md`, `TERMS.md`, and `docs/FAQ.md`.
+
+### Direct MCP stdio
+
+Add a zero-configuration snippet from `examples/mcp-config/` to your MCP host. Published installs use `npx -y doodle-mcp`; local checkouts may use `node dist/index.js` after `npm run build`. The server chooses a free loopback port, an isolated board-state directory, and the launched workspace by default. Set `DOODLE_WORKSPACE_ROOT` only when the MCP host starts outside the project that `scan_project` should inspect; `OUTPUT_DIR`, `PREVIEW_HOST`, `PREVIEW_PORT`, and `LOG_LEVEL` remain optional overrides. When `PREVIEW_PORT` is unset, the server reports the active address as `PANEL_URL`; normal MCP calls do not open a browser.
+
+### Contributor check
 
 ```bash
 npm install
-npm run build
 npm run check
 npm run doctor
 ```
-
-For Codex, build the plugin and add this repository as a local marketplace:
-
-```bash
-npm install
-npm run build
-codex plugin marketplace add . --json
-codex plugin add doodle@doodle --json
-```
-
-`npm run build:submission` also produces an ignored `doodle-plugin-submission/doodle-0.6.2.zip` for review. Public plugin-directory publication remains a separate approved OpenAI submission; see `docs/SUBMISSION.md`, `PRIVACY.md`, `SUPPORT.md`, `TERMS.md`, and `docs/FAQ.md`.
-
-For direct MCP hosts, add `dist/index.js` as a stdio server. Config snippets are in `examples/mcp-config/`. Use `DOODLE_WORKSPACE_ROOT` for the project that `scan_project` should inspect and `OUTPUT_DIR` for the board state directory. When `PREVIEW_PORT` is unset, the server chooses a free loopback port and reports it as `PANEL_URL`; normal MCP calls do not open a browser.
 
 Version 1 board files may contain old notes. They remain readable for compatibility, but new canvas UI and agent tools do not display or write a message feed.
 

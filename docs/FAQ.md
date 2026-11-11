@@ -10,7 +10,11 @@ No hosted upload is part of the product. Board state stays on the local machine.
 
 ## Why is `show_board` separate from `get_board`?
 
-`get_board` is the data tool for every MCP host. `show_board` is an optional render tool for hosts that support MCP Apps. Text-only hosts retain the complete four-tool workflow and can use the `PANEL_URL` reported by `get_board` as a human-facing local fallback.
+`get_board` is the data tool for every MCP host and now also leads with `FIRST_USE` / `NEXT_STEPS`. `show_board` is an optional render tool for hosts that support MCP Apps. Text-only hosts retain the complete four-tool workflow and can use the `PANEL_URL` reported by `get_board` as a human-facing local fallback.
+
+## What do I say after installing?
+
+Start a new Codex session and say 「打开 Doodle 画板，放一张便签，我来改给你看。」 The AI reads the board, shows it where supported, draws one starter note, and you edit the same canvas. Use the `?` button for three short gestures, then ask the AI to read the board again.
 
 ## Does a drawing change my source code?
 

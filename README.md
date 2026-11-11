@@ -8,11 +8,29 @@ Doodle 不是项目工作台、静态图生成器、聊天产品或批准系统�
 
 产品定义见 [docs/PRODUCT_DIRECTION.md](docs/PRODUCT_DIRECTION.md)，plugin 目标见 [docs/GOAL_PLUGIN.md](docs/GOAL_PLUGIN.md)，架构见 [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md)，AI 操作手册见 [AGENTS.md](AGENTS.md)。
 
+## 30 秒上手
+
+在 Doodle 仓库里运行一条命令：
+
+```bash
+npm run setup:codex
+```
+
+它会自动安装依赖、构建自包含插件、注册本仓库的本地 marketplace、安装 `doodle@doodle`，并打印首句提示。**开启一个新的 Codex 会话**，然后说：
+
+```text
+打开 Doodle 画板，放一张便签，我来改给你看。
+```
+
+兼容 MCP Apps 的宿主会直接显示画布；AI 会先读画板，再放一个起步对象。你可以选工具点按 / 拖拽、双击改字，画板右上角的 `?` 或键盘 `?` 可随时查看三条提示。改完后在聊天里说「读一下画板」，AI 用 `get_board` 读取你的修改。若宿主不显示嵌入画布，就问 AI 要 `PANEL_URL`，再打开这个本地地址；正常 MCP 调用不会擅自打开浏览器。
+
+完整链路：`npm run setup:codex → 新会话 → 首句提示 → 看 / 改同一张画布 → AI 再读`。
+
 ## 四个 MCP 工具
 
 | 工具 | 用途 |
 |---|---|
-| `get_board` | 读取共享画布：revision、对象 ID、坐标、作者、`BOARD_JSON` 与画图规范；默认第一步，只读 |
+| `get_board` | 读取共享画布：`FIRST_USE` / `NEXT_STEPS` 摘要、revision、对象 ID、坐标、作者、`BOARD_JSON` 与画图规范；默认第一步，只读 |
 | `show_board` | 在 Agent 对话旁打开可交互的共享画布；用户要求查看或编辑画布时使用 |
 | `draw_board` | 批量新增 / 更新 / 删除便签、文字、矩形、椭圆和有方向箭头；写入会串行应用到最新状态 |
 | `scan_project` | 可选只读扫描当前项目结构，返回有界相对路径和 `file:line` 证据文本；不写文件、不自动画图 |
@@ -25,30 +43,21 @@ Agent 对话 ↔ 共享画布：get_board → draw_board → 人继续画 → AI
 
 `show_board` 只是在兼容宿主里显示这张画布的可选工具；`scan_project` 只是「项目结构」这个主题的能力之一。AI 决定是否需要它们，并用 `draw_board` 把结果画到同一张画布；它们不创建图库、不改会话、不授权代码变更。
 
-## 快速开始
-
-```bash
-npm install
-npm run build
-npm run check
-npm run doctor
-```
+## 安装
 
 ### Codex plugin（推荐）
 
+一条命令即可完成安装，详见上方「30 秒上手」：
+
 ```bash
-npm install
-npm run build
-codex plugin marketplace add . --json
-codex plugin list --marketplace doodle --available --json
-codex plugin add doodle@doodle --json
+npm run setup:codex
 ```
 
-插件包由 `scripts/build-plugin.mjs` 生成到忽略的 `.doodle-plugin/doodle/`。它使用同一个自包含 stdio MCP server，不依赖仓库里的 `dist/` 或绝对路径。`npm run build:submission` 会生成忽略的 `doodle-plugin-submission/doodle-0.6.2.zip` 供提交审核；本仓库提供本地 / repo marketplace 安装路径，公共插件目录发布仍需要 OpenAI 侧资格、身份验证和审核。材料清单见 [docs/SUBMISSION.md](docs/SUBMISSION.md)。
+`scripts/setup-codex.mjs` 只会在你主动运行时调用 Codex CLI：`npm install`（首次）、`npm run build`、`codex plugin marketplace add . --json`、`codex plugin add doodle@doodle --json`。重复运行是安全的；可用 `npm run setup:codex -- --dry-run` 预览命令。官方 OpenAI 文档说明本地 marketplace 与[公共插件目录](https://developers.openai.com/plugins/build/plugins)是不同路径，安装后应[开启新会话](https://learn.chatgpt.com/docs/plugins)再使用插件的 MCP 工具和 skill。插件包由 `scripts/build-plugin.mjs` 生成到忽略的 `.doodle-plugin/doodle/`，使用同一个自包含 stdio MCP server，不依赖仓库里的 `dist/` 或绝对路径。`npm run build:submission` 会生成忽略的 `doodle-plugin-submission/doodle-0.6.3.zip` 供提交审核；本仓库提供本地 / repo marketplace 安装路径，公共插件目录发布仍需要 OpenAI 侧资格、身份验证和审核。材料清单见 [docs/SUBMISSION.md](docs/SUBMISSION.md)。
 
 ### 直接 MCP stdio
 
-在 MCP 宿主里加入 stdio server，配置示例见 [examples/mcp-config/](examples/mcp-config/)。常用环境变量：
+把 [examples/mcp-config/](examples/mcp-config/) 的零配置片段加入 MCP 宿主即可；发布版使用 `npx -y doodle-mcp`，无需绝对路径。本地 checkout 也可使用 `node dist/index.js`（先运行 `npm run build`）。默认自动选择空闲本地端口、隔离画板状态目录，并通过启动环境推断工作区；只有宿主在项目外启动 MCP 时才需要设置 `DOODLE_WORKSPACE_ROOT`。可选环境变量：
 
 | 变量 | 默认值 | 说明 |
 |---|---|---|
@@ -57,6 +66,14 @@ codex plugin add doodle@doodle --json
 | `OUTPUT_DIR` | plugin data / `.doodle-data` / `./output` | 画板状态目录 |
 | `DOODLE_WORKSPACE_ROOT` | 包根目录 | `scan_project` 的目标工作区 |
 | `LOG_LEVEL` | `info` | stderr 日志级别 |
+
+### 开发者自检
+
+```bash
+npm install
+npm run check
+npm run doctor
+```
 
 状态文件位于所选目录下的 `.doodle/board.json`，是独立 version 1 状态，应加入忽略，不提交到仓库。既有 version 1 留言字段为兼容旧状态而保留；新画布和 Agent 工具不再显示或写入留言流。
 
@@ -90,7 +107,7 @@ npm run repo:check
 npm run doctor
 ```
 
-完整验收用 `npm run check`，其中包含 plugin 构建与 `npm run repo:plugin-check`。新增或移除 MCP 工具、协议字段、plugin 打包或安全边界时，必须同步 `AGENTS.md`、架构、决策、plugin 目标文档、测试、示例、CI 和两个离线守卫。
+完整验收用 `npm run check`，其中包含 plugin 构建、`npm run repo:plugin-check` 与 `setup:codex --dry-run`；校验不会修改本机 Codex 配置。新增或移除 MCP 工具、协议字段、plugin 打包或安全边界时，必须同步 `AGENTS.md`、架构、决策、plugin 目标文档、测试、示例、CI 和两个离线守卫。
 
 四个工具均带显式 MCP annotations：`get_board` / `show_board` / `scan_project` 为只读、非破坏性、封闭本地；`draw_board` 是可删除或覆盖对象的破坏性写入。任何工具 schema 或行为变化都必须同步这些标注和回归测试。
 
@@ -103,7 +120,7 @@ npm run doctor
 | [产品方向](docs/PRODUCT_DIRECTION.md) | 定义、边界与验收 |
 | [Plugin 目标](docs/GOAL_PLUGIN.md) | Codex plugin 的目标、范围与验收 |
 | [架构](docs/ARCHITECTURE.md) | 源码结构、协议、HTTP 与安全模型 |
-| [当前决策](docs/DECISIONS.md) | 0.6.2 收束决策与历史 ADR 状态 |
+| [当前决策](docs/DECISIONS.md) | 0.6.3 体验链路与历史 ADR 状态 |
 | [文档地图](docs/README.md) | 全部文档入口 |
 | [故障排查](docs/TROUBLESHOOTING.md) | 首用自检与常见问题 |
 | [贡献指南](CONTRIBUTING.md) | 本地验证与 PR 规范 |

@@ -4,10 +4,10 @@ This document defines the product boundary and completion criteria for packaging
 
 ## Objective
 
-Keep **one simple shared infinite board** and distribute it through an installable local Codex plugin. The plugin wraps the same four-tool MCP stdio server used by direct MCP configurations. MCP Apps rendering remains an optional host enhancement, not a second product or a requirement for text-only hosts.
+Keep **one simple shared infinite board** and distribute it through an installable local Codex plugin with one-command setup. The plugin wraps the same four-tool MCP stdio server used by direct MCP configurations. MCP Apps rendering remains an optional host enhancement, not a second product or a requirement for text-only hosts.
 
 ```text
-marketplace install → plugin manifest → bundled stdio MCP server → four board tools → one local canvas
+one-command install → new session → first prompt → plugin manifest → bundled stdio MCP server → four board tools → one local canvas
 ```
 
 ## Product boundary
@@ -20,6 +20,7 @@ The plugin is a distribution layer around this product. It must not turn Doodle 
 
 - Add one Codex-compatible `.codex-plugin/plugin.json` and `.mcp.json` layout with a `${PLUGIN_ROOT}` server entrypoint, a concise agent skill, presentation metadata, and simple local-only assets.
 - Add a repository-scoped marketplace at `.agents/plugins/marketplace.json` that points at the generated `.doodle-plugin/doodle` package.
+- Add `npm run setup:codex` as the recommended install path. It installs dependencies when needed, builds the plugin, adds the local marketplace, installs the plugin, and prints one first-use prompt. Official OpenAI documentation treats local marketplaces as separate from the public directory and recommends a new session after installation.
 - Build a self-contained `server/index.mjs` with the same four tools, the shared `board.html`, the MCP App `board-app.js`, and an injected package version.
 - Keep the direct npm CLI and direct MCP host examples as supported development paths.
 - Connect MCP stdio before the optional local HTTP preview; a preview failure must not disable MCP.
@@ -60,15 +61,15 @@ The plugin is a distribution layer around this product. It must not turn Doodle 
 ## Acceptance
 
 1. `docs/GOAL_PLUGIN.md` remains accurate at completion.
-2. A fresh checkout builds the normal npm CLI and the plugin package without hand-written absolute paths.
+2. A fresh checkout installs with one command, builds the normal npm CLI and the plugin package without hand-written absolute paths, and uses zero-configuration direct MCP snippets.
 3. Direct MCP startup and plugin MCP startup expose exactly `get_board`, `show_board`, `draw_board`, and `scan_project`.
 4. The marketplace entry can be discovered by `codex plugin list` or an equivalent local CLI check.
-5. `get_board` returns `BOARD_JSON`, the drawing guide, and the active loopback `PANEL_URL`; it does not open a browser.
+5. `get_board` returns `FIRST_USE` / `NEXT_STEPS`, `BOARD_JSON`, the drawing guide, and the active loopback `PANEL_URL`; it does not open a browser.
 6. The plugin uses isolated writable board state and a free loopback port by default; explicit `OUTPUT_DIR` and `PREVIEW_PORT` continue to override defaults.
 7. `show_board` remains the explicit render tool, and successful `draw_board` results also advertise the optional MCP App so compatible hosts show completed AI drawings; all tools remain usable in text-only hosts.
 8. `scan_project` stays bounded, read-only, workspace-relative, and secret-conservative.
 9. `npm run check` passes, including lint, build, tests, example syntax, offline guards, plugin guard, doctor, and package dry-run.
-10. CI runs the same plugin guard, builds the versioned submission ZIP, and the publish workflow creates a Release only when the current version is missing; the guard rejects conflicting portable manifests, missing policy URLs, missing tool annotations, and uncommitted generated artifacts.
+10. CI runs the same plugin guard and a dry-run setup guard, builds the versioned submission ZIP, and the publish workflow creates a Release only when the current version is missing; the guard rejects conflicting portable manifests, missing policy URLs, missing tool annotations, and uncommitted generated artifacts.
 11. `git status` contains only intended tracked changes; no generated runtime, submission ZIP, or private board state is staged.
 12. Final audit lists changed files, validation evidence, known limitations, public-directory eligibility gates, and any manual desktop-app reload required for the current session.
 
@@ -77,7 +78,7 @@ The plugin is a distribution layer around this product. It must not turn Doodle 
 - `npm run check` output.
 - Direct MCP SDK startup output with four tools and a successful `get_board`.
 - Plugin bundle MCP SDK startup output with four tools, `BOARD_JSON`, a loopback `PANEL_URL`, and a 200 human board response.
-- `codex plugin marketplace add . --json`, `codex plugin list --marketplace doodle --available --json`, and an isolated `CODEX_HOME` installation smoke test.
+- `npm run setup:codex -- --dry-run`, `codex plugin marketplace add . --json`, `codex plugin list --marketplace doodle --available --json`, and an isolated `CODEX_HOME` installation smoke test.
 - `git status --short --branch`, exact diff inspection, and `npm pack --dry-run` contents.
 - Annotated `listTools` output from both runtime paths, a built submission ZIP, and `docs/SUBMISSION.md`.
 - A final note on whether reloading Codex/ChatGPT is needed for an already-running session.
