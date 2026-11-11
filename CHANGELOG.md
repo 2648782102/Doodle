@@ -25,6 +25,7 @@ All notable changes are documented here. Versions follow `VERSIONING.md`.
 ### Validation
 
 - `npm run check` covers the new pure-function tests, TypeScript, build, plugin build, example syntax, repository and plugin guards, setup dry-run, submission ZIP, doctor, and npm package dry-run. Live host-context delivery remains an MCP Apps host capability and is documented as an external surface.
+- Remote CI and Publish Release pass; GitHub Release `v0.7.0` contains `doodle-0.7.0.zip`. npm direct-MCP publication remains a separate maintainer-authenticated action; see `docs/EXPERIENCE_AUDIT.md` E15.
 
 ## 0.6.3 — Complete install-to-use experience
 
