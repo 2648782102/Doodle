@@ -1,10 +1,10 @@
 # Product Direction
 
-**Doodle is a local-first two-way board for a person and an AI.** Both sides can draw notes, text, shapes, and directed arrows on one infinite canvas to express intent. The AI draws through four MCP tools; the person draws directly on the canvas. The board is the communication medium, not a one-way display of AI output or a human annotation form.
+**Doodle is a local-first two-way board for a person and an AI.** Both sides can draw notes, text, shapes, directed arrows, freehand strokes, and images on one infinite canvas to express intent. The AI draws through four MCP tools; the person draws directly on the canvas. The board is the communication medium, not a one-way display of AI output or a human annotation form.
 
 The product story is deliberately small: one kernel, two entry points, three capability layers.
 
-- One kernel: the shared infinite board and version 1 state.
+- One kernel: the shared infinite board and version 1 state with optional extended object fields.
 - Two entry points: the recommended Codex plugin and direct MCP / `npx` for any MCP host.
 - Three layers: four tools always work; MCP Apps hosts render the canvas; hosts with `updateModelContext` / `sendMessage` add automatic final-state sync and a short notification. The standalone `PANEL_URL` page is the fallback when no embedded canvas is available.
 
@@ -25,9 +25,9 @@ The loop can start from either side and pause at any point. `get_board` remains 
 
 ## Product model
 
-- **Canvas:** an infinite surface with bounded simple objects: notes, text, rectangles, ellipses, and directed arrow lines. A line runs from `(x,y)` to `(x+w,y+h)`. Click to place a default-sized shape or drag to size shapes and draw arrows in any direction. Space-drag or middle-drag pans; the wheel pans and Ctrl/Command-wheel zooms.
-- **Human input:** clicking, dragging, editing text, deleting objects, and drawing new visual context. Discussion happens in the agent host conversation; an optional `通知 Agent` button adds one short message there, never a second chat surface.
-- **AI input:** `get_board` reads progressive first-use or concise next-step guidance, canvas data, and the active loopback `PANEL_URL`; `show_board` returns the optional MCP App view; `draw_board` adds, edits, or removes objects and can reject stale UI edits by revision. The visible App refreshes the shared board so either side sees the other's drawings in place. `scan_project` optionally reads bounded project structure.
+- **Canvas:** an infinite surface with bounded objects: notes, text, rectangles, ellipses, directed arrows, freehand strokes, and local `data:image/*` images. A line runs from `(x,y)` to `(x+w,y+h)` and can route as a straight, curve, or orthogonal path. Click to place a default-sized object or drag to size shapes, sketch, and draw arrows in any direction. Space-drag or middle-drag pans; the wheel pans and Ctrl/Command-wheel zooms.
+- **Human input:** clicking, dragging, double-click-to-create, text editing, marquee multi-select, batch move/delete/group/layout, undo/redo, image paste, arrow-key nudging, alignment snapping, and drawing new visual context. Discussion happens in the agent host conversation; an optional `通知 Agent` button adds one short message there, never a second chat surface.
+- **AI input:** `get_board` reads progressive first-use or concise next-step guidance, canvas data, and the active loopback `PANEL_URL`; `show_board` returns the optional MCP App view; `draw_board` adds items, applies precise updates/removals, arranges objects, and rejects stale UI edits by revision. The visible App refreshes the shared board so either side sees the other's drawings in place. `scan_project` optionally reads bounded project structure.
 - **Authors:** every object records whether a person or AI created it. Legacy board notes remain in version 1 state for compatibility but are hidden from current tools and UI.
 - **Approval:** this product has no built-in code-change approval protocol. Board content never authorizes project writes.
 
@@ -36,7 +36,7 @@ The loop can start from either side and pause at any point. `get_board` remains 
 1. Keep one shared canvas and one four-tool MCP server as the product.
 2. Make plugin installation one command and first use one prompt, while preserving zero-configuration direct MCP configuration.
 3. Keep conversation in the host. Do not reproduce its composer or message feed inside Doodle.
-4. Keep drawing obvious, with direct click and drag gestures and one dismissible three-line help popover.
+4. Keep drawing obvious with direct click and drag gestures, one dismissible help popover, and progressive shortcuts rather than permanent control panels.
 5. Keep the MCP App optional, attach it to `show_board`, and advertise it on successful `draw_board` results so AI drawings are visible immediately in compatible hosts. In capable hosts, publish the latest final board snapshot plus a delta from the last published state to the current session's model context without triggering a turn.
 6. Keep the local browser page as a standalone fallback; normal MCP tool calls do not open the system browser.
 7. Keep project context optional, bounded, read-only, and free of absolute paths or secrets.
@@ -59,7 +59,7 @@ A fresh checkout installs through `npm run setup:codex`, and any MCP host can us
 
 ## Next work
 
-Keep the core canvas stable and two-way. Improve drawing ergonomics, accessibility, install and reload ergonomics, and agent-facing layout guidance while keeping discussion in the agent host and shared visual context on the board.
+Keep the core canvas stable and two-way. Improve drawing ergonomics, accessibility, install and reload ergonomics, and agent-facing layout guidance while keeping discussion in the agent host and shared visual context on the board. Extended object fields are optional version 1 additions; old boards remain valid without migration.
 
 ## Experience audit
 

@@ -7,7 +7,19 @@ import { fileURLToPath } from "node:url";
 import { WebSocketServer } from "ws";
 import type { AppConfig } from "../infra/config.js";
 import { logger } from "../infra/logger.js";
-import { addBoardItem, removeBoardItem, updateBoardItem, type BoardItemInput, type SimpleBoard } from "./types.js";
+import {
+  addBoardItem,
+  addBoardItems,
+  layoutBoardItems,
+  removeBoardItem,
+  removeBoardItems,
+  replaceBoardContent,
+  updateBoardItem,
+  updateBoardItems,
+  type BoardItemInput,
+  type BoardLayoutInput,
+  type SimpleBoard,
+} from "./types.js";
 import { BoardRevisionConflictError } from "./errors.js";
 import type { BoardStore } from "./store.js";
 import { projectSnapshotText, scanProject, type ProjectScanOptions } from "./project-scan.js";
@@ -42,7 +54,7 @@ export class BoardHttpServer {
     private board: BoardStore,
     private config: AppConfig,
   ) {
-    this.app.use(express.json({ limit: "32kb" }));
+    this.app.use(express.json({ limit: "2mb" }));
     this.setupRoutes();
   }
 
@@ -114,6 +126,32 @@ export class BoardHttpServer {
       if (!body || typeof body !== "object") return res.status(400).json({ error: "JSON object is required" });
       if (body.confirmedBy !== "human") return res.status(403).json({ error: "Human confirmation is required" });
       await commit(res, (current) => removeBoardItem(current, req.params.id));
+    });
+
+    this.app.post("/api/board/batch", async (req, res) => {
+      const body = req.body as {
+        confirmedBy?: string;
+        items?: BoardItemInput[];
+        updates?: Array<{ id: string; patch: Partial<BoardItemInput> }>;
+        remove_ids?: string[];
+        layout?: BoardLayoutInput;
+      };
+      if (body.confirmedBy !== "human") return res.status(403).json({ error: "Human confirmation is required" });
+      await commit(res, (current) => {
+        let next = current;
+        if (body.items?.length) next = addBoardItems(next, body.items.map((item) => ({ ...item, author: "human" })));
+        if (body.updates?.length) next = updateBoardItems(next, body.updates, "human");
+        if (body.remove_ids?.length) next = removeBoardItems(next, body.remove_ids);
+        if (body.layout) next = layoutBoardItems(next, body.layout, "human");
+        return next;
+      });
+    });
+
+    this.app.post("/api/board/replace", async (req, res) => {
+      const body = req.body as { confirmedBy?: string; board?: unknown };
+      if (body.confirmedBy !== "human") return res.status(403).json({ error: "Human confirmation is required" });
+      if (body.board === undefined) return res.status(400).json({ error: "board is required" });
+      await commit(res, (current) => replaceBoardContent(current, body.board));
     });
 
     this.app.get("/api/board/project", async (req, res) => {

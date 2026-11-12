@@ -39,7 +39,7 @@ It installs dependencies when needed, builds the self-contained plugin, register
 Open the Doodle board so we can communicate on it.
 ```
 
-MCP Apps-compatible hosts show the canvas beside the chat. The AI reads the board first, then draws a starter object. Pick a tool to click or drag to draw directly; double-click or select an object and press `Enter` / click `Edit` to change its text. Use `?` for the short gesture guide. After a person draws, capable hosts sync the final state automatically; `Notify Agent` sends one short reminder where supported. The AI replies in chat or keeps drawing on the board. If the host cannot render the canvas, ask for `PANEL_URL`, open that local address, and ask the AI to reread the board in chat.
+MCP Apps-compatible hosts show the canvas beside the chat. The AI reads the board first, then draws a starter object. Pick a tool to click or drag to draw directly; double-click an object to edit text and double-click empty canvas to create a note. Drag on empty canvas to marquee-select for batch move/delete/group/layout, with undo/redo, arrow-key nudging, alignment snapping, and `Ctrl/⌘+V` image paste. Use `?` for the short gesture guide. After a person draws, capable hosts sync the final state automatically; `Notify Agent` sends one short reminder where supported. The AI replies in chat or keeps drawing on the board. If the host cannot render the canvas, ask for `PANEL_URL`, open that local address, and ask the AI to reread the board in chat.
 
 The complete path is `npm run setup:codex → new session → first prompt → two-way drawing and editing → final-state context sync / notification → AI reads and draws again`.
 
@@ -51,7 +51,7 @@ The complete path is `npm run setup:codex → new session → first prompt → t
 |---|---|
 | `get_board` | Read the shared canvas; an empty board returns `FIRST_USE` / `NEXT_STEPS` and the drawing guide, while later reads use a concise `NEXT`. `BOARD_JSON`, object IDs, coordinates, authors, and revision are always retained. |
 | `show_board` | Open the interactive shared canvas beside the agent conversation when a user wants to see or edit it. |
-| `draw_board` | Add, update, or remove notes, text, rectangles, ellipses, and directed arrows; writes are serialized against the latest state. |
+| `draw_board` | Add items, apply precise updates/removals, or arrange objects; supports notes, text, shapes, arrows, strokes, images, headings, and focus markers; writes are serialized against the latest state. |
 | `scan_project` | Optional read-only project paths and bounded `file:line` evidence. It does not draw or write files. |
 
 The loop is two-way: `AI reads and draws → person draws or edits → final-state delta enters the current conversation context / person notifies the agent → AI reads and draws again`. `show_board` is the explicit render tool, while successful `draw_board` results also advertise the optional UI in compatible hosts. Project structure is only one possible subject; `scan_project` is optional and must be visualized with `draw_board` if needed.
@@ -85,11 +85,12 @@ Version 1 board files may contain old notes. They remain readable for compatibil
 
 ## Drawing contract
 
-- Call `get_board` first and reuse object IDs for updates and removals.
+- Call `get_board` first; prefer `updates` for precise changes and reuse object IDs for removals.
 - Put `author` at the `draw_board` top level.
 - Use a strict grid, short labels, and consistent sizes for structured diagrams.
-- A `line` is a directed arrow from `(x,y)` to `(x+w,y+h)`; `w` and `h` may be negative. Other objects use `(x,y)` as the top-left corner.
-- Use `remove_ids` before redrawing a whole diagram.
+- A `line` is a directed arrow from `(x,y)` to `(x+w,y+h)`; `w` and `h` may be negative. Set `shape` to `straight`, `curve`, or `orthogonal`. Other objects use `(x,y)` as the top-left corner.
+- `stroke.points` are local to the item bounds; `image.src` is a bounded `data:image/*;base64` source.
+- Use `remove_ids` only when replacing a whole diagram.
 
 ## Safety
 

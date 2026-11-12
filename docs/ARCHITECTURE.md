@@ -1,6 +1,6 @@
 # Architecture
 
-Doodle is a local-first shared infinite canvas. The repository builds two distribution paths from the same source: the npm CLI/direct MCP server and a desktop-only Codex plugin with a bundled stdio server. Compatible MCP Apps hosts may render its interactive canvas beside the agent conversation as an optional enhancement; the host retains its existing chat surface. Capable hosts also receive the board's final-state delta in that conversation's model context. A standalone local HTTP page provides the same canvas when the host does not render MCP Apps. Both views and the AI tools share one independent version 1 board state file.
+Doodle is a local-first shared infinite canvas. The repository builds two distribution paths from the same source: the npm CLI/direct MCP server and a desktop-only Codex plugin with a bundled stdio server. Compatible MCP Apps hosts may render its interactive canvas beside the agent conversation as an optional enhancement; the host retains its existing chat surface. Capable hosts also receive the board's final-state delta in that conversation's model context. A standalone local HTTP page provides the same canvas when the host does not render MCP Apps. Both views and the AI tools share one independent version 1 board state file with optional extended object fields.
 
 ## Source layout
 
@@ -45,7 +45,7 @@ Both runtime paths register exactly four tools:
 |---|---|---|
 | `get_board` | Reads one shared version 1 board | progressive `FIRST_USE` / `NEXT_STEPS` or `NEXT`, `BOARD_JSON`, `PANEL_URL`, structured board snapshot; drawing guide on an empty board |
 | `show_board` | Returns the optional MCP App resource beside the conversation | initial structured board snapshot and interactive UI |
-| `draw_board` | Adds / updates / removes visual objects under the board lock; can reject stale app edits by expected revision | revision, counts, authoritative structured snapshot |
+| `draw_board` | Adds items, applies precise updates/removals, arranges objects, and can reject stale app edits by expected revision | revision, counts, authoritative structured snapshot |
 | `scan_project` | Reads bounded project paths and evidence | `PROJECT_JSON` and `PROJECT_TEXT` |
 
 All tools are registered through the MCP SDK config API with explicit annotations: `get_board`, `show_board`, and `scan_project` are read-only, non-destructive, and local-scope; `draw_board` is destructive because it can remove or overwrite visual objects. These values are integration-tested and guarded by the offline repository checks.
@@ -76,6 +76,8 @@ The HTTP server binds to `127.0.0.1` by default and a free loopback port when `P
 |---|---|
 | `GET /` | Standalone infinite canvas |
 | `GET /api/board` | Current version 1 board state |
+| `POST /api/board/batch` | Human-confirmed add/update/remove/layout batch |
+| `POST /api/board/replace` | Human-confirmed full replacement with preserved identity and revision increment |
 | `POST /api/board/items` | Human-confirmed object creation |
 | `PATCH /api/board/items/:id` | Human-confirmed object update |
 | `DELETE /api/board/items/:id` | Human-confirmed object deletion |
@@ -89,7 +91,7 @@ Non-GET `/api/board/*` requests require the random `X-AI-Draw-Token` injected in
 
 `scan_project` walks the configured workspace root with bounded depth and entry count, skips common generated/private directories, ignores dot-private files including `.env`, and reads only small text files for at most five evidence lines per file and 40 total. Candidate lines containing common secret names or credential formats are omitted. Paths are workspace-relative. It returns no file contents beyond short evidence excerpts, no absolute workspace path, and no write capability.
 
-The canvas supports click-to-place defaults, drag-to-size shapes, directional drag-to-draw arrows, Space or middle-button panning, wheel panning, and Ctrl/Command-wheel zoom. Text editing is available through double-click, the `编辑` button, or `Enter` for a selected non-arrow object; creation returns to the select tool so a later click edits or moves an existing object rather than creating another one. Pointer cancellation discards an in-progress drawing. Dragging arrows uses their bounds so negative endpoint deltas do not make them jump. In MCP Apps hosts, a small `展开` control appears when fullscreen is available.
+The canvas supports click-to-place defaults, drag-to-size shapes, directional drag-to-draw arrows, freehand strokes, image paste, double-click-to-create notes, marquee multi-select, batch move/delete/group/layout, undo/redo, arrow-key nudging, alignment snapping, Space or middle-button panning, wheel panning, and Ctrl/Command-wheel zoom. Text editing is available through double-click, the `编辑` button, or `Enter` for a selected text-bearing object; creation returns to the select tool so a later click edits or moves an existing object rather than creating another one. Pointer cancellation discards an in-progress drawing. Dragging arrows uses their bounds so negative endpoint deltas do not make them jump. Extended version 1 fields include `title`, `shape`, `points`, `src`, `mime`, `groupId`, and `emphasis`. In MCP Apps hosts, a small `展开` control appears when fullscreen is available.
 
 Project scanning does not modify the board. If the AI wants to show structure, it calls `draw_board` with a layout derived from the scan result.
 

@@ -1,5 +1,12 @@
 export type BoardAuthor = "human" | "ai";
-export type BoardItemType = "note" | "text" | "rect" | "ellipse" | "line";
+export type BoardItemType = "note" | "text" | "rect" | "ellipse" | "line" | "stroke" | "image";
+export type BoardLineShape = "straight" | "curve" | "orthogonal";
+export type BoardEmphasis = "normal" | "focus";
+
+export interface BoardPoint {
+  x: number;
+  y: number;
+}
 
 export interface BoardItem {
   id: string;
@@ -13,6 +20,13 @@ export interface BoardItem {
   author: BoardAuthor;
   createdAt: string;
   updatedAt: string;
+  title?: string;
+  shape?: BoardLineShape;
+  points?: BoardPoint[];
+  src?: string;
+  mime?: string;
+  groupId?: string;
+  emphasis?: BoardEmphasis;
 }
 
 export interface BoardNote {
@@ -43,14 +57,42 @@ export interface BoardItemInput {
   text?: string;
   color?: string;
   author?: BoardAuthor;
+  title?: string;
+  shape?: BoardLineShape;
+  points?: BoardPoint[];
+  src?: string;
+  mime?: string;
+  groupId?: string;
+  emphasis?: BoardEmphasis;
 }
 
-const ITEM_TYPES: BoardItemType[] = ["note", "text", "rect", "ellipse", "line"];
+export interface BoardItemPatch {
+  id: string;
+  patch: Partial<BoardItemInput>;
+}
+
+export interface BoardLayoutInput {
+  ids?: string[];
+  origin?: BoardPoint;
+  columns?: number;
+  gap?: number;
+  mode?: "grid" | "row" | "column";
+}
+
+const ITEM_TYPES: BoardItemType[] = ["note", "text", "rect", "ellipse", "line", "stroke", "image"];
+const LINE_SHAPES: BoardLineShape[] = ["straight", "curve", "orthogonal"];
+const EMPHASES: BoardEmphasis[] = ["normal", "focus"];
 const COLORS = ["#f6d365", "#b8e0d2", "#c7d8ff", "#ffd1dc", "#e8e8e8", "#ffffff"];
+const IMAGE_MIMES = ["image/png", "image/jpeg", "image/gif", "image/webp"];
 const MAX_ITEMS = 400;
 const MAX_NOTES = 200;
 const MAX_TEXT = 1200;
+const MAX_TITLE = 120;
+const MAX_GROUP_ID = 80;
+const MAX_IMAGE_SRC = 700_000;
+const MAX_STROKE_POINTS = 500;
 const MIN_SHAPE_SIZE = 16;
+const MIN_STROKE_SPAN = 1;
 const MAX_SHAPE_WIDTH = 2000;
 const MAX_SHAPE_HEIGHT = 1200;
 const MAX_LINE_DELTA_X = 2000;
@@ -63,6 +105,26 @@ function isFiniteNumber(value: unknown): value is number {
 
 function isAuthor(value: unknown): value is BoardAuthor {
   return value === "human" || value === "ai";
+}
+
+function isLineShape(value: unknown): value is BoardLineShape {
+  return LINE_SHAPES.includes(value as BoardLineShape);
+}
+
+function isEmphasis(value: unknown): value is BoardEmphasis {
+  return EMPHASES.includes(value as BoardEmphasis);
+}
+
+function isPoint(value: unknown): value is BoardPoint {
+  return Boolean(value) && typeof value === "object"
+    && isFiniteNumber((value as BoardPoint).x)
+    && isFiniteNumber((value as BoardPoint).y);
+}
+
+function isImageSource(value: unknown): value is string {
+  return typeof value === "string"
+    && value.length <= MAX_IMAGE_SRC
+    && /^data:image\/(png|jpeg|jpg|gif|webp);base64,[A-Za-z0-9+/=]+$/.test(value);
 }
 
 function makeId(prefix: string): string {
@@ -178,15 +240,44 @@ export function parseBoard(value: unknown): SimpleBoard {
     if (x < -MAX_COORDINATE || x > MAX_COORDINATE
       || y < -MAX_COORDINATE || y > MAX_COORDINATE)
       throw new Error("Board item coordinates are out of range");
+    if (candidate.type !== "line" && candidate.type !== "stroke" && candidate.type !== "image"
+      && (width < MIN_SHAPE_SIZE || width > MAX_SHAPE_WIDTH
+        || height < MIN_SHAPE_SIZE || height > MAX_SHAPE_HEIGHT)) {
+      throw new Error("Board item size is out of range");
+    }
+    if (candidate.type === "stroke"
+      && (width < MIN_STROKE_SPAN || width > MAX_SHAPE_WIDTH
+        || height < MIN_STROKE_SPAN || height > MAX_SHAPE_HEIGHT)) {
+      throw new Error("Stroke size is out of range");
+    }
+    if (candidate.type === "image"
+      && (width < MIN_SHAPE_SIZE || width > MAX_SHAPE_WIDTH
+        || height < MIN_SHAPE_SIZE || height > MAX_SHAPE_HEIGHT)) {
+      throw new Error("Image size is out of range");
+    }
     if (candidate.type === "line") {
       if (width === 0 && height === 0) throw new Error("Line needs a direction");
       if (width < -MAX_LINE_DELTA_X || width > MAX_LINE_DELTA_X
         || height < -MAX_LINE_DELTA_Y || height > MAX_LINE_DELTA_Y)
         throw new Error("Line endpoint deltas are out of range");
-    } else if (width < MIN_SHAPE_SIZE || width > MAX_SHAPE_WIDTH
-      || height < MIN_SHAPE_SIZE || height > MAX_SHAPE_HEIGHT) {
-      throw new Error("Board item size is out of range");
     }
+    if (candidate.type === "image" && !isImageSource(candidate.src)) throw new Error("Invalid image source");
+    if (candidate.type === "stroke") {
+      if (!Array.isArray(candidate.points) || candidate.points.length < 2 || candidate.points.length > MAX_STROKE_POINTS)
+        throw new Error("Stroke needs bounded points");
+      if (!candidate.points.every((point) => isPoint(point)
+        && (point as BoardPoint).x >= 0 && (point as BoardPoint).x <= width
+        && (point as BoardPoint).y >= 0 && (point as BoardPoint).y <= height))
+        throw new Error("Stroke point is out of range");
+    }
+    if (candidate.title !== undefined && (typeof candidate.title !== "string" || candidate.title.length > MAX_TITLE))
+      throw new Error("Invalid board item title");
+    if (candidate.shape !== undefined && !isLineShape(candidate.shape)) throw new Error("Invalid line shape");
+    if (candidate.emphasis !== undefined && !isEmphasis(candidate.emphasis)) throw new Error("Invalid item emphasis");
+    if (candidate.groupId !== undefined && (typeof candidate.groupId !== "string" || candidate.groupId.length > MAX_GROUP_ID))
+      throw new Error("Invalid board item group");
+    if (candidate.mime !== undefined && !IMAGE_MIMES.includes(candidate.mime as string))
+      throw new Error("Invalid image mime type");
     return {
       id: candidate.id,
       type: candidate.type as BoardItemType,
@@ -199,6 +290,13 @@ export function parseBoard(value: unknown): SimpleBoard {
       author: candidate.author,
       createdAt: typeof candidate.createdAt === "string" ? candidate.createdAt : now(),
       updatedAt: typeof candidate.updatedAt === "string" ? candidate.updatedAt : now(),
+      ...(candidate.title ? { title: candidate.title } : {}),
+      ...(candidate.shape ? { shape: candidate.shape } : {}),
+      ...(candidate.points ? { points: candidate.points.map((point) => ({ x: point.x, y: point.y })) } : {}),
+      ...(candidate.src ? { src: candidate.src } : {}),
+      ...(candidate.mime ? { mime: candidate.mime } : {}),
+      ...(candidate.groupId ? { groupId: candidate.groupId } : {}),
+      ...(candidate.emphasis ? { emphasis: candidate.emphasis } : {}),
     };
   });
   const itemIdSet = new Set(items.map((item) => item.id));
@@ -244,8 +342,12 @@ function normalizeItem(input: BoardItemInput): Omit<BoardItem, "createdAt" | "up
     if (input.w !== undefined && !isFiniteNumber(input.w)) throw new Error("Line width must be finite");
     if (input.h !== undefined && !isFiniteNumber(input.h)) throw new Error("Line height must be finite");
   }
-  const width = input.type === "line" ? 1 : Math.max(MIN_SHAPE_SIZE, Math.min(MAX_SHAPE_WIDTH, input.w ?? 180));
-  const height = input.type === "line" ? 1 : Math.max(MIN_SHAPE_SIZE, Math.min(MAX_SHAPE_HEIGHT, input.h ?? 120));
+  const width = input.type === "line" ? 1
+    : input.type === "stroke" ? Math.max(MIN_STROKE_SPAN, Math.min(MAX_SHAPE_WIDTH, input.w ?? 1))
+      : Math.max(MIN_SHAPE_SIZE, Math.min(MAX_SHAPE_WIDTH, input.w ?? 180));
+  const height = input.type === "line" ? 1
+    : input.type === "stroke" ? Math.max(MIN_STROKE_SPAN, Math.min(MAX_SHAPE_HEIGHT, input.h ?? 1))
+      : Math.max(MIN_SHAPE_SIZE, Math.min(MAX_SHAPE_HEIGHT, input.h ?? 120));
   const signedWidth = input.w !== undefined
     ? (input.type === "line" ? Math.max(-MAX_LINE_DELTA_X, Math.min(MAX_LINE_DELTA_X, input.w)) : width)
     : (input.type === "line" ? 0 : width);
@@ -257,6 +359,21 @@ function normalizeItem(input: BoardItemInput): Omit<BoardItem, "createdAt" | "up
   const color = input.color && /^#[0-9a-fA-F]{6}$/.test(input.color) ? input.color : COLORS[0];
   const author = isAuthor(input.author) ? input.author : "human";
   if (input.type === "line" && signedWidth === 0 && signedHeight === 0) throw new Error("Line needs a direction");
+  if (input.type === "image" && !isImageSource(input.src)) throw new Error("Image source is required");
+  if (input.type === "line" && input.shape !== undefined && !isLineShape(input.shape)) throw new Error("Invalid line shape");
+  if (input.emphasis !== undefined && !isEmphasis(input.emphasis)) throw new Error("Invalid item emphasis");
+  if (input.type === "stroke") {
+    if (!Array.isArray(input.points) || input.points.length < 2 || input.points.length > MAX_STROKE_POINTS)
+      throw new Error("Stroke needs bounded points");
+  }
+  const points = input.type === "stroke"
+    ? (input.points ?? []).map((point) => ({
+      x: Math.max(0, Math.min(width, point.x)),
+      y: Math.max(0, Math.min(height, point.y)),
+    }))
+    : undefined;
+  const title = input.title?.trim().slice(0, MAX_TITLE) || undefined;
+  const groupId = input.groupId?.trim().slice(0, MAX_GROUP_ID) || undefined;
   return {
     id: input.id?.trim() || makeId("item"),
     type: input.type,
@@ -267,6 +384,13 @@ function normalizeItem(input: BoardItemInput): Omit<BoardItem, "createdAt" | "up
     text,
     color,
     author,
+    ...(title ? { title } : {}),
+    ...(input.type === "line" ? { shape: isLineShape(input.shape) ? input.shape : "straight" as BoardLineShape } : {}),
+    ...(points ? { points } : {}),
+    ...(input.src ? { src: input.src } : {}),
+    ...(input.mime && IMAGE_MIMES.includes(input.mime) ? { mime: input.mime } : {}),
+    ...(groupId ? { groupId } : {}),
+    ...(isEmphasis(input.emphasis) ? { emphasis: input.emphasis } : {}),
   };
 }
 
@@ -294,6 +418,78 @@ export function updateBoardItem(
       ? { ...normalized, createdAt: existing.createdAt, updatedAt: timestamp }
       : item),
   });
+}
+
+export function addBoardItems(board: SimpleBoard, inputs: BoardItemInput[]): SimpleBoard {
+  if (board.items.length + inputs.length > MAX_ITEMS) throw new Error("Board item limit reached");
+  const timestamp = now();
+  const items = inputs.map((input) => {
+    const normalized = normalizeItem(input);
+    return { ...normalized, createdAt: timestamp, updatedAt: timestamp } satisfies BoardItem;
+  });
+  return touchBoard({ ...board, items: [...board.items, ...items] });
+}
+
+export function updateBoardItems(
+  board: SimpleBoard,
+  updates: BoardItemPatch[],
+  author: BoardAuthor = "human",
+): SimpleBoard {
+  const patches = new Map(updates.map((update) => [update.id, update.patch]));
+  const timestamp = now();
+  const items = board.items.map((item) => {
+    const patch = patches.get(item.id);
+    if (!patch) return item;
+    const normalized = normalizeItem({ ...item, ...patch, id: item.id, author });
+    return { ...normalized, createdAt: item.createdAt, updatedAt: timestamp };
+  });
+  return touchBoard({ ...board, items });
+}
+
+export function removeBoardItems(board: SimpleBoard, ids: string[]): SimpleBoard {
+  const removeSet = new Set(ids);
+  const found = board.items.some((item) => removeSet.has(item.id));
+  if (!found) throw new Error("Board item not found");
+  return touchBoard({
+    ...board,
+    items: board.items.filter((item) => !removeSet.has(item.id)),
+    notes: board.notes.map((note) => note.itemId && removeSet.has(note.itemId) ? { ...note, itemId: undefined } : note),
+  });
+}
+
+export function replaceBoardContent(current: SimpleBoard, incoming: unknown): SimpleBoard {
+  const parsed = parseBoard(incoming);
+  return touchBoard({ ...parsed, id: current.id, title: current.title, revision: current.revision });
+}
+
+export function layoutBoardItems(
+  board: SimpleBoard,
+  layout: BoardLayoutInput,
+  author: BoardAuthor = "human",
+): SimpleBoard {
+  const selected = new Set(layout.ids ?? []);
+  const candidates = board.items.filter((item) =>
+    item.type !== "line" && (!selected.size || selected.has(item.id)));
+  if (candidates.length < 2) return board;
+  const sorted = [...candidates].sort((left, right) => left.y - right.y || left.x - right.x);
+  const columns = Math.max(1, Math.min(12, Math.floor(layout.columns ?? 3)));
+  const gap = Math.max(8, Math.min(200, layout.gap ?? 24));
+  const origin = layout.origin ?? {
+    x: Math.min(...sorted.map((item) => item.x)),
+    y: Math.min(...sorted.map((item) => item.y)),
+  };
+  const maxWidth = Math.max(...sorted.map((item) => item.w));
+  const maxHeight = Math.max(...sorted.map((item) => item.h));
+  const cellX = (column: number) => origin.x + column * (maxWidth + gap);
+  const cellY = (row: number) => origin.y + row * (maxHeight + gap);
+  const updates = sorted.map((item, index) => ({
+    id: item.id,
+    patch: {
+      x: Math.round(layout.mode === "row" ? cellX(index) : layout.mode === "column" ? origin.x : cellX(index % columns)),
+      y: Math.round(layout.mode === "row" ? origin.y : layout.mode === "column" ? cellY(index) : cellY(Math.floor(index / columns))),
+    },
+  }));
+  return updateBoardItems(board, updates, author);
 }
 
 export function removeBoardItem(board: SimpleBoard, id: string): SimpleBoard {
@@ -326,7 +522,11 @@ export function addBoardNote(
 }
 
 export function boardCopyText(board: SimpleBoard): string {
-  const items = board.items.map((item) => `- ${item.type} · ${item.text || "(空)"} · ${item.author} · ${Math.round(item.x)},${Math.round(item.y)}`);
+  const items = board.items.map((item) => {
+    const label = item.title ? `${item.title}：${item.text}` : item.text;
+    const extra = item.type === "image" ? " · 图片" : item.type === "stroke" ? " · 手绘" : item.shape && item.type === "line" && item.shape !== "straight" ? ` · ${item.shape}` : "";
+    return `- ${item.type} · ${label || "(空)"} · ${item.author} · ${Math.round(item.x)},${Math.round(item.y)}${extra}`;
+  });
   const notes = board.notes.slice(-12).map((note) => `- ${note.author}: ${note.body}`);
   return [
     `Doodle · ${board.title} · revision ${board.revision}`,

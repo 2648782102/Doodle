@@ -2,6 +2,20 @@
 
 All notable changes are documented here. Versions follow `VERSIONING.md`.
 
+## Unreleased — Richer shared canvas
+
+### Added
+
+- Extended version 1 board objects with freehand `stroke`, bounded local `image`, `title`, `shape`, `groupId`, and `emphasis: focus`; older boards remain valid without migration.
+- `draw_board` now supports precise `updates`, batch `items`, `remove_ids`, and deterministic `layout` while keeping exactly four MCP tools.
+- Human canvas adds marquee multi-select, batch move/delete/group/layout, undo/redo, double-click-to-create notes, arrow-key nudging, alignment snapping, and bounded `Ctrl/⌘+V` image paste.
+- New local HTTP batch/replacement endpoints support these canvas operations with human confirmation and revision checks.
+
+### Changed
+
+- MCP guidance, READMEs, agent handbook, architecture, decisions, product direction, experience audit, and guards now describe the richer two-way canvas.
+- Text projection for AI and model context includes titles and marks freehand/image/focus semantics without turning them into a message feed or project-write authority.
+
 ## 0.7.0 — Current-session board context sync
 
 ### Added

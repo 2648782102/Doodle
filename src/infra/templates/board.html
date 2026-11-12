@@ -70,24 +70,29 @@
       top: 12px;
       left: 12px;
       z-index: 4;
-      display: flex;
-      gap: 4px;
-      padding: 4px;
+      display: grid;
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+      gap: 3px;
+      width: 182px;
+      padding: 6px;
       border: 1px solid var(--line);
-      border-radius: var(--radius);
+      border-radius: 12px;
       background: rgba(255, 255, 255, 0.96);
+      box-shadow: 0 6px 18px rgba(15, 23, 42, 0.08);
     }
     .tool {
-      min-width: 34px;
-      height: 34px;
-      padding: 0 9px;
+      min-width: 0;
+      height: 32px;
+      padding: 0 8px;
       border: 0;
-      border-radius: 6px;
+      border-radius: 7px;
       background: transparent;
+      color: var(--muted);
       cursor: pointer;
+      font-size: 12px;
     }
     .tool:hover { background: #f1f3f6; }
-    .tool[aria-pressed="true"] { background: var(--accent-soft); color: var(--accent); }
+    .tool[aria-pressed="true"] { background: var(--accent); color: #fff; }
     .tool.contextual { display: none; }
     .tool.contextual.available { display: inline-block; }
     .tool.notify {
@@ -98,6 +103,37 @@
     .tool.notify:hover { background: #dce8ff; }
     .tool-hint { padding: 0 8px; align-self: center; color: var(--muted); font-size: 11px; white-space: nowrap; }
     .tool.danger:hover { background: #fff1f1; color: #b91c1c; }
+    .historybar {
+      position: absolute;
+      left: 12px;
+      bottom: 58px;
+      z-index: 4;
+      display: flex;
+      gap: 3px;
+      padding: 4px;
+      border: 1px solid var(--line);
+      border-radius: 10px;
+      background: rgba(255, 255, 255, 0.96);
+      box-shadow: 0 6px 18px rgba(15, 23, 42, 0.08);
+    }
+    .historybar .tool { min-width: 48px; height: 28px; }
+    .historybar .tool:disabled { opacity: .38; cursor: default; }
+    .actionbar {
+      position: absolute;
+      left: 50%;
+      top: 14px;
+      z-index: 5;
+      display: none;
+      gap: 3px;
+      padding: 4px;
+      transform: translateX(-50%);
+      border: 1px solid var(--line);
+      border-radius: 10px;
+      background: rgba(255, 255, 255, 0.97);
+      box-shadow: 0 8px 22px rgba(15, 23, 42, 0.1);
+    }
+    .actionbar.available { display: flex; }
+    .actionbar .tool { min-width: 48px; height: 28px; }
     .help-button {
       position: absolute;
       top: 12px;
@@ -143,6 +179,7 @@
       border: 1px solid var(--line);
       border-radius: var(--radius);
       background: rgba(255, 255, 255, 0.96);
+      box-shadow: 0 6px 18px rgba(15, 23, 42, 0.08);
     }
     .viewbar button { min-width: 30px; height: 30px; border: 0; border-radius: 5px; background: transparent; cursor: pointer; }
     .viewbar button:hover { background: #f1f3f6; }
@@ -175,6 +212,7 @@
     }
     .board-item:hover { border-color: #8d99a9; }
     .board-item.selected { outline: 2px solid var(--accent); outline-offset: 2px; }
+    .board-item.focused { box-shadow: 0 0 0 3px rgba(245, 158, 11, 0.24); }
     .board-item.preview { border-color: var(--accent); border-style: dashed; background: var(--accent-soft); opacity: .65; pointer-events: none; }
     .board-item.preview[data-type="text"] { background: transparent; }
     .board-item.preview[data-type="line"] { background: transparent; border: 0; }
@@ -208,6 +246,16 @@
       pointer-events: none;
     }
     .board-item[data-type="line"] .item-text:empty { display: none; }
+    .item-title { position: absolute; left: 10px; top: 7px; max-width: calc(100% - 20px); color: rgba(31, 41, 55, 0.62); font-size: 11px; font-weight: 700; line-height: 1.2; text-align: left; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; pointer-events: none; }
+    .board-item.has-title .item-text { margin-top: 12px; }
+    .board-item[data-type="image"] { padding: 0; background: #fff; }
+    .board-item[data-type="image"] .item-image { width: 100%; height: 100%; object-fit: contain; user-select: none; pointer-events: none; }
+    .board-item[data-type="stroke"] { border-color: transparent; background: transparent; overflow: visible; }
+    .board-item[data-type="stroke"] svg { display: block; width: 100%; height: 100%; overflow: visible; pointer-events: none; }
+    .selection-box { position: absolute; z-index: 3; border: 1px solid var(--accent); border-radius: 4px; background: rgba(37, 99, 235, 0.08); pointer-events: none; }
+    .snap-line { position: absolute; z-index: 3; background: #f59e0b; pointer-events: none; }
+    .snap-line.vertical { width: 1px; top: 0; bottom: 0; }
+    .snap-line.horizontal { left: 0; right: 0; height: 1px; }
     .item-author { position: absolute; right: 6px; bottom: 4px; color: rgba(31, 41, 55, 0.28); font-size: 9px; }
     .board-item[data-type="text"] .item-author, .board-item[data-type="line"] .item-author { display: none; }
     #toast { position: absolute; left: 50%; bottom: 18px; z-index: 8; transform: translateX(-50%); padding: 7px 12px; border-radius: 6px; color: #fff; background: #334155; opacity: 0; pointer-events: none; transition: opacity .18s ease; }
@@ -217,8 +265,9 @@
     body[data-mcp-app="true"] #btnExpand:not([hidden]) { display: inline-block; }
     @media (max-width: 760px) {
       .brand small, #boardTitle, #status { display: none; }
-      .toolbar { max-width: calc(100vw - 24px); overflow-x: auto; }
+      .toolbar { width: 168px; }
       .tool-hint { display: none; }
+      .actionbar { left: auto; right: 12px; transform: none; }
     }
     @media (prefers-reduced-motion: reduce) {
       #toast { transition: none; }
@@ -240,11 +289,21 @@
         <button class="tool" data-tool="rect" aria-pressed="false" title="矩形 (R)">矩形</button>
         <button class="tool" data-tool="ellipse" aria-pressed="false" title="椭圆 (E)">椭圆</button>
         <button class="tool" data-tool="line" aria-pressed="false" title="箭头 (L)">箭头</button>
+        <button class="tool" data-tool="stroke" aria-pressed="false" title="随手画 (P)">画笔</button>
+        <button class="tool" data-tool="image" aria-pressed="false" title="粘贴图片；也可直接 Ctrl/⌘+V">图片</button>
         <button class="tool" id="btnExpand" hidden title="在 Agent 中展开画布">展开</button>
         <button class="tool notify" id="btnNotifyAgent" hidden title="把当前画板状态同步给当前会话的 Agent">通知 Agent</button>
-        <button class="tool contextual" id="btnEdit" title="编辑选中对象文字 (Enter)">编辑</button>
-        <button class="tool contextual danger" id="btnDelete" title="删除选中对象 (Delete)">删除</button>
-        <span class="tool-hint" aria-hidden="true">点按放置 · 拖拽定形 · Space 平移</span>
+      </div>
+      <div class="actionbar" id="actionBar" role="toolbar" aria-label="选中对象操作">
+        <button class="tool" id="btnEdit" title="编辑选中对象文字 (Enter)">编辑</button>
+        <button class="tool" id="btnGroup" title="把选中对象设为一组">成组</button>
+        <button class="tool" id="btnUngroup" title="解除选中对象的组">解组</button>
+        <button class="tool" id="btnLayout" title="自动整理选中对象">整理</button>
+        <button class="tool danger" id="btnDelete" title="删除选中对象 (Delete)">删除</button>
+      </div>
+      <div class="historybar" role="toolbar" aria-label="历史操作">
+        <button class="tool" id="btnUndo" title="撤销 (Ctrl/⌘+Z)">撤销</button>
+        <button class="tool" id="btnRedo" title="重做 (Ctrl/⌘+Shift+Z)">重做</button>
       </div>
       <button class="help-button" id="btnHelp" aria-label="查看 Doodle 使用提示" aria-expanded="false" title="使用提示 (?)">?</button>
       <div class="help-popover" id="helpPopover" hidden role="dialog" aria-label="Doodle 使用提示">
@@ -253,7 +312,9 @@
         <ul>
           <li>AI 和你都能画：你直接画 / 改，AI 在聊天里看图回应。</li>
           <li>嵌入画布会自动同步最终状态；点「通知 Agent」提醒 AI 看图。</li>
-          <li>选工具后点按放置或拖拽定形，双击对象改字。</li>
+          <li>选工具后点按放置或拖拽定形，双击对象改字，双击空白新建便签。</li>
+          <li>空白处拖拽可框选，批量移动 / 删除 / 成组；Ctrl/⌘+V 可粘贴图片。</li>
+          <li>Ctrl/⌘+Z 撤销，Ctrl/⌘+Shift+Z 重做，方向键微调位置。</li>
           <li>选中对象后按 Enter，或点「编辑」，也能改字。</li>
           <li>Space / 中键拖动平移，滚轮平移，Ctrl/⌘ + 滚轮缩放。</li>
         </ul>
@@ -291,15 +352,19 @@
       patchItem: (id) => `/api/board/items/${encodeURIComponent(id)}`,
       deleteItem: (id) => `/api/board/items/${encodeURIComponent(id)}`,
     };
-    const defaultText = { note: "", text: "", rect: "", ellipse: "", line: "" };
+    const defaultText = { note: "", text: "", rect: "", ellipse: "", line: "", stroke: "", image: "" };
     const defaultSize = {
       note: { w: 180, h: 120 }, text: { w: 220, h: 44 },
       rect: { w: 180, h: 110 }, ellipse: { w: 180, h: 110 }, line: { w: 180, h: 0 },
+      stroke: { w: 180, h: 80 }, image: { w: 240, h: 160 },
     };
     const colorCycle = ["#f6d365", "#b8e0d2", "#c7d8ff", "#ffd1dc", "#e8e8e8", "#ffffff"];
     let board = { version: 1, title: "和 AI 一起画", revision: 0, items: [], notes: [] };
     let tool = "select";
     let selectedId = null;
+    let selectedIds = new Set();
+    let undoStack = [];
+    let redoStack = [];
     let pendingTextEditId = null;
     let lastDoubleClick = 0;
     let viewport = { x: 0, y: 0, scale: 1 };
@@ -311,6 +376,7 @@
     let viewportSaveTimer = 0;
     let spacePressed = false;
     let mcpApp = null;
+    let pasteImageSource = null;
 
     function storageGet(key) {
       try { return localStorage.getItem(key); } catch { return null; }
@@ -400,9 +466,55 @@
     }
 
     function updateContextualTools() {
-      const selected = board.items.find((item) => item.id === selectedId);
-      document.querySelector("#btnEdit").classList.toggle("available", Boolean(selected && selected.type !== "line"));
-      document.querySelector("#btnDelete").classList.toggle("available", Boolean(selected));
+      const selected = selectedItems();
+      const actionBar = document.querySelector("#actionBar");
+      const canEdit = selected.length === 1 && selected[0].type !== "line";
+      const canGroup = selected.length > 1;
+      const canUngroup = selected.some((item) => item.groupId);
+      const canLayout = selected.length > 1;
+      const canDelete = selected.length > 0;
+      actionBar.classList.toggle("available", canEdit || canGroup || canUngroup || canLayout || canDelete);
+      document.querySelector("#btnEdit").hidden = !canEdit;
+      document.querySelector("#btnDelete").hidden = !canDelete;
+      document.querySelector("#btnGroup").hidden = !canGroup;
+      document.querySelector("#btnUngroup").hidden = !canUngroup;
+      document.querySelector("#btnLayout").hidden = !canLayout;
+      document.querySelector("#btnUndo").disabled = undoStack.length === 0;
+      document.querySelector("#btnRedo").disabled = redoStack.length === 0;
+    }
+
+    function selectedItems() {
+      const ids = selectedIds.size ? selectedIds : selectedId ? new Set([selectedId]) : new Set();
+      return board.items.filter((item) => ids.has(item.id));
+    }
+
+    function clearSelection() {
+      selectedId = null;
+      selectedIds = new Set();
+    }
+
+    function setSelection(ids) {
+      selectedIds = new Set(ids);
+      selectedId = selectedIds.size === 1 ? [...selectedIds][0] : null;
+    }
+
+    function recordHistory(before) {
+      undoStack.push(before);
+      if (undoStack.length > 40) undoStack.shift();
+      redoStack = [];
+      updateContextualTools();
+    }
+
+    async function restoreHistory(snapshot, direction) {
+      if (!snapshot) return;
+      const before = board;
+      await boardWrite(null, "REPLACE", { board: snapshot }, board.revision);
+      if (direction === "undo") {
+        redoStack.push(before);
+      } else {
+        undoStack.push(before);
+      }
+      updateContextualTools();
     }
 
     function placeItemElement(element, item) {
@@ -472,7 +584,9 @@
         element.className = "board-item";
         element.dataset.id = item.id;
         element.dataset.type = item.type;
-        element.classList.toggle("selected", item.id === selectedId);
+        element.classList.toggle("selected", selectedIds.has(item.id) || item.id === selectedId);
+        element.classList.toggle("focused", item.emphasis === "focus");
+        if (item.title) element.classList.add("has-title");
         let lineGeometry = null;
         if (item.type === "line") {
           const hitPadding = 12;
@@ -499,7 +613,7 @@
           element.style.height = `${item.h}px`;
         }
         element.style.setProperty("--item-color", item.color);
-        if (item.type !== "line") element.style.background = item.color;
+        if (item.type !== "line" && item.type !== "stroke" && item.type !== "image") element.style.background = item.color;
         if (item.type === "line") {
           const { width, height, startX, startY, endX, endY } = lineGeometry;
           const markerId = `board-arrow-${index}`;
@@ -507,7 +621,13 @@
           svg.setAttribute("viewBox", `0 0 ${width} ${height}`);
           svg.setAttribute("preserveAspectRatio", "none");
           const path = document.createElementNS("http://www.w3.org/2000/svg", "path");
-          path.setAttribute("d", `M ${startX} ${startY} L ${endX} ${endY}`);
+          const shape = item.shape || "straight";
+          const pathData = shape === "curve"
+            ? `M ${startX} ${startY} C ${startX + (endX - startX) * 0.45} ${startY}, ${startX + (endX - startX) * 0.55} ${endY}, ${endX} ${endY}`
+            : shape === "orthogonal"
+              ? `M ${startX} ${startY} L ${endX} ${startY} L ${endX} ${endY}`
+              : `M ${startX} ${startY} L ${endX} ${endY}`;
+          path.setAttribute("d", pathData);
           path.setAttribute("stroke", item.color);
           path.setAttribute("stroke-width", "3");
           path.setAttribute("stroke-linecap", "round");
@@ -529,6 +649,33 @@
           defs.append(marker);
           svg.append(defs, path);
           element.append(svg);
+        } else if (item.type === "stroke" && item.points?.length) {
+          const svg = document.createElementNS("http://www.w3.org/2000/svg", "svg");
+          svg.setAttribute("viewBox", `0 0 ${Math.max(1, item.w)} ${Math.max(1, item.h)}`);
+          svg.setAttribute("preserveAspectRatio", "none");
+          const path = document.createElementNS("http://www.w3.org/2000/svg", "path");
+          path.setAttribute("d", item.points.map((point, index) => `${index ? "L" : "M"} ${point.x} ${point.y}`).join(" "));
+          path.setAttribute("stroke", item.color);
+          path.setAttribute("stroke-width", "3");
+          path.setAttribute("stroke-linecap", "round");
+          path.setAttribute("stroke-linejoin", "round");
+          path.setAttribute("fill", "none");
+          svg.append(path);
+          element.append(svg);
+        } else if (item.type === "image" && item.src) {
+          const image = document.createElement("img");
+          image.className = "item-image";
+          image.src = item.src;
+          image.alt = item.text || "画板图片";
+          element.append(image);
+        }
+        if (item.type === "note" || item.type === "rect" || item.type === "ellipse") {
+          if (item.title) {
+            const titleElement = document.createElement("div");
+            titleElement.className = "item-title";
+            titleElement.textContent = item.title;
+            element.append(titleElement);
+          }
         }
         const textElement = document.createElement("div");
         textElement.className = "item-text";
@@ -595,7 +742,9 @@
     async function boardWrite(path, method, payload, expectedRevision = board.revision) {
       if (mcpApp) {
         let args;
-        if (method === "POST") args = { items: [payload.item], author: "human" };
+        if (method === "REPLACE") args = { replace_board: payload.board, author: "human" };
+        else if (method === "BATCH") args = payload.args;
+        else if (method === "POST") args = { items: [payload.item], author: "human" };
         else if (method === "PATCH") {
           const id = decodeURIComponent(path.split("/").at(-1));
           const existing = board.items.find((item) => item.id === id);
@@ -610,6 +759,34 @@
         boardRenderPending = false;
         renderBoard();
         return updated;
+      }
+      if (method === "REPLACE") {
+        const response = await fetch("/api/board/replace", {
+          method: "POST",
+          headers,
+          body: JSON.stringify({ confirmedBy: "human", board: payload.board }),
+        });
+        const result = await response.json().catch(() => ({}));
+        if (!response.ok) throw new Error(result.error || `HTTP ${response.status}`);
+        boardRenderPending = false;
+        board = { ...result.board, lastChange: "local" };
+        boardRenderPending = false;
+        renderBoard();
+        return result.board;
+      }
+      if (method === "BATCH") {
+        const response = await fetch("/api/board/batch", {
+          method: "POST",
+          headers,
+          body: JSON.stringify({ confirmedBy: "human", ...payload.args }),
+        });
+        const result = await response.json().catch(() => ({}));
+        if (!response.ok) throw new Error(result.error || `HTTP ${response.status}`);
+        boardRenderPending = false;
+        board = { ...result.board, lastChange: "local" };
+        boardRenderPending = false;
+        renderBoard();
+        return result.board;
       }
       const requestHeaders = { ...headers, "If-Match-Revision": String(expectedRevision) };
       const response = await fetch(path, { method, headers: requestHeaders, body: JSON.stringify(payload) });
@@ -641,8 +818,17 @@
       const spot = findFreeSpot({ x: originX, y: originY, w: size.w, h: size.h });
       const x = spot.x;
       const y = spot.y;
+      const rawPoints = point.points;
+      const points = rawPoints?.map((candidate) => ({ x: candidate.x, y: candidate.y }));
       const existingIds = new Set(board.items.map((item) => item.id));
       const color = colorCycle[board.items.length % colorCycle.length];
+      const extra = {};
+      if (itemType === "image" && pasteImageSource) {
+        extra.src = pasteImageSource;
+        extra.mime = pasteImageSource.match(/^data:(image\/[a-z]+);/)?.[1] || "image/png";
+        extra.text = "图片";
+        pasteImageSource = null;
+      }
       const updatedBoard = await boardWrite(boardEndpoints.addItem, "POST", {
         confirmedBy: "human",
         item: {
@@ -653,6 +839,8 @@
           h: size.h,
           text: defaultText[itemType],
           color,
+          ...(points ? { points } : {}),
+          ...extra,
         },
       }, expectedRevision);
       const createdItem = updatedBoard.items.find((item) => !existingIds.has(item.id));
@@ -751,11 +939,13 @@
     }
 
     async function deleteSelected() {
-      if (!selectedId) { showToast("先选中一个对象"); return; }
-      const deletedId = selectedId;
+      const items = selectedItems();
+      if (!items.length) { showToast("先选中一个对象"); return; }
+      const before = board;
       const expectedRevision = board.revision;
-      const updatedBoard = await boardWrite(boardEndpoints.deleteItem(deletedId), "DELETE", { confirmedBy: "human" }, expectedRevision);
-      if (!board.items.some((item) => item.id === deletedId)) selectedId = null;
+      await boardWrite(null, "BATCH", { args: { remove_ids: items.map((item) => item.id) } }, expectedRevision);
+      clearSelection();
+      recordHistory(before);
       renderBoard();
     }
 
@@ -779,6 +969,33 @@
     }
     document.querySelector("#btnEdit").addEventListener("click", editSelected);
     document.querySelector("#btnDelete").addEventListener("click", deleteSelected);
+    document.querySelector("#btnUndo").addEventListener("click", () => restoreHistory(undoStack.pop(), "undo").catch((error) => showToast(error.message)));
+    document.querySelector("#btnRedo").addEventListener("click", () => restoreHistory(redoStack.pop(), "redo").catch((error) => showToast(error.message)));
+    document.querySelector("#btnGroup").addEventListener("click", () => {
+      const items = selectedItems();
+      if (items.length < 2) return;
+      const groupId = `group_${Date.now().toString(36)}`;
+      const before = board;
+      boardWrite(null, "BATCH", {
+        args: { updates: items.map((item) => ({ id: item.id, patch: { groupId } })) },
+      }).then(() => recordHistory(before)).catch((error) => showToast(error.message));
+    });
+    document.querySelector("#btnUngroup").addEventListener("click", () => {
+      const items = selectedItems().filter((item) => item.groupId);
+      if (!items.length) return;
+      const before = board;
+      boardWrite(null, "BATCH", {
+        args: { updates: items.map((item) => ({ id: item.id, patch: { groupId: "" } })) },
+      }).then(() => recordHistory(before)).catch((error) => showToast(error.message));
+    });
+    document.querySelector("#btnLayout").addEventListener("click", () => {
+      const items = selectedItems().filter((item) => item.type !== "line" && item.type !== "stroke");
+      if (items.length < 2) return;
+      const before = board;
+      boardWrite(null, "BATCH", {
+        args: { layout: { ids: items.map((item) => item.id), columns: Math.ceil(Math.sqrt(items.length)), gap: 24 } },
+      }).then(() => recordHistory(before)).catch((error) => showToast(error.message));
+    });
     helpButton.addEventListener("click", () => setHelpOpen(helpPopover.hidden));
     helpCloseButton.addEventListener("click", () => setHelpOpen(false));
     document.querySelector("#btnZoomOut").addEventListener("click", () => zoomAt(canvas.getBoundingClientRect().left + canvas.clientWidth / 2, canvas.getBoundingClientRect().top + canvas.clientHeight / 2, viewport.scale / 1.2));
@@ -812,7 +1029,7 @@
       element.className = "board-item preview";
       element.dataset.type = type;
       if (type === "ellipse") element.style.borderRadius = "50%";
-      if (type === "line") {
+      if (type === "line" || type === "stroke") {
         const svg = document.createElementNS("http://www.w3.org/2000/svg", "svg");
         svg.style.cssText = "position:absolute;inset:0;width:100%;height:100%;overflow:visible";
         const defs = document.createElementNS("http://www.w3.org/2000/svg", "defs");
@@ -833,9 +1050,11 @@
         path.setAttribute("data-preview-path", "true");
         path.setAttribute("fill", "none");
         path.setAttribute("stroke", "var(--accent)");
-        path.setAttribute("stroke-width", "3");
-        path.setAttribute("stroke-dasharray", "6 4");
-        path.setAttribute("marker-end", "url(#board-preview-arrow)");
+        path.setAttribute("stroke-width", type === "stroke" ? "3" : "3");
+        if (type === "line") {
+          path.setAttribute("stroke-dasharray", "6 4");
+          path.setAttribute("marker-end", "url(#board-preview-arrow)");
+        }
         svg.append(defs, path);
         element.append(svg);
       }
@@ -846,7 +1065,7 @@
     function updatePreview(element, type, start, end) {
       const deltaX = end.x - start.x;
       const deltaY = end.y - start.y;
-      if (type === "line") {
+      if (type === "line" || type === "stroke") {
         const hitPadding = 12;
         const left = Math.min(start.x, end.x) - hitPadding;
         const top = Math.min(start.y, end.y) - hitPadding;
@@ -869,7 +1088,9 @@
 
     function cancelGesture() {
       if (pointerState?.preview) pointerState.preview.remove();
-      if (pointerState?.kind === "move" || boardRenderPending) renderBoard();
+      if (pointerState?.marquee) pointerState.marquee.remove();
+      clearSnapLines();
+      if ((pointerState?.kind === "move" && pointerState.moved) || boardRenderPending) renderBoard();
       boardRenderPending = false;
       pointerState = null;
       canvas.classList.remove("panning");
@@ -885,6 +1106,56 @@
         viewport.y = view.y;
         applyViewport();
       }
+    }
+
+    function clearSnapLines() {
+      for (const line of canvas.querySelectorAll(".snap-line")) line.remove();
+    }
+
+    function showSnapLines(guides) {
+      for (const guide of guides) {
+        const element = document.createElement("div");
+        element.className = `snap-line ${guide.axis}`;
+        if (guide.axis === "vertical") element.style.left = `${guide.value * viewport.scale + viewport.x}px`;
+        else element.style.top = `${guide.value * viewport.scale + viewport.y}px`;
+        canvas.append(element);
+      }
+    }
+
+    function snapMove(origins, deltaX, deltaY) {
+      const threshold = 6 / viewport.scale;
+      const moved = origins.map((origin) => ({ ...origin, x: origin.x + deltaX, y: origin.y + deltaY }));
+      const selected = new Set(origins.map((origin) => origin.id));
+      const others = board.items.filter((item) => !selected.has(item.id) && item.type !== "line" && item.type !== "stroke");
+      const guides = [];
+      let bestX = null;
+      let bestY = null;
+      for (const position of moved) {
+        const item = board.items.find((candidate) => candidate.id === position.id);
+        if (!item || item.type === "line") continue;
+        for (const other of others) {
+          for (const value of [other.x, other.x + other.w / 2, other.x + other.w]) {
+            for (const candidate of [position.x, position.x + item.w / 2, position.x + item.w]) {
+              const distance = Math.abs(candidate - value);
+              if (distance <= threshold && (bestX === null || distance < bestX.distance)) bestX = { distance, offset: value - candidate, value };
+            }
+          }
+          for (const value of [other.y, other.y + other.h / 2, other.y + other.h]) {
+            for (const candidate of [position.y, position.y + item.h / 2, position.y + item.h]) {
+              const distance = Math.abs(candidate - value);
+              if (distance <= threshold && (bestY === null || distance < bestY.distance)) bestY = { distance, offset: value - candidate, value };
+            }
+          }
+        }
+      }
+      const offsetX = bestX?.offset ?? 0;
+      const offsetY = bestY?.offset ?? 0;
+      if (bestX) guides.push({ axis: "vertical", value: bestX.value });
+      if (bestY) guides.push({ axis: "horizontal", value: bestY.value });
+      return {
+        positions: moved.map((position) => ({ ...position, x: Math.round(position.x + offsetX), y: Math.round(position.y + offsetY) })),
+        guides,
+      };
     }
 
     canvas.addEventListener("pointerdown", (event) => {
@@ -903,24 +1174,33 @@
         selectTool("select");
         const item = board.items.find((candidate) => candidate.id === itemElement.dataset.id);
         if (!item) return;
-        selectedId = item.id;
+        if (event.shiftKey || event.metaKey || event.ctrlKey) {
+          const next = new Set(selectedIds.size ? selectedIds : selectedId ? [selectedId] : []);
+          if (next.has(item.id)) next.delete(item.id); else next.add(item.id);
+          setSelection(next);
+        } else {
+          setSelection([item.id]);
+        }
         renderBoard();
-        if (event.detail >= 2 || event.shiftKey || Date.now() - lastDoubleClick < 350) {
+        if (event.detail >= 2 || Date.now() - lastDoubleClick < 350) {
           pendingTextEditId = item.id;
           renderBoard();
           pointerState = null;
           return;
         }
         pointerState = {
-          kind: "move", id: item.id, item, startX: event.clientX, startY: event.clientY,
-          originX: item.x, originY: item.y, revision: board.revision, moved: false,
+          kind: "move", ids: [...selectedIds.size ? selectedIds : new Set([item.id])],
+          startX: event.clientX, startY: event.clientY, revision: board.revision, moved: false,
+          origins: board.items.filter((candidate) => (selectedIds.size ? selectedIds.has(candidate.id) : candidate.id === item.id))
+            .map((candidate) => ({ id: candidate.id, x: candidate.x, y: candidate.y })),
         };
       } else {
-        if (!panGesture) selectedId = null;
+        if (!panGesture) clearSelection();
         renderBoard();
         pointerState = {
-          kind: "pan", startX: event.clientX, startY: event.clientY,
+          kind: tool === "select" ? "marquee" : "pan", startX: event.clientX, startY: event.clientY,
           originX: viewport.x, originY: viewport.y, moved: false,
+          marquee: null,
         };
         canvas.classList.add("panning");
       }
@@ -937,15 +1217,34 @@
         viewport.x = pointerState.originX + deltaX;
         viewport.y = pointerState.originY + deltaY;
         applyViewport();
+      } else if (pointerState.kind === "marquee" && pointerState.moved) {
+        const rect = canvas.getBoundingClientRect();
+        const startClientX = Math.min(pointerState.startX, event.clientX) - rect.left;
+        const startClientY = Math.min(pointerState.startY, event.clientY) - rect.top;
+        const width = Math.abs(deltaX);
+        const height = Math.abs(deltaY);
+        if (!pointerState.marquee) {
+          pointerState.marquee = document.createElement("div");
+          pointerState.marquee.className = "selection-box";
+          canvas.append(pointerState.marquee);
+        }
+        pointerState.marquee.style.left = `${startClientX}px`;
+        pointerState.marquee.style.top = `${startClientY}px`;
+        pointerState.marquee.style.width = `${width}px`;
+        pointerState.marquee.style.height = `${height}px`;
       } else if (pointerState.kind === "create" && pointerState.moved) {
         updatePreview(pointerState.preview, pointerState.type, pointerState.start, screenToWorld(event.clientX, event.clientY));
       } else if (pointerState.kind === "move" && pointerState.moved) {
-        const element = world.querySelector(`[data-id="${CSS.escape(pointerState.id)}"]`);
-        if (element) placeItemElement(element, {
-          ...pointerState.item,
-          x: pointerState.originX + deltaX / viewport.scale,
-          y: pointerState.originY + deltaY / viewport.scale,
-        });
+        const snapped = snapMove(pointerState.origins, deltaX / viewport.scale, deltaY / viewport.scale);
+        pointerState.currentPositions = snapped.positions;
+        clearSnapLines();
+        showSnapLines(snapped.guides);
+        for (const position of snapped.positions) {
+          const element = world.querySelector(`[data-id="${CSS.escape(position.id)}"]`);
+          const item = board.items.find((candidate) => candidate.id === position.id);
+          if (!element || !item) continue;
+          placeItemElement(element, { ...item, x: position.x, y: position.y });
+        }
       }
     });
 
@@ -964,9 +1263,21 @@
         const dragged = Math.abs(event.clientX - state.startX) + Math.abs(event.clientY - state.startY) > 3;
         if (state.type === "line" && dragged
           && Math.abs(end.x - state.start.x) + Math.abs(end.y - state.start.y) < 1) return;
+        if (state.type === "stroke" && !dragged) return;
+        if (state.type === "image" && !pasteImageSource) { showToast("请先复制图片，再按 Ctrl/⌘+V 粘贴"); return; }
         let point = state.start;
-        if (dragged && state.type === "line") {
-          point = { ...state.start, size: { w: end.x - state.start.x, h: end.y - state.start.y } };
+        if (dragged && (state.type === "line" || state.type === "stroke")) {
+          const deltaX = end.x - state.start.x;
+          const deltaY = end.y - state.start.y;
+          point = state.type === "line"
+            ? { ...state.start, size: { w: deltaX, h: deltaY } }
+            : {
+              x: Math.min(state.start.x, end.x),
+              y: Math.min(state.start.y, end.y),
+              size: { w: Math.max(1, Math.abs(deltaX)), h: Math.max(1, Math.abs(deltaY)) },
+              points: [{ x: state.start.x < end.x ? 0 : Math.abs(deltaX), y: state.start.y < end.y ? 0 : Math.abs(deltaY) },
+                { x: state.start.x < end.x ? Math.abs(deltaX) : 0, y: state.start.y < end.y ? Math.abs(deltaY) : 0 }],
+            };
         } else if (dragged) {
           point = {
             x: Math.min(state.start.x, end.x),
@@ -975,25 +1286,52 @@
           };
         }
         createItem(state.type, point, state.revision).catch((error) => showToast(error.message));
+      } else if (state.kind === "marquee") {
+        state.marquee?.remove();
+        clearSnapLines();
+        if (state.moved) {
+          const rect = canvas.getBoundingClientRect();
+          const left = Math.min(state.startX, event.clientX) - rect.left;
+          const top = Math.min(state.startY, event.clientY) - rect.top;
+          const right = left + Math.abs(deltaXOf(state, event));
+          const bottom = top + Math.abs(deltaYOf(state, event));
+          const ids = board.items.filter((item) => {
+            const bounds = getItemBounds(item);
+            const screen = {
+              left: bounds.left * viewport.scale + viewport.x,
+              top: bounds.top * viewport.scale + viewport.y,
+              right: bounds.right * viewport.scale + viewport.x,
+              bottom: bounds.bottom * viewport.scale + viewport.y,
+            };
+            return screen.left < right && screen.right > left && screen.top < bottom && screen.bottom > top;
+          }).map((item) => item.id);
+          setSelection(ids);
+          renderBoard();
+        }
       } else if (state.kind === "move" && state.moved) {
-        const deltaX = (event.clientX - state.startX) / viewport.scale;
-        const deltaY = (event.clientY - state.startY) / viewport.scale;
-        const movedItem = {
-          ...state.item,
-          x: state.originX + deltaX,
-          y: state.originY + deltaY,
-        };
-      const view = { ...viewport, revision: board.revision };
-        view.revision = board.revision;
-        boardWrite(boardEndpoints.patchItem(state.id), "PATCH", {
-          confirmedBy: "human", patch: { x: movedItem.x, y: movedItem.y },
-        }, state.revision).then(() => placeCreatedItem(movedItem, view))
-          .catch((error) => { showToast(error.message); renderBoard(); });
+        const positions = state.currentPositions || state.origins.map((origin) => ({ ...origin, x: origin.x, y: origin.y }));
+        const before = board;
+        const view = { ...viewport, revision: board.revision };
+        boardWrite(null, "BATCH", {
+          args: {
+            updates: positions.map((position) => ({ id: position.id, patch: { x: position.x, y: position.y } })),
+          },
+        }, state.revision).then(() => {
+          recordHistory(before);
+          for (const position of positions) {
+            const item = board.items.find((candidate) => candidate.id === position.id);
+            if (item) placeCreatedItem(item, view);
+          }
+        }).catch((error) => { showToast(error.message); renderBoard(); });
+        clearSnapLines();
       } else if (state.kind === "pan" && boardRenderPending) {
         boardRenderPending = false;
         renderBoard();
       }
     });
+
+    function deltaXOf(state, event) { return event.clientX - state.startX; }
+    function deltaYOf(state, event) { return event.clientY - state.startY; }
 
     canvas.addEventListener("pointercancel", cancelGesture);
     canvas.addEventListener("lostpointercapture", cancelGesture);
@@ -1018,13 +1356,38 @@
         setHelpOpen(helpPopover.hidden);
         return;
       }
-      const shortcut = { v: "select", n: "note", t: "text", r: "rect", e: "ellipse", l: "line" }[event.key.toLowerCase()];
+      const shortcut = { v: "select", n: "note", t: "text", r: "rect", e: "ellipse", l: "line", p: "stroke" }[event.key.toLowerCase()];
       if (shortcut) { selectTool(shortcut); return; }
       if (event.key === "Enter") { event.preventDefault(); editSelected(); return; }
       if (event.key === "Delete" || event.key === "Backspace") { event.preventDefault(); deleteSelected().catch((error) => showToast(error.message)); }
+      if ((event.metaKey || event.ctrlKey) && event.key.toLowerCase() === "z") {
+        event.preventDefault();
+        if (event.shiftKey) restoreHistory(redoStack.pop(), "redo").catch((error) => showToast(error.message));
+        else restoreHistory(undoStack.pop(), "undo").catch((error) => showToast(error.message));
+        return;
+      }
+      if ((event.metaKey || event.ctrlKey) && event.key.toLowerCase() === "a") {
+        event.preventDefault();
+        setSelection(board.items.map((item) => item.id));
+        renderBoard();
+        return;
+      }
+      if (["ArrowLeft", "ArrowRight", "ArrowUp", "ArrowDown"].includes(event.key)) {
+        const items = selectedItems();
+        if (!items.length) return;
+        event.preventDefault();
+        const step = event.shiftKey ? 20 : 2;
+        const deltaX = event.key === "ArrowLeft" ? -step : event.key === "ArrowRight" ? step : 0;
+        const deltaY = event.key === "ArrowUp" ? -step : event.key === "ArrowDown" ? step : 0;
+        const before = board;
+        boardWrite(null, "BATCH", {
+          args: { updates: items.map((item) => ({ id: item.id, patch: { x: item.x + deltaX, y: item.y + deltaY } })) },
+        }).then(() => recordHistory(before)).catch((error) => showToast(error.message));
+        return;
+      }
       if (event.key === "Escape") {
         if (!helpPopover.hidden) setHelpOpen(false);
-        else { cancelGesture(); selectedId = null; selectTool("select"); renderBoard(); }
+        else { cancelGesture(); clearSelection(); selectTool("select"); renderBoard(); }
         return;
       }
     });
@@ -1040,14 +1403,35 @@
       cancelGesture();
     });
 
+    window.addEventListener("paste", (event) => {
+      const files = [...(event.clipboardData?.files ?? [])];
+      const file = files.find((candidate) => candidate.type.startsWith("image/"));
+      if (!file) return;
+      event.preventDefault();
+      if (file.size > 700_000) { showToast("图片太大，请使用 700KB 以内图片"); return; }
+      const reader = new FileReader();
+      reader.onload = () => {
+        pasteImageSource = typeof reader.result === "string" ? reader.result : null;
+        selectTool("image");
+        showToast("点画布放置图片");
+      };
+      reader.readAsDataURL(file);
+    });
+
     const beginDoubleClickEdit = (event) => {
       const itemElement = event.target.closest(".board-item");
-      if (!itemElement || itemElement.dataset.type === "line") return;
+      if (!itemElement) {
+        if (tool !== "select") return;
+        const point = screenToWorld(event.clientX, event.clientY);
+        createItem("note", point, board.revision).catch((error) => showToast(error.message));
+        return;
+      }
+      if (itemElement.dataset.type === "line" || itemElement.dataset.type === "stroke" || itemElement.dataset.type === "image") return;
       const item = board.items.find((candidate) => candidate.id === itemElement.dataset.id);
       if (!item) return;
       event.preventDefault();
       event.stopPropagation();
-      selectedId = item.id;
+      setSelection([item.id]);
       pendingTextEditId = item.id;
       lastDoubleClick = Date.now();
       selectTool("select");

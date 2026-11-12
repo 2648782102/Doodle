@@ -245,7 +245,10 @@ describe("MCP board server", () => {
         name: "draw_board",
         arguments: {
           author: "ai",
-          items: [{ id: drawnResult.structuredContent.items.find((item) => item.text === "MCP test")?.id, type: "note", x: 0, y: 0, w: 180, h: 100, text: "AI revised" }],
+          updates: [{
+            id: drawnResult.structuredContent.items.find((item) => item.text === "MCP test")?.id,
+            patch: { type: "note", x: 0, y: 0, w: 180, h: 100, text: "AI revised" },
+          }],
         },
       });
       expect(updated.structuredContent.items.find((item) => item.text === "AI revised")).toMatchObject({ author: "ai" });

@@ -4,7 +4,7 @@ This is the current operating manual for AI coding agents. Humans should read `R
 
 ## Product
 
-`doodle-mcp` is a local-first **two-way shared infinite board**. A person and an AI both place notes, text, rectangles, ellipses, and directed arrows on one canvas to express intent; each side can read and continue what the other drew. MCP stdio is the AI's normal access channel inside an agent; the repository also builds an installable desktop-only Codex plugin around the same four-tool MCP server. Compatible MCP Apps hosts may show the interactive canvas beside the existing agent conversation as an optional enhancement and attach the board's final-state delta to that conversation's model context. Conversation stays in the host chat; the standalone local page is a fallback, never a side effect of a normal tool call.
+`doodle-mcp` is a local-first **two-way shared infinite board**. A person and an AI both place notes, text, rectangles, ellipses, directed arrows, freehand strokes, and images on one canvas to express intent; each side can read and continue what the other drew. MCP stdio is the AI's normal access channel inside an agent; the repository also builds an installable desktop-only Codex plugin around the same four-tool MCP server. Compatible MCP Apps hosts may show the interactive canvas beside the existing agent conversation as an optional enhancement and attach the board's final-state delta to that conversation's model context. Conversation stays in the host chat; the standalone local page is a fallback, never a side effect of a normal tool call.
 
 The board is the product. Project structure is only one optional subject that can be drawn. There is no second session model, proposal workflow, approval grant, code-change authority, diagram library, or workbench.
 
@@ -24,7 +24,7 @@ Install and first-use experience:
 - Direct MCP examples use zero-configuration `npx -y doodle-mcp`; `DOODLE_WORKSPACE_ROOT` and other environment variables are optional overrides, not installation prerequisites.
 - `PANEL_URL` belongs to the current MCP server process and may disappear when the host session ends. `npm run preview:board` is the explicit terminal-owned HTTP-only preview; it registers no MCP tools and installs no background service.
 - `get_board` uses progressive guidance: an empty board returns `FIRST_USE` / `NEXT_STEPS` and the drawing guide; a board with objects returns a concise `NEXT`. It always retains `BOARD_JSON`, `PANEL_URL`, the structured snapshot, and version 1 board state.
-- The canvas exposes a dismissible `?` help popover with three human gestures. It is UI state in browser localStorage, never board state or permission.
+- The canvas exposes a dismissible `?` help popover with creation, multi-select, undo/redo, image paste, and navigation gestures. It is UI state in browser localStorage, never board state or permission.
 - In MCP Apps hosts that advertise `updateModelContext`, the embedded canvas publishes the current final board snapshot and a delta from the last published snapshot. This is final state, not an operation log, and it does not trigger a model turn. A `通知 Agent` button appears only when `sendMessage` is also supported; it sends one short user message in the host's existing conversation. Neither path creates a Doodle chat, session, or message feed. `get_board` remains authoritative; a standalone `PANEL_URL` page has no bridge to the current host session.
 
 Shared visual context is anchored to objects, coordinates, text, and authors. Either side may add or revise objects. `scan_project` may provide bounded read-only project context; it does not draw, change the board, write files, or authorize code changes. `get_board` also reports `PANEL_URL`, the active local human-facing address; mention it when a person asks where to look or when the host cannot render an embedded canvas.
@@ -40,11 +40,12 @@ Shared visual context is anchored to objects, coordinates, text, and authors. Ei
 
 Drawing contract:
 
-- Read `BOARD_JSON` first and reuse existing item IDs for updates and removals. Board mutations are serialized against the latest state; stale browser edits require a reload after conflict.
+- Read `BOARD_JSON` first; prefer `updates` for precise changes and reuse existing item IDs for removals. Board mutations are serialized against the latest state; stale browser edits require a reload after conflict.
 - Put `author` at the `draw_board` top level, not inside each item.
 - Use a strict grid, short labels, consistent sizes, and endpoints just outside source/target shapes.
-- A `line` is a directed arrow from `(x,y)` to `(x+w,y+h)`. `w` and `h` are signed endpoint deltas and may be negative. Other objects use `(x,y)` as the top-left corner and positive width/height.
-- In the human canvas, click to place a default-sized shape or drag to size shapes and draw arrows in any direction. Space-drag or middle-drag pans; the wheel pans and Ctrl/Command-wheel zooms.
+- A `line` is a directed arrow from `(x,y)` to `(x+w,y+h)`. `w` and `h` are signed endpoint deltas and may be negative; `shape` may be `straight`, `curve`, or `orthogonal`. Other objects use `(x,y)` as the top-left corner and positive width/height.
+- `stroke.points` are local to the object bounds; `image.src` is a bounded `data:image/*;base64` source. `title`, `emphasis: focus`, and `groupId` are optional version 1 fields; old boards remain valid.
+- In the human canvas, click to place a default-sized object or drag to size shapes, sketch strokes, and draw arrows in any direction. Double-click empty canvas creates a note; dragging on empty canvas marquee-selects; selected objects support batch move/delete/group/layout, undo/redo, arrow-key nudging, and alignment snapping. `Ctrl/⌘+V` pastes a bounded local image. Space-drag or middle-drag pans; the wheel pans and Ctrl/Command-wheel zooms.
 - Do not fake connectors with text or decorative horizontal lines.
 - Normal tool calls never open a browser, IDE, or editor, and never write project files.
 
@@ -86,7 +87,7 @@ docs/                           product, architecture, decisions, and maintenanc
 - Tool names are `snake_case`; TypeScript files are `kebab-case`; registration functions are `registerXxx`.
 - Tool descriptions are written for an LLM and explain when to use another tool instead.
 - Every MCP tool registers explicit `readOnlyHint`, `destructiveHint`, and `openWorldHint` annotations. `draw_board` is destructive because it can remove or overwrite objects.
-- `SimpleBoard` is version 1. Protocol or persisted-state changes require compatibility tests and synchronized docs/guards.
+- `SimpleBoard` is version 1. Extended optional object fields are backward-compatible version 1 additions; any required or incompatible state change still requires compatibility tests and synchronized docs/guards.
 - The server version comes from `package.json`; do not hard-code it in `src/server.ts`.
 - The preview server binds to `127.0.0.1` by default. `PREVIEW_PORT` selects a fixed port; when unset or `0`, the server binds to a free loopback port and `get_board` reports it as `PANEL_URL`.
 - Normal startup connects MCP stdio before starting the local HTTP preview. Preview startup failure is logged on stderr and does not disable the MCP tools.
@@ -102,6 +103,6 @@ docs/                           product, architecture, decisions, and maintenanc
 
 ## Validation
 
-Run `npm run check` before proposing a change. It covers TypeScript, build, plugin build, tests, example syntax, offline repository guards, plugin guards, submission ZIP, doctor, and package contents. CI runs the same plugin guard. Protocol, tool, security, plugin packaging, or product changes must update all of `AGENTS.md`, `README.md`, `README.en.md`, `docs/PRODUCT_DIRECTION.md`, `docs/ARCHITECTURE.md`, `docs/DECISIONS.md`, `docs/GOAL_PLUGIN.md`, `CHANGELOG.md`, tests, examples, `.github/workflows/ci.yml`, `scripts/repo-check.mjs`, and `scripts/plugin-check.mjs` together.
+Run `npm run check` before proposing a change. It covers TypeScript, build, plugin build, tests, example syntax, offline repository guards, plugin guards, submission ZIP, doctor, and package contents. CI runs the same plugin guard. Protocol, tool, security, plugin packaging, or product changes must update all of `AGENTS.md`, `README.md`, `README.en.md`, `docs/PRODUCT_DIRECTION.md`, `docs/ARCHITECTURE.md`, `docs/DECISIONS.md`, `docs/GOAL_PLUGIN.md`, `docs/EXPERIENCE_AUDIT.md`, `CHANGELOG.md`, tests, examples, `.github/workflows/ci.yml`, `scripts/repo-check.mjs`, and `scripts/plugin-check.mjs` together.
 
 Keep the product small. Historical ADRs under `docs/archive/adr-legacy/` are read-only history, not current contracts.

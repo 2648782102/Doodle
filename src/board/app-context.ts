@@ -49,6 +49,7 @@ function itemFingerprint(item: BoardItem): string {
   return JSON.stringify([
     item.id, item.type, item.x, item.y, item.w, item.h,
     item.text, item.color, item.author, item.createdAt, item.updatedAt,
+    item.title, item.shape, item.points, item.src, item.mime, item.groupId, item.emphasis,
   ]);
 }
 
@@ -100,13 +101,21 @@ function textProjection(item: BoardItem, maxTextChars: number): Record<string, u
     color: item.color,
     author: item.author,
     text: clipText(item.text, maxTextChars),
+    ...(item.title ? { title: clipText(item.title, maxTextChars) } : {}),
+    ...(item.shape ? { shape: item.shape } : {}),
+    ...(item.points ? { points: item.points } : {}),
+    ...(item.src ? { src: item.src.slice(0, 40), srcOmitted: true } : {}),
+    ...(item.mime ? { mime: item.mime } : {}),
+    ...(item.groupId ? { groupId: item.groupId } : {}),
+    ...(item.emphasis ? { emphasis: item.emphasis } : {}),
   };
 }
 
 function summarizeItems(items: BoardItem[]): string[] {
   return items.slice(0, DELTA_SUMMARY_LIMIT).map((item) => {
     const label = shortText(item.text) || "（无文字）";
-    return `- ${item.id} · ${item.type} · ${item.author} · (${item.x}, ${item.y}) · ${label}`;
+    const detail = item.title ? ` · ${shortText(item.title)}` : item.type === "image" ? " · 图片" : item.type === "stroke" ? " · 手绘" : item.shape && item.shape !== "straight" ? ` · ${item.shape}` : "";
+    return `- ${item.id} · ${item.type} · ${item.author} · (${item.x}, ${item.y}) · ${label}${detail}`;
   }).concat(items.length > DELTA_SUMMARY_LIMIT ? [`- …另有 ${items.length - DELTA_SUMMARY_LIMIT} 个对象，见结构化最终快照`] : []);
 }
 

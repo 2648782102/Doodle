@@ -13,9 +13,12 @@ import type { BoardStore } from "./store.js";
 import { BoardRevisionConflictError } from "./errors.js";
 import {
   addBoardItem,
+  addBoardItems,
   boardCopyText,
-  removeBoardItem,
-  updateBoardItem,
+  layoutBoardItems,
+  removeBoardItems,
+  updateBoardItems,
+  replaceBoardContent,
   type SimpleBoard,
 } from "./types.js";
 
@@ -82,11 +85,13 @@ function boardJson(board: SimpleBoard) {
 function boardGuidance(): string {
   return [
     "Drawing guide:",
-    "- Read BOARD_JSON first; reuse item IDs to update or remove existing objects.",
+    "- Read BOARD_JSON first; reuse item IDs and use updates/removes for precise changes.",
     "- Use a strict grid with short labels. Put author at the draw_board top level, not inside items.",
-    "- A line is an arrow from (x,y) to (x+w,y+h); w/h represent direction, not a box size. They may be negative.",
+    "- A line is an arrow from (x,y) to (x+w,y+h); w/h are signed endpoint deltas. Set shape to straight, curve, or orthogonal.",
+    "- Use stroke for freehand marks with local points, image for a data:image/* source, title for a short heading, and emphasis: focus to highlight what matters.",
+    "- Use layout for tidy arrangements; human multi-select can group related objects in the canvas.",
     "- Place line endpoints just outside the source and target shapes; the arrow text is a short centered label.",
-    "- Prefer a clean replace when redrawing a whole diagram: remove_ids for the old objects, then add the new ones.",
+    "- Prefer updates/removes over clearing everything; replacements should be a last resort.",
     "- The MCP App displays this canvas beside the agent chat in compatible hosts; board tools do not open a browser or grant project-write authority.",
     "- scan_project is optional read-only structure context; draw its result with draw_board if useful.",
   ].join("\n");
@@ -94,13 +99,34 @@ function boardGuidance(): string {
 
 const itemInput = z.object({
   id: z.string().optional().describe("Existing item ID to update; omit to create a new item"),
-  type: z.enum(["note", "text", "rect", "ellipse", "line"]).describe("Simple visual object type"),
+  type: z.enum(["note", "text", "rect", "ellipse", "line", "stroke", "image"]).describe("Visual object type"),
   x: z.number().finite().describe("Canvas X coordinate"),
   y: z.number().finite().describe("Canvas Y coordinate"),
-  w: z.number().finite().optional().describe("Shape width, or line endpoint delta X; negative values are allowed for lines"),
-  h: z.number().finite().optional().describe("Shape height, or line endpoint delta Y; negative values are allowed for lines"),
+  w: z.number().finite().optional().describe("Shape width, line endpoint delta X, or stroke/image bounds width"),
+  h: z.number().finite().optional().describe("Shape height, line endpoint delta Y, or stroke/image bounds height"),
   text: z.string().max(1200).optional().describe("Visible text on the object"),
   color: z.string().regex(/^#[0-9a-fA-F]{6}$/).optional().describe("Hex fill color"),
+  title: z.string().max(120).optional().describe("Short heading rendered above the object text"),
+  shape: z.enum(["straight", "curve", "orthogonal"]).optional().describe("Line routing style"),
+  points: z.array(z.object({ x: z.number().finite(), y: z.number().finite() })).max(500).optional()
+    .describe("Local stroke points relative to the item bounds; use for freehand marks"),
+  src: z.string().max(700000).optional().describe("data:image/*;base64 source for image items"),
+  mime: z.enum(["image/png", "image/jpeg", "image/gif", "image/webp"]).optional().describe("Image mime type"),
+  groupId: z.string().max(80).optional().describe("Optional group marker for moving related objects together"),
+  emphasis: z.enum(["normal", "focus"]).optional().describe("Visual emphasis marker"),
+});
+
+const updateInput = z.object({
+  id: z.string().describe("Existing item ID to update"),
+  patch: itemInput.omit({ id: true }).partial().describe("Fields to change on the existing item"),
+});
+
+const layoutInput = z.object({
+  ids: z.array(z.string()).max(400).optional().describe("Objects to arrange; omit to arrange all non-arrow objects"),
+  origin: z.object({ x: z.number().finite(), y: z.number().finite() }).optional().describe("Top-left grid origin"),
+  columns: z.number().int().min(1).max(12).optional().describe("Grid columns, 1-12; defaults to 3"),
+  gap: z.number().int().min(8).max(200).optional().describe("Gap in canvas units, 8-200; defaults to 24"),
+  mode: z.enum(["grid", "row", "column"]).optional().describe("Arrangement mode; defaults to grid"),
 });
 
 export function registerBoardTools(server: McpServer, ctx: BoardToolContext): void {
@@ -197,33 +223,40 @@ export function registerBoardTools(server: McpServer, ctx: BoardToolContext): vo
     {
       description: "让 AI 直接在共享无限画布上画或改：批量新增/更新便签、文字、矩形、椭圆或有方向箭头，也可按 ID 删除对象。每次操作会在锁内读取最新画板，避免覆盖其他进程的更新。line 的 (x,y) 是起点，(x+w,y+h) 是终点，w/h 可为负数；其他对象是左上角与宽高。按整齐网格布局；不打开浏览器，不写项目文件。",
       inputSchema: z.object({
-        items: z.array(itemInput).max(100).optional().describe("Objects to create (without id) or update (with id)"),
+        items: z.array(itemInput).max(100).optional().describe("Objects to create; omit id"),
+        updates: z.array(updateInput).max(100).optional().describe("Precise updates to existing object IDs"),
         remove_ids: z.array(z.string()).max(100).optional().describe("Existing object IDs to remove"),
+        layout: layoutInput.optional().describe("Optional deterministic arrangement of existing objects"),
+        replace_board: z.unknown().optional().describe("Rare full replacement with a version 1 board snapshot; revision and identity are preserved"),
         author: z.enum(["human", "ai"]).optional().describe("Author marker; AI responses should normally use ai"),
         expected_revision: z.number().int().nonnegative().optional().describe("Optional board revision for rejecting stale canvas edits"),
       }),
       annotations: BOARD_WRITE_ANNOTATIONS,
       _meta: CANVAS_UI_META,
     },
-    async ({ items, remove_ids, author, expected_revision }) => {
+    async ({ items, updates, remove_ids, layout, replace_board, author, expected_revision }) => {
       try {
         let created = 0;
         let updated = 0;
         const removed = new Set(remove_ids ?? []);
         const change = (current: SimpleBoard) => {
           let next = current;
-          for (const raw of items ?? []) {
-            const input = { ...raw, author: author ?? "ai" as const };
-            if (raw.id) {
-              const { id: _id, ...patch } = input;
-              next = updateBoardItem(next, raw.id, patch, author ?? "ai");
-              updated += 1;
-            } else {
-              next = addBoardItem(next, input);
-              created += 1;
-            }
+          if (replace_board !== undefined) {
+            next = replaceBoardContent(next, replace_board);
+            return next;
           }
-          for (const id of removed) next = removeBoardItem(next, id);
+          if (items?.length) {
+            next = addBoardItems(next, items.map((item) => ({ ...item, author: author ?? "ai" as const })));
+            created += items.length;
+          }
+          if (updates?.length) {
+            next = updateBoardItems(next, updates ?? [], author ?? "ai");
+            updated += updates.length;
+          }
+          if (removed.size) {
+            next = removeBoardItems(next, [...removed]);
+          }
+          if (layout) next = layoutBoardItems(next, layout, author ?? "ai");
           return next;
         };
         const initial = await ctx.board.snapshot();

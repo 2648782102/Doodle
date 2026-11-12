@@ -45,8 +45,11 @@ describe("board HTTP surface", () => {
     expect(html).toContain("Doodle");
     expect(html).toContain("/api/board");
     expect(html).not.toContain("/workbench");
-    expect(html).toContain('defaultText = { note: "", text: "", rect: "", ellipse: "", line: "" }');
-    expect(html).toContain('selectTool("select");\n      if (newest)');
+    expect(html).toContain('data-tool="stroke"');
+    expect(html).toContain('data-tool="image"');
+    expect(html).toContain('id="btnUndo"');
+    expect(html).toContain('function snapMove(');
+    expect(html).toContain('defaultText = { note: "", text: "", rect: "", ellipse: "", line: "", stroke: "", image: "" }');
     expect(html).toContain('tool !== "select" && !itemElement');
     expect(html).toContain('socket.addEventListener("open"');
     expect(html).toContain('id="btnEdit"');

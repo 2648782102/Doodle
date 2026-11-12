@@ -156,11 +156,16 @@ check(boardTemplate.includes("AI 和你都能画"), "board help does not explain
 check(boardTemplate.includes("btnHelp") && boardTemplate.includes('event.key === "?"'), "board template lost its dismissible help popover");
 check(!boardTemplate.includes("doodleHelpSeen"), "board template still auto-opens help on first visit");
 check(boardTemplate.includes("canvas.focus();") && !boardTemplate.includes("helpCloseButton.focus();"), "board help steals persistent focus from the canvas");
-check(boardTemplate.includes('defaultText = { note: "", text: "", rect: "", ellipse: "", line: "" }'), "board template still fills new objects with demo text");
+check(boardTemplate.includes('defaultText = { note: "", text: "", rect: "", ellipse: "", line: "", stroke: "", image: "" }'), "board template lost the extended object defaults");
+check(boardTemplate.includes('data-tool="stroke"') && boardTemplate.includes('data-tool="image"'), "board template lost freehand or image tools");
+check(boardTemplate.includes('id="btnUndo"') && boardTemplate.includes('id="btnRedo"') && boardTemplate.includes('class="actionbar"'), "board template lost the separated history and selection controls");
+check(boardTemplate.includes("function snapMove(") && boardTemplate.includes("kind: tool === \"select\" ? \"marquee\" : \"pan\""), "board template lost marquee selection or snapping");
+check(boardTemplate.includes("window.addEventListener(\"paste\""), "board template lost image paste");
 check(boardTemplate.includes("findFreeSpot("), "board template no longer avoids overlapping new objects");
-check(boardTemplate.includes('selectTool("select");\n      if (newest)'), "board template does not return to select after creating an object");
+check(boardTemplate.includes("selectTool(\"select\");\n      if (newest)"), "board template does not return to select after creating an object");
 check(boardTemplate.includes('tool !== "select" && !itemElement'), "board template creates objects when clicking an existing item");
 check(boardTemplate.includes('canvas.addEventListener("dblclick"') && boardTemplate.includes('selectTool("select");\n      canvas.focus();'), "board template lost reliable double-click editing");
+check(boardTemplate.includes('createItem("note", point, board.revision)'), "board template lost double-click-empty note creation");
 check(boardTemplate.includes('id="btnEdit"') && boardTemplate.includes('function editSelected()') && boardTemplate.includes('event.key === "Enter"'), "board template lacks the explicit text-edit entry point");
 check(boardTemplate.includes("function updateContextualTools()"), "board template does not scope edit and delete tools to a selection");
 check(boardTemplate.includes("window.doodleBoardSocket") && boardTemplate.includes('socket.addEventListener("open"'), "board template lost singleton live WebSocket updates");
@@ -173,6 +178,7 @@ check(instructions.includes("conversation") && !instructions.includes("reply_on_
 check(http.includes('"/api/board"') && http.includes("X-AI-Draw-Token"), "board HTTP server lost its authenticated API");
 check(http.includes("templateCandidates(this.config)") && http.includes("panelUrlValue"), "plugin bundle template resolution and dynamic panel URL are missing");
 check(http.includes("canvasSnapshot") && http.includes("notes: _legacyNotes"), "HTTP canvas API still exposes the retired message feed");
+check(http.includes('"/api/board/batch"') && http.includes('"/api/board/replace"'), "HTTP board API lost batch or replacement operations");
 check(http.includes('"/api/board/project"') && !http.includes('"/project"'), "project scan is outside the authenticated board API namespace");
 check(!http.includes("/workbench") && !http.includes("/api/collab"), "board HTTP server still exposes workbench routes");
 check(store.includes("AsyncMutex") && store.includes("replaceIfRevision") && store.includes("BoardRevisionConflictError"), "board store lost serialized revision-safe writes");

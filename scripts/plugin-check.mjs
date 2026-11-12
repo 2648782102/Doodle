@@ -106,6 +106,9 @@ check(privacy.includes("Retention") && privacy.includes("User controls"), "priva
 check(submissionScript.includes("doodle-${packageJson.version}.zip"), "submission ZIP does not use the package version");
 check(toolsSource.includes("READ_ONLY_LOCAL_ANNOTATIONS") && toolsSource.includes("BOARD_WRITE_ANNOTATIONS"), "tool annotations are missing");
 check((toolsSource.match(/server\.registerTool\(/g) ?? []).length === 4, "tools are not all registered through the annotated config API");
+check(boardTemplate.includes('data-tool="stroke"') && boardTemplate.includes('data-tool="image"'), "bundled board template lost the extended drawing tools");
+check(boardTemplate.includes("function snapMove(") && boardTemplate.includes("kind: tool === \"select\" ? \"marquee\" : \"pan\""), "bundled board template lost marquee selection or snapping");
+check(boardTemplate.includes('id="btnUndo"') && boardTemplate.includes('id="btnRedo"'), "bundled board template lost undo/redo controls");
 check(boardTemplate.includes('selectTool("select");\n      if (newest)'), "bundled board template does not return to select after object creation");
 check(boardTemplate.includes('tool !== "select" && !itemElement'), "bundled board template creates objects when clicking an existing item");
 check(boardTemplate.includes("window.doodleBoardSocket") && boardTemplate.includes('socket.addEventListener("open"'), "bundled board template lacks singleton live updates");

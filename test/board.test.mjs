@@ -4,13 +4,18 @@ import path from "node:path";
 import { describe, expect, it } from "vitest";
 import {
   addBoardItem,
+  addBoardItems,
   addBoardNote,
   boardCopyText,
   createEmptyBoard,
   createStarterBoard,
   parseBoard,
   removeBoardItem,
+  removeBoardItems,
   updateBoardItem,
+  updateBoardItems,
+  layoutBoardItems,
+  replaceBoardContent,
 } from "../dist/board/types.js";
 import { BoardStore } from "../dist/board/store.js";
 import { BoardRevisionConflictError } from "../dist/board/errors.js";
@@ -44,6 +49,48 @@ describe("simple shared board", () => {
     expect(board.items[0]).toMatchObject({ w: -180, h: 40, author: "ai" });
     expect(parseBoard(JSON.parse(JSON.stringify(board))).items[0].w).toBe(-180);
     expect(() => addBoardItem(board, { type: "line", x: 0, y: 0, w: 0, h: 0 })).toThrow();
+  });
+
+  it("supports extended visual objects and deterministic board operations", () => {
+    let board = createEmptyBoard();
+    board = addBoardItems(board, [
+      { type: "note", x: 0, y: 0, w: 160, h: 100, title: "事实", text: "用户画了三层", author: "human", groupId: "g1" },
+      { type: "rect", x: 320, y: 0, w: 160, h: 100, text: "AI 理解", author: "ai", groupId: "g1" },
+      { type: "line", x: 160, y: 50, w: 160, h: 0, shape: "curve", text: "回应", author: "ai" },
+      { type: "stroke", x: 20, y: 140, w: 100, h: 40, points: [{ x: 0, y: 0 }, { x: 50, y: 40 }, { x: 100, y: 10 }], author: "human" },
+      {
+        type: "image", x: 200, y: 140, w: 80, h: 60,
+        src: "data:image/png;base64,iVBORw0KGgo=", mime: "image/png", text: "参考图", author: "human",
+      },
+    ]);
+    expect(board.items.map((item) => item.type)).toEqual(["note", "rect", "line", "stroke", "image"]);
+    expect(board.items[0]).toMatchObject({ title: "事实", groupId: "g1" });
+    expect(board.items[2].shape).toBe("curve");
+    expect(boardCopyText(board)).toContain("事实：用户画了三层");
+    expect(parseBoard(JSON.parse(JSON.stringify(board)))).toMatchObject({ version: 1 });
+
+    board = updateBoardItems(board, [{ id: board.items[0].id, patch: { emphasis: "focus", text: "用户改了重点" } }], "human");
+    expect(board.items[0]).toMatchObject({ emphasis: "focus", text: "用户改了重点", author: "human" });
+
+    board = layoutBoardItems(board, {
+      ids: board.items.filter((item) => item.type !== "line" && item.type !== "stroke").map((item) => item.id),
+      origin: { x: 100, y: 100 }, columns: 2, gap: 20, mode: "grid",
+    });
+    expect(board.items.find((item) => item.text === "AI 理解")).toMatchObject({ x: 280, y: 100 });
+
+    const replacement = replaceBoardContent(board, { ...board, title: "ignored", revision: 999 });
+    expect(replacement).toMatchObject({ id: board.id, title: board.title, version: 1 });
+    expect(replacement.revision).toBe(board.revision + 1);
+
+    board = removeBoardItems(board, [board.items[3].id, board.items[4].id]);
+    expect(board.items.some((item) => item.type === "stroke" || item.type === "image")).toBe(false);
+  });
+
+  it("rejects malformed extended objects", () => {
+    let board = createEmptyBoard();
+    expect(() => addBoardItem(board, { type: "stroke", x: 0, y: 0, points: [{ x: 0, y: 0 }] })).toThrow();
+    expect(() => addBoardItem(board, { type: "image", x: 0, y: 0, src: "https://example.com/a.png" })).toThrow();
+    expect(() => addBoardItem(board, { type: "line", x: 0, y: 0, w: 10, h: 0, shape: "loop" })).toThrow();
   });
 
   it("updates, removes, revalidates, and persists independently", async () => {
