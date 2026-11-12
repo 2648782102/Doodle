@@ -54,6 +54,7 @@ const privacy = await read("PRIVACY.md");
 const support = await read("SUPPORT.md");
 const terms = await read("TERMS.md");
 const faq = await read("docs/FAQ.md");
+const troubleshooting = await read("docs/TROUBLESHOOTING.md");
 const submission = await read("docs/SUBMISSION.md");
 const experienceAudit = await read("docs/EXPERIENCE_AUDIT.md");
 const submissionScript = await read("scripts/build-submission.mjs");
@@ -81,6 +82,9 @@ check(pluginSkill.includes("get_board") && pluginSkill.includes("show_board") &&
 check(goalPlugin.includes("## Objective") && goalPlugin.includes("plugin") && goalPlugin.includes("MCP Apps"), "plugin goal document is missing or stale");
 check(packageJson.scripts.build.includes("build-plugin.mjs") && packageJson.scripts.check.includes("repo:plugin-check"), "npm scripts do not build and check the plugin");
 check(packageJson.scripts["setup:codex"] === "node scripts/setup-codex.mjs", "one-command Codex setup is missing");
+check(packageJson.scripts["preview:board"] === "node scripts/preview-board.mjs", "explicit local preview command is missing");
+check(await exists("scripts/preview-board.mjs"), "local preview script is missing");
+check(troubleshooting.includes("npm run preview:board") && troubleshooting.includes("current MCP server process"), "troubleshooting does not explain PANEL_URL lifetime");
 check(packageJson.scripts.check.includes("setup:codex -- --dry-run"), "npm check does not dry-run the Codex setup");
 check(ci.includes("npm run repo:plugin-check"), "CI does not run the plugin guard");
 check(ci.includes("npm run setup:codex -- --dry-run"), "CI does not dry-run the Codex setup");
@@ -94,6 +98,7 @@ check(releasing.includes("npm stage approve") && releasing.includes("npm view do
 check(experienceAudit.includes("| E12 | P1 | fixed |") && experienceAudit.includes("doodle-mcp@0.6.3"), "experience audit does not record the closed npm publication");
 check(experienceAudit.includes("| E13 | P0 | fixed |") && experienceAudit.includes("final-state delta"), "experience audit does not record host model context sync");
 check(experienceAudit.includes("| E15 | P1 | external |") && experienceAudit.includes("npm `latest`"), "experience audit does not record the npm publication gate");
+check(experienceAudit.includes("| E19 | P1 | fixed |") && experienceAudit.includes("terminal-owned preview command"), "experience audit does not record PANEL_URL lifecycle clarification");
 check(!readme.includes("尚未更新") && !readmeEn.includes("until `npm view doodle-mcp version`"), "READMEs still warn about a resolved npm version gap");
 check(gitignore.includes(".doodle-plugin/") && gitignore.includes(".doodle-data/") && gitignore.includes("doodle-plugin-submission/"), "generated plugin output, data, or submission ZIP is not ignored");
 check(index.indexOf("await mcp.connect(transport);") < index.indexOf("await preview.start();"), "MCP stdio is not connected before optional preview startup");

@@ -60,6 +60,7 @@ console.log([
   "  2. 开启一个新的 Codex 会话",
   "  3. 说：「打开 Doodle 画板，我们先用画板交流。」",
   "  4. 在画布上直接画 / 改，让 AI 看后再接着画",
+  "  5. 本地手动预览：npm run preview:board（Ctrl+C 停止）",
   "",
   `ℹ️  零配置 MCP 示例：examples/mcp-config/；插件构建产物：.doodle-plugin/doodle/；本机 Codex 配置：${configPath}`,
 ].join("\n"));

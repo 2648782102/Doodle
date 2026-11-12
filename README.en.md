@@ -13,6 +13,8 @@ There are two supported entry points:
 
 Host capability has three layers: the four tools always work; MCP Apps hosts show the same canvas beside the chat; hosts with `updateModelContext` / `sendMessage` add automatic final-state sync and a short notification. When a host cannot render the canvas, `PANEL_URL` from `get_board` is the local fallback page. Project structure is optional source material, not the product.
 
+`PANEL_URL` belongs to the current MCP server process: it becomes unavailable when that session or host exits. For a local preview independent of a conversation, run `npm run preview:board`. It starts only the board HTTP server, registers no MCP stdio tools, and installs no background service. Stop it with `Ctrl+C`.
+
 The two-way loop:
 
 ```text
@@ -76,6 +78,7 @@ Add a zero-configuration snippet from `examples/mcp-config/` to your MCP host. P
 npm install
 npm run check
 npm run doctor
+npm run preview:board
 ```
 
 Version 1 board files may contain old notes. They remain readable for compatibility, but new canvas UI and agent tools do not display or write a message feed.

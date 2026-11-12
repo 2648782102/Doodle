@@ -13,6 +13,8 @@ Doodle 只有一个内核：**人和 AI 共用的无限画板**。AI 通过 MCP 
 
 宿主能力分三层：四工具始终可用；支持 MCP Apps 时把同一张画布显示在对话旁；支持 `updateModelContext` / `sendMessage` 时增加自动同步和短通知。宿主不渲染画布时，`get_board` 返回的 `PANEL_URL` 是本地兜底页面。项目结构只是可选素材，不是产品主体。
 
+`PANEL_URL` 属于当前 MCP server 进程：会话或宿主退出后它会失效，这是正常生命周期。需要脱离会话、手动开关的本地预览时，运行 `npm run preview:board`；它只启动画板 HTTP 服务，不注册 MCP stdio 工具，也不会安装后台服务。用 `Ctrl+C` 停止。
+
 双向主流程：
 
 ```text
@@ -93,6 +95,7 @@ npm run setup:codex
 npm install
 npm run check
 npm run doctor
+npm run preview:board
 ```
 
 状态文件位于所选目录下的 `.doodle/board.json`，是独立 version 1 状态，应加入忽略，不提交到仓库。既有 version 1 留言字段为兼容旧状态而保留；新画布和 Agent 工具不再显示或写入留言流。
