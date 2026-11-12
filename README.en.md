@@ -53,7 +53,7 @@ npm run setup:codex
 
 ### Direct MCP stdio
 
-Add a zero-configuration snippet from `examples/mcp-config/` to your MCP host. Published installs use `npx -y doodle-mcp`; local checkouts may use `node dist/index.js` after `npm run build`. The server chooses a free loopback port, an isolated board-state directory, and the launched workspace by default. Set `DOODLE_WORKSPACE_ROOT` only when the MCP host starts outside the project that `scan_project` should inspect; `OUTPUT_DIR`, `PREVIEW_HOST`, `PREVIEW_PORT`, and `LOG_LEVEL` remain optional overrides. When `PREVIEW_PORT` is unset, the server reports the active address as `PANEL_URL`; normal MCP calls do not open a browser.
+Add a zero-configuration snippet from `examples/mcp-config/` to your MCP host. Published installs use `npx -y doodle-mcp`; local checkouts may use `node dist/index.js` after `npm run build`. The server chooses a free loopback port, an isolated board-state directory, and the launched workspace by default. Set `DOODLE_WORKSPACE_ROOT` only when the MCP host starts outside the project that `scan_project` should inspect; `OUTPUT_DIR`, `PREVIEW_HOST`, `PREVIEW_PORT`, and `LOG_LEVEL` remain optional overrides. When `PREVIEW_PORT` is unset or `0`, the server reports the active address as `PANEL_URL`; normal MCP calls do not open a browser.
 
 ### Contributor check
 

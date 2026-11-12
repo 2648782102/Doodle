@@ -13,7 +13,7 @@ npm run doctor
 
 ### `PREVIEW_PORT` or the local panel is unavailable
 
-The plugin uses a free loopback port by default and reports it as `PANEL_URL` from `get_board`. If you set a fixed `PREVIEW_PORT`, another process may already own it; pick another port with `PREVIEW_PORT=3402`. The MCP stdio server remains usable even when its optional HTTP listener cannot bind.
+The plugin uses a free loopback port by default and reports it as `PANEL_URL` from `get_board`; `PREVIEW_PORT=0` also requests automatic selection. If you set a fixed `PREVIEW_PORT`, another process may already own it; pick another port with `PREVIEW_PORT=3402`. The MCP stdio server remains usable even when its optional HTTP listener cannot bind.
 
 ### The browser panel does not update
 

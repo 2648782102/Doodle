@@ -70,7 +70,7 @@ All board mutations are pure functions in `src/board/types.ts`. They validate fi
 
 ## Human HTTP surface
 
-The HTTP server binds to `127.0.0.1` by default and a free loopback port when `PREVIEW_PORT` is unset. MCP stdio is connected first; preview startup failure is logged on stderr and leaves the tools usable. `get_board` reports the active `PANEL_URL`. The standalone and embedded canvas share one template with an optional `?` help popover; its dismissed state is browser localStorage only. The bundled plugin resolves both templates relative to its own `server/index.mjs`, so the human fallback works even when the host starts it from a project root. The server serves the standalone canvas:
+The HTTP server binds to `127.0.0.1` by default and a free loopback port when `PREVIEW_PORT` is unset or `0`. MCP stdio is connected first; preview startup failure is logged on stderr and leaves the tools usable. `get_board` reports the active `PANEL_URL`. The standalone and embedded canvas share one template with an on-demand `?` help popover and selection-scoped edit/delete actions; help is never auto-opened, and view preferences live in browser localStorage only. The bundled plugin resolves both templates relative to its own `server/index.mjs`, so the human fallback works even when the host starts it from a project root. The server serves the standalone canvas:
 
 | Endpoint | Purpose |
 |---|---|

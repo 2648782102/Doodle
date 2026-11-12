@@ -65,7 +65,7 @@ npm run setup:codex
 
 | 变量 | 默认值 | 说明 |
 |---|---|---|
-| `PREVIEW_PORT` | 空闲端口 | 固定本地画板 HTTP 端口；未设置时自动选择 |
+| `PREVIEW_PORT` | 空闲端口 | 固定本地画板 HTTP 端口；未设置或设为 `0` 时自动选择 |
 | `PREVIEW_HOST` | `127.0.0.1` | 本地监听地址 |
 | `OUTPUT_DIR` | plugin data / `.doodle-data` / `./output` | 画板状态目录 |
 | `DOODLE_WORKSPACE_ROOT` | 包根目录 | `scan_project` 的目标工作区 |

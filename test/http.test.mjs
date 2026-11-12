@@ -51,6 +51,9 @@ describe("board HTTP surface", () => {
     expect(html).toContain('socket.addEventListener("open"');
     expect(html).toContain('id="btnEdit"');
     expect(html).toContain('function editSelected()');
+    expect(html).toContain('.tool.contextual { display: none; }');
+    expect(html).toContain('function updateContextualTools()');
+    expect(html).not.toContain('storageGet("doodleHelpSeen")');
     expect(html).toContain('id="btnNotifyAgent"');
     expect(html).toContain('notifyButton.hidden = !adapter.canNotifyAgent');
     expect(html).not.toContain("helpCloseButton.focus()");

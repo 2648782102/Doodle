@@ -132,7 +132,7 @@ check(tools.includes("registerAppResource") && tools.includes('"ui://doodle/boar
 check(tools.includes('"show_board"') && tools.includes('"get_board"'), "canvas render and data tools are not separated");
 check(tools.includes("CANVAS_UI_META") && tools.includes("_meta: CANVAS_UI_META"), "draw_board does not advertise the canvas for automatic post-draw rendering");
 check(tools.includes("appBundleCandidates(ctx.config)") && tools.includes("PANEL_URL"), "MCP App resources are not plugin-safe and the panel URL is missing");
-check(tools.includes("FIRST_USE") && tools.includes("NEXT_STEPS") && tools.includes('"NEXT:"'), "get_board does not use progressive first-use and next-step guidance");
+check(tools.includes("FIRST_USE:") && tools.includes("NEXT_STEPS:") && tools.includes("NEXT:"), "get_board does not use progressive first-use and next-step guidance");
 check(tools.includes("structuredContent: boardJson(board)"), "board tools do not return an authoritative structured snapshot");
 check(tools.includes('"scan_project"') && tools.includes("Use draw_board to visualize"), "scan_project is not a read-only board-context tool");
 check(boardTypes.includes("signedWidth") && boardTypes.includes("signedHeight"), "board types lost signed directed-arrow deltas");
@@ -146,7 +146,8 @@ check(!boardTemplate.includes('id="noteInput"') && !boardTemplate.includes('clas
 check(boardTemplate.includes("DoodleBoardInit") && boardTemplate.includes("MCP_APP_BUNDLE") && boardTemplate.includes("btnExpand"), "board template is not connected to the MCP Apps adapter");
 check(boardTemplate.includes('id="btnNotifyAgent"') && boardTemplate.includes("canNotifyAgent") && boardTemplate.includes("notifyAgent()"), "board template lacks the host notification button");
 check(boardTemplate.includes("嵌入画布会自动同步最终状态"), "board help does not explain automatic final-state context sync");
-check(boardTemplate.includes("btnHelp") && boardTemplate.includes("doodleHelpSeen") && boardTemplate.includes('event.key === "?"'), "board template lost its dismissible help popover");
+check(boardTemplate.includes("btnHelp") && boardTemplate.includes('event.key === "?"'), "board template lost its dismissible help popover");
+check(!boardTemplate.includes("doodleHelpSeen"), "board template still auto-opens help on first visit");
 check(boardTemplate.includes("canvas.focus();") && !boardTemplate.includes("helpCloseButton.focus();"), "board help steals persistent focus from the canvas");
 check(boardTemplate.includes('defaultText = { note: "", text: "", rect: "", ellipse: "", line: "" }'), "board template still fills new objects with demo text");
 check(boardTemplate.includes("findFreeSpot("), "board template no longer avoids overlapping new objects");
@@ -154,6 +155,7 @@ check(boardTemplate.includes('selectTool("select");\n      if (newest)'), "board
 check(boardTemplate.includes('tool !== "select" && !itemElement'), "board template creates objects when clicking an existing item");
 check(boardTemplate.includes('canvas.addEventListener("dblclick"') && boardTemplate.includes('selectTool("select");\n      canvas.focus();'), "board template lost reliable double-click editing");
 check(boardTemplate.includes('id="btnEdit"') && boardTemplate.includes('function editSelected()') && boardTemplate.includes('event.key === "Enter"'), "board template lacks the explicit text-edit entry point");
+check(boardTemplate.includes("function updateContextualTools()"), "board template does not scope edit and delete tools to a selection");
 check(boardTemplate.includes("window.doodleBoardSocket") && boardTemplate.includes('socket.addEventListener("open"'), "board template lost singleton live WebSocket updates");
 check(boardTemplate.includes('async function loadBoard(change = null)') && boardTemplate.includes('loadBoard(isCurrent ? "local" : "remote")'), "board template does not distinguish local and remote revision status");
 check(buildScript.includes('entryPoints: [path.join(sourceRoot, "board", "app.ts")]') && buildScript.includes("minify: true"), "build does not bundle a compact MCP App client");

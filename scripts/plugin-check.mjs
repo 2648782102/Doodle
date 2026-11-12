@@ -79,7 +79,7 @@ check(httpSource.includes("templateCandidates(this.config)") && httpSource.inclu
 check(httpSource.includes('"../infra/templates/board.html"'), "bundled server cannot resolve board templates relative to its own server bundle");
 check(toolsSource.includes("appBundleCandidates(ctx.config)") && toolsSource.includes('"server", "infra", "templates", "board-app.js"'), "bundled server cannot resolve the MCP App bundle");
 check(toolsSource.includes("CANVAS_UI_META") && toolsSource.includes("_meta: CANVAS_UI_META"), "bundled draw_board path does not advertise automatic post-draw rendering");
-check(toolsSource.includes("FIRST_USE") && toolsSource.includes("NEXT_STEPS") && toolsSource.includes('"NEXT:"'), "bundled get_board path lacks progressive first-use guidance");
+check(toolsSource.includes("FIRST_USE:") && toolsSource.includes("NEXT_STEPS:") && toolsSource.includes("NEXT:"), "bundled get_board path lacks progressive first-use guidance");
 check(toolsSource.includes("PANEL_URL") && instructions.includes("PANEL_URL"), "active local panel URL is not exposed to the agent");
 check(!instructions.includes("reply_on_board"), "MCP instructions reference the removed reply tool");
 check(instructions.includes("updateModelContext") && instructions.includes("sendMessage"), "MCP instructions do not describe host context and notification boundaries");
@@ -109,6 +109,7 @@ check(boardTemplate.includes('selectTool("select");\n      if (newest)'), "bundl
 check(boardTemplate.includes('tool !== "select" && !itemElement'), "bundled board template creates objects when clicking an existing item");
 check(boardTemplate.includes("window.doodleBoardSocket") && boardTemplate.includes('socket.addEventListener("open"'), "bundled board template lacks singleton live updates");
 check(boardTemplate.includes('id="btnEdit"') && boardTemplate.includes('function editSelected()'), "bundled board template lacks the explicit text-edit entry point");
+check(boardTemplate.includes("function updateContextualTools()") && !boardTemplate.includes("doodleHelpSeen"), "bundled board template lost contextual tools or auto-opens help");
 check(boardTemplate.includes('id="btnNotifyAgent"') && boardTemplate.includes("notifyAgent()"), "bundled board template lacks the host notification button");
 check(appBundle.includes("updateModelContext") && appBundle.includes("sendMessage"), "bundled MCP App bridge lacks host context and notification support");
 check(appBundle.includes("doodle_board_context") && appBundle.includes("finalStateNotOperationLog"), "bundled MCP App context is not a final-state delta");

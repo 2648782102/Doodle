@@ -170,9 +170,34 @@ describe("MCP board server", () => {
       expect(text).toContain("NEXT:");
       expect(text).not.toContain("FIRST_USE:");
       expect(text).not.toContain("Drawing guide:");
+      expect(text).not.toContain("BOARD_JSON is the read-only shared state");
       expect(text).toContain("BOARD_JSON:");
       expect(text).toContain('"text": "context"');
     });
+  }, 30_000);
+
+  it("treats PREVIEW_PORT=0 as automatic port selection", async () => {
+    const transport = new StdioClientTransport({
+      command: "node",
+      args: ["dist/index.js"],
+      env: {
+        ...process.env,
+        PREVIEW_PORT: "0",
+        LOG_LEVEL: "error",
+        OUTPUT_DIR: path.join(tempDir, "auto-zero"),
+        DOODLE_WORKSPACE_ROOT: process.cwd(),
+      },
+    });
+    const client = new Client({ name: "doodle-auto-port-tests", version: "1.0.0" });
+    try {
+      await client.connect(transport);
+      const text = textOf(await client.callTool({ name: "get_board", arguments: {} }));
+      const panel = text.match(/PANEL_URL: (http:\/\/127\.0\.0\.1:\d+\/)/)?.[1];
+      expect(panel).toBeTruthy();
+      expect(Number.parseInt(new URL(panel).port, 10)).toBeGreaterThan(0);
+    } finally {
+      await client.close();
+    }
   }, 30_000);
 
   it("starts with a free loopback port when PREVIEW_PORT is unset", async () => {
@@ -259,7 +284,9 @@ describe("MCP board server", () => {
       expect(snapshot.files.length).toBeGreaterThan(0);
       expect(snapshot).not.toHaveProperty("workspaceRoot");
       expect(JSON.stringify(snapshot)).not.toContain(process.cwd());
-      expect(text).toContain("Use draw_board to visualize this read-only context");
+      expect(text).not.toContain("Use draw_board to visualize this read-only context");
+      expect(text).not.toContain("PROJECT_TEXT:");
+      expect(text.length).toBeLessThan(14_000);
     });
   }, 30_000);
 });

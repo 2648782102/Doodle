@@ -17,8 +17,9 @@ export interface AppConfig {
 
 function parsePort(raw: string): number {
   const value = Number.parseInt(raw, 10);
-  if (!Number.isFinite(value) || value < 1 || value > 65535) {
-    throw new Error(`PREVIEW_PORT invalid (got ${JSON.stringify(raw)}). Use 1–65535.`);
+  if (raw.trim() === "0") return 0;
+  if (!Number.isFinite(value) || value < 0 || value > 65535) {
+    throw new Error(`PREVIEW_PORT invalid (got ${JSON.stringify(raw)}). Use 0 for auto, or 1–65535.`);
   }
   return value;
 }

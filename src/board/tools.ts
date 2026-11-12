@@ -8,7 +8,7 @@ import { fileURLToPath } from "node:url";
 import type { AppConfig } from "../infra/config.js";
 import { logger } from "../infra/logger.js";
 import type { BoardHttpServer } from "./http.js";
-import { projectSnapshotText, scanProject } from "./project-scan.js";
+import { scanProject } from "./project-scan.js";
 import type { BoardStore } from "./store.js";
 import { BoardRevisionConflictError } from "./errors.js";
 import {
@@ -138,42 +138,23 @@ export function registerBoardTools(server: McpServer, ctx: BoardToolContext): vo
         const payload = boardJson(await ctx.board.snapshot());
         const firstUse = payload.itemCount === 0;
         const guidance = firstUse ? [
-          "FIRST_USE:",
-          "- 先在聊天里说明你想画什么；AI 用 draw_board 落在同一张画布。",
-          "- 人可直接点按、拖拽、双击改字；兼容宿主会显示画布，其他宿主用 PANEL_URL。",
-          ``,
-          "NEXT_STEPS:",
-          "- 用户说「打开画板」：调用 show_board。",
-          "- 需要画或改：调用 draw_board；成功后保持画布可见。",
-          "- 人改完后：再次调用 get_board 读取最新内容。",
-          ``,
+          "FIRST_USE: 空画板。用户想看时调用 show_board；需要画时调用 draw_board。",
+          "NEXT_STEPS: draw_board → 保持画布可见 → 人改完后 get_board。首张画板见下方 Drawing guide。",
         ] : [
-          "NEXT:",
-          "- 读取 BOARD_JSON 中的对象与坐标；用 show_board 显示、用 draw_board 修改。",
-          "- 人改完后再次调用 get_board；兼容宿主会自动同步最终状态差量，点「通知 Agent」可发一句短提醒。",
-          ``,
+          "NEXT: 读取 BOARD_JSON 中的对象与坐标；show_board 显示，draw_board 修改，改完后再 get_board。Use draw_board to visualize any context.",
         ];
         return {
           content: [{
             type: "text" as const,
             text: [
-                `🎨 共享画布 · revision ${payload.revision} · ${payload.itemCount} 个对象`,
+              `🎨 共享画布 · revision ${payload.revision} · ${payload.itemCount} 个对象`,
               ``,
               ...guidance,
-              jsonLine({
-                version: 1,
-                revision: payload.revision,
-                items: payload.itemCount,
-                readOnly: true,
-              }),
-              ``,
               "BOARD_JSON:",
               JSON.stringify(payload, null, 2),
               ``,
               ...(firstUse ? [boardGuidance(), ``] : []),
               `PANEL_URL: ${ctx.preview.panelUrl ?? "unavailable (standalone preview not started)"}`,
-              ``,
-              "BOARD_JSON is the read-only shared state. Use draw_board to add or edit visual objects. Conversation belongs in the agent chat; put shared context on the canvas itself.",
             ].join("\n"),
           }],
           structuredContent: payload,
@@ -198,7 +179,10 @@ export function registerBoardTools(server: McpServer, ctx: BoardToolContext): vo
         return {
           content: [{
             type: "text" as const,
-            text: `🎨 已打开共享画布 · revision ${snapshot.revision} · ${snapshot.itemCount} 个对象`,
+            text: [
+              `🎨 共享画布 · revision ${snapshot.revision} · ${snapshot.itemCount} 个对象`,
+              "兼容宿主会显示可交互画布；文本宿主请从 get_board 的 PANEL_URL 打开本地画板。",
+            ].join("\n"),
           }],
           structuredContent: snapshot,
         };
@@ -255,17 +239,13 @@ export function registerBoardTools(server: McpServer, ctx: BoardToolContext): vo
             type: "text" as const,
             text: [
               `✅ 画板已更新 · 新增 ${created} · 更新 ${updated} · 删除 ${removed.size}`,
-              `Revision: ${board.revision} · objects: ${board.items.length}`,
-              `NEXT: 保持画布可见；让用户直接修改，再用 get_board 读取。`,
-              ``,
+              `NEXT: 保持画布可见；人改完后用 get_board 读取。`,
               jsonLine({
                 revision: board.revision,
                 created,
                 updated,
                 removed: removed.size,
               }),
-              ``,
-              "Only board visuals changed; no project file was written.",
             ].join("\n"),
           }],
           structuredContent: boardJson(board),
@@ -298,23 +278,8 @@ export function registerBoardTools(server: McpServer, ctx: BoardToolContext): vo
           content: [{
             type: "text" as const,
             text: [
-              `📁 项目结构 · ${snapshot.files.length} 项 · read-only`,
-              ``,
-              jsonLine({
-                version: 1,
-                files: snapshot.files.length,
-                evidence: snapshot.evidence.length,
-                truncated: snapshot.truncated,
-                writes: "none",
-              }),
-              ``,
               "PROJECT_JSON:",
               JSON.stringify(snapshot, null, 2),
-              ``,
-              "PROJECT_TEXT:",
-              projectSnapshotText(snapshot),
-              ``,
-              "Use draw_board to visualize this read-only context on the same canvas. No project file was written.",
             ].join("\n"),
           }],
         };

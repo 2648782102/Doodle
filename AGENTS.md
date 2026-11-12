@@ -84,7 +84,7 @@ docs/                           product, architecture, decisions, and maintenanc
 - Every MCP tool registers explicit `readOnlyHint`, `destructiveHint`, and `openWorldHint` annotations. `draw_board` is destructive because it can remove or overwrite objects.
 - `SimpleBoard` is version 1. Protocol or persisted-state changes require compatibility tests and synchronized docs/guards.
 - The server version comes from `package.json`; do not hard-code it in `src/server.ts`.
-- The preview server binds to `127.0.0.1` by default. `PREVIEW_PORT` selects a fixed port; when unset, the server binds to a free loopback port and `get_board` reports it as `PANEL_URL`.
+- The preview server binds to `127.0.0.1` by default. `PREVIEW_PORT` selects a fixed port; when unset or `0`, the server binds to a free loopback port and `get_board` reports it as `PANEL_URL`.
 - Normal startup connects MCP stdio before starting the local HTTP preview. Preview startup failure is logged on stderr and does not disable the MCP tools.
 - Non-GET `/api/board/*` requests require the random HTML-injected `X-AI-Draw-Token` and `confirmedBy: "human"`.
 - Human view settings belong only in browser localStorage. They are not board state or permission.
