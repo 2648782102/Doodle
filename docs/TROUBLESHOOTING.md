@@ -7,7 +7,7 @@ npm run setup:codex
 npm run doctor
 ```
 
-`npm run setup:codex` builds the plugin, adds this repository as a local marketplace, and installs `doodle@doodle`. Start a new Codex session and use one first prompt: 「打开 Doodle 画板，放一张便签，我来改给你看。」 If the host cannot embed the canvas, ask the agent for `PANEL_URL`. For direct MCP hosts, use a zero-configuration snippet from `examples/mcp-config/`; set `DOODLE_WORKSPACE_ROOT` only when the MCP server starts outside the project that `scan_project` should inspect. Older `AI_DRAW_WORKSPACE_ROOT` settings still work as a legacy alias.
+`npm run setup:codex` builds the plugin, adds this repository as a local marketplace, and installs `doodle@doodle`. Start a new Codex session and use one first prompt: 「打开 Doodle 画板，我们先用画板交流。」 If the host cannot embed the canvas, ask the agent for `PANEL_URL`. For direct MCP hosts, use a zero-configuration snippet from `examples/mcp-config/`; set `DOODLE_WORKSPACE_ROOT` only when the MCP server starts outside the project that `scan_project` should inspect. Older `AI_DRAW_WORKSPACE_ROOT` settings still work as a legacy alias.
 
 ## Common issues
 

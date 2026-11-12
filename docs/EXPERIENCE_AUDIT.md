@@ -1,16 +1,15 @@
 # Experience Audit — 2026-11-12
 
-This is a maintained, task-scoped audit of the complete Doodle experience chain: install the plugin, open a new agent session, let the AI read and draw, let a person edit the same canvas, let the final state reach the current host conversation, and let the AI read it again. It is based on a live local session where the assistant acted as both the MCP-side AI and the browser-side human. The board was started with a temporary `OUTPUT_DIR` and `PANEL_URL=http://127.0.0.1:3411/`; no private board state was written to the repository.
+This is a maintained, task-scoped audit of the complete two-way Doodle experience chain: install the plugin, open a new agent session, let the AI read and draw, let a person draw or edit on the same canvas, let the final state reach the current host conversation, and let the AI read and draw again. It is based on a live local session where the assistant acted as both the MCP-side AI and the browser-side human. The board was started with a temporary `OUTPUT_DIR` and `PANEL_URL=http://127.0.0.1:3411/`; no private board state was written to the repository.
 
 ## Product direction
 
-Doodle remains one simple shared infinite board for people and AI. It is not a chat product, project workbench, approval system, or diagram library. The complete experience path is:
+Doodle remains one simple two-way shared infinite board for people and AI. Either side can draw to express intent and continue what the other drew. It is not a chat product, project workbench, approval system, or diagram library. The complete experience path is:
 
 ```text
-one-command install → new agent session → one first prompt
-  → AI reads shared board → canvas visible → AI draws
-  → person sees and edits → final-state context sync / short notification
-  → AI rereads → person sees the AI response
+AI reads shared board → canvas visible → AI draws
+  → person sees and draws or edits → final-state context sync / short notification
+  → AI rereads and responds in chat or draws again → repeat
 ```
 
 Any fix below must reduce friction in that loop without adding a fifth MCP tool, a second state model, a chat surface, a browser-opening side effect, or project-write authority.

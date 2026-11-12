@@ -69,6 +69,7 @@ check(mcp.mcpServers.doodle?.env_vars?.includes("PLUGIN_DATA") === true, "MCP en
 check(marketplace.plugins?.[0]?.name === "doodle", "marketplace does not expose doodle");
 check(marketplace.plugins?.[0]?.source?.path === "./.doodle-plugin/doodle", "marketplace does not point at the generated plugin package");
 check(skill.includes("get_board") && skill.includes("show_board") && skill.includes("draw_board") && skill.includes("scan_project"), "Doodle skill lacks the four-tool workflow");
+check(skill.includes("two-way board"), "Doodle skill lost the two-way product definition");
 check(skill.includes("FIRST_USE") && skill.includes("NEXT_STEPS") && skill.includes("打开 Doodle 画板"), "Doodle skill does not lead with the first-use path");
 check(!skill.includes("reply_on_board"), "Doodle skill references the removed reply tool");
 check(skill.includes("PANEL_URL") && !skill.includes("Open a browser"), "Doodle skill mishandles the human panel URL");

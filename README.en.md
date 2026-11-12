@@ -1,14 +1,29 @@
 # Doodle
 
-> A shared canvas for people and AI to draw together through MCP.
+> A local-first two-way board where people and AI draw to express intent through MCP.
 
-Doodle is a local-first MCP canvas, not a project workbench, static diagram generator, chat product, or code approval system. Install the desktop-only Codex plugin from this repository's marketplace, or connect the same four-tool stdio server directly. In hosts that support MCP Apps, `show_board` optionally presents the interactive canvas beside the existing agent conversation, and successful `draw_board` results advertise the same UI so completed AI drawings appear immediately. Hosts that advertise `updateModelContext` receive the current final board snapshot plus a final-state delta from the last published snapshot in the **current host conversation's** model context. This is not an operation log and does not trigger a model turn. Hosts that also advertise `sendMessage` show a `Notify Agent` button that sends only one short message into the existing host chat; Doodle adds no session or chat window. Conversation stays in the host chat. `get_board` reports the active local `PANEL_URL` as a standalone fallback; normal MCP calls never open the system browser.
+## Product definition
 
-Choose a tool to click-place or drag-size objects. Space or middle-button drag pans; the wheel pans and Ctrl/Command-wheel zooms. Double-click an object to edit its text. The embedded UI calls the same `get_board` and `draw_board` tools through the host bridge; it needs no separate chat service.
+Doodle has one kernel: **one infinite board shared by a person and an AI**. The AI draws through MCP tools inside the agent; the person draws directly on the canvas. Either side can continue or revise what the other left behind. The board is the communication medium. Conversation stays in the host chat; Doodle creates no second session.
+
+There are two supported entry points:
+
+- **Codex plugin**: the recommended install, one command.
+- **Direct MCP / `npx`**: works in any MCP host without cloning the repository.
+
+Host capability has three layers: the four tools always work; MCP Apps hosts show the same canvas beside the chat; hosts with `updateModelContext` / `sendMessage` add automatic final-state sync and a short notification. When a host cannot render the canvas, `PANEL_URL` from `get_board` is the local fallback page. Project structure is optional source material, not the product.
+
+The two-way loop:
+
+```text
+AI draws with draw_board → person draws or edits on the canvas
+→ final state enters the current conversation context / person notifies the agent
+→ AI reads with get_board or model context → AI draws again → repeat
+```
 
 ## 30-second start
 
-Choose one path:
+Choose one entry point:
 
 **Codex desktop plugin**: from a Doodle checkout, run one command:
 
@@ -19,12 +34,12 @@ npm run setup:codex
 It installs dependencies when needed, builds the self-contained plugin, registers this repository as a local marketplace, installs `doodle@doodle`, and prints the first prompt. **Start a new Codex session**, then say:
 
 ```text
-Open the Doodle board and put one note on it so I can edit it.
+Open the Doodle board so we can communicate on it.
 ```
 
-MCP Apps-compatible hosts show the canvas beside the chat. The AI reads the board first, then draws a starter object. Pick a tool to click or drag, then double-click or select an object and press `Enter` / click `Edit` to change its text. Use the `?` button or press `?` for the short human gestures. Hosts with context support sync the final board state automatically; after editing, click `Notify Agent` for one short reminder, or say “read the board again” so the AI calls `get_board`. If the host cannot embed the canvas or lacks these capabilities, ask the agent for `PANEL_URL`, open that local address, and ask the AI to reread the board in chat. Normal MCP calls never open a browser as a side effect.
+MCP Apps-compatible hosts show the canvas beside the chat. The AI reads the board first, then draws a starter object. Pick a tool to click or drag to draw directly; double-click or select an object and press `Enter` / click `Edit` to change its text. Use `?` for the short gesture guide. After a person draws, capable hosts sync the final state automatically; `Notify Agent` sends one short reminder where supported. The AI replies in chat or keeps drawing on the board. If the host cannot render the canvas, ask for `PANEL_URL`, open that local address, and ask the AI to reread the board in chat.
 
-The complete path is `npm run setup:codex → new session → first prompt → see or edit one canvas → final-state context sync / notify agent → AI reads it again`.
+The complete path is `npm run setup:codex → new session → first prompt → two-way drawing and editing → final-state context sync / notification → AI reads and draws again`.
 
 **Any MCP host**: add the `npx -y doodle-mcp` snippet from `examples/mcp-config/` to your host configuration, restart the MCP session, and use the same first prompt. `show_board` / `draw_board` still present the canvas; if the host cannot render it, ask for `PANEL_URL`. This path needs no repository clone and does not imply public plugin-directory publication.
 
@@ -37,7 +52,7 @@ The complete path is `npm run setup:codex → new session → first prompt → s
 | `draw_board` | Add, update, or remove notes, text, rectangles, ellipses, and directed arrows; writes are serialized against the latest state. |
 | `scan_project` | Optional read-only project paths and bounded `file:line` evidence. It does not draw or write files. |
 
-The loop is `agent conversation ↔ shared canvas: get_board → draw_board → person sees or edits the canvas → final-state delta enters the current conversation context → notify agent / AI reads it again`. `show_board` is the explicit render tool, while successful `draw_board` results also advertise the optional UI in compatible hosts. Project structure is only one possible subject; `scan_project` is optional and must be visualized with `draw_board` if needed.
+The loop is two-way: `AI reads and draws → person draws or edits → final-state delta enters the current conversation context / person notifies the agent → AI reads and draws again`. `show_board` is the explicit render tool, while successful `draw_board` results also advertise the optional UI in compatible hosts. Project structure is only one possible subject; `scan_project` is optional and must be visualized with `draw_board` if needed.
 
 ## Install
 

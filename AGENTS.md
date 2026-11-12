@@ -4,18 +4,21 @@ This is the current operating manual for AI coding agents. Humans should read `R
 
 ## Product
 
-`doodle-mcp` is a local-first **simple shared infinite board**. A person and an AI place notes, text, rectangles, ellipses, and directed arrows on one canvas. MCP stdio is the AI's normal access channel inside an agent; the repository also builds an installable desktop-only Codex plugin around the same four-tool MCP server. Compatible MCP Apps hosts may show the interactive canvas beside the existing agent conversation as an optional enhancement and attach the board's final-state delta to that conversation's model context. Conversation stays in the host chat; the standalone local page is a fallback, never a side effect of a normal tool call.
+`doodle-mcp` is a local-first **two-way shared infinite board**. A person and an AI both place notes, text, rectangles, ellipses, and directed arrows on one canvas to express intent; each side can read and continue what the other drew. MCP stdio is the AI's normal access channel inside an agent; the repository also builds an installable desktop-only Codex plugin around the same four-tool MCP server. Compatible MCP Apps hosts may show the interactive canvas beside the existing agent conversation as an optional enhancement and attach the board's final-state delta to that conversation's model context. Conversation stays in the host chat; the standalone local page is a fallback, never a side effect of a normal tool call.
 
 The board is the product. Project structure is only one optional subject that can be drawn. There is no second session model, proposal workflow, approval grant, code-change authority, diagram library, or workbench.
 
-Default loop:
+Default two-way loop:
 
 ```text
-install once → new agent session → get_board → show_board → draw_board → person edits the same canvas → final-state context sync / short notification → AI reads it again
+AI: get_board → show_board when needed → draw_board → person sees the board
+person: draws or edits the same canvas → final-state context sync / short notification
+AI: reads with get_board or current model context → continues in chat or draws again
 ```
 
 Install and first-use experience:
 
+- Product story is one kernel, two entry points, three capability layers: one shared board; Codex plugin or direct MCP; four tools always, optional embedded canvas, optional context sync and notification. Project structure is optional source material only.
 - `npm run setup:codex` is the one-command Codex install path. It runs `npm install` when needed, builds the self-contained plugin, adds the repository marketplace, installs `doodle@doodle`, and prints one first prompt. It never runs as a hidden side effect of validation.
 - Official OpenAI documentation distinguishes local marketplaces from the public plugin directory; installed plugin skills and MCP tools are used in a new session. See [Package your plugin](https://developers.openai.com/plugins/build/plugins) and [Developer commands](https://learn.chatgpt.com/docs/developer-commands).
 - Direct MCP examples use zero-configuration `npx -y doodle-mcp`; `DOODLE_WORKSPACE_ROOT` and other environment variables are optional overrides, not installation prerequisites.
@@ -23,7 +26,7 @@ Install and first-use experience:
 - The canvas exposes a dismissible `?` help popover with three human gestures. It is UI state in browser localStorage, never board state or permission.
 - In MCP Apps hosts that advertise `updateModelContext`, the embedded canvas publishes the current final board snapshot and a delta from the last published snapshot. This is final state, not an operation log, and it does not trigger a model turn. A `通知 Agent` button appears only when `sendMessage` is also supported; it sends one short user message in the host's existing conversation. Neither path creates a Doodle chat, session, or message feed. `get_board` remains authoritative; a standalone `PANEL_URL` page has no bridge to the current host session.
 
-Shared visual context is anchored to objects, coordinates, text, and authors. `scan_project` may provide bounded read-only project context; it does not draw, change the board, write files, or authorize code changes. `get_board` also reports `PANEL_URL`, the active local human-facing address; mention it when a person asks where to look or when the host cannot render an embedded canvas.
+Shared visual context is anchored to objects, coordinates, text, and authors. Either side may add or revise objects. `scan_project` may provide bounded read-only project context; it does not draw, change the board, write files, or authorize code changes. `get_board` also reports `PANEL_URL`, the active local human-facing address; mention it when a person asks where to look or when the host cannot render an embedded canvas.
 
 ## Four MCP tools
 

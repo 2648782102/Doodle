@@ -2,7 +2,7 @@
 
 ## Canonical description
 
-> A shared canvas for people and AI to draw together through MCP.
+> A local-first two-way board where people and AI draw to express intent through MCP.
 
 Recommended homepage: `https://github.com/2648782102/Doodle#readme`
 

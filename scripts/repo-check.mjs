@@ -69,7 +69,7 @@ const sourceFiles = (await fs.readdir(path.join(root, "src", "board"), { recursi
   .filter((name) => typeof name === "string" && name.endsWith(".ts"));
 const totalSourceFiles = (await fs.readdir(path.join(root, "src"), { recursive: true }))
   .filter((name) => typeof name === "string" && name.endsWith(".ts"));
-const canonicalDescription = "A shared canvas for people and AI to draw together through MCP.";
+const canonicalDescription = "A local-first two-way board where people and AI draw to express intent through MCP.";
 const canonicalTopics = ["ai", "canvas", "developer-tools", "drawing", "local-first", "mcp", "typescript", "whiteboard"];
 
 check(packageJson.version === "0.7.0", "package.json is not version 0.7.0");
@@ -123,6 +123,7 @@ check(instructions.includes("get_board") && instructions.includes("show_board") 
 check(instructions.includes("First use") && instructions.includes("FIRST_USE"), "MCP instructions do not include the first-use path");
 check(instructions.includes("PANEL_URL") && !instructions.includes("reply_on_board"), "MCP instructions do not describe the local panel URL correctly");
 check(instructions.includes("Doodle is"), "MCP instructions do not introduce Doodle");
+check(instructions.includes("two-way") && instructions.includes("one kernel, two entry points, three capability layers"), "MCP instructions lost the two-way product story");
 check(instructions.includes("updateModelContext") && instructions.includes("final-state delta"), "MCP instructions do not describe host model context sync");
 check(sourceFiles.length === 11, `src/board has ${sourceFiles.length} TypeScript modules; expected the focused eleven-module structure`);
 check(!boardIndex.includes("preview-server") && !boardIndex.includes("session-store"), "board index re-exports legacy infrastructure");
@@ -146,6 +147,7 @@ check(!boardTemplate.includes('id="noteInput"') && !boardTemplate.includes('clas
 check(boardTemplate.includes("DoodleBoardInit") && boardTemplate.includes("MCP_APP_BUNDLE") && boardTemplate.includes("btnExpand"), "board template is not connected to the MCP Apps adapter");
 check(boardTemplate.includes('id="btnNotifyAgent"') && boardTemplate.includes("canNotifyAgent") && boardTemplate.includes("notifyAgent()"), "board template lacks the host notification button");
 check(boardTemplate.includes("嵌入画布会自动同步最终状态"), "board help does not explain automatic final-state context sync");
+check(boardTemplate.includes("AI 和你都能画"), "board help does not explain the two-way board");
 check(boardTemplate.includes("btnHelp") && boardTemplate.includes('event.key === "?"'), "board template lost its dismissible help popover");
 check(!boardTemplate.includes("doodleHelpSeen"), "board template still auto-opens help on first visit");
 check(boardTemplate.includes("canvas.focus();") && !boardTemplate.includes("helpCloseButton.focus();"), "board help steals persistent focus from the canvas");

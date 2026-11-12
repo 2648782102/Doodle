@@ -18,7 +18,7 @@ In an MCP Apps host that supports `updateModelContext`, the embedded canvas publ
 
 ## What do I say after installing?
 
-Start a new Codex session and say 「打开 Doodle 画板，放一张便签，我来改给你看。」 The AI reads the board, shows it where supported, draws one starter note, and you edit the same canvas. Double-click a shape, or select it and press `Enter` / click `Edit`. In supported embedded hosts the final board state syncs to the current session; click `通知 Agent` or ask the AI to read the board again. Use the `?` button for short gestures.
+Start a new Codex session and say 「打开 Doodle 画板，我们先用画板交流。」 The AI reads the board, shows it where supported, and draws a starter object. Draw or edit on the same canvas: click-place or drag shapes, double-click text, or select an object and press `Enter` / click `Edit`. In supported embedded hosts the final board state syncs to the current session; click `通知 Agent` or ask the AI to read the board again. The AI can answer in chat or draw a visual response on the board. Use the `?` button for short gestures.
 
 ## Does a drawing change my source code?
 

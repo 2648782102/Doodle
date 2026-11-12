@@ -58,8 +58,8 @@ console.log([
   "首次使用：",
   "  1. npm run setup:codex",
   "  2. 开启一个新的 Codex 会话",
-  "  3. 说：「打开 Doodle 画板，放一张便签，我来改给你看。」",
-  "  4. 在画布上直接修改，再让 AI 读取画板",
+  "  3. 说：「打开 Doodle 画板，我们先用画板交流。」",
+  "  4. 在画布上直接画 / 改，让 AI 看后再接着画",
   "",
   `ℹ️  零配置 MCP 示例：examples/mcp-config/；插件构建产物：.doodle-plugin/doodle/；本机 Codex 配置：${configPath}`,
 ].join("\n"));

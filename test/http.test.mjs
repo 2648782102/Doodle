@@ -56,6 +56,7 @@ describe("board HTTP surface", () => {
     expect(html).not.toContain('storageGet("doodleHelpSeen")');
     expect(html).toContain('id="btnNotifyAgent"');
     expect(html).toContain('notifyButton.hidden = !adapter.canNotifyAgent');
+    expect(html).toContain("AI 和你都能画");
     expect(html).not.toContain("helpCloseButton.focus()");
     const snapshot = await fetch(`${base}/api/board`).then((response) => response.json());
     expect(snapshot).toMatchObject({ version: 1 });

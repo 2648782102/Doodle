@@ -1,7 +1,7 @@
 {
   "name": "doodle",
   "version": "0.7.0",
-  "description": "A local-first shared infinite board for people and AI, packaged as a desktop-only Codex plugin and MCP server.",
+  "description": "A local-first two-way board where people and AI draw to express intent, packaged as a desktop-only Codex plugin and MCP server.",
   "homepage": "https://github.com/2648782102/Doodle#readme",
   "repository": "https://github.com/2648782102/Doodle",
   "license": "MIT",
@@ -14,8 +14,8 @@
   "skills": "./skills/",
   "interface": {
     "displayName": "Doodle Shared Board",
-    "shortDescription": "Shared human + AI canvas",
-    "longDescription": "Doodle Shared Board is a local-first shared infinite canvas for people and AI. A person and an agent place notes, text, shapes, and directed arrows on one canvas through four focused MCP tools inside a desktop-only Codex plugin. MCP Apps rendering is optional; conversation stays in the host chat. Project structure is only one possible subject, and the board never writes project files.",
+    "shortDescription": "Two-way human + AI board",
+    "longDescription": "Doodle is a local-first two-way board. A person and an AI both draw notes, text, shapes, and directed arrows on one canvas to express intent; either side can read and continue what the other drew. Four focused MCP tools work in every host; MCP Apps rendering, final-state context sync, and notification are optional capabilities. Conversation stays in the host chat. Project structure is only one possible subject, and the board never writes project files.",
     "developerName": "Doodle open-source contributors",
     "category": "Developer Tools",
     "capabilities": ["Read", "Write"],
@@ -27,7 +27,7 @@
     "logo": "./assets/doodle.svg",
     "logoDark": "./assets/doodle-dark.svg",
     "defaultPrompt": [
-      "打开 Doodle 画板，放一张便签，我来改给你看。"
+      "打开 Doodle 画板，我们先用画板交流。"
     ],
     "brandColor": "#f59e0b",
     "screenshots": []

@@ -138,10 +138,10 @@ export function registerBoardTools(server: McpServer, ctx: BoardToolContext): vo
         const payload = boardJson(await ctx.board.snapshot());
         const firstUse = payload.itemCount === 0;
         const guidance = firstUse ? [
-          "FIRST_USE: 空画板。用户想看时调用 show_board；需要画时调用 draw_board。",
-          "NEXT_STEPS: draw_board → 保持画布可见 → 人改完后 get_board。首张画板见下方 Drawing guide。",
+          "FIRST_USE: 空画板。用户想看时调用 show_board；AI 表达意图时调用 draw_board。",
+          "NEXT_STEPS: draw_board → 保持画布可见 → 读取人的画图后用 get_board 或当前会话上下文。首张画板见下方 Drawing guide。",
         ] : [
-          "NEXT: 读取 BOARD_JSON 中的对象与坐标；show_board 显示，draw_board 修改，改完后再 get_board。Use draw_board to visualize any context.",
+          "NEXT: BOARD_JSON 中的对象是人和 AI 的双向表达；show_board 显示，draw_board 画图回应，改完后再 get_board 或读当前会话上下文。Use draw_board to visualize any context.",
         ];
         return {
           content: [{
@@ -239,7 +239,7 @@ export function registerBoardTools(server: McpServer, ctx: BoardToolContext): vo
             type: "text" as const,
             text: [
               `✅ 画板已更新 · 新增 ${created} · 更新 ${updated} · 删除 ${removed.size}`,
-              `NEXT: 保持画布可见；人改完后用 get_board 读取。`,
+              `NEXT: 保持画布可见；人画 / 改完后用 get_board 或当前会话上下文读取。`,
               jsonLine({
                 revision: board.revision,
                 created,

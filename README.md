@@ -1,16 +1,30 @@
 # Doodle
 
-> 一张本地优先的共享无限画布：人和 AI 在同一个地方画便签、形状和箭头。
+> 一张本地优先的双向画板：人和 AI 都能在上面画图表达意思，并读取对方留下的视觉上下文。
 
-Doodle 不是项目工作台、静态图生成器、聊天产品或批准系统。它提供一张共享画布，AI 通过 MCP stdio 在 Agent 内自然地读写；Codex 用户可以从本仓库的 plugin marketplace 安装桌面插件。支持 MCP Apps 的宿主可把同一张画布作为可选增强显示在对话旁；日常对话仍留在 Agent 自己的聊天里。项目结构可以画，但不是产品主体。
+## 产品定义
 
-用户要求看画布时，`show_board` 会在支持 MCP Apps 的宿主对话旁呈现可交互画布；AI 成功调用 `draw_board` 后，兼容宿主也会从结果自动呈现或刷新画布，让用户直接看到刚画的内容。支持 `updateModelContext` 的宿主会在每次画布 revision 前进时，自动把「当前最终快照 + 相对上次同步的最终状态差量」挂到**当前会话**的模型上下文；它不是操作记录，也不会自动触发一轮对话。支持 `sendMessage` 的宿主还会显示「通知 Agent」按钮，点击只发一句「我改了 Doodle 画板，你看下图。」到宿主现有聊天，不新增 Doodle 会话或聊天窗口。宿主不渲染 App 时，`get_board` 返回的 `PANEL_URL` 指向本地画布，改完后请让 AI 调用 `get_board` 再读；普通 MCP 工具不会主动打开系统浏览器。选工具后点按快速放置或拖拽定尺寸，Space / 中键拖动画布，滚轮平移、Ctrl/⌘+滚轮缩放，双击改字。AI 用 `get_board` 读取画布、用 `draw_board` 画便签 / 形状 / 有方向箭头；回复和讨论留在 Agent 对话。MCP Apps UI 通过 Agent 宿主调用同一组工具，不依赖独立聊天服务。
+Doodle 只有一个内核：**人和 AI 共用的无限画板**。AI 通过 MCP 工具在 Agent 内画，人直接在画布上画；任何一方都能接着改，画板本身就是沟通媒介。对话仍留在宿主聊天里，Doodle 不创建第二套会话。
+
+对外只有两个入口：
+
+- **Codex 插件**：推荐安装方式，一条命令完成安装。
+- **直接 MCP / `npx`**：任意 MCP 宿主都可使用，无需 clone 仓库。
+
+宿主能力分三层：四工具始终可用；支持 MCP Apps 时把同一张画布显示在对话旁；支持 `updateModelContext` / `sendMessage` 时增加自动同步和短通知。宿主不渲染画布时，`get_board` 返回的 `PANEL_URL` 是本地兜底页面。项目结构只是可选素材，不是产品主体。
+
+双向主流程：
+
+```text
+AI 用 draw_board 画 → 人看后直接画 / 改 → 最终状态进入当前会话上下文 / 人点通知
+→ AI 用 get_board 或上下文读取 → AI 继续画 / 改 → 人再看……可无限往返
+```
 
 产品定义见 [docs/PRODUCT_DIRECTION.md](docs/PRODUCT_DIRECTION.md)，plugin 目标见 [docs/GOAL_PLUGIN.md](docs/GOAL_PLUGIN.md)，架构见 [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md)，AI 操作手册见 [AGENTS.md](AGENTS.md)。
 
 ## 30 秒上手
 
-选择一条路径：
+选一个入口：
 
 **Codex 桌面插件**：在 Doodle 仓库里运行一条命令：
 
@@ -21,12 +35,12 @@ npm run setup:codex
 它会自动安装依赖、构建自包含插件、注册本仓库的本地 marketplace、安装 `doodle@doodle`，并打印首句提示。**开启一个新的 Codex 会话**，然后说：
 
 ```text
-打开 Doodle 画板，放一张便签，我来改给你看。
+打开 Doodle 画板，我们先用画板交流。
 ```
 
-兼容 MCP Apps 的宿主会直接显示画布；AI 会先读画板，再放一个起步对象。你可以选工具点按 / 拖拽、双击或选中后按 `Enter` / 点「编辑」改字，画板右上角的 `?` 或键盘 `?` 可随时查看提示。支持宿主上下文能力的嵌入画布会自动同步最终状态；改完后点「通知 Agent」发一句短提醒，或在聊天里说「读一下画板」让 AI 用 `get_board` 复核。若宿主不显示嵌入画布或不具备这些能力，就问 AI 要 `PANEL_URL`，打开本地地址并在聊天里让 AI 重读；正常 MCP 调用不会擅自打开浏览器。
+兼容 MCP Apps 的宿主会直接显示画布；AI 会先读画板，再放一个起步对象。你可以选工具点按 / 拖拽直接画，双击或选中后按 `Enter` / 点「编辑」改字；`?` 可随时查看提示。人画完后，宿主会自动同步最终状态（若支持），也可点「通知 Agent」发一句短提醒；AI 会看画、用文字或继续画图回应。若宿主不显示画布，就问 AI 要 `PANEL_URL`，打开本地地址，并在聊天里让 AI 重读。
 
-完整链路：`npm run setup:codex → 新会话 → 首句提示 → 看 / 改同一张画布 → 最终状态同步 / 通知 Agent → AI 再读`。
+完整链路：`npm run setup:codex → 新会话 → 首句提示 → AI 和人双向画 / 改 → 最终状态同步 / 通知 Agent → AI 再看 / 再画`。
 
 **任意 MCP 宿主**：把 [examples/mcp-config/](examples/mcp-config/) 的 `npx -y doodle-mcp` 片段加入宿主配置，重启 MCP 会话后使用同一句提示；画布仍通过 `show_board` / `draw_board` 自动呈现，宿主不渲染时询问 `PANEL_URL`。这条路径不需要 clone 仓库，也不等于公共插件目录发布。
 
@@ -39,13 +53,15 @@ npm run setup:codex
 | `draw_board` | 批量新增 / 更新 / 删除便签、文字、矩形、椭圆和有方向箭头；写入会串行应用到最新状态 |
 | `scan_project` | 可选只读扫描当前项目结构，返回有界相对路径和 `file:line` 证据文本；不写文件、不自动画图 |
 
-默认闭环：
+默认双向闭环：
 
 ```text
-Agent 对话 ↔ 共享画布：get_board → draw_board → 人继续画 → 最终状态差量进入当前会话上下文 → 通知 Agent / AI 再读
+AI: get_board → draw_board → 看人怎么改
+人: 看画 → 直接画 / 改 → 自动同步或通知 Agent
+然后重复；对话始终留在宿主聊天里
 ```
 
-`show_board` 只是在兼容宿主里显示这张画布的可选工具；`scan_project` 只是「项目结构」这个主题的能力之一。AI 决定是否需要它们，并用 `draw_board` 把结果画到同一张画布；它们不创建图库、不改会话、不授权代码变更。
+`show_board` 只是在兼容宿主里显示这张画布的可选工具；`scan_project` 只是「项目结构」这个主题的能力之一。AI 决定是否需要，并用 `draw_board` 把结果画到同一张画布；它们不创建图库、不改会话、不授权代码变更。
 
 ## 安装
 

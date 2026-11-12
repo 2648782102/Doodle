@@ -40,7 +40,7 @@ try {
     `✅ Doodle ${packageJson.version} 已准备好${dryRun ? "（仅预览命令）" : ""}`,
     "",
     "请开启一个新的 Codex 会话，然后说：",
-    "「打开 Doodle 画板，放一张便签，我来改给你看。」",
+    "「打开 Doodle 画板，我们先用画板交流。」",
     "",
     "画布会出现在兼容 MCP Apps 的会话旁；其他宿主可在聊天里询问 PANEL_URL。",
   ].join("\n"));
