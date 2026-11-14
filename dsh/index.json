@@ -29,7 +29,7 @@
   },
   "plugins": [
     {
-      "name": "dsh-doodle",
+      "name": "doodle-dsh-plugin",
       "title": {
         "en": "Doodle shared board",
         "zh": "Doodle 双向画板"
@@ -64,7 +64,7 @@
           "source": {
             "type": "git",
             "url": "https://github.com/2648782102/Doodle",
-            "commit": "03a1685f3bdbbdbc17bbd55aa61badc7852792a9",
+            "commit": "0000000000000000000000000000000000000000",
             "path": "dsh"
           },
           "engines": {}

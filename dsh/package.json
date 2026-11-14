@@ -1,5 +1,5 @@
 {
-  "name": "dsh-doodle",
+  "name": "doodle-dsh-plugin",
   "version": "0.8.0",
   "description": "Two-way shared board for DeepSeek Harness: the agent and the person draw on the same local canvas.",
   "icon": "./icon.svg",
