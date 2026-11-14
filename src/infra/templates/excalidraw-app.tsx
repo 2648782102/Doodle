@@ -46,6 +46,7 @@ function isEditing(appState: ExcalidrawAppState | undefined): boolean {
 declare global {
   interface Window {
     DOODLE_EXCALIDRAW_TOKEN?: string;
+    DOODLE_THEME?: "light" | "dark";
     DoodleExcalidrawInit?: (snapshot: BoardSnapshot, mcpApp?: unknown) => void;
     DoodleExcalidrawUpdate?: (snapshot: BoardSnapshot) => void;
   }
@@ -62,6 +63,42 @@ const currentAppState: { current: ExcalidrawAppState } = { current: {} };
 const pendingRemote: { current: BoardSnapshot | null } = { current: null };
 const pendingTimer: { current: number | null } = { current: null };
 let selectedBoardId = "";
+
+type DoodleTheme = "light" | "dark";
+const THEME_STORAGE_KEY = "doodle-theme";
+const canvasColors: Record<DoodleTheme, { view: string; export: string }> = {
+  light: { view: "transparent", export: "#f7f8f5" },
+  dark: { view: "transparent", export: "#f7f8f5" },
+};
+
+function readTheme(): DoodleTheme {
+  try {
+    return localStorage.getItem(THEME_STORAGE_KEY) === "dark" ? "dark" : "light";
+  } catch {
+    return "light";
+  }
+}
+
+function applyTheme(theme: DoodleTheme): void {
+  document.documentElement.dataset.doodleTheme = theme;
+  window.DOODLE_THEME = theme;
+  const toggle = document.querySelector<HTMLButtonElement>("#doodleThemeToggle");
+  if (toggle) {
+    toggle.textContent = theme === "dark" ? "☀" : "☾";
+    toggle.setAttribute("aria-label", theme === "dark" ? "切换浅色主题" : "切换深色主题");
+    toggle.title = theme === "dark" ? "切换浅色主题" : "切换深色主题";
+  }
+  try {
+    localStorage.setItem(THEME_STORAGE_KEY, theme);
+  } catch {}
+  window.dispatchEvent(new CustomEvent("doodle-theme-change", { detail: theme }));
+}
+
+function initThemeToggle(): void {
+  const toggle = document.querySelector<HTMLButtonElement>("#doodleThemeToggle");
+  applyTheme(readTheme());
+  toggle?.addEventListener("click", () => applyTheme(readTheme() === "dark" ? "light" : "dark"));
+}
 
 function applyRemoteSnapshot(data: BoardSnapshot, refreshFiles = true) {
   if (!data || !Array.isArray(data.items) || typeof data.revision !== "number") return;
@@ -337,7 +374,7 @@ async function exportSnapshot(format: "png" | "jpg" | "svg"): Promise<void> {
   const elements = api.getSceneElements();
   const files = api.getFiles?.() ?? currentFiles.current;
   const appState = api.getAppState?.() ?? {
-    viewBackgroundColor: "#fbfbfc",
+    viewBackgroundColor: canvasColors[readTheme()].view,
     exportBackground: true,
     exportScale: 2,
   };
@@ -345,7 +382,7 @@ async function exportSnapshot(format: "png" | "jpg" | "svg"): Promise<void> {
   const exportState = {
     ...appState,
     exportBackground: true,
-    viewBackgroundColor: String(appState.viewBackgroundColor ?? "#fbfbfc"),
+    viewBackgroundColor: canvasColors[readTheme()].export,
     exportScale: format === "svg" ? 1 : 2,
   } as never;
   if (format === "svg") {
@@ -416,16 +453,21 @@ function initNotifyButton() {
 function CanvasApp({ initial }: { initial: BoardSnapshot }) {
   const [snapshot, setSnapshot] = useState(initial);
   const [api, setApi] = useState<ExcalidrawAPI | null>(null);
+  const [theme, setTheme] = useState<DoodleTheme>(readTheme());
   const initialData = useMemo(() => {
     const files = toFiles(initial);
     currentFiles.current = Object.fromEntries(files.map((file) => [file.id, file]));
     return {
       elements: toElements(initial),
       files: currentFiles.current,
-      appState: { viewBackgroundColor: "#fbfbfc" },
+      appState: {
+        viewBackgroundColor: canvasColors[theme].view,
+        exportBackground: true,
+        exportWithDarkMode: false,
+      },
       scrollToContent: true,
     };
-  }, [initial]);
+  }, [initial, theme]);
 
   useEffect(() => {
     if (activeSnapshot !== initial || snapshot === initial) activeSnapshot = snapshot;
@@ -434,6 +476,28 @@ function CanvasApp({ initial }: { initial: BoardSnapshot }) {
   useEffect(() => {
     apiRef.current = api;
   }, [api]);
+
+  useEffect(() => {
+    if (!api) return;
+    api.updateScene({
+      appState: {
+        viewBackgroundColor: canvasColors[theme].view,
+        exportBackground: true,
+        exportWithDarkMode: false,
+        gridModeEnabled: false,
+      },
+      captureUpdate: "NEVER",
+    });
+  }, [api, theme]);
+
+  useEffect(() => {
+    const onThemeChange = (event: Event) => {
+      const detail = (event as CustomEvent<DoodleTheme>).detail;
+      if (detail === "light" || detail === "dark") setTheme(detail);
+    };
+    window.addEventListener("doodle-theme-change", onThemeChange);
+    return () => window.removeEventListener("doodle-theme-change", onThemeChange);
+  }, []);
 
   useEffect(() => {
     window.DoodleExcalidrawUpdate = (next) => applyRemoteSnapshot(next);
@@ -489,6 +553,7 @@ function CanvasApp({ initial }: { initial: BoardSnapshot }) {
       initialData,
       onChange,
       langCode: "zh-CN",
+      theme,
       UIOptions: {
         canvasActions: {
           loadScene: false,
@@ -526,6 +591,7 @@ window.DoodleExcalidrawInit = (snapshot, mcpApp) => {
 };
 
 if (document.querySelector("#excalidrawRoot")) {
+  initThemeToggle();
   initLibraryUi();
   initSnapshotExports();
   initNotifyButton();
