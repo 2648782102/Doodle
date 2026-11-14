@@ -62,7 +62,10 @@
           "version": "0.8.0",
           "publishTimestamp": 1794677260,
           "source": {
-            "type": "npm"
+            "type": "git",
+            "url": "https://github.com/2648782102/Doodle",
+            "commit": "0f6c6dcdf33d5f959c3152a4b8c0fc2f34c02d5c",
+            "path": "dsh"
           },
           "engines": {}
         }
