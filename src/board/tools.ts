@@ -12,6 +12,7 @@ import { BoardRevisionConflictError } from "./errors.js";
 import { boardAgentDelta, boardAgentView, summarizeAgentBoard } from "./agent-view.js";
 import { BoardRevisionCache } from "./revision-cache.js";
 import { describeHandoff } from "./handoff.js";
+import { projectDiagramDraft } from "./project-diagram.js";
 import {
   addBoardItem,
   addBoardItems,
@@ -552,7 +553,7 @@ export function registerBoardTools(server: McpServer, ctx: BoardToolContext): vo
   server.registerTool(
     "scan_project",
     {
-      description: "可选能力：只读扫描当前工作区的目录与文件路径，并返回少量 file:line 证据文本。项目结构只是画板可以讨论的内容之一；本工具不生成图、不改画板、不写文件，也不授权代码变更。需要可视化时用 draw_board 把路径画到共享画板。",
+      description: "可选能力：只读扫描当前工作区的目录与文件路径，并返回少量 file:line 证据文本，同时给一份可直接传给 draw_board.diagram 的草图（DIAGRAM_DRAFT_JSON）。项目结构只是画板可以讨论的内容之一；本工具不生成图、不改画板、不写文件，也不授权代码变更。要可视化时把草图传给 draw_board。",
       inputSchema: z.object({
         max_depth: z.number().int().min(1).max(6).optional().describe("Maximum directory depth; defaults to 3, maximum 6"),
         max_files: z.number().int().min(1).max(400).optional().describe("Maximum number of entries; defaults to 80, maximum 400"),
@@ -573,8 +574,14 @@ export function registerBoardTools(server: McpServer, ctx: BoardToolContext): vo
             text: [
               "PROJECT_JSON:",
               JSON.stringify(snapshot, null, 2),
+              "DIAGRAM_DRAFT_JSON:",
+              JSON.stringify(projectDiagramDraft(snapshot), null, 2),
             ].join("\n"),
           }],
+          structuredContent: {
+            ...snapshot,
+            diagramDraft: projectDiagramDraft(snapshot),
+          },
         };
       } catch (error) {
         return errorResult("scan_project", error);

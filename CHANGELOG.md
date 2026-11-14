@@ -8,6 +8,7 @@ All notable changes are documented here. Versions follow `VERSIONING.md`.
 
 - `get_board` accepts `since_revision`. A reread returns only objects added, updated, or removed since that revision, plus a compact summary, instead of the whole board again.
 - Delta reads include `HANDOFF`: human-attributed `added` / `edited` / `removed` changes with the final values that differ, bounded to 12 entries. The agent's own writes are excluded so it is never told to review itself.
+- `scan_project` also returns `DIAGRAM_DRAFT_JSON`, a ready-to-draw `draw_board.diagram` draft of the top-level structure, so visualizing a scan no longer needs a separate authoring step.
 - `draw_board.diagram.mode` adds `timeline`, `compare`, and `matrix` beside the default `flow`. Non-flow modes honour explicit `column` / `row`, so an ordered explanation is never reordered by edge analysis.
 
 ### Changed

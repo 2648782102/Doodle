@@ -130,6 +130,15 @@ A delta read now also carries `HANDOFF`:
 - The payload is bounded: at most 12 edits, with `omitted` counting the rest.
 - When nothing human changed, the agent gets one line saying so, not silence.
 
+## Fourth target: remove a round trip
+
+`scan_project` answered "what is here", and then the agent invented a diagram and
+paid a second call to draw it. The scan now also returns `DIAGRAM_DRAFT_JSON`:
+the same top-level structure already shaped as `draw_board.diagram` input, with
+stable ids, bounded to 12 nodes, and marked as a suggestion. The agent can pass
+it through, change labels, or ignore it. `scan_project` still reads only; it
+never draws and never changes the board.
+
 ## Authority and red lines
 
 - Allowed: normal commits and pushes on this branch, source, tests, docs, CI,
