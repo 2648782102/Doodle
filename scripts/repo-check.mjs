@@ -73,6 +73,12 @@ const totalSourceFiles = (await fs.readdir(path.join(root, "src"), { recursive: 
   .filter((name) => typeof name === "string" && name.endsWith(".ts"));
 const canonicalDescription = "A local-first two-way board where people and AI draw to express intent through MCP.";
 const canonicalTopics = ["ai", "canvas", "developer-tools", "drawing", "local-first", "mcp", "typescript", "whiteboard"];
+const hoverGeometry = [...excalidrawTemplate.matchAll(/([^{}]+)\{([^{}]*)\}/g)]
+  .filter(([, selectors]) => selectors.includes(":hover") || selectors.includes(":active"))
+  .flatMap(([, selectors, body]) => {
+    const geometry = body.match(/(?:^|;)\s*(?:transform|translate|scale|rotate|margin(?:-[a-z]+)?|padding(?:-[a-z]+)?|width|height|min-width|max-width|min-height|max-height|top|right|bottom|left|gap|border-width|font-size|line-height)\s*:/i);
+    return geometry ? [`${selectors.trim()} → ${geometry[0].trim()}`] : [];
+  });
 
 check(packageJson.version === "0.7.0", "package.json is not version 0.7.0");
 check(pluginManifest.version === packageJson.version, "plugin version does not match package.json");
@@ -161,6 +167,11 @@ check(excalidrawApp.includes('if (action.type === "duplicate")') && excalidrawAp
 check(excalidrawApp.includes("exportToBlob") && excalidrawApp.includes("exportToSvg") && excalidrawTemplate.includes('data-snapshot-export="png"') && excalidrawTemplate.includes('data-snapshot-export="jpg"') && excalidrawTemplate.includes('data-snapshot-export="svg"'), "static PNG/JPG/SVG snapshot exports are missing");
 check(excalidrawTemplate.includes("--doodle-accent") && excalidrawTemplate.includes('data-doodle-theme="dark"') && excalidrawTemplate.includes("background-image: radial-gradient(circle, var(--doodle-dot)") && excalidrawApp.includes('view: "transparent"'), "unified theme tokens or native Excalidraw dot grid are missing");
 check(excalidrawTemplate.includes('id="doodleThemeToggle"') && excalidrawApp.includes("initThemeToggle") && excalidrawApp.includes("THEME_STORAGE_KEY"), "light/dark theme toggle is missing");
+check(excalidrawTemplate.includes("--doodle-drawer-width") && excalidrawTemplate.includes("doodle-drawer-scrim") && excalidrawApp.includes("doodle-drawer-open"), "library drawer lost its bounded width or accessible scrim");
+check(excalidrawTemplate.includes("body.doodle-drawer-open .doodle-topbar") && !excalidrawTemplate.includes("body.doodle-drawer-open .excalidraw-host > .excalidraw"), "library drawer squeezes or collides with the canvas toolbar");
+check(excalidrawTemplate.includes(".doodle-library-section--boards") && excalidrawTemplate.includes(".doodle-library-section--shares") && excalidrawTemplate.indexOf(".doodle-library-section--boards") < excalidrawTemplate.indexOf('data-library-action="duplicate"'), "library drawer does not separate its scrollable list from fixed actions");
+check(hoverGeometry.length === 0, `hover or active feedback changes layout geometry: ${hoverGeometry.join(", ")}`);
+check(excalidrawApp.includes("scrim.hidden = false") && excalidrawApp.includes("scrim?.addEventListener(\"click\", closePanel)") && excalidrawApp.includes("event.key === \"Escape\""), "library drawer lost its scrim, outside-click, or Escape dismissal");
 check(!await exists("src/infra/templates/board.html") && !await exists("src/infra/templates/board-app.js"), "legacy DOM canvas template or bundle still exists");
 check(!tools.includes("engine=dom") && !http.includes("engine=dom"), "legacy DOM engine fallback still exists");
 check(buildScript.includes("excalidraw-app.tsx") && buildScript.includes("minify: true"), "build does not bundle the Excalidraw canvas client");

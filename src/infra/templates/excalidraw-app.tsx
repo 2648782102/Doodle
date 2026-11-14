@@ -290,11 +290,14 @@ function initLibraryUi() {
     status.textContent = message;
     status.style.color = isError ? "#b91c1c" : "#6b7280";
   };
+  const scrim = document.querySelector<HTMLElement>("#doodleDrawerScrim");
   let closeTimer: number | null = null;
   const openPanel = () => {
     if (closeTimer !== null) window.clearTimeout(closeTimer);
     closeTimer = null;
     panel.hidden = false;
+    if (scrim) scrim.hidden = false;
+    document.body.classList.add("doodle-drawer-open");
     toggle.setAttribute("aria-expanded", "true");
     void panel.offsetWidth;
     panel.classList.add("is-open");
@@ -303,9 +306,11 @@ function initLibraryUi() {
   const closePanel = () => {
     if (closeTimer !== null) window.clearTimeout(closeTimer);
     panel.classList.remove("is-open");
+    document.body.classList.remove("doodle-drawer-open");
     toggle.setAttribute("aria-expanded", "false");
     closeTimer = window.setTimeout(() => {
       panel.hidden = true;
+      if (scrim) scrim.hidden = true;
       closeTimer = null;
     }, 220);
   };
@@ -314,6 +319,7 @@ function initLibraryUi() {
     else closePanel();
   });
   close.addEventListener("click", closePanel);
+  scrim?.addEventListener("click", closePanel);
   for (const button of document.querySelectorAll<HTMLButtonElement>("[data-library-action]")) {
     button.addEventListener("click", () => void (async () => {
       try {
