@@ -138,7 +138,7 @@ function styleFor(item: BoardItem): Partial<ExcalidrawSkeleton> {
     textAlign: style.textAlign ?? (item.type === "text" ? "left" : "center"),
     verticalAlign: "middle",
     groupIds: item.groupId ? [item.groupId] : [],
-    customData: { doodle: { id: item.id, author: item.author, role: item.role, variant: item.variant, z: item.z, emphasis: item.emphasis, textAlign: style.textAlign, lineHeight: 1.25 } },
+    customData: { doodle: { id: item.id, author: item.author, role: item.role, variant: item.variant, z: item.z, emphasis: item.emphasis, textAlign: style.textAlign, lineHeight: 1.25, color: item.color, textColor: style.textColor, borderColor: style.borderColor } },
   };
 }
 
@@ -178,7 +178,7 @@ function boundTextSkeleton(item: BoardItem, parent: ExcalidrawSkeleton): Excalid
     lineHeight: 1.25,
     opacity: item.style?.opacity ?? 100,
     groupIds: item.groupId ? [item.groupId] : [],
-    customData: { doodle: { id: `${item.id}_text`, author: item.author, role: "label", z: item.z } },
+    customData: { doodle: { id: `${item.id}_text`, author: item.author, role: "label", z: item.z, color: item.color } },
   };
 }
 
@@ -255,6 +255,17 @@ function itemText(element: ExcalidrawLikeElement): { title?: string; text: strin
   return splitText(element.text ?? element.originalText ?? "");
 }
 
+function itemStyle(element: ExcalidrawLikeElement): NonNullable<BoardItem["style"]> {
+  return {
+    ...(typeof element.opacity === "number" ? { opacity: Math.max(0.1, Math.min(1, element.opacity / 100)) } : {}),
+    ...(typeof element.strokeWidth === "number" ? { strokeWidth: element.strokeWidth } : {}),
+    ...(typeof element.fontSize === "number" ? { fontSize: element.fontSize } : {}),
+    ...(typeof element.strokeColor === "string" ? { borderColor: element.strokeColor } : {}),
+    ...(typeof element.textAlign === "string" && ["left", "center", "right"].includes(element.textAlign)
+      ? { textAlign: element.textAlign as "left" | "center" | "right" } : {}),
+  };
+}
+
 function elementColor(element: ExcalidrawLikeElement): string {
   const color = element.backgroundColor && element.backgroundColor !== "transparent"
     ? element.backgroundColor : element.strokeColor ?? "#f6d365";
@@ -281,10 +292,15 @@ export function excalidrawElementsToBoardItems(
   const bySceneId = new Map(previousItems.flatMap((item) => item.scene?.element?.id
     ? [[String(item.scene.element.id), item] as [string, BoardItem]] : []));
   const byId = new Map(previousItems.map((item) => [item.id, item]));
-  const visible = elements.filter((element) => !element.isDeleted);
+  const frameRole = (element: ExcalidrawLikeElement): boolean =>
+    (element.customData?.doodle as Record<string, unknown> | undefined)?.role === "frame";
+  const visible = elements.filter((element) => !element.isDeleted
+    && !(element.type === "text" && !element.containerId && !element.text?.trim())
+    && !(element.type === "rectangle" && frameRole(element)));
+  const frameElements = elements.filter((element) => !element.isDeleted && element.type === "rectangle" && frameRole(element));
   const textByContainer = new Map(visible.filter((element) => element.type === "text" && element.containerId)
     .map((element) => [String(element.containerId), element]));
-  return visible.filter((element) => !(element.type === "text" && element.containerId)).map((element) => {
+  const items = visible.filter((element) => !(element.type === "text" && element.containerId)).map((element) => {
     const custom = element.customData?.doodle as Record<string, unknown> | undefined;
     const type = elementType(element);
     const bound = textByContainer.get(element.id);
@@ -315,17 +331,16 @@ export function excalidrawElementsToBoardItems(
       ...(custom?.emphasis ? { emphasis: custom.emphasis as BoardItem["emphasis"] } : {}),
       ...(type === "stroke" && points.length > 1 ? { points } : {}),
       ...(type === "image" && file ? { src: file.dataURL, mime: file.mimeType as BoardItem["mime"] } : {}),
+      ...(custom?.color && typeof custom.color === "string" ? { color: custom.color } : {}),
       ...(type === "line" && element.startBinding?.elementId ? { startItemId: element.startBinding.elementId } : {}),
       ...(type === "line" && element.endBinding?.elementId ? { endItemId: element.endBinding.elementId } : {}),
       ...(custom?.variant && typeof custom.variant === "string" ? { variant: custom.variant as BoardItem["variant"] } : {}),
-      ...(typeof element.opacity === "number" || typeof element.strokeWidth === "number" || typeof element.fontSize === "number"
+      ...((Object.keys(itemStyle(element)).length || custom?.textColor)
         ? { style: {
-          ...(typeof element.opacity === "number" ? { opacity: Math.max(0.1, Math.min(1, element.opacity / 100)) } : {}),
-          ...(typeof element.strokeWidth === "number" ? { strokeWidth: element.strokeWidth } : {}),
-          ...(typeof element.fontSize === "number" ? { fontSize: element.fontSize } : {}),
-          ...(typeof element.textAlign === "string" && ["left", "center", "right"].includes(element.textAlign)
-            ? { textAlign: element.textAlign as "left" | "center" | "right" } : {}),
-        } } : {}),
+          ...itemStyle(element),
+          ...(typeof custom?.textColor === "string" ? { textColor: custom.textColor } : {}),
+        } }
+        : {}),
       scene: {
         element: cloneElement(element),
         ...(bound ? { boundText: cloneElement(bound) } : {}),
@@ -335,6 +350,12 @@ export function excalidrawElementsToBoardItems(
     };
     return item;
   });
+  for (const frame of frameElements) {
+    const previous = bySceneId.get(frame.id) ?? byId.get(frame.id);
+    if (!previous) continue;
+    items.push({ ...previous, x: round(finite(frame.x)), y: round(finite(frame.y)), w: round(Math.max(1, finite(frame.width, previous.w))), h: round(Math.max(1, finite(frame.height, previous.h))), updatedAt: timestamp, scene: { ...previous.scene, element: cloneElement(frame) } });
+  }
+  return items;
 }
 
 export function boardToExcalidrawInitialData(board: SimpleBoard): Record<string, unknown> {
