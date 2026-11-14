@@ -36,8 +36,12 @@ icon.svg           entry artwork
 
 - `dsh/index.json` is format 1 and was validated with the Harness
   `@deepseek-ai/dsh-plugin-market-index` parser.
-- The npm package name `dsh-doodle` was already taken on the public registry, so
-  this bundle installs from Git. Bump `version` here and in `dsh/package.json`,
-  commit, then update `versions[0].source.commit` in `dsh/index.json`.
+- The package is named `doodle-dsh-plugin`. The earlier attempt used
+  `dsh-doodle`, but that name is already taken on the public registry.
+- This repository currently publishes the index with a Git source pinned to a
+  commit, so installing needs no npm publish. To switch to npm, publish
+  `doodle-dsh-plugin` and change `versions[0].source` to `{"type":"npm"}`.
+- Bump `version` here and in `dsh/package.json`, commit, then update
+  `versions[0].source.commit` in `dsh/index.json`.
 - `doodle-mcp` itself is published on npm; the bundle launches
   `doodle-mcp@0.8.0` through `npx` so the server is not vendored twice.
