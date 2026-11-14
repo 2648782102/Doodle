@@ -285,7 +285,7 @@ export function registerBoardTools(server: McpServer, ctx: BoardToolContext): vo
               type: "text" as const,
               text: [
                 `🎨 Excalidraw 实验画布 · revision ${snapshot.revision} · ${snapshot.itemCount} 个对象`,
-                "打开 PANEL_URL 并在地址后添加 ?engine=excalidraw；MCP App 资源仍以默认 DOM 引擎呈现。",
+                "此特性分支默认打开 Excalidraw 画布；如需回退稳定 DOM 引擎，在 PANEL_URL 后添加 ?engine=dom。",
                 `PANEL_URL: ${ctx.preview.panelUrl ?? "unavailable (standalone preview not started)"}`,
               ].join("\n"),
             }],

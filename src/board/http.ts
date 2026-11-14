@@ -239,7 +239,7 @@ export class BoardHttpServer {
       res.type("text/plain").send(projectSnapshotText(snapshot));
     });
 
-    this.app.get("/", (req, res) => this.serveBoard(res, req.query.engine === "excalidraw"));
+    this.app.get("/", (req, res) => this.serveBoard(res, req.query.engine !== "dom"));
     this.app.use("/excalidraw", async (req, res, next) => {
       const assetRoot = await this.findExisting(assetCandidates(this.config));
       if (!assetRoot) return res.status(404).send("Excalidraw assets not found");

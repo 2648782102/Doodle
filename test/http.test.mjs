@@ -40,7 +40,7 @@ afterAll(async () => {
 
 describe("board HTTP surface", () => {
   it("serves the human board and the read-only board API", async () => {
-    const html = await fetch(base).then((response) => response.text());
+    const html = await fetch(`${base}/?engine=dom`).then((response) => response.text());
     expect(preview.panelUrl).toBe(`${base}/`);
     expect(html).toContain("Doodle");
     expect(html).toContain("/api/board");
@@ -77,7 +77,7 @@ describe("board HTTP surface", () => {
   });
 
   it("exposes a human-confirmed local board library", async () => {
-    const html = await fetch(base).then((response) => response.text());
+    const html = await fetch(`${base}/?engine=dom`).then((response) => response.text());
     const token = html.match(/const PANEL_TOKEN = "([^"]+)"/)?.[1];
     const library = await fetch(`${base}/api/board/library`).then((response) => response.json());
     expect(library).toMatchObject({ version: 1 });
@@ -93,10 +93,13 @@ describe("board HTTP surface", () => {
   });
 
   it("serves the experimental Excalidraw engine and self-hosted assets", async () => {
-    const html = await fetch(`${base}/?engine=excalidraw`).then((response) => response.text());
+    const html = await fetch(base).then((response) => response.text());
     expect(html).toContain("Doodle · Excalidraw Canvas");
     expect(html).toContain("/excalidraw/excalidraw-app.js");
+    expect(html).toContain('const PANEL_TOKEN =');
     expect(html).not.toContain("https://");
+    const fallback = await fetch(`${base}/?engine=dom`).then((response) => response.text());
+    expect(fallback).toContain("<title>Doodle</title>");
     const app = await fetch(`${base}/excalidraw/excalidraw-app.js`);
     expect(app.status).toBe(200);
     const css = await fetch(`${base}/excalidraw/index.css`);
@@ -132,7 +135,7 @@ describe("board HTTP surface", () => {
       body: JSON.stringify({ confirmedBy: "human", item: { type: "note", x: 0, y: 0 } }),
     });
     expect(unauthenticated.status).toBe(401);
-    const html = await fetch(base).then((response) => response.text());
+    const html = await fetch(`${base}/?engine=dom`).then((response) => response.text());
     const token = html.match(/const PANEL_TOKEN = "([^"]+)"/)?.[1];
     expect(token).toBeTruthy();
     const unconfirmed = await fetch(`${base}/api/board/items`, {
@@ -152,7 +155,7 @@ describe("board HTTP surface", () => {
   });
 
   it("marks human edits to AI objects with the human author", async () => {
-    const html = await fetch(base).then((response) => response.text());
+    const html = await fetch(`${base}/?engine=dom`).then((response) => response.text());
     const token = html.match(/const PANEL_TOKEN = "([^"]+)"/)?.[1];
     const created = await board.mutate((current) => addBoardItem(current, {
       type: "note", x: 0, y: 0, text: "AI note", author: "ai",

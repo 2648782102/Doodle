@@ -15,7 +15,7 @@ Doodle 只有一个内核：**人和 AI 共用的无限画板**。AI 通过 MCP 
 
 画板图库保存的是**可编辑的版本 1 画板快照**：可以另存当前图、切换不同图、新建 / 重命名 / 复制 / 删除图，以及导入 / 导出 JSON。它不是静态 PNG 导出，也不是第二套会话模型；`get_board`、MCP App 和本地画布始终读写同一张当前活动图。
 
-实验分支 `codex/excalidraw-spike` 另外提供 `?engine=excalidraw` 画布：Excalidraw 只作为人类编辑/渲染层，Board v1 仍是唯一持久状态和 AI 权威入口；默认页面继续用稳定 DOM 引擎。详见 [docs/GOAL_EXCALIDRAW.md](docs/GOAL_EXCALIDRAW.md)。
+实验分支 `codex/excalidraw-spike` 默认启用 Excalidraw 画布，`?engine=dom` 可回退到稳定 DOM 引擎。Excalidraw 只作为人类编辑/渲染层，Board v1 仍是唯一持久状态和 AI 权威入口。详见 [docs/GOAL_EXCALIDRAW.md](docs/GOAL_EXCALIDRAW.md)。
 
 `PANEL_URL` 属于当前 MCP server 进程：会话或宿主退出后它会失效，这是正常生命周期。需要脱离会话、手动开关的本地预览时，运行 `npm run preview:board`；它只启动画板 HTTP 服务，不注册 MCP stdio 工具，也不会安装后台服务。用 `Ctrl+C` 停止。
 
