@@ -1,0 +1,21 @@
+# Doodle: one local two-way board shared by the agent and the person.
+#
+# The MCP server owns a loopback HTTP canvas and reports its PANEL_URL through
+# get_board. It runs the published `doodle-mcp` CLI, so the launch never depends
+# on a repository checkout or a global install. PATH is passed explicitly
+# because the MCP child process receives a scrubbed environment.
+- insert:
+    - id: doodle-mcp
+      name: '@deepseek-ai/dsh-mcp-client'
+      config:
+        serverName: doodle
+        transport: stdio
+        command: npx
+        args:
+          - '-y'
+          - 'doodle-mcp@0.8.0'
+        env:
+          DOODLE_WORKSPACE_ROOT: !!js "process.cwd()"
+          PATH: !!js "process.env.PATH ?? '/usr/local/bin:/usr/bin:/bin'"
+        cwd: !!js "process.cwd()"
+        startupTimeoutMs: 60000

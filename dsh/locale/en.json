@@ -1,0 +1,7 @@
+{
+  "meta": {
+    "title": "Doodle shared board",
+    "description": "A local two-way infinite canvas where you and the agent both draw and read, to align on structure, flow, and ideas.",
+    "detail": "docs/DETAIL.md"
+  }
+}

@@ -1,0 +1,44 @@
+{
+  "name": "dsh-doodle",
+  "version": "0.8.0",
+  "description": "Two-way shared board for DeepSeek Harness: the agent and the person draw on the same local canvas.",
+  "icon": "./icon.svg",
+  "publishConfig": {
+    "access": "public"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/2648782102/Doodle.git",
+    "directory": "dsh"
+  },
+  "homepage": "https://github.com/2648782102/Doodle#readme",
+  "type": "module",
+  "exports": {
+    "./cordis.patch.yml": "./cordis.patch.yml",
+    "./icon.svg": "./icon.svg",
+    "./locale/*.json": "./locale/*.json",
+    "./package.json": "./package.json"
+  },
+  "files": [
+    "cordis.patch.yml",
+    "icon.svg",
+    "locale/*.json",
+    "docs"
+  ],
+  "keywords": [
+    "dsh-plugin",
+    "mcp",
+    "canvas",
+    "whiteboard",
+    "ai"
+  ],
+  "license": "MIT",
+  "dsh": {
+    "bundle": {
+      "patch": "./cordis.patch.yml"
+    }
+  },
+  "engines": {
+    "node": ">=20.0.0"
+  }
+}
