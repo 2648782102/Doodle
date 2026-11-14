@@ -24,7 +24,7 @@ BoardStore / MCP tools / HTTP API / BoardLibrary
 5. All AI writes and library switches must update the Excalidraw scene through `updateScene` without losing Board v1 revision safety.
 6. Excalidraw assets, CSS, fonts, and locales must be self-hosted from the local preview/plugin package. No CDN or hosted endpoint is used.
 7. Conversation stays in the host chat. Doodle does not add Excalidraw collaboration, accounts, chat, or hosted state.
-8. Static PNG/SVG export remains a non-goal, even though Excalidraw can do it.
+8. Static PNG/JPG/SVG sharing snapshots are derived from the canvas and never become board-library state; the editable library remains version 1 JSON only.
 9. On this feature branch Excalidraw is the only human-facing canvas engine. The legacy DOM canvas and `board-app.js` bundle are removed from source, build, plugin package, and guards.
 
 ## Acceptance

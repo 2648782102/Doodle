@@ -1,6 +1,6 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { createRoot } from "react-dom/client";
-import { Excalidraw, convertToExcalidrawElements } from "@excalidraw/excalidraw";
+import { Excalidraw, convertToExcalidrawElements, exportToBlob, exportToSvg } from "@excalidraw/excalidraw";
 import {
   boardToExcalidrawFiles,
   boardItemsFromExcalidrawBoard,
@@ -29,6 +29,8 @@ type ExcalidrawAPI = {
   getSceneElements: () => ExcalidrawLikeElement[];
   scrollToContent: (elements?: unknown[]) => void;
   addFiles: (files: ExcalidrawFileData[]) => void;
+  getAppState?: () => Record<string, unknown>;
+  getFiles?: () => Record<string, ExcalidrawFileData>;
 };
 
 type ExcalidrawAppState = {
@@ -316,6 +318,74 @@ async function replaceBoard(items: unknown[], expectedRevision: number): Promise
 function showError(error: unknown) {
   console.warn("Doodle board sync skipped", error);
 }
+function downloadBlob(blob: Blob, filename: string) {
+  const url = URL.createObjectURL(blob);
+  const link = document.createElement("a");
+  link.href = url;
+  link.download = filename;
+  link.click();
+  URL.revokeObjectURL(url);
+}
+
+function safeFilename(name: string): string {
+  return (name || "doodle-board").replace(/[\\/:*?"<>|]/g, "_");
+}
+
+async function exportSnapshot(format: "png" | "jpg" | "svg"): Promise<void> {
+  const api = apiRef.current;
+  if (!api) throw new Error("Canvas is not ready");
+  const elements = api.getSceneElements();
+  const files = api.getFiles?.() ?? currentFiles.current;
+  const appState = api.getAppState?.() ?? {
+    viewBackgroundColor: "#fbfbfc",
+    exportBackground: true,
+    exportScale: 2,
+  };
+  const title = safeFilename((await loadBoard()).title);
+  const exportState = {
+    ...appState,
+    exportBackground: true,
+    viewBackgroundColor: String(appState.viewBackgroundColor ?? "#fbfbfc"),
+    exportScale: format === "svg" ? 1 : 2,
+  } as never;
+  if (format === "svg") {
+    const svg = await exportToSvg({
+      elements: elements as never[],
+      appState: exportState,
+      files: files as never,
+      exportPadding: 24,
+    });
+    downloadBlob(new Blob([svg.outerHTML], { type: "image/svg+xml" }), `${title}.svg`);
+    return;
+  }
+  const blob = await exportToBlob({
+    elements: elements as never[],
+    appState: exportState,
+    files: files as never,
+    mimeType: format === "jpg" ? "image/jpeg" : "image/png",
+    quality: format === "jpg" ? 0.92 : undefined,
+    exportPadding: 24,
+  });
+  downloadBlob(blob, `${title}.${format}`);
+}
+
+function initSnapshotExports() {
+  for (const button of document.querySelectorAll<HTMLButtonElement>("[data-snapshot-export]")) {
+    button.addEventListener("click", () => void (async () => {
+      const format = button.dataset.snapshotExport as "png" | "jpg" | "svg";
+      const status = document.querySelector<HTMLElement>("#doodleLibraryStatus");
+      try {
+        if (status) status.textContent = `正在导出 ${format.toUpperCase()}…`;
+        await exportSnapshot(format);
+        if (status) status.textContent = `已导出 ${format.toUpperCase()}`;
+      } catch (error) {
+        showError(error);
+        if (status) status.textContent = error instanceof Error ? error.message : String(error);
+      }
+    })());
+  }
+}
+
 
 function initNotifyButton() {
   const button = document.querySelector<HTMLButtonElement>("#doodleNotifyAgent");
@@ -457,6 +527,7 @@ window.DoodleExcalidrawInit = (snapshot, mcpApp) => {
 
 if (document.querySelector("#excalidrawRoot")) {
   initLibraryUi();
+  initSnapshotExports();
   initNotifyButton();
   if (embedded) void initHostApp().catch(() => {});
   else connectStandaloneUpdates();

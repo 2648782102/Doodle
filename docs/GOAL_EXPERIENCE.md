@@ -43,7 +43,7 @@ These recipes are guidance for using primitives. They are not a diagram template
 
 - No fifth MCP tool and no duplicate conversation surface.
 - No required version 2 migration; no breaking change to old version 1 boards.
-- No static PNG/SVG export; saved "图" remain editable JSON snapshots.
+- Static PNG/JPG/SVG exports are sharing snapshots only; saved “图” remain editable JSON snapshots.
 - No project file writes or approval semantics from board content.
 - No normal MCP call that opens a browser, IDE, editor, or external app.
 - No npm publish.

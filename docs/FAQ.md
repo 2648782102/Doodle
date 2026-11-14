@@ -30,7 +30,7 @@ The plugin starts a local stdio MCP server and a loopback HTTP preview on the us
 
 ## Where is the board saved?
 
-The active version 1 board state is saved as `.doodle/board.json` under `OUTPUT_DIR`, plugin data, or workspace-local `.doodle-data`. Named editable snapshots live beside it in `.doodle/boards/`. Generated runtime bundles and board state are ignored by Git. Use the `图库` panel or `draw_board.library` to save and switch these snapshots; Doodle does not export static PNG/SVG images.
+The active version 1 board state is saved as `.doodle/board.json` under `OUTPUT_DIR`, plugin data, or workspace-local `.doodle-data`. Named editable snapshots live beside it in `.doodle/boards/`. Generated runtime bundles and board state are ignored by Git. Use the `图库` panel or `draw_board.library` to save and switch these snapshots; Doodle exports static PNG/JPG/SVG sharing snapshots from the human canvas; library imports/exports remain editable JSON.
 
 ## Where do I get help?
 

@@ -5,6 +5,7 @@ All notable changes are documented here. Versions follow `VERSIONING.md`.
 ## Unreleased — Richer shared canvas
 
 ### Added
+- Added human-canvas static sharing snapshots for PNG, JPG, and SVG. These are download-only views; editable library save/import/export remains version 1 JSON.
 
 - Extended version 1 board objects with freehand `stroke`, bounded local `image`, `title`, `shape`, `groupId`, and `emphasis: focus`; older boards remain valid without migration.
 - `draw_board` now supports precise `updates`, batch `items`, `remove_ids`, and deterministic `layout` while keeping exactly four MCP tools.
