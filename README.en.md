@@ -53,7 +53,7 @@ The complete path is `npm run setup:codex → new session → first prompt → t
 
 | Tool | Purpose |
 |---|---|
-| `get_board` | Read the shared canvas; an empty board returns `FIRST_USE` / `NEXT_STEPS` and the drawing guide, while later reads use a concise `NEXT`. `BOARD_JSON`, object IDs, coordinates, authors, revision, `capabilities`, `visualDigest`, and the library index are always retained. |
+| `get_board` | Read the shared canvas. The first read returns the full guide and later reads stay concise. Pass `since_revision` to get only changed objects plus `HANDOFF`: what the person added, edited, or removed, excluding the agent's own writes. Canvas fidelity metadata is never returned. |
 | `show_board` | Open the interactive shared canvas beside the agent conversation when a user wants to see or edit it. |
 | `draw_board` | Add items, apply precise updates/removals, deterministic layout, connected lines, variants/roles/styles/z-order, or use `library` to save/switch/import/export editable boards; `diagram` adds one layered diagram generated from semantic nodes and edges; `replace: true` clears the board first; supports notes, text, shapes, arrows, strokes, images, headings, and focus markers; writes are serialized against the latest state. |
 | `scan_project` | Optional read-only project paths and bounded `file:line` evidence. It does not draw or write files. |

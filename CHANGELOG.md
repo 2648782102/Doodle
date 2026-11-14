@@ -2,6 +2,20 @@
 
 All notable changes are documented here. Versions follow `VERSIONING.md`.
 
+## Unreleased — Cheaper agent reads
+
+### Added
+
+- `get_board` accepts `since_revision`. A reread returns only objects added, updated, or removed since that revision, plus a compact summary, instead of the whole board again.
+- Delta reads include `HANDOFF`: human-attributed `added` / `edited` / `removed` changes with the final values that differ, bounded to 12 entries. The agent's own writes are excluded so it is never told to review itself.
+- `draw_board.diagram.mode` adds `timeline`, `compare`, and `matrix` beside the default `flow`. Non-flow modes honour explicit `column` / `row`, so an ordered explanation is never reordered by edge analysis.
+
+### Changed
+
+- Canvas fidelity metadata (`scene`) no longer appears in any agent-facing payload. It stays persisted, and `canvasFidelityItems` reports how many items carry it.
+- The capabilities, recipes, and drawing guide are sent once per server process; later reads carry a one-line pointer, and `include_guide: true` asks for them again.
+- On a real 4-object board the agent projection is 56% smaller than the persisted board, and an unchanged reread is about 90% smaller than a full read.
+
 ## 0.8.0 — Excalidraw canvas and richer board
 
 ### Added
