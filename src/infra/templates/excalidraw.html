@@ -8,20 +8,20 @@
   <style>
     :root {
       color-scheme: light;
-      --doodle-surface: rgba(255, 255, 255, 0.92);
-      --doodle-surface-solid: #ffffff;
-      --doodle-panel: rgba(250, 251, 253, 0.96);
-      --doodle-ink: #172033;
-      --doodle-muted: #637083;
-      --doodle-border: rgba(23, 32, 51, 0.12);
-      --doodle-border-strong: rgba(23, 32, 51, 0.2);
-      --doodle-accent: #2f6f62;
-      --doodle-accent-soft: rgba(47, 111, 98, 0.11);
+      --doodle-surface: rgba(253, 254, 250, 0.92);
+      --doodle-surface-solid: #fbfcf7;
+      --doodle-panel: rgba(250, 252, 246, 0.97);
+      --doodle-ink: #1e2a26;
+      --doodle-muted: #5f6e66;
+      --doodle-border: rgba(30, 42, 38, 0.12);
+      --doodle-border-strong: rgba(30, 42, 38, 0.22);
+      --doodle-accent: #2f6b5c;
+      --doodle-accent-soft: rgba(47, 107, 92, 0.1);
       --doodle-accent-ink: #ffffff;
       --doodle-danger: #b4463d;
-      --doodle-canvas-bg: #f7f8f5;
-      --doodle-dot: rgba(47, 111, 98, 0.18);
-      --doodle-shadow: 0 16px 44px rgba(28, 40, 56, 0.14);
+      --doodle-canvas-bg: #f5f6f0;
+      --doodle-dot: rgba(47, 107, 92, 0.16);
+      --doodle-shadow: 0 16px 40px rgba(24, 40, 34, 0.12);
       --doodle-radius: 12px;
       --doodle-radius-sm: 8px;
       --doodle-space: 8px;
@@ -32,20 +32,94 @@
     }
     :root[data-doodle-theme="dark"] {
       color-scheme: dark;
-      --doodle-surface: rgba(27, 33, 43, 0.92);
-      --doodle-surface-solid: #171d27;
-      --doodle-panel: rgba(22, 28, 37, 0.96);
-      --doodle-ink: #ecf2f1;
-      --doodle-muted: #9aa7ad;
-      --doodle-border: rgba(236, 242, 241, 0.14);
-      --doodle-border-strong: rgba(236, 242, 241, 0.25);
-      --doodle-accent: #86c6ae;
-      --doodle-accent-soft: rgba(134, 198, 174, 0.14);
-      --doodle-accent-ink: #10221d;
+      --doodle-surface: rgba(28, 36, 33, 0.92);
+      --doodle-surface-solid: #161d1a;
+      --doodle-panel: rgba(24, 32, 29, 0.97);
+      --doodle-ink: #e6eee9;
+      --doodle-muted: #94a49b;
+      --doodle-border: rgba(230, 238, 233, 0.14);
+      --doodle-border-strong: rgba(230, 238, 233, 0.24);
+      --doodle-accent: #8fcbb4;
+      --doodle-accent-soft: rgba(143, 203, 180, 0.14);
+      --doodle-accent-ink: #0e221b;
       --doodle-danger: #e89288;
-      --doodle-canvas-bg: #151b23;
-      --doodle-dot: rgba(134, 198, 174, 0.22);
-      --doodle-shadow: 0 18px 48px rgba(0, 0, 0, 0.4);
+      --doodle-canvas-bg: #131a18;
+      --doodle-dot: rgba(143, 203, 180, 0.2);
+      --doodle-shadow: 0 18px 44px rgba(0, 0, 0, 0.42);
+    }
+    .excalidraw {
+      --color-primary: #2f6b5c;
+      --color-primary-darker: #275a4e;
+      --color-primary-darkest: #1f4a40;
+      --color-primary-light: #dcebe4;
+      --color-primary-light-darker: #cfe2d9;
+      --color-primary-hover: #2a6154;
+      --color-selection: #2f6b5c;
+      --color-brand-hover: #275a4e;
+      --color-brand-active: #1f4a40;
+      --color-on-primary-container: #1f4a40;
+      --color-surface-primary-container: #dcebe4;
+      --color-surface-high: #eef2ea;
+      --color-surface-mid: #f2f4ef;
+      --color-surface-low: #e9ede5;
+      --color-surface-lowest: #fbfcf8;
+      --color-on-surface: #1e2a26;
+      --color-border-outline: #6b7a72;
+      --color-border-outline-variant: #c9d2cb;
+      --island-bg-color: #fdfefb;
+      --button-gray-1: #eef2ea;
+      --button-gray-2: #e2e8e0;
+      --button-gray-3: #cfd7d1;
+      --button-hover-bg: #eef2ea;
+      --button-active-bg: #e2e8e0;
+      --button-active-border: #2f6b5c;
+      --focus-highlight-color: #2f6b5c;
+      --link-color: #2f6b5c;
+      --default-border-color: #e2e8e0;
+      --input-bg-color: #fbfcf8;
+      --input-border-color: #c9d2cb;
+      --input-hover-bg-color: #eef2ea;
+      --input-label-color: #526159;
+      --popup-secondary-bg-color: #f2f4ef;
+      --shadow-island: 0 1px 2px rgba(24, 40, 34, 0.08), 0 8px 24px rgba(24, 40, 34, 0.08);
+    }
+    .excalidraw.theme--dark {
+      --color-primary: #8fcbb4;
+      --color-primary-darker: #a3d6c2;
+      --color-primary-darkest: #bde4d3;
+      --color-primary-light: #2c4a3f;
+      --color-primary-light-darker: #355949;
+      --color-primary-hover: #a3d6c2;
+      --color-selection: #8fcbb4;
+      --color-brand-hover: #a3d6c2;
+      --color-brand-active: #bde4d3;
+      --color-on-primary-container: #bfe6d6;
+      --color-surface-primary-container: #2c4a3f;
+      --color-surface-high: #263029;
+      --color-surface-mid: #1b2320;
+      --color-surface-low: #202925;
+      --color-surface-lowest: #131a18;
+      --color-on-surface: #e6eee9;
+      --color-border-outline: #8a9a91;
+      --color-border-outline-variant: #3a4743;
+      --island-bg-color: #1c2421;
+      --button-gray-1: #2a342f;
+      --button-gray-2: #333f39;
+      --button-gray-3: #3c4a43;
+      --button-hover-bg: #263029;
+      --button-active-bg: #2c4a3f;
+      --button-active-border: #8fcbb4;
+      --focus-highlight-color: #8fcbb4;
+      --link-color: #8fcbb4;
+      --default-border-color: #333f39;
+      --input-bg-color: #131a18;
+      --input-border-color: #3a4743;
+      --input-hover-bg-color: #202925;
+      --input-label-color: #c4d0c9;
+      --popup-secondary-bg-color: #202925;
+      --scrollbar-thumb: #3a4743;
+      --scrollbar-thumb-hover: #4a5a52;
+      --shadow-island: 0 1px 2px rgba(0, 0, 0, 0.32), 0 10px 28px rgba(0, 0, 0, 0.28);
     }
     * { box-sizing: border-box; }
     html, body, #excalidrawRoot { height: 100%; margin: 0; }
@@ -55,7 +129,7 @@
     .excalidraw-host { height: 100%; position: relative; background-color: var(--doodle-canvas-bg); background-image: radial-gradient(circle, var(--doodle-dot) 1px, transparent 1px); background-size: 20px 20px; background-position: 10px 10px; }
     .excalidraw-host > .excalidraw { position: relative; background: transparent; }
     .excalidraw .App-menu_top { z-index: 4; }
-    .excalidraw .App-menu_top .App-toolbar, .excalidraw .App-menu_bottom, .excalidraw .layer-ui__wrapper__top-right { filter: saturate(0.86); }
+    .excalidraw .App-toolbar, .excalidraw .App-menu_bottom .Island, .excalidraw .layer-ui__wrapper__top-right .Island { border-radius: 12px; }
     .doodle-topbar { position: fixed; top: 64px; left: 16px; z-index: 23; display: flex; gap: 2px; align-items: center; padding: 2px; border: 1px solid var(--doodle-border); border-radius: 10px; background: var(--doodle-surface); box-shadow: var(--doodle-shadow); backdrop-filter: blur(12px); transition: box-shadow var(--doodle-duration) var(--doodle-ease), border-color var(--doodle-duration) var(--doodle-ease), opacity var(--doodle-duration) var(--doodle-ease), visibility 0s linear; }
     .doodle-topbar:has(#doodleLibraryToggle[aria-expanded="true"]) { border-color: var(--doodle-border-strong); }
     body.doodle-drawer-open .doodle-topbar { opacity: 0; visibility: hidden; pointer-events: none; transition: opacity var(--doodle-duration) var(--doodle-ease), visibility 0s linear var(--doodle-duration); }

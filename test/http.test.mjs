@@ -58,6 +58,9 @@ describe("board HTTP surface", () => {
     expect(html).toContain(".doodle-library-section--shares");
     expect(html.indexOf('href="/excalidraw/index.css"')).toBeLessThan(html.indexOf("<style>"));
     expect(html).toContain(".excalidraw .HelpDialog__header { display: none; }");
+    expect(html).toContain("--color-primary: #2f6b5c");
+    expect(html).toContain("--color-primary: #8fcbb4");
+    expect(html).not.toContain("--color-primary: #6965db");
     const snapshot = await fetch(`${base}/api/board`).then((response) => response.json());
     expect(snapshot).toMatchObject({ version: 1 });
     expect(snapshot.library).toMatchObject({ version: 1 });

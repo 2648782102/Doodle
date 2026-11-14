@@ -8,6 +8,7 @@ All notable changes are documented here. Versions follow `VERSIONING.md`.
 - Added human-canvas static sharing snapshots for PNG, JPG, and SVG. These are download-only views; editable library save/import/export remains version 1 JSON.
 - Added layout regression coverage for the human canvas: the `图库` drawer must overlay rather than resize Excalidraw, keep one independently scrollable board list with fixed action rows, and hide its launcher while open; hover/active rules may change only color, border, and shadow.
 - The human canvas now uses a Doodle-owned main menu: local search, local help, and one GitHub link to the current Doodle repository. Upstream social links, help-header external links, the materials-library browse destination, arbitrary web embedding, and Excalidraw AI/Mermaid generation entries are removed.
+- Unified Doodle and Excalidraw under one palette: warm paper with pine green in light mode and green-tinted charcoal with pale mint in dark mode. Native Excalidraw primary, surface, island, input, border, button, and shadow variables now follow those tokens instead of the upstream violet defaults.
 
 - Extended version 1 board objects with freehand `stroke`, bounded local `image`, `title`, `shape`, `groupId`, and `emphasis: focus`; older boards remain valid without migration.
 - `draw_board` now supports precise `updates`, batch `items`, `remove_ids`, and deterministic `layout` while keeping exactly four MCP tools.
