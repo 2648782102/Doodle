@@ -1,0 +1,79 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Doodle · 当前项目架构图</title>
+<style>
+  :root { --ink:#172033; --muted:#667085; --line:#cbd5e1; --bg:#f7f8fb; --card:#fff; --blue:#2563eb; --blue-soft:#eaf1ff; --green:#d8f3e5; --yellow:#fde68a; --pink:#fecdd3; --purple:#ddd6fe; }
+  * { box-sizing: border-box; }
+  body { margin:0; padding:36px; background:var(--bg); color:var(--ink); font-family:-apple-system,BlinkMacSystemFont,"Segoe UI","PingFang SC",sans-serif; }
+  h1 { margin:0 0 8px; font-size:30px; letter-spacing:-.02em; }
+  .sub { color:var(--muted); margin-bottom:28px; }
+  .grid { display:grid; grid-template-columns: 190px 250px 190px 250px; gap:34px; align-items:center; max-width:1080px; }
+  .col { display:grid; gap:24px; }
+  .box, .frame { border:1.5px solid var(--line); border-radius:16px; padding:18px; background:var(--card); box-shadow:0 8px 24px rgba(15,23,42,.06); }
+  .box strong { display:block; font-size:16px; margin-bottom:8px; }
+  .box small, .frame small { color:var(--muted); font-size:12px; line-height:1.55; }
+  .yellow { background:var(--yellow); } .green { background:var(--green); } .blue { background:var(--purple); } .pink { background:var(--pink); }
+  .core { border:2px solid var(--blue); background:var(--blue-soft); }
+  .frame { border-style:dashed; box-shadow:none; min-height:94px; }
+  canvas { position:absolute; inset:0; width:100%; height:100%; pointer-events:none; }
+  .footer { margin-top:30px; padding:16px 20px; border:1.5px dashed var(--line); border-radius:16px; color:var(--muted); max-width:1080px; }
+  .legend { margin-top:18px; color:var(--muted); font-size:12px; }
+  .diagram { position:relative; }
+</style>
+</head>
+<body>
+  <div class="diagram">
+    <h1>Doodle · 当前项目架构</h1>
+    <div class="sub">一个 Board v1 状态 · 四个 MCP 工具 · 两个入口 · 三层能力</div>
+    <canvas id="links"></canvas>
+    <div class="grid" id="grid">
+      <div class="col">
+        <div class="box yellow" id="plugin"><strong>入口 1</strong><small>Codex 插件<br>npm run setup:codex</small></div>
+        <div class="box yellow" id="direct"><strong>入口 2</strong><small>直接 MCP / npx<br>doodle-mcp</small></div>
+      </div>
+      <div class="col">
+        <div class="box core" id="server"><strong>四工具 MCP server</strong><small>get_board · show_board<br>draw_board · scan_project<br><br>stdio / 本地 HTTP 生命周期</small></div>
+        <div class="box blue" id="state"><strong>Board v1</strong><small>board.json<br>revision-safe · atomic write</small></div>
+      </div>
+      <div class="col">
+        <div class="box frame" id="http"><strong>HTTP / WS</strong><small>本地预览与写入 API<br>PANEL_URL · /ws</small></div>
+        <div class="box frame" id="app"><strong>MCP App</strong><small>宿主内嵌资源与上下文桥</small></div>
+        <div class="box pink" id="library"><strong>画板图库</strong><small>可编辑 version 1 快照<br>保存 / 切换 / 导入导出</small></div>
+      </div>
+      <div class="col">
+        <div class="box green" id="canvas"><strong>Excalidraw-only 画布</strong><small>人类编辑层 · React<br>自托管 CSS / fonts / chunks</small></div>
+        <div class="box green" id="adapter"><strong>Scene Adapter</strong><small>Board v1 ↔ Excalidraw<br>bound text · files · scene</small></div>
+      </div>
+    </div>
+    <div class="footer"><strong>开源项目维护层</strong> · build · tests · repo guard · plugin guard · docs · CI · submission ZIP</div>
+    <div class="legend">箭头表示数据/控制流；当前分支为 <code>codex/excalidraw-spike</code>，主线 <code>master</code> 仍使用轻量 DOM 引擎。</div>
+  </div>
+<script>
+const links = [
+  ["plugin","server","stdio"],["direct","server","stdio"],["server","state","读写"],
+  ["server","http","HTTP"],["server","app","resource"],["http","canvas","panel"],
+  ["app","canvas","embedded"],["canvas","adapter","投影"],["adapter","state","Board v1"],
+  ["state","library","快照"]
+];
+function draw(){
+  const canvas=document.querySelector('#links'), root=document.querySelector('.diagram');
+  const dpr=devicePixelRatio||1, rect=root.getBoundingClientRect();
+  canvas.width=rect.width*dpr; canvas.height=rect.height*dpr;
+  const ctx=canvas.getContext('2d'); ctx.scale(dpr,dpr); ctx.clearRect(0,0,rect.width,rect.height);
+  ctx.strokeStyle='#64748b'; ctx.fillStyle='#64748b'; ctx.lineWidth=1.5; ctx.font='11px sans-serif';
+  for(const [from,to,label] of links){
+    const a=document.querySelector('#'+from).getBoundingClientRect(), b=document.querySelector('#'+to).getBoundingClientRect();
+    const x1=a.right-rect.left, y1=a.top+a.height/2-rect.top, x2=b.left-rect.left, y2=b.top+b.height/2-rect.top;
+    const mid=(x1+x2)/2;
+    ctx.beginPath(); ctx.moveTo(x1,y1); ctx.bezierCurveTo(mid,y1,mid,y2,x2,y2); ctx.stroke();
+    ctx.beginPath(); ctx.moveTo(x2,y2); ctx.lineTo(x2-8,y2-4); ctx.lineTo(x2-8,y2+4); ctx.fill();
+    ctx.fillText(label, mid-12, (y1+y2)/2-6);
+  }
+}
+window.addEventListener('load',draw); window.addEventListener('resize',draw);
+</script>
+</body>
+</html>

@@ -132,7 +132,32 @@ function connectStandaloneUpdates() {
 }
 
 function toElements(snapshot: BoardSnapshot) {
-  return convertToExcalidrawElements(boardItemsToExcalidrawSkeleton(snapshot.items as never[]), { regenerateIds: false });
+  const items = snapshot.items as Array<Record<string, unknown>>;
+  const sceneElements: Record<string, unknown>[] = [];
+  const freshSkeletons = [];
+  for (const item of items) {
+    const scene = item.scene as { element?: Record<string, unknown>; boundText?: Record<string, unknown> } | undefined;
+    if (scene?.element) {
+      const element = { ...scene.element };
+      delete element.index;
+      delete element.version;
+      delete element.versionNonce;
+      sceneElements.push(element);
+      if (scene.boundText) {
+        const boundText = { ...scene.boundText };
+        delete boundText.index;
+        delete boundText.version;
+        delete boundText.versionNonce;
+        sceneElements.push(boundText);
+      }
+    } else {
+      freshSkeletons.push(item);
+    }
+  }
+  const converted = freshSkeletons.length
+    ? convertToExcalidrawElements(boardItemsToExcalidrawSkeleton(freshSkeletons as never[]), { regenerateIds: false })
+    : [];
+  return [...sceneElements, ...converted];
 }
 
 function toFiles(snapshot: BoardSnapshot): ExcalidrawFileData[] {

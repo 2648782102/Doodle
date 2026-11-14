@@ -130,7 +130,7 @@ function styleFor(item: BoardItem): Partial<ExcalidrawSkeleton> {
     roundness: item.variant === "pill" ? { type: 3 } : item.variant === "card" ? { type: 3 } : null,
     opacity: style.opacity ?? 100,
     fontSize: style.fontSize ?? (item.variant === "heading" ? 28 : item.type === "text" ? 20 : 16),
-    fontFamily: 1,
+    fontFamily: 3,
     textAlign: style.textAlign ?? (item.type === "text" ? "left" : "center"),
     verticalAlign: "middle",
     groupIds: item.groupId ? [item.groupId] : [],
@@ -157,14 +157,14 @@ function boundTextSkeleton(item: BoardItem, parent: ExcalidrawSkeleton): Excalid
   return {
     id: `${item.id}_text`,
     type: "text",
-    x: parent.x + (parent.width ?? 0) / 2,
-    y: parent.y + (parent.height ?? 0) / 2,
+    x: 8,
+    y: 8,
     width: Math.max(1, (parent.width ?? 0) - 16),
     height: Math.max(1, (parent.height ?? 0) - 16),
     text: raw,
     originalText: raw,
     fontSize,
-    fontFamily: 1,
+    fontFamily: 3,
     textAlign: item.style?.textAlign ?? "center",
     verticalAlign: "middle",
     strokeColor: item.style?.textColor ?? "#1f2937",
@@ -203,6 +203,9 @@ export function boardItemsToExcalidrawSkeleton(items: BoardItem[]): ExcalidrawSk
       base.text = textOf(item);
       base.originalText = base.text;
       base.width = item.w;
+      base.height = item.h;
+      base.autoResize = false;
+      base.lineHeight = 1.25;
       return [base];
     }
     if (item.type === "image") {
@@ -258,6 +261,11 @@ function elementColor(element: ExcalidrawLikeElement): string {
 function cloneElement(element: ExcalidrawLikeElement): Record<string, unknown> {
   const clone = { ...element } as Record<string, unknown>;
   delete clone.isDeleted;
+  delete clone.index;
+  delete clone.version;
+  delete clone.versionNonce;
+  delete clone.seed;
+  delete clone.updated;
   return clone;
 }
 
