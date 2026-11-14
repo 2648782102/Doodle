@@ -39,12 +39,13 @@
   <section class="doodle-library-panel" id="doodleLibraryPanel" hidden aria-label="画板图库">
     <div class="doodle-library-head"><strong>画板图库</strong><button id="doodleLibraryClose">×</button></div>
     <div id="doodleLibraryCurrent" style="margin-bottom:8px;color:#6b7280;font-size:11px">当前：—</div>
+    <div id="doodleLibraryStatus" style="margin-bottom:8px;color:#6b7280;font-size:11px" role="status" aria-live="polite"></div>
     <input class="doodle-library-name" id="doodleLibraryName" maxlength="80" placeholder="画板名称">
     <div class="doodle-library-actions">
-      <button data-library-action="save">另存为</button>
+      <button data-library-action="duplicate">另存为</button>
       <button data-library-action="create">新建</button>
       <button data-library-action="rename">重命名</button>
-      <button data-library-action="duplicate">复制</button>
+      <button data-library-action="duplicate-selected">复制所选</button>
       <button data-library-action="export">导出 JSON</button>
       <button data-library-action="delete">删除</button>
     </div>

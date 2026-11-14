@@ -59,6 +59,7 @@ const currentFiles: { current: Record<string, ExcalidrawFileData> } = { current:
 const currentAppState: { current: ExcalidrawAppState } = { current: {} };
 const pendingRemote: { current: BoardSnapshot | null } = { current: null };
 const pendingTimer: { current: number | null } = { current: null };
+let selectedBoardId = "";
 
 function applyRemoteSnapshot(data: BoardSnapshot, refreshFiles = true) {
   if (!data || !Array.isArray(data.items) || typeof data.revision !== "number") return;
@@ -187,7 +188,7 @@ async function refreshLibraryUi() {
   current.textContent = `当前：${boards.find((entry) => entry.id === index?.activeId)?.name ?? "—"} · ${board.items.length} 个对象`;
   if (name && document.activeElement !== name) name.value = boards.find((entry) => entry.id === index?.activeId)?.name ?? "";
   list.replaceChildren();
-  let selectedId = index?.activeId ?? "";
+  selectedBoardId = index?.activeId ?? "";
   for (const entry of boards) {
     const row = document.createElement("div");
     row.className = "doodle-library-entry";
@@ -198,7 +199,7 @@ async function refreshLibraryUi() {
     meta.textContent = `${entry.itemCount} 个对象 · rev ${entry.revision}`;
     button.append(meta);
     button.addEventListener("click", () => {
-      selectedId = entry.id;
+        selectedBoardId = entry.id;
       for (const child of list.children) child.classList.toggle("active", child === row);
     });
     button.addEventListener("dblclick", () => void runLibraryAction({ type: "switch", id: entry.id }));
@@ -209,12 +210,20 @@ async function refreshLibraryUi() {
     list.append(row);
   }
   const switchButton = document.querySelector<HTMLButtonElement>("#doodleLibrarySwitch");
-  if (switchButton) switchButton.onclick = () => void runLibraryAction({ type: "switch", id: selectedId });
+  if (switchButton) switchButton.onclick = () => void runLibraryAction({ type: "switch", id: selectedBoardId });
 }
 
 async function runLibraryAction(action: Record<string, unknown>) {
   const name = document.querySelector<HTMLInputElement>("#doodleLibraryName")?.value.trim();
-  const result = await libraryRequest({ ...action, ...(name && ["save", "create", "rename", "duplicate"].includes(String(action.type)) ? { name } : {}) });
+  let request: Record<string, unknown> = action;
+  if (action.type === "duplicate") {
+    request = { type: "duplicate", id: selectedBoardId, name: name || undefined };
+  } else if (action.type === "duplicate-selected") {
+    request = { type: "duplicate", id: selectedBoardId, name: name || `${selectedBoardId} 副本` };
+  } else {
+    request = { ...action, ...(name && ["save", "create", "rename", "duplicate"].includes(String(action.type)) ? { name } : {}) };
+  }
+  const result = await libraryRequest(request);
   const board = (result.board as BoardSnapshot | undefined) ?? await loadBoard();
   applyRemoteSnapshot(board);
   if (action.type === "export" || action.type === "get") {
@@ -236,6 +245,12 @@ function initLibraryUi() {
   const close = document.querySelector<HTMLButtonElement>("#doodleLibraryClose");
   const file = document.querySelector<HTMLInputElement>("#doodleLibraryFile");
   if (!toggle || !panel || !close || !file) return;
+  const status = document.querySelector<HTMLElement>("#doodleLibraryStatus");
+  const showStatus = (message: string, isError = false) => {
+    if (!status) return;
+    status.textContent = message;
+    status.style.color = isError ? "#b91c1c" : "#6b7280";
+  };
   toggle.addEventListener("click", () => {
     panel.hidden = !panel.hidden;
     toggle.setAttribute("aria-expanded", String(!panel.hidden));
@@ -243,7 +258,16 @@ function initLibraryUi() {
   });
   close.addEventListener("click", () => { panel.hidden = true; toggle.setAttribute("aria-expanded", "false"); });
   for (const button of document.querySelectorAll<HTMLButtonElement>("[data-library-action]")) {
-    button.addEventListener("click", () => void runLibraryAction({ type: button.dataset.libraryAction }).catch((error) => showError(error)));
+    button.addEventListener("click", () => void (async () => {
+      try {
+        showStatus("处理中…");
+        await runLibraryAction({ type: button.dataset.libraryAction });
+        showStatus("已完成");
+      } catch (error) {
+        showError(error);
+        showStatus(error instanceof Error ? error.message : String(error), true);
+      }
+    })());
   }
   document.querySelector<HTMLButtonElement>("#doodleLibraryImport")?.addEventListener("click", () => file.click());
   file.addEventListener("change", async () => {

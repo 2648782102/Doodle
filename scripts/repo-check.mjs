@@ -156,6 +156,8 @@ check(boardStore.includes("createEmptyBoard") && !boardStore.includes("createSta
 check(excalidrawTemplate.includes("Doodle · Excalidraw Canvas") && excalidrawTemplate.includes('id="excalidrawRoot"'), "Excalidraw-only board template is missing");
 check(excalidrawTemplate.includes("/excalidraw/excalidraw-app.js") && excalidrawTemplate.includes("const PANEL_TOKEN"), "Excalidraw template lost its local entry or panel token");
 check(excalidrawTemplate.includes('id="doodleLibraryPanel"') && !excalidrawTemplate.includes('id="toast"'), "Excalidraw template lost the library overlay or kept an obsolete toast");
+check(excalidrawTemplate.includes('data-library-action="duplicate">另存为') && excalidrawTemplate.includes('id="doodleLibraryStatus"'), "Excalidraw template lost save-as feedback or turned it into a rename");
+check(excalidrawApp.includes('if (action.type === "duplicate")') && excalidrawApp.includes("selectedBoardId"), "canvas library Save As does not duplicate the active or selected snapshot");
 check(!await exists("src/infra/templates/board.html") && !await exists("src/infra/templates/board-app.js"), "legacy DOM canvas template or bundle still exists");
 check(!tools.includes("engine=dom") && !http.includes("engine=dom"), "legacy DOM engine fallback still exists");
 check(buildScript.includes("excalidraw-app.tsx") && buildScript.includes("minify: true"), "build does not bundle the Excalidraw canvas client");
