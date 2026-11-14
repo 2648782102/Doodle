@@ -136,7 +136,6 @@ function styleFor(item: BoardItem): Partial<ExcalidrawSkeleton> {
     fontSize: style.fontSize ?? (item.variant === "heading" ? 28 : item.type === "text" ? 20 : 16),
     fontFamily: 3,
     textAlign: style.textAlign ?? (item.type === "text" ? "left" : "center"),
-    verticalAlign: "middle",
     groupIds: item.groupId ? [item.groupId] : [],
     customData: { doodle: { id: item.id, author: item.author, role: item.role, variant: item.variant, z: item.z, emphasis: item.emphasis, textAlign: style.textAlign, lineHeight: 1.25, color: item.color, textColor: style.textColor, borderColor: style.borderColor } },
   };
@@ -150,6 +149,7 @@ function baseSkeleton(item: BoardItem): ExcalidrawSkeleton {
     y: item.y,
     width: item.type === "line" ? Math.abs(item.w) : item.w,
     height: item.type === "line" ? Math.abs(item.h) : item.h,
+    verticalAlign: item.type === "text" ? "top" : "middle",
     ...styleFor(item),
   };
 }
@@ -157,14 +157,20 @@ function baseSkeleton(item: BoardItem): ExcalidrawSkeleton {
 function boundTextSkeleton(item: BoardItem, parent: ExcalidrawSkeleton): ExcalidrawSkeleton {
   const raw = labelOf(item);
   const fontSize = item.style?.fontSize ?? 16;
-  const offset = 8;
+  const align = item.style?.textAlign ?? "center";
+  const parentWidth = parent.width ?? 0;
+  const parentHeight = parent.height ?? 0;
+  const padding = 8;
+  const x = align === "center" ? parent.x + parentWidth / 2
+    : align === "right" ? parent.x + parentWidth - padding
+      : parent.x + padding;
   return {
     id: `${item.id}_text`,
     type: "text",
-    x: offset,
-    y: offset,
-    width: Math.max(1, (parent.width ?? 0) - offset * 2),
-    height: Math.max(1, (parent.height ?? 0) - offset * 2),
+    x,
+    y: parent.y + parentHeight / 2,
+    width: Math.max(1, parentWidth - padding * 2),
+    height: Math.max(1, parentHeight - padding * 2),
     text: raw,
     originalText: raw,
     fontSize,

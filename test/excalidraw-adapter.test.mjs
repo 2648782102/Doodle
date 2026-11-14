@@ -22,14 +22,20 @@ describe("Doodle to Excalidraw adapter", () => {
       "rectangle", "text", "ellipse", "text", "freedraw", "arrow",
     ]);
     expect(skeletons[0].id).toBe(board.items[0].id);
-    expect(skeletons[1]).toMatchObject({ containerId: board.items[0].id, text: "开始\n输入", x: 8, y: 8, width: 164, height: 84 });
+    expect(skeletons[1]).toMatchObject({ containerId: board.items[0].id, text: "开始\n输入", x: 100, y: 70, width: 164, height: 84, verticalAlign: "middle" });
+    const standalone = boardItemsToExcalidrawSkeleton([{
+      id: "standalone", type: "text", x: 20, y: 40, w: 200, h: 32,
+      text: "独立文字", color: "#ffffff", author: "ai",
+      createdAt: new Date(0).toISOString(), updatedAt: new Date(0).toISOString(),
+    }]);
+    expect(standalone[0]).toMatchObject({ type: "text", verticalAlign: "top" });
     expect(skeletons[0].customData?.doodle).toMatchObject({ role: "step", variant: "card", author: "ai" });
     expect(skeletons[4].points).toHaveLength(3);
     expect(skeletons[5]).toMatchObject({ start: { id: "item_a" }, end: { id: "item_b" }, label: { text: "下一步" } });
     const roundTrip = boardItemsFromExcalidrawBoard(board, skeletons.map((skeleton, index) => ({
       ...skeleton,
-      x: index === 1 ? skeleton.x + board.items[0].x : skeleton.x,
-      y: index === 1 ? skeleton.y + board.items[0].y : skeleton.y,
+      x: skeleton.x,
+      y: skeleton.y,
       width: skeleton.width ?? 100,
       height: skeleton.height ?? 60,
       customData: index === 0 ? skeleton.customData : undefined,
