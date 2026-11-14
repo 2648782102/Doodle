@@ -127,12 +127,8 @@ async function replaceBoard(items: unknown[], expectedRevision: number): Promise
   return result.board as BoardSnapshot;
 }
 
-function showToast(message: string) {
-  const toast = document.querySelector("#toast");
-  if (!toast) return;
-  toast.textContent = message;
-  toast.classList.add("visible");
-  window.setTimeout(() => toast.classList.remove("visible"), 1800);
+function showError(error: unknown) {
+  console.warn("Doodle board sync skipped", error);
 }
 
 function CanvasApp({ initial }: { initial: BoardSnapshot }) {
@@ -179,7 +175,7 @@ function CanvasApp({ initial }: { initial: BoardSnapshot }) {
           api.updateScene({ elements: toElements(refreshed) });
           window.setTimeout(() => { applyingRemote.current = false; }, 0);
         }
-        showToast(error instanceof Error ? error.message : String(error));
+        showError(error);
       }
     }, 450);
   }, [api]);
@@ -225,5 +221,5 @@ window.DoodleExcalidrawInit = (snapshot, mcpApp) => {
 
 if (document.querySelector("#excalidrawRoot")) {
   void initHostApp().catch(() => {});
-  void start().catch((error) => showToast(error.message));
+  void start().catch((error) => showError(error));
 }

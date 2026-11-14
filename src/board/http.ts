@@ -74,6 +74,7 @@ export class BoardHttpServer {
   private server: http.Server | null = null;
   private wss: WebSocketServer | null = null;
   readonly panelToken = crypto.randomBytes(24).toString("hex");
+  private readonly assetVersion = crypto.randomBytes(8).toString("hex");
   private appBundle = "";
   private panelUrlValue: string | null = null;
   private readonly library: BoardLibrary;
@@ -245,7 +246,7 @@ export class BoardHttpServer {
                   : extension === ".svg" ? "image/svg+xml"
                     : extension === ".png" ? "image/png"
                       : "application/octet-stream";
-        res.set("Cache-Control", "public, max-age=3600");
+        res.set("Cache-Control", "no-store, max-age=0");
         res.type(contentType);
         return res.send(data);
       } catch {
@@ -270,6 +271,7 @@ export class BoardHttpServer {
       try {
         const html = (await fs.readFile(candidate, "utf8"))
           .replace('"__DOODLE_MCP_APP__"', '"0"')
+          .replace("__DOODLE_ASSET_VERSION__", this.assetVersion)
           .replace("__DOODLE_PANEL_TOKEN__", this.panelToken)
           .replace("__AI_DRAW_PANEL_TOKEN__", this.panelToken);
         res.type("html").send(html);
@@ -301,6 +303,7 @@ export class BoardHttpServer {
     if (!template) throw new Error("Excalidraw template not found");
     return template
       .replace('"__DOODLE_MCP_APP__"', '"1"')
+      .replace("__DOODLE_ASSET_VERSION__", this.assetVersion)
       .replace("__DOODLE_PANEL_TOKEN__", "")
       .replace("__AI_DRAW_PANEL_TOKEN__", "");
   }
