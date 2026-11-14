@@ -40,6 +40,28 @@ export interface BoardHandoff {
   note: string;
 }
 
+/**
+ * One line telling the agent what to do next.
+ *
+ * The board already knows whether a person is waiting on it. A fixed "read the
+ * board again" hint wastes a turn when nothing changed, and under-describes the
+ * case that matters: a person just edited something.
+ */
+export function handoffNextStep(handoff: BoardHandoff): string {
+  if (!handoff.needsAttention) {
+    return `NEXT: 人没有改动，不必重画或复述。需要更多对象时省略 since_revision 重读；下次差量基准为 ${handoff.revision}。`;
+  }
+  const edited = handoff.humanEdits.filter((edit) => edit.change === "edited").length;
+  const added = handoff.humanEdits.filter((edit) => edit.change === "added").length;
+  const removed = handoff.humanEdits.filter((edit) => edit.change === "removed").length;
+  const kinds = [
+    edited ? `${edited} 处修改` : "",
+    added ? `${added} 处新增` : "",
+    removed ? `${removed} 处删除` : "",
+  ].filter(Boolean).join("、");
+  return `NEXT: 人改动了 ${kinds}。先回应这些改动（改字、挪位、补图都可以），除非人的改动明显有误；下次差量基准为 ${handoff.revision}。`;
+}
+
 const COMPARED_FIELDS: Array<keyof BoardItem> = [
   "type", "x", "y", "w", "h", "text", "color", "title", "shape", "groupId",
   "emphasis", "variant", "role", "z", "startItemId", "endItemId", "author",

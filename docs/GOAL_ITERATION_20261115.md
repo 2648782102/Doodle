@@ -139,6 +139,14 @@ stable ids, bounded to 12 nodes, and marked as a suggestion. The agent can pass
 it through, change labels, or ignore it. `scan_project` still reads only; it
 never draws and never changes the board.
 
+## Fifth target: make the next step obvious
+
+A fixed "read the board again" hint wastes a turn when nothing changed, and
+under-describes the case that matters. `HANDOFF` now ends with a state-derived
+`NEXT` line: when nothing human changed it says so and discourages a redraw;
+when a person edited, added, or removed something it names the counts and asks
+the agent to respond to those changes first.
+
 ## Authority and red lines
 
 - Allowed: normal commits and pushes on this branch, source, tests, docs, CI,

@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { describeHandoff } from "../dist/board/handoff.js";
+import { describeHandoff, handoffNextStep } from "../dist/board/handoff.js";
 
 function item(overrides = {}) {
   return {
@@ -87,5 +87,32 @@ describe("handoff describes who changed what", () => {
     expect(handoff.humanEdits.length).toBeLessThanOrEqual(12);
     expect(handoff.omitted).toBeGreaterThan(0);
     expect(JSON.stringify(handoff).length).toBeLessThan(3000);
+  });
+});
+
+describe("handoff suggests the next move", () => {
+  it("tells the agent not to redraw when nothing human changed", () => {
+    const next = handoffNextStep(describeHandoff(board(2, [item()]), null));
+
+    expect(next).toContain("不必重画");
+    expect(next).toContain("2");
+  });
+
+  it("names what the person changed", () => {
+    const previous = board(1, [item({ text: "开始" })]);
+    const current = board(2, [item({ text: "从需求开始", author: "human" })]);
+    const next = handoffNextStep(describeHandoff(current, previous));
+
+    expect(next).toContain("先回应");
+    expect(next).toContain("1 处修改");
+  });
+
+  it("counts removals and additions separately", () => {
+    const previous = board(1, [item({ id: "a", author: "human" })]);
+    const current = board(2, [item({ id: "b", author: "human", text: "新" })]);
+    const next = handoffNextStep(describeHandoff(current, previous));
+
+    expect(next).toContain("1 处新增");
+    expect(next).toContain("1 处删除");
   });
 });

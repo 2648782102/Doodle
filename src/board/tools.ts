@@ -11,7 +11,7 @@ import type { BoardStore } from "./store.js";
 import { BoardRevisionConflictError } from "./errors.js";
 import { boardAgentDelta, boardAgentView, summarizeAgentBoard } from "./agent-view.js";
 import { BoardRevisionCache } from "./revision-cache.js";
-import { describeHandoff } from "./handoff.js";
+import { describeHandoff, handoffNextStep } from "./handoff.js";
 import { projectDiagramDraft } from "./project-diagram.js";
 import {
   addBoardItem,
@@ -330,7 +330,7 @@ export function registerBoardTools(server: McpServer, ctx: BoardToolContext): vo
             "BOARD_SUMMARY_JSON:",
             JSON.stringify(summarizeAgentBoard(current), null, 2),
             "",
-            `NEXT: 需要完整对象时用 since_revision 省略或重读；修改用 draw_board，下次差量基准为 ${delta.revision}。`,
+            handoffNextStep(handoff),
             `PANEL_URL: ${ctx.preview.panelUrl ?? "unavailable (standalone preview not started)"}`,
           ].join("\n");
           return {

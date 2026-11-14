@@ -14,6 +14,7 @@ All notable changes are documented here. Versions follow `VERSIONING.md`.
 ### Changed
 
 - Canvas fidelity metadata (`scene`) no longer appears in agent-facing payloads. It stays persisted, and `canvasFidelityItems` reports how many items carry it. The canvas is a separate consumer: it asks for fidelity with `include_canvas_fidelity: true`, and `draw_board` still returns the authoritative snapshot the canvas rebuilds from.
+- Delta reads end with a state-derived `NEXT` line: no-change reads discourage a redraw, and human-edit reads name what changed and ask for a response first.
 - The capabilities, recipes, and drawing guide are sent once per server process; later reads carry a one-line pointer, and `include_guide: true` asks for them again.
 - On a real 4-object board the agent projection is 56% smaller than the persisted board, and an unchanged reread is about 90% smaller than a full read.
 
