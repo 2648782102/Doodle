@@ -48,6 +48,8 @@ describe("board HTTP surface", () => {
     expect(html).toContain("/excalidraw/excalidraw-app.js");
     expect(html).toContain('id="excalidrawRoot"');
     expect(html).not.toContain('id="libraryPanel"');
+    expect(html).toContain('id="doodleLibraryPanel"');
+    expect(html).not.toContain('id="toast"');
     const snapshot = await fetch(`${base}/api/board`).then((response) => response.json());
     expect(snapshot).toMatchObject({ version: 1 });
     expect(snapshot.library).toMatchObject({ version: 1 });
@@ -81,6 +83,11 @@ describe("board HTTP surface", () => {
     expect(html).not.toContain("?engine=dom");
     const app = await fetch(`${base}/excalidraw/excalidraw-app.js`);
     expect(app.status).toBe(200);
+    const appText = await app.text();
+    expect(appText).toContain("doodleLibraryPanel");
+    expect(appText).toContain("editingTextElement");
+    expect(appText).toContain("board_updated");
+    expect(appText).not.toContain("已同步到 Doodle 画板");
     const css = await fetch(`${base}/excalidraw/index.css`);
     expect(css.status).toBe(200);
     expect(await css.text()).toContain("fonts/Assistant");

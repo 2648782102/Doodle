@@ -7,6 +7,14 @@ export type BoardRole = "normal" | "label" | "frame" | "column" | "step" | "deci
 export type BoardTextAlign = "left" | "center" | "right";
 export type BoardLayoutMode = "grid" | "row" | "column" | "timeline" | "cluster";
 
+export interface BoardSceneMeta {
+  element?: Record<string, unknown>;
+  boundText?: Record<string, unknown>;
+  fileId?: string;
+  fileMime?: string;
+  fileCreated?: number;
+}
+
 export interface BoardItemStyle {
   borderColor?: string;
   borderWidth?: number;
@@ -50,6 +58,7 @@ export interface BoardItem {
   style?: BoardItemStyle;
   startItemId?: string;
   endItemId?: string;
+  scene?: BoardSceneMeta;
 }
 
 export interface BoardNote {
@@ -93,6 +102,7 @@ export interface BoardItemInput {
   style?: BoardItemStyle;
   startItemId?: string;
   endItemId?: string;
+  scene?: BoardSceneMeta;
 }
 
 export interface BoardItemPatch {
@@ -116,13 +126,15 @@ const ROLES: BoardRole[] = ["normal", "label", "frame", "column", "step", "decis
 const TEXT_ALIGNS: BoardTextAlign[] = ["left", "center", "right"];
 const LAYOUT_MODES: BoardLayoutMode[] = ["grid", "row", "column", "timeline", "cluster"];
 const COLORS = ["#f6d365", "#b8e0d2", "#c7d8ff", "#ffd1dc", "#e8e8e8", "#ffffff"];
-const IMAGE_MIMES = ["image/png", "image/jpeg", "image/gif", "image/webp"];
+const IMAGE_MIMES = ["image/png", "image/jpeg", "image/jpg", "image/gif", "image/webp", "image/bmp", "image/avif", "image/svg+xml"];
 const MAX_ITEMS = 400;
 const MAX_NOTES = 200;
 const MAX_TEXT = 1200;
 const MAX_TITLE = 120;
 const MAX_GROUP_ID = 80;
 const MAX_IMAGE_SRC = 700_000;
+const MAX_SCENE_JSON = 40_000;
+const MAX_FILE_ID = 120;
 const MAX_STROKE_POINTS = 500;
 const MIN_SHAPE_SIZE = 16;
 const MIN_STROKE_SPAN = 1;
@@ -206,7 +218,43 @@ function isPoint(value: unknown): value is BoardPoint {
 function isImageSource(value: unknown): value is string {
   return typeof value === "string"
     && value.length <= MAX_IMAGE_SRC
-    && /^data:image\/(png|jpeg|jpg|gif|webp);base64,[A-Za-z0-9+/=]+$/.test(value);
+    && /^data:image\/(png|jpeg|jpg|gif|webp|bmp|avif|svg\+xml);base64,[A-Za-z0-9+/=]+$/.test(value);
+}
+
+function cloneSceneRecord(value: unknown): Record<string, unknown> | undefined {
+  if (!value || typeof value !== "object" || Array.isArray(value)) throw new Error("Invalid board scene record");
+  let cloned: Record<string, unknown>;
+  try {
+    cloned = JSON.parse(JSON.stringify(value)) as Record<string, unknown>;
+  } catch {
+    throw new Error("Board scene record must be JSON serializable");
+  }
+  if (JSON.stringify(cloned).length > MAX_SCENE_JSON) throw new Error("Board scene record is too large");
+  return cloned;
+}
+
+function normalizeScene(value: unknown): BoardSceneMeta | undefined {
+  if (value === undefined) return undefined;
+  if (!value || typeof value !== "object" || Array.isArray(value)) throw new Error("Invalid board scene metadata");
+  const candidate = value as Partial<BoardSceneMeta>;
+  const scene: BoardSceneMeta = {};
+  if (candidate.element !== undefined) scene.element = cloneSceneRecord(candidate.element);
+  if (candidate.boundText !== undefined) scene.boundText = cloneSceneRecord(candidate.boundText);
+  if (candidate.fileId !== undefined) {
+    if (typeof candidate.fileId !== "string" || !candidate.fileId.trim() || candidate.fileId.length > MAX_FILE_ID)
+      throw new Error("Invalid board scene file ID");
+    scene.fileId = candidate.fileId;
+  }
+  if (candidate.fileMime !== undefined) {
+    if (typeof candidate.fileMime !== "string" || !IMAGE_MIMES.includes(candidate.fileMime))
+      throw new Error("Invalid board scene file mime");
+    scene.fileMime = candidate.fileMime;
+  }
+  if (candidate.fileCreated !== undefined) {
+    if (!isFiniteNumber(candidate.fileCreated)) throw new Error("Invalid board scene file timestamp");
+    scene.fileCreated = candidate.fileCreated;
+  }
+  return Object.keys(scene).length ? scene : undefined;
 }
 
 function makeId(prefix: string): string {
@@ -361,6 +409,7 @@ export function parseBoard(value: unknown): SimpleBoard {
     if (candidate.mime !== undefined && !IMAGE_MIMES.includes(candidate.mime as string))
       throw new Error("Invalid image mime type");
     const style = normalizeStyle(candidate.style);
+    const scene = normalizeScene(candidate.scene);
     if (candidate.variant !== undefined && !isVariant(candidate.variant)) throw new Error("Invalid board item variant");
     if (candidate.role !== undefined && !isRole(candidate.role)) throw new Error("Invalid board item role");
     if (candidate.z !== undefined && !isFiniteNumber(candidate.z)) throw new Error("Invalid board item z-order");
@@ -395,6 +444,7 @@ export function parseBoard(value: unknown): SimpleBoard {
       ...(style ? { style } : {}),
       ...(candidate.startItemId ? { startItemId: candidate.startItemId } : {}),
       ...(candidate.endItemId ? { endItemId: candidate.endItemId } : {}),
+      ...(scene ? { scene } : {}),
     };
   });
   const allItemIds = new Set(items.map((item) => item.id));
@@ -466,6 +516,7 @@ function normalizeItem(input: BoardItemInput): Omit<BoardItem, "createdAt" | "up
   if (input.type === "line" && input.shape !== undefined && !isLineShape(input.shape)) throw new Error("Invalid line shape");
   if (input.emphasis !== undefined && !isEmphasis(input.emphasis)) throw new Error("Invalid item emphasis");
   const style = normalizeStyle(input.style);
+  const scene = normalizeScene(input.scene);
   if (input.variant !== undefined && !isVariant(input.variant)) throw new Error("Invalid item variant");
   if (input.role !== undefined && !isRole(input.role)) throw new Error("Invalid item role");
   if (input.z !== undefined && (!isFiniteNumber(input.z) || input.z < -1000 || input.z > 1000))
@@ -506,6 +557,7 @@ function normalizeItem(input: BoardItemInput): Omit<BoardItem, "createdAt" | "up
     ...(style ? { style } : {}),
     ...(input.startItemId ? { startItemId: input.startItemId } : {}),
     ...(input.endItemId ? { endItemId: input.endItemId } : {}),
+    ...(scene ? { scene } : {}),
   };
 }
 

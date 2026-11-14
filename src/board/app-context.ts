@@ -67,6 +67,7 @@ function itemFingerprint(item: BoardItem): string {
     item.text, item.color, item.author, item.createdAt, item.updatedAt,
     item.title, item.shape, item.points, item.src, item.mime, item.groupId, item.emphasis,
     item.variant, item.role, item.z, item.style, item.startItemId, item.endItemId,
+    item.scene,
   ]);
 }
 
@@ -122,6 +123,7 @@ function textProjection(item: BoardItem, maxTextChars: number): Record<string, u
     ...(item.shape ? { shape: item.shape } : {}),
     ...(item.points ? { points: item.points } : {}),
     ...(item.src ? { src: item.src.slice(0, 40), srcOmitted: true } : {}),
+    ...(item.scene ? { scene: true } : {}),
     ...(item.mime ? { mime: item.mime } : {}),
     ...(item.groupId ? { groupId: item.groupId } : {}),
     ...(item.emphasis ? { emphasis: item.emphasis } : {}),

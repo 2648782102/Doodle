@@ -59,7 +59,8 @@ await fs.mkdir(excalidrawTargetDir, { recursive: true });
 for (const name of await fs.readdir(excalidrawTargetDir)) {
   await fs.rm(path.join(excalidrawTargetDir, name), { recursive: true, force: true });
 }
-await fs.cp(excalidrawProdDir, excalidrawTargetDir, { recursive: true });
+await fs.copyFile(path.join(excalidrawProdDir, "index.css"), path.join(excalidrawTargetDir, "index.css"));
+await fs.cp(path.join(excalidrawProdDir, "fonts"), path.join(excalidrawTargetDir, "fonts"), { recursive: true });
 const excalidrawBundle = await bundle({
   entryPoints: [path.join(sourceDir, "excalidraw-app.tsx")],
   bundle: true,

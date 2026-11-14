@@ -153,6 +153,13 @@ const itemInput = z.object({
   }).optional().describe("Optional bounded visual styling"),
   startItemId: z.string().optional().describe("Source object ID for a connected line"),
   endItemId: z.string().optional().describe("Target object ID for a connected line"),
+  scene: z.object({
+    element: z.record(z.string(), z.unknown()).optional(),
+    boundText: z.record(z.string(), z.unknown()).optional(),
+    fileId: z.string().max(120).optional(),
+    fileMime: z.string().max(40).optional(),
+    fileCreated: z.number().finite().optional(),
+  }).optional().describe("Optional Excalidraw scene fidelity metadata; Board v1 remains authoritative"),
 });
 
 const updateInput = z.object({

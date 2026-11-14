@@ -42,9 +42,18 @@ BoardStore / MCP tools / HTTP API / BoardLibrary
 
 ## Observed cost
 
-With Excalidraw production assets copied into `dist/` and the generated plugin package, `npm pack --dry-run` grows from roughly 260 KB to about 17.3 MB compressed and 27.2 MB unpacked, with 582 files. The Excalidraw engine bundle itself is about 8.4 MB before compression. This confirms the experiment must remain isolated from the stable default distribution until product value outweighs packaging cost.
+After removing duplicate Excalidraw production JS/locales from the generated assets, `npm pack --dry-run` grows from roughly 260 KB to about 16.0 MB compressed and 22.8 MB unpacked, with 516 files. The Excalidraw engine bundle itself is about 9.1 MB before compression. This confirms the experiment must remain isolated from the stable default distribution until product value outweighs packaging cost.
 
 On this feature branch, the active `PANEL_URL` opens the Excalidraw canvas directly. `master` remains the stable DOM-engine branch until this experiment is accepted.
+
+## Stabilization fixes
+
+- Text typed into a shape is represented as one Board v1 object with an Excalidraw bound text element; it no longer duplicates into a second board object or creates visible overlay/stacking artifacts.
+- `onChange(elements, appState, files)` now preserves image file data, pauses persistence while text/line/group editing is active, and resumes after editing finishes.
+- Excalidraw scene fidelity is kept in optional `scene` metadata inside version 1 board state: bound text, container/frame/group IDs, element ordering, bindings, and image file metadata. Old boards without `scene` remain valid.
+- Standalone pages listen to WebSocket `board_updated` / `board_library_updated`; remote changes refresh the scene only when the person is not actively editing.
+- The Excalidraw-only page keeps a lightweight board-library overlay for save/switch/create/rename/duplicate/delete/import/export.
+- Generated assets copy only self-hosted CSS/fonts plus esbuild chunks, not the duplicate Excalidraw production bundle and locale tree.
 
 ## Red lines
 
