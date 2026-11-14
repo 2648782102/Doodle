@@ -59,7 +59,7 @@ function canvasSnapshot(board: SimpleBoard) {
     visualDigest: boardVisualDigest(board),
     capabilities: {
       version: 1,
-      canvasEngines: ["dom", "excalidraw"],
+      canvasEngine: "excalidraw",
       layouts: ["grid", "row", "column", "timeline", "cluster"],
       connectors: ["startItemId", "endItemId"],
       variants: ["plain", "card", "frame", "pill", "diamond", "callout", "heading"],

@@ -54,7 +54,7 @@ describe("board HTTP surface", () => {
     expect(snapshot).toMatchObject({ version: 1 });
     expect(snapshot.library).toMatchObject({ version: 1 });
     expect(snapshot.capabilities.layouts).toContain("cluster");
-    expect(snapshot.capabilities.canvasEngines).toContain("excalidraw");
+    expect(snapshot.capabilities.canvasEngine).toBe("excalidraw");
     expect(snapshot.visualDigest).toMatchObject({ version: 1 });
   });
 

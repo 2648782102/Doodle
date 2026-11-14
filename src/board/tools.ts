@@ -63,7 +63,7 @@ function boardCapabilities() {
     recipes: ["flow", "compare", "cluster", "emphasis", "image-annotation"],
     style: ["borderColor", "borderWidth", "textColor", "fontSize", "fontWeight", "textAlign", "strokeWidth", "opacity", "radius", "fillOpacity"],
     library: ["list", "get", "create", "save", "switch", "rename", "duplicate", "delete", "import", "export"],
-    canvasEngines: ["dom", "excalidraw"],
+    canvasEngine: "excalidraw",
     safety: "Visual context only; board objects never authorize project writes.",
   };
 }
