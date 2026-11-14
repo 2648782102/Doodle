@@ -169,6 +169,22 @@ describe("simple shared board", () => {
     expect(items.every((item) => typeof item.z === "number")).toBe(true);
   });
 
+  it("keeps edge labels in the legend instead of overlapping detail text", () => {
+    const items = diagramToBoardItems({
+      title: "可读性",
+      nodes: [
+        { id: "a", label: "A", detail: "get / show / draw / scan" },
+        { id: "b", label: "B", detail: "PANEL_URL" },
+      ],
+      edges: [{ from: "a", to: "b", label: "HTTP" }],
+      origin: { x: 40, y: 140 },
+    }, "ai");
+    const connectors = items.filter((item) => item.type === "line");
+    const legend = items.find((item) => item.id === "diagram_legend");
+    expect(connectors.every((item) => item.text === "")).toBe(true);
+    expect(legend?.text).toContain("HTTP");
+  });
+
   it("keeps cycles and back edges within version 1 bounds", () => {
     const diagram = {
       title: "Cycle",
@@ -186,6 +202,40 @@ describe("simple shared board", () => {
       Math.abs(item.w) <= 2000 && Math.abs(item.h) <= 1200 && (item.w !== 0 || item.h !== 0)
     ))).toBe(true);
     expect(new Set(items.filter((item) => item.type === "rect").map((item) => item.x)).size).toBeGreaterThan(2);
+  });
+
+  it("omits long semantic edges that would cross intermediate nodes", () => {
+    const diagram = {
+      title: "Long edge",
+      nodes: ["a", "b", "c", "d", "e"].map((id, index) => ({ id, label: id, detail: `${id} detail`, column: index === 4 ? 4 : 0, row: index === 4 ? 0 : index })),
+      edges: [{ from: "a", to: "e", label: "far" }],
+      origin: { x: 40, y: 140 },
+    };
+    const items = diagramToBoardItems(diagram, "ai");
+    const edges = items.filter((item) => item.type === "line");
+    const middleNodes = items.filter((item) => ["b", "c", "d"].includes(item.id));
+    const legend = items.find((item) => item.id === "diagram_legend");
+    expect(edges).toHaveLength(0);
+    expect(middleNodes).toHaveLength(3);
+    expect(legend?.text).toContain("a → e（far）");
+  });
+
+  it("records omitted semantic edges in the legend instead of drawing over the subtitle", () => {
+    const items = diagramToBoardItems({
+      title: "Title",
+      subtitle: "Long subtitle",
+      nodes: ["a", "b", "c", "d"].map((id, index) => ({
+        id, label: id, detail: `${id} detail`, column: index,
+      })),
+      edges: [{ from: "a", to: "d", label: "far" }],
+      origin: { x: 40, y: 140 },
+    }, "ai");
+    const subtitle = items.find((item) => item.id === "diagram_subtitle");
+    const frame = items.find((item) => item.id === "diagram_frame");
+    const legend = items.find((item) => item.id === "diagram_legend");
+    expect(items.filter((item) => item.type === "line")).toHaveLength(0);
+    expect(frame.y).toBeLessThan(subtitle.y);
+    expect(legend?.text).toContain("a → d（far）");
   });
 
   it("architecture layout moves selected nodes without erasing labels", () => {

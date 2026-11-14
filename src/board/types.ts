@@ -860,7 +860,7 @@ function layoutArchitectureBoard(
 
 export function diagramToBoardItems(diagram: DiagramInput, author: BoardAuthor = "ai"): BoardItem[] {
   const timestamp = now();
-  const { origin, width, height, rowGap, positions, rows } = resolveDiagramLayout(diagram);
+  const { origin, width, height, columnGap, rowGap, positions, rows } = resolveDiagramLayout(diagram);
   const maxRows = Math.max(...rows.values());
   const allPositions = [...positions.values()];
   const maxY = Math.max(...allPositions.map((position) => position.y));
@@ -872,9 +872,10 @@ export function diagramToBoardItems(diagram: DiagramInput, author: BoardAuthor =
   const base = (id: string): Pick<BoardItem, "id" | "author" | "createdAt" | "updatedAt"> => ({
     id, author, createdAt: timestamp, updatedAt: timestamp,
   });
+  const frameTop = bounds.top - 12;
   const frame = {
-    ...base("diagram_frame"), type: "rect" as const, x: bounds.left - 20, y: bounds.top - 12,
-    w: bounds.right - bounds.left + 40, h: bounds.bottom - bounds.top + 24,
+    ...base("diagram_frame"), type: "rect" as const, x: bounds.left - 20, y: frameTop,
+    w: bounds.right - bounds.left + 40, h: bounds.bottom - frameTop + 24,
     text: "", color: "#ffffff", variant: "frame" as const, role: "frame" as const, z: 0,
   };
   items.push(frame);
@@ -899,28 +900,42 @@ export function diagramToBoardItems(diagram: DiagramInput, author: BoardAuthor =
       text: node.detail.slice(0, 40), color: "#ffffff", z: 3, style: { fontSize: 12, textAlign: "center" },
     });
   }
-  diagram.edges.forEach((edge, index) => {
+  const omittedEdges: string[] = [];
+  let edgeIndex = 0;
+  diagram.edges.forEach((edge) => {
     const from = positions.get(edge.from)!;
     const to = positions.get(edge.to)!;
+    const layerDistance = Math.abs(to.x - from.x) / (width + columnGap);
+    const deltaRow = Math.round(to.y - from.y);
+    const shortEdge = layerDistance <= 1.01 && deltaRow === 0;
+    if (!shortEdge) {
+      omittedEdges.push(`${edge.from} → ${edge.to}${edge.label ? `（${edge.label}）` : ""}`);
+      return;
+    }
     const startX = from.x + width + 8;
     const startY = from.y + height / 2;
     const endX = to.x - 8;
     const endY = to.y + height / 2;
     const deltaX = Math.max(-MAX_LINE_DELTA_X, Math.min(MAX_LINE_DELTA_X, Math.round(endX - startX)));
     const deltaY = Math.max(-MAX_LINE_DELTA_Y, Math.min(MAX_LINE_DELTA_Y, Math.round(endY - startY)));
+    edgeIndex += 1;
     items.push({
-      ...base(`diagram_edge_${index + 1}`), type: "line",
+      ...base(`diagram_edge_${edgeIndex}`), type: "line",
       x: Math.round(startX), y: Math.round(startY), w: deltaX, h: deltaY,
-      text: edge.label?.slice(0, 10) ?? "", color: "#64748b", shape: "straight",
+      text: "", color: "#64748b", shape: "straight",
       startItemId: edge.from, endItemId: edge.to, z: 1,
     });
   });
-  if (diagram.edges.some((edge) => edge.label)) {
-    const labels = diagram.edges.filter((edge) => edge.label).map((edge) => edge.label).join(" · ");
+  const legendLabels = diagram.edges.filter((edge) => edge.label).map((edge) => edge.label).join(" · ");
+  if (legendLabels || omittedEdges.length) {
+    const parts = [
+      legendLabels ? `连接：${legendLabels}` : "",
+      omittedEdges.length ? `未绘制远连接：${omittedEdges.join(" · ")}` : "",
+    ].filter(Boolean);
     const legendWidth = Math.max(MIN_SHAPE_SIZE, Math.min(MAX_SHAPE_WIDTH, bounds.right - bounds.left));
     items.push({
       ...base("diagram_legend"), type: "text", x: origin.x, y: bottom - 28,
-      w: legendWidth, h: 28, text: `连接：${labels.slice(0, 120)}`, color: "#ffffff", z: 3, style: { fontSize: 12, textAlign: "left" },
+      w: legendWidth, h: 28, text: parts.join(" · ").slice(0, 120), color: "#ffffff", z: 3, style: { fontSize: 12, textAlign: "left" },
     });
   }
   const frameItem = items.find((item) => item.id === "diagram_frame")!;
