@@ -10,7 +10,7 @@ import { addBoardItems, createEmptyBoard, parseBoard } from "../dist/board/types
 const png = "data:image/png;base64,iVBORw0KGgo=";
 
 describe("Doodle to Excalidraw adapter", () => {
-  it("projects common Board v1 objects into stable Excalidraw skeletons", () => {
+  it("projects common Board v1 objects with official skeleton labels", () => {
     const board = addBoardItems(createEmptyBoard(), [
       { type: "rect", x: 10, y: 20, w: 180, h: 100, text: "输入", title: "开始", role: "step", variant: "card", author: "ai" },
       { type: "ellipse", x: 260, y: 20, w: 120, h: 100, text: "判断", author: "human" },
@@ -18,40 +18,35 @@ describe("Doodle to Excalidraw adapter", () => {
       { type: "line", x: 190, y: 70, w: 70, h: 0, text: "下一步", startItemId: "item_a", endItemId: "item_b", author: "ai" },
     ]);
     const skeletons = boardItemsToExcalidrawSkeleton(board.items);
-    expect(skeletons.map((element) => element.type)).toEqual(["rectangle", "text", "ellipse", "text", "freedraw", "arrow"]);
+    expect(skeletons.map((element) => element.type)).toEqual([
+      "rectangle", "text", "ellipse", "text", "freedraw", "arrow",
+    ]);
     expect(skeletons[0].id).toBe(board.items[0].id);
-    expect(skeletons[1]).toMatchObject({ containerId: board.items[0].id, text: "开始\n输入" });
-    expect(skeletons[1].customData?.doodle).toMatchObject({ role: "label" });
+    expect(skeletons[1]).toMatchObject({ containerId: board.items[0].id, text: "开始\n输入", x: 8, y: 8, width: 164, height: 84 });
     expect(skeletons[0].customData?.doodle).toMatchObject({ role: "step", variant: "card", author: "ai" });
     expect(skeletons[4].points).toHaveLength(3);
-    expect(skeletons[5]).toMatchObject({ start: { id: "item_a" }, end: { id: "item_b" } });
+    expect(skeletons[5]).toMatchObject({ start: { id: "item_a" }, end: { id: "item_b" }, label: { text: "下一步" } });
+    const roundTrip = boardItemsFromExcalidrawBoard(board, skeletons.map((skeleton, index) => ({
+      ...skeleton,
+      x: index === 1 ? skeleton.x + board.items[0].x : skeleton.x,
+      y: index === 1 ? skeleton.y + board.items[0].y : skeleton.y,
+      width: skeleton.width ?? 100,
+      height: skeleton.height ?? 60,
+      customData: index === 0 ? skeleton.customData : undefined,
+    })));
+    expect(roundTrip.items[0]).toMatchObject({ id: board.items[0].id, title: "开始", text: "输入", x: 10, y: 20 });
     const initial = boardToExcalidrawInitialData(board);
     expect(initial.elements).toHaveLength(6);
     expect(initial.files).toEqual({});
   });
 
-  it("projects Excalidraw text containers without duplicate Board v1 objects", () => {
+  it("folds bound text back into one Board v1 object", () => {
     const board = createEmptyBoard();
     const elements = [
-      {
-        id: "ex_rect", type: "rectangle", x: 5, y: 10, width: 100, height: 60,
-        backgroundColor: "#f6d365", groupIds: ["group_a"],
-        customData: { doodle: { author: "ai", role: "step", z: 2 } }, roundness: { type: 3 },
-        boundElements: [{ type: "text", id: "ex_rect_text" }],
-      },
-      {
-        id: "ex_rect_text", type: "text", x: 10, y: 20, width: 80, height: 30,
-        text: "标题\n正文", originalText: "标题\n正文", containerId: "ex_rect",
-        strokeColor: "#1f2937",
-      },
-      {
-        id: "ex_draw", type: "freedraw", x: 0, y: 100, width: 30, height: 20,
-        points: [[0, 0], [10, 20], [30, 5]], strokeColor: "#1f2937",
-      },
-      {
-        id: "ex_arrow", type: "arrow", x: 100, y: 100, width: 80, height: 0,
-        points: [[0, 0], [80, 0]], text: "next", startBinding: { elementId: "ex_rect" }, endBinding: { elementId: "ex_draw" },
-      },
+      { id: "ex_rect", type: "rectangle", x: 5, y: 10, width: 100, height: 60, backgroundColor: "#f6d365", groupIds: ["group_a"], customData: { doodle: { author: "ai", role: "step", z: 2 } }, boundElements: [{ type: "text", id: "ex_rect_text" }] },
+      { id: "ex_rect_text", type: "text", x: 13, y: 18, width: 84, height: 44, text: "标题\n正文", originalText: "标题\n正文", containerId: "ex_rect", fontSize: 16, fontFamily: 3 },
+      { id: "ex_draw", type: "freedraw", x: 0, y: 100, width: 30, height: 20, points: [[0, 0], [10, 20], [30, 5]], strokeColor: "#1f2937" },
+      { id: "ex_arrow", type: "arrow", x: 100, y: 100, width: 80, height: 0, points: [[0, 0], [80, 0]], text: "next", startBinding: { elementId: "ex_rect" }, endBinding: { elementId: "ex_draw" } },
     ];
     const projected = boardItemsFromExcalidrawBoard(board, elements);
     expect(projected.items).toHaveLength(3);

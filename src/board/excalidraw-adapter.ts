@@ -93,6 +93,10 @@ function finite(value: unknown, fallback = 0): number {
 }
 
 function textOf(item: BoardItem): string {
+  return item.text;
+}
+
+function labelOf(item: BoardItem): string {
   return item.title ? `${item.title}\n${item.text}` : item.text;
 }
 
@@ -134,8 +138,7 @@ function styleFor(item: BoardItem): Partial<ExcalidrawSkeleton> {
     textAlign: style.textAlign ?? (item.type === "text" ? "left" : "center"),
     verticalAlign: "middle",
     groupIds: item.groupId ? [item.groupId] : [],
-    customData: { doodle: { id: item.id, author: item.author, role: item.role, variant: item.variant, z: item.z, emphasis: item.emphasis } },
-    ...(item.scene?.element ?? {}),
+    customData: { doodle: { id: item.id, author: item.author, role: item.role, variant: item.variant, z: item.z, emphasis: item.emphasis, textAlign: style.textAlign, lineHeight: 1.25 } },
   };
 }
 
@@ -152,15 +155,16 @@ function baseSkeleton(item: BoardItem): ExcalidrawSkeleton {
 }
 
 function boundTextSkeleton(item: BoardItem, parent: ExcalidrawSkeleton): ExcalidrawSkeleton {
-  const raw = textOf(item);
+  const raw = labelOf(item);
   const fontSize = item.style?.fontSize ?? 16;
+  const offset = 8;
   return {
     id: `${item.id}_text`,
     type: "text",
-    x: 8,
-    y: 8,
-    width: Math.max(1, (parent.width ?? 0) - 16),
-    height: Math.max(1, (parent.height ?? 0) - 16),
+    x: offset,
+    y: offset,
+    width: Math.max(1, (parent.width ?? 0) - offset * 2),
+    height: Math.max(1, (parent.height ?? 0) - offset * 2),
     text: raw,
     originalText: raw,
     fontSize,
@@ -174,8 +178,7 @@ function boundTextSkeleton(item: BoardItem, parent: ExcalidrawSkeleton): Excalid
     lineHeight: 1.25,
     opacity: item.style?.opacity ?? 100,
     groupIds: item.groupId ? [item.groupId] : [],
-    customData: { doodle: { id: `${item.id}_text`, author: item.author, role: "label" } },
-    ...(item.scene?.boundText ?? {}),
+    customData: { doodle: { id: `${item.id}_text`, author: item.author, role: "label", z: item.z } },
   };
 }
 
@@ -186,7 +189,7 @@ export function boardItemsToExcalidrawSkeleton(items: BoardItem[]): ExcalidrawSk
       const endX = item.w;
       const endY = item.h;
       base.points = [[0, 0], [endX, endY]];
-      if (item.text && !item.scene?.boundText) base.label = { text: item.text, fontSize: item.style?.fontSize ?? 14 };
+      if (item.text) base.label = { text: item.text, fontSize: item.style?.fontSize ?? 14 };
       if (item.startItemId) base.start = { id: item.startItemId };
       if (item.endItemId) base.end = { id: item.endItemId };
       if (item.shape === "orthogonal") base.arrowType = "elbowed";
@@ -314,6 +317,7 @@ export function excalidrawElementsToBoardItems(
       ...(type === "image" && file ? { src: file.dataURL, mime: file.mimeType as BoardItem["mime"] } : {}),
       ...(type === "line" && element.startBinding?.elementId ? { startItemId: element.startBinding.elementId } : {}),
       ...(type === "line" && element.endBinding?.elementId ? { endItemId: element.endBinding.elementId } : {}),
+      ...(custom?.variant && typeof custom.variant === "string" ? { variant: custom.variant as BoardItem["variant"] } : {}),
       ...(typeof element.opacity === "number" || typeof element.strokeWidth === "number" || typeof element.fontSize === "number"
         ? { style: {
           ...(typeof element.opacity === "number" ? { opacity: Math.max(0.1, Math.min(1, element.opacity / 100)) } : {}),

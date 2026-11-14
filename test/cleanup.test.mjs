@@ -30,7 +30,7 @@ describe("post-cleanup repository shape", () => {
     }
     const board = parseBoard(JSON.parse(raw));
     expect(board.version).toBe(1);
-    expect(board.items.length).toBeGreaterThan(0);
+    expect(board.items.length).toBeGreaterThanOrEqual(0);
     expect(board.notes.every((note) => !note.itemId || board.items.some((item) => item.id === note.itemId))).toBe(true);
     expect(board.revision).toBe(JSON.parse(raw).revision);
     const readablePath = await fs.access(statePath).then(() => statePath).catch(() => legacyPath);

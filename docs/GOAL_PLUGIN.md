@@ -12,7 +12,7 @@ one-command install → new session → first prompt → plugin manifest → bun
 
 ## Product boundary
 
-Doodle is a local-first board. A person and an AI place notes, text, rectangles, ellipses, directed arrows, freehand strokes, images, and richer visual variants on one canvas. The AI normally uses MCP tools inside an agent; a person uses the standalone local canvas or the optional embedded MCP App. A local library stores editable named snapshots of the same active board for save/switch workflows; `capabilities`, `visualDigest`, and recipes help the AI compose drawings with the same four tools. Conversation stays in the host chat. Project structure is only one subject that `scan_project` can inspect and `draw_board` can visualize.
+Doodle is a local-first board. A person and an AI place notes, text, rectangles, ellipses, directed arrows, freehand strokes, images, and richer visual variants on one canvas. The AI normally uses MCP tools inside an agent; a person uses the standalone local canvas or the optional embedded MCP App. A local library stores editable named snapshots of the same active board for save/switch workflows; `capabilities`, `visualDigest`, recipes, and the bounded `draw_board.diagram` field help the AI compose drawings with the same four tools. Conversation stays in the host chat. Project structure is only one subject that `scan_project` can inspect and `draw_board` can visualize.
 
 The plugin is a distribution layer around this product. It must not turn Doodle into a hosted service, general chat product, approval workflow, project dashboard, code-change authority, or a different MCP server with a different tool set.
 
@@ -68,6 +68,7 @@ The plugin is a distribution layer around this product. It must not turn Doodle 
 6. The plugin uses isolated writable board state and a free loopback port by default; explicit `OUTPUT_DIR` and `PREVIEW_PORT` continue to override defaults.
 7. `show_board` remains the explicit render tool, and successful `draw_board` results also advertise the optional MCP App so compatible hosts show completed AI drawings; all tools remain usable in text-only hosts.
 8. MCP Apps hosts with `updateModelContext` receive the current final board state and final-state delta in the current session's model context; `sendMessage` is reserved for one user-initiated short notification. The standalone fallback does not claim a host-session bridge.
+8a. The bundled Excalidraw client keeps one hidden `通知 Agent` button that becomes visible only after the host advertises both `updateModelContext.text` and `message.text`; semantic diagrams remain ordinary version 1 board objects and do not rely on a second scene endpoint.
 9. `scan_project` stays bounded, read-only, workspace-relative, and secret-conservative.
 10. `npm run check` passes, including lint, build, tests, example syntax, offline guards, plugin guard, doctor, and package dry-run. Tests cover final-state deltas and the context/notification bundle.
 11. CI runs the same plugin guard and a dry-run setup guard, builds the versioned submission ZIP, and the publish workflow creates a Release only when the current version is missing; the guard rejects conflicting portable manifests, missing policy URLs, missing tool annotations, and uncommitted generated artifacts.

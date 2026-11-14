@@ -5,7 +5,7 @@ export type BoardEmphasis = "normal" | "focus";
 export type BoardVariant = "plain" | "card" | "frame" | "pill" | "diamond" | "callout" | "heading";
 export type BoardRole = "normal" | "label" | "frame" | "column" | "step" | "decision" | "annotation";
 export type BoardTextAlign = "left" | "center" | "right";
-export type BoardLayoutMode = "grid" | "row" | "column" | "timeline" | "cluster";
+export type BoardLayoutMode = "grid" | "row" | "column" | "timeline" | "cluster" | "architecture";
 
 export interface BoardSceneMeta {
   element?: Record<string, unknown>;
@@ -118,13 +118,52 @@ export interface BoardLayoutInput {
   mode?: BoardLayoutMode;
 }
 
+export interface DiagramNodeInput {
+  id: string;
+  label: string;
+  detail?: string;
+  type?: "rect" | "ellipse";
+  color?: string;
+  column?: number;
+  row?: number;
+}
+
+export interface DiagramEdgeInput {
+  from: string;
+  to: string;
+  label?: string;
+}
+
+export interface DiagramInput {
+  title?: string;
+  subtitle?: string;
+  replace?: boolean;
+  nodes: DiagramNodeInput[];
+  edges: DiagramEdgeInput[];
+  origin?: BoardPoint;
+  columnGap?: number;
+  rowGap?: number;
+  nodeWidth?: number;
+  nodeHeight?: number;
+}
+
+export interface DiagramLayout {
+  origin: BoardPoint;
+  width: number;
+  height: number;
+  columnGap: number;
+  rowGap: number;
+  positions: Map<string, BoardPoint>;
+  rows: Map<number, number>;
+}
+
 const ITEM_TYPES: BoardItemType[] = ["note", "text", "rect", "ellipse", "line", "stroke", "image"];
 const LINE_SHAPES: BoardLineShape[] = ["straight", "curve", "orthogonal"];
 const EMPHASES: BoardEmphasis[] = ["normal", "focus"];
 const VARIANTS: BoardVariant[] = ["plain", "card", "frame", "pill", "diamond", "callout", "heading"];
 const ROLES: BoardRole[] = ["normal", "label", "frame", "column", "step", "decision", "annotation"];
 const TEXT_ALIGNS: BoardTextAlign[] = ["left", "center", "right"];
-const LAYOUT_MODES: BoardLayoutMode[] = ["grid", "row", "column", "timeline", "cluster"];
+const LAYOUT_MODES: BoardLayoutMode[] = ["grid", "row", "column", "timeline", "cluster", "architecture"];
 const COLORS = ["#f6d365", "#b8e0d2", "#c7d8ff", "#ffd1dc", "#e8e8e8", "#ffffff"];
 const IMAGE_MIMES = ["image/png", "image/jpeg", "image/jpg", "image/gif", "image/webp", "image/bmp", "image/avif", "image/svg+xml"];
 const MAX_ITEMS = 400;
@@ -263,6 +302,79 @@ function makeId(prefix: string): string {
 
 function now(): string {
   return new Date().toISOString();
+}
+
+export function resolveDiagramLayout(diagram: DiagramInput): DiagramLayout {
+  if (diagram.nodes.length > 48 || diagram.edges.length > 96) throw new Error("Diagram is too large");
+  const nodeIds = new Set<string>();
+  const reserved = new Set(["diagram_title", "diagram_subtitle", "diagram_legend", "diagram_frame"]);
+  for (const node of diagram.nodes) {
+    const id = node.id?.trim();
+    if (!id || nodeIds.has(id) || reserved.has(id) || id.endsWith("_detail") || /^diagram_edge_\d+$/.test(id)) {
+      throw new Error("Diagram node IDs must be unique and must not use generated object IDs");
+    }
+    nodeIds.add(id);
+  }
+  const generatedIds = new Set<string>();
+  generatedIds.add("diagram_frame");
+  for (const node of diagram.nodes) {
+    for (const suffix of ["", "_detail"]) {
+      const id = `${node.id}${suffix}`;
+      if (generatedIds.has(id)) throw new Error("Diagram generates duplicate object IDs");
+      generatedIds.add(id);
+    }
+  }
+  diagram.edges.forEach((_edge, index) => {
+    const id = `diagram_edge_${index + 1}`;
+    if (generatedIds.has(id)) throw new Error("Diagram generates duplicate object IDs");
+    generatedIds.add(id);
+  });
+  const origin = diagram.origin ?? { x: 40, y: 120 };
+  if (Math.abs(origin.x) > 20_000 || Math.abs(origin.y) > 20_000) throw new Error("Diagram origin is out of range");
+  const width = Math.max(160, Math.min(260, diagram.nodeWidth ?? 190));
+  const height = Math.max(72, Math.min(130, diagram.nodeHeight ?? 90));
+  const columnGap = Math.max(36, Math.min(160, diagram.columnGap ?? 70));
+  const rowGap = Math.max(24, Math.min(120, diagram.rowGap ?? 44));
+  const nodes = new Map(diagram.nodes.map((node) => [node.id, node]));
+  const incoming = new Map(diagram.nodes.map((node) => [node.id, 0]));
+  const outgoing = new Map(diagram.nodes.map((node) => [node.id, [] as string[]]));
+  for (const edge of diagram.edges) {
+    if (!nodes.has(edge.from) || !nodes.has(edge.to)) throw new Error("Diagram edge references an unknown node");
+    outgoing.get(edge.from)!.push(edge.to);
+    incoming.set(edge.to, (incoming.get(edge.to) ?? 0) + 1);
+  }
+  const layer = new Map(diagram.nodes.map((node) => [node.id, node.column ?? -1]));
+  const indegree = new Map(incoming);
+  const queue = diagram.nodes.filter((node) => (indegree.get(node.id) ?? 0) === 0).map((node) => node.id);
+  if (!queue.length && diagram.nodes.length) queue.push(diagram.nodes[0].id);
+  for (const id of queue) if ((layer.get(id) ?? -1) < 0) layer.set(id, 0);
+  const processed = new Set<string>();
+  while (queue.length) {
+    const id = queue.shift()!;
+    if (processed.has(id)) continue;
+    processed.add(id);
+    for (const target of outgoing.get(id) ?? []) {
+      if (nodes.get(target)?.column === undefined) layer.set(target, Math.max(layer.get(target) ?? 0, (layer.get(id) ?? 0) + 1));
+      indegree.set(target, Math.max(0, (indegree.get(target) ?? 1) - 1));
+      if ((indegree.get(target) ?? 0) === 0 && !processed.has(target)) queue.push(target);
+    }
+  }
+  let fallbackColumn = Math.max(0, ...layer.values()) + 1;
+  for (const node of diagram.nodes) {
+    if ((layer.get(node.id) ?? -1) < 0) layer.set(node.id, fallbackColumn++);
+  }
+  const positions = new Map<string, BoardPoint>();
+  const rows = new Map<number, number>();
+  for (const node of diagram.nodes) {
+    const column = Math.min(12, Math.max(0, layer.get(node.id) ?? 0));
+    const row = node.row ?? rows.get(column) ?? 0;
+    rows.set(column, Math.max(rows.get(column) ?? 0, row + 1));
+    positions.set(node.id, {
+      x: Math.round(origin.x + column * (width + columnGap)),
+      y: Math.round(origin.y + row * (height + rowGap)),
+    });
+  }
+  return { origin, width, height, columnGap, rowGap, positions, rows };
 }
 
 export function touchBoard(board: SimpleBoard): SimpleBoard {
@@ -634,6 +746,7 @@ export function layoutBoardItems(
   layout: BoardLayoutInput,
   author: BoardAuthor = "human",
 ): SimpleBoard {
+  if (layout.mode === "architecture") return layoutArchitectureBoard(board, layout, author);
   const selected = new Set(layout.ids ?? []);
   const candidates = board.items.filter((item) =>
     item.type !== "line" && (!selected.size || selected.has(item.id)));
@@ -662,6 +775,160 @@ export function layoutBoardItems(
     },
   }));
   return updateBoardItems(board, updates, author);
+}
+
+function layoutArchitectureBoard(
+  board: SimpleBoard,
+  layout: BoardLayoutInput,
+  author: BoardAuthor,
+): SimpleBoard {
+  const selected = new Set(layout.ids ?? []);
+  const nodes = board.items.filter((item) =>
+    item.type !== "line" && item.type !== "stroke" && item.type !== "image"
+    && (!selected.size || selected.has(item.id)));
+  const connections = board.items.filter((item) => item.type === "line");
+  if (!nodes.length) return board;
+  const origin = layout.origin ?? { x: 40, y: 120 };
+  const gap = Math.max(24, Math.min(120, layout.gap ?? 48));
+  const columns = Math.max(2, Math.min(6, Math.floor(layout.columns ?? 4)));
+  const maxWidth = Math.max(...nodes.map((item) => item.w), 160);
+  const maxHeight = Math.max(...nodes.map((item) => item.h), 80);
+  const byId = new Map(nodes.map((item) => [item.id, item]));
+  const indegree = new Map(nodes.map((item) => [item.id, 0]));
+  const outgoing = new Map(nodes.map((item) => [item.id, [] as string[]]));
+  for (const line of connections) {
+    if (line.startItemId && line.endItemId && byId.has(line.startItemId) && byId.has(line.endItemId)) {
+      outgoing.get(line.startItemId)!.push(line.endItemId);
+      indegree.set(line.endItemId, (indegree.get(line.endItemId) ?? 0) + 1);
+    }
+  }
+  const layer = new Map<string, number>(nodes.map((item) => [item.id, 0]));
+  const residual = new Map(indegree);
+  const queue = nodes.filter((item) => (residual.get(item.id) ?? 0) === 0).map((item) => item.id);
+  if (!queue.length && nodes.length) queue.push(nodes[0].id);
+  const processed = new Set<string>();
+  while (queue.length) {
+    const id = queue.shift()!;
+    if (processed.has(id)) continue;
+    processed.add(id);
+    for (const target of outgoing.get(id) ?? []) {
+      layer.set(target, Math.max(layer.get(target) ?? 0, (layer.get(id) ?? 0) + 1));
+      residual.set(target, Math.max(0, (residual.get(target) ?? 1) - 1));
+      if ((residual.get(target) ?? 0) === 0) queue.push(target);
+    }
+  }
+  const maxLayer = Math.max(1, ...layer.values());
+  const groups = new Map<number, BoardItem[]>();
+  for (const node of nodes) {
+    const level = Math.min(maxLayer, layer.get(node.id) ?? 0);
+    if (!groups.has(level)) groups.set(level, []);
+    groups.get(level)!.push(node);
+  }
+  const positions = new Map<string, BoardPoint>();
+  for (const [level, group] of groups) {
+    group.sort((left, right) => left.y - right.y || left.x - right.x);
+    group.forEach((item, index) => {
+      const row = Math.floor(index / Math.min(columns, maxLayer + 1));
+      const column = index % Math.min(columns, maxLayer + 1);
+      positions.set(item.id, {
+        x: origin.x + level * (maxWidth + gap) + column * 24,
+        y: origin.y + row * (maxHeight + gap),
+      });
+    });
+  }
+  const updates: BoardItemPatch[] = [];
+  for (const node of nodes) {
+    const position = positions.get(node.id)!;
+    updates.push({ id: node.id, patch: { x: Math.round(position.x), y: Math.round(position.y) } });
+  }
+  for (const line of connections) {
+    const source = line.startItemId ? positions.get(line.startItemId) : undefined;
+    const target = line.endItemId ? positions.get(line.endItemId) : undefined;
+    if (!source || !target) continue;
+    updates.push({
+      id: line.id,
+      patch: {
+        x: Math.round(source.x + maxWidth),
+        y: Math.round(source.y + maxHeight / 2),
+        w: Math.max(-MAX_LINE_DELTA_X, Math.min(MAX_LINE_DELTA_X, Math.round(target.x - source.x - maxWidth))),
+        h: Math.max(-MAX_LINE_DELTA_Y, Math.min(MAX_LINE_DELTA_Y, Math.round(target.y - source.y))),
+      },
+    });
+  }
+  return updateBoardItems(board, updates, author);
+}
+
+export function diagramToBoardItems(diagram: DiagramInput, author: BoardAuthor = "ai"): BoardItem[] {
+  const timestamp = now();
+  const { origin, width, height, rowGap, positions, rows } = resolveDiagramLayout(diagram);
+  const maxRows = Math.max(...rows.values());
+  const allPositions = [...positions.values()];
+  const maxY = Math.max(...allPositions.map((position) => position.y));
+  const leftmostX = Math.min(...allPositions.map((position) => position.x));
+  const rightmostX = Math.max(...allPositions.map((position) => position.x));
+  const bottom = Math.max(maxY + height + (diagram.edges.some((edge) => edge.label) ? rowGap + 28 : 0), origin.y + (maxRows + 1) * (height + rowGap) + 28);
+  const bounds = { left: leftmostX, top: origin.y - 94, right: rightmostX + width, bottom };
+  const items: BoardItem[] = [];
+  const base = (id: string): Pick<BoardItem, "id" | "author" | "createdAt" | "updatedAt"> => ({
+    id, author, createdAt: timestamp, updatedAt: timestamp,
+  });
+  const frame = {
+    ...base("diagram_frame"), type: "rect" as const, x: bounds.left - 20, y: bounds.top - 12,
+    w: bounds.right - bounds.left + 40, h: bounds.bottom - bounds.top + 24,
+    text: "", color: "#ffffff", variant: "frame" as const, role: "frame" as const, z: 0,
+  };
+  items.push(frame);
+  if (diagram.title) items.push({
+    ...base("diagram_title"), type: "text", x: origin.x, y: origin.y - 94, w: 760, h: 44,
+    text: diagram.title, color: "#ffffff", variant: "heading", role: "label", z: 3,
+    style: { fontSize: 28, fontWeight: "bold", textAlign: "left" },
+  });
+  if (diagram.subtitle) items.push({
+    ...base("diagram_subtitle"), type: "text", x: origin.x, y: origin.y - 48, w: 900, h: 28,
+    text: diagram.subtitle, color: "#ffffff", z: 3, style: { fontSize: 14, textAlign: "left" },
+  });
+  for (const node of diagram.nodes) {
+    const position = positions.get(node.id)!;
+    items.push({
+      ...base(node.id), type: node.type ?? "rect", x: position.x, y: position.y, w: width, h: height,
+      text: node.label.slice(0, 24), color: node.color ?? "#f6d365", variant: "card", role: "step", z: 2,
+      style: { fontSize: 15, textAlign: "center" },
+    });
+    if (node.detail) items.push({
+      ...base(`${node.id}_detail`), type: "text", x: position.x, y: position.y + height + 6, w: width, h: 24,
+      text: node.detail.slice(0, 40), color: "#ffffff", z: 3, style: { fontSize: 12, textAlign: "center" },
+    });
+  }
+  diagram.edges.forEach((edge, index) => {
+    const from = positions.get(edge.from)!;
+    const to = positions.get(edge.to)!;
+    const startX = from.x + width + 8;
+    const startY = from.y + height / 2;
+    const endX = to.x - 8;
+    const endY = to.y + height / 2;
+    const deltaX = Math.max(-MAX_LINE_DELTA_X, Math.min(MAX_LINE_DELTA_X, Math.round(endX - startX)));
+    const deltaY = Math.max(-MAX_LINE_DELTA_Y, Math.min(MAX_LINE_DELTA_Y, Math.round(endY - startY)));
+    items.push({
+      ...base(`diagram_edge_${index + 1}`), type: "line",
+      x: Math.round(startX), y: Math.round(startY), w: deltaX, h: deltaY,
+      text: edge.label?.slice(0, 10) ?? "", color: "#64748b", shape: "straight",
+      startItemId: edge.from, endItemId: edge.to, z: 1,
+    });
+  });
+  if (diagram.edges.some((edge) => edge.label)) {
+    const labels = diagram.edges.filter((edge) => edge.label).map((edge) => edge.label).join(" · ");
+    const legendWidth = Math.max(MIN_SHAPE_SIZE, Math.min(MAX_SHAPE_WIDTH, bounds.right - bounds.left));
+    items.push({
+      ...base("diagram_legend"), type: "text", x: origin.x, y: bottom - 28,
+      w: legendWidth, h: 28, text: `连接：${labels.slice(0, 120)}`, color: "#ffffff", z: 3, style: { fontSize: 12, textAlign: "left" },
+    });
+  }
+  const frameItem = items.find((item) => item.id === "diagram_frame")!;
+  frameItem.w = Math.max(MIN_SHAPE_SIZE, Math.min(MAX_SHAPE_WIDTH, frameItem.w));
+  frameItem.h = Math.max(MIN_SHAPE_SIZE, Math.min(MAX_SHAPE_HEIGHT, frameItem.h));
+  const candidate = { version: 1 as const, id: "diagram_validation", title: diagram.title ?? "diagram", revision: 0, updatedAt: timestamp, items, notes: [] };
+  parseBoard(candidate);
+  return items;
 }
 
 export function removeBoardItem(board: SimpleBoard, id: string): SimpleBoard {

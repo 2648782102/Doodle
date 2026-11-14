@@ -19,7 +19,7 @@ BoardStore / MCP tools / HTTP API / BoardLibrary
 
 1. `get_board` is authoritative and still returns Doodle Board v1 plus `capabilities`, `visualDigest`, `library`, and `PANEL_URL`.
 2. `draw_board` keeps exactly the same four-tool MCP surface. `library` actions remain available through `draw_board`.
-3. Excalidraw elements and `appState` are UI-only state. They are not persisted as the board library format.
+3. Excalidraw elements and `appState` are UI-only state. They are derived from Board v1 on every render and are not persisted as the board library format or a second scene file.
 4. All canvas edits by a person must be projected into Board v1 through the existing human-confirmed HTTP or MCP bridge path.
 5. All AI writes and library switches must update the Excalidraw scene through `updateScene` without losing Board v1 revision safety.
 6. Excalidraw assets, CSS, fonts, and locales must be self-hosted from the local preview/plugin package. No CDN or hosted endpoint is used.
@@ -39,6 +39,7 @@ BoardStore / MCP tools / HTTP API / BoardLibrary
 8. Tests cover the pure adapter functions, engine selection, self-hosted assets, library switching, and four-tool safety.
 9. `npm run check` passes on the experiment branch; a local preview is visually verified.
 10. The experiment branch is pushed. `master` is not changed and npm is not published.
+11. Semantic diagram generation stays within Board v1, with one authoritative layout resolver and no separate Excalidraw scene endpoint.
 
 ## Observed cost
 
@@ -54,6 +55,8 @@ On this feature branch, the active `PANEL_URL` opens the Excalidraw canvas direc
 - Standalone pages listen to WebSocket `board_updated` / `board_library_updated`; remote changes refresh the scene only when the person is not actively editing.
 - The Excalidraw-only page keeps a lightweight board-library overlay for save/switch/create/rename/duplicate/delete/import/export.
 - Generated assets copy only self-hosted CSS/fonts plus esbuild chunks, not the duplicate Excalidraw production bundle and locale tree.
+- The embedded canvas restores one `通知 Agent` button that appears only when the host advertises both `updateModelContext.text` and `message.text`.
+- Semantic diagrams are generated as ordinary version 1 objects with bounded labels and z-order; a prior native-scene experiment was removed to avoid board/scene divergence.
 
 ## Red lines
 

@@ -58,6 +58,7 @@ const applyingRemote = { current: false };
 const currentFiles: { current: Record<string, ExcalidrawFileData> } = { current: {} };
 const currentAppState: { current: ExcalidrawAppState } = { current: {} };
 const pendingRemote: { current: BoardSnapshot | null } = { current: null };
+const pendingTimer: { current: number | null } = { current: null };
 
 function applyRemoteSnapshot(data: BoardSnapshot, refreshFiles = true) {
   if (!data || !Array.isArray(data.items) || typeof data.revision !== "number") return;
@@ -65,6 +66,10 @@ function applyRemoteSnapshot(data: BoardSnapshot, refreshFiles = true) {
   if (isEditing(currentAppState.current)) {
     pendingRemote.current = data;
     return;
+  }
+  if (pendingTimer.current !== null) {
+    window.clearTimeout(pendingTimer.current);
+    pendingTimer.current = null;
   }
   activeSnapshot = data;
   applyingRemote.current = true;
@@ -132,32 +137,13 @@ function connectStandaloneUpdates() {
 }
 
 function toElements(snapshot: BoardSnapshot) {
-  const items = snapshot.items as Array<Record<string, unknown>>;
-  const sceneElements: Record<string, unknown>[] = [];
-  const freshSkeletons = [];
-  for (const item of items) {
-    const scene = item.scene as { element?: Record<string, unknown>; boundText?: Record<string, unknown> } | undefined;
-    if (scene?.element) {
-      const element = { ...scene.element };
-      delete element.index;
-      delete element.version;
-      delete element.versionNonce;
-      sceneElements.push(element);
-      if (scene.boundText) {
-        const boundText = { ...scene.boundText };
-        delete boundText.index;
-        delete boundText.version;
-        delete boundText.versionNonce;
-        sceneElements.push(boundText);
-      }
-    } else {
-      freshSkeletons.push(item);
-    }
-  }
-  const converted = freshSkeletons.length
-    ? convertToExcalidrawElements(boardItemsToExcalidrawSkeleton(freshSkeletons as never[]), { regenerateIds: false })
-    : [];
-  return [...sceneElements, ...converted];
+  const skeletons = boardItemsToExcalidrawSkeleton(snapshot.items as never[]);
+  return convertToExcalidrawElements(skeletons as never[], { regenerateIds: false })
+    .sort((left: ExcalidrawLikeElement, right: ExcalidrawLikeElement) => {
+      const leftZ = (left.customData?.doodle as { z?: number } | undefined)?.z ?? 0;
+      const rightZ = (right.customData?.doodle as { z?: number } | undefined)?.z ?? 0;
+      return leftZ - rightZ;
+    });
 }
 
 function toFiles(snapshot: BoardSnapshot): ExcalidrawFileData[] {
@@ -307,9 +293,34 @@ function showError(error: unknown) {
   console.warn("Doodle board sync skipped", error);
 }
 
+function initNotifyButton() {
+  const button = document.querySelector<HTMLButtonElement>("#doodleNotifyAgent");
+  if (!button) return;
+  const updateVisibility = () => {
+    const capabilities = hostApp?.getHostCapabilities();
+    button.hidden = !capabilities?.updateModelContext?.text || !capabilities?.message?.text;
+  };
+  button.addEventListener("click", async () => {
+    try {
+      const snapshot = activeSnapshot ?? await loadBoard();
+      publishedRevision = -1;
+      await publishContext(snapshot);
+      if (!hostApp) throw new Error("Host bridge is unavailable");
+      const result = await hostApp.sendMessage({
+        role: "user",
+        content: [{ type: "text", text: "我改了 Doodle 画板，你看下图。" }],
+      });
+      if (result.isError) throw new Error("Host rejected the notification");
+    } catch (error) {
+      showError(error);
+    }
+  });
+  updateVisibility();
+  window.setTimeout(updateVisibility, 1200);
+}
+
 function CanvasApp({ initial }: { initial: BoardSnapshot }) {
   const [snapshot, setSnapshot] = useState(initial);
-  const pendingTimer = useRef<number | null>(null);
   const [api, setApi] = useState<ExcalidrawAPI | null>(null);
   const initialData = useMemo(() => {
     const files = toFiles(initial);
@@ -323,8 +334,8 @@ function CanvasApp({ initial }: { initial: BoardSnapshot }) {
   }, [initial]);
 
   useEffect(() => {
-    activeSnapshot = snapshot;
-  }, [snapshot]);
+    if (activeSnapshot !== initial || snapshot === initial) activeSnapshot = snapshot;
+  }, [snapshot, initial]);
 
   useEffect(() => {
     apiRef.current = api;
@@ -351,18 +362,19 @@ function CanvasApp({ initial }: { initial: BoardSnapshot }) {
       currentFiles.current,
     );
     if (JSON.stringify(projected.items) === JSON.stringify(activeSnapshot.items)) return;
+    const base = activeSnapshot;
     if (pendingTimer.current !== null) window.clearTimeout(pendingTimer.current);
     pendingTimer.current = window.setTimeout(async () => {
       pendingTimer.current = null;
-      const before = activeSnapshot;
-      if (!before) return;
+      if (!base || activeSnapshot !== base) return;
       try {
-        const updated = await replaceBoard(projected.items as unknown[], before.revision);
+        const updated = await replaceBoard(projected.items as unknown[], base.revision);
         setSnapshot(updated);
       } catch (error) {
         const refreshed = await loadBoard().catch(() => null);
         if (refreshed) {
           applyingRemote.current = true;
+          activeSnapshot = refreshed;
           setSnapshot(refreshed);
           const files = toFiles(refreshed);
           currentFiles.current = Object.fromEntries(files.map((file) => [file.id, file]));
@@ -398,24 +410,30 @@ function CanvasApp({ initial }: { initial: BoardSnapshot }) {
   );
 }
 
-async function start() {
+let rootInstance: ReturnType<typeof createRoot> | null = null;
+function renderCanvas(initial: BoardSnapshot): void {
   const root = document.querySelector("#excalidrawRoot");
   if (!root) return;
-  const initial = await loadBoard();
+  if (!rootInstance) rootInstance = createRoot(root);
   activeSnapshot = initial;
-  createRoot(root).render(React.createElement(CanvasApp, { initial }));
+  rootInstance.render(React.createElement(CanvasApp, { initial }));
+}
+
+async function start() {
+  const root = document.querySelector("#excalidrawRoot");
+  if (!root || embedded || rootInstance) return;
+  const initial = await loadBoard();
+  renderCanvas(initial);
 }
 
 window.DoodleExcalidrawInit = (snapshot, mcpApp) => {
-  activeSnapshot = snapshot;
   activeMcpApp = mcpApp as typeof activeMcpApp;
-  const root = document.querySelector("#excalidrawRoot");
-  if (!root) return;
-  createRoot(root).render(React.createElement(CanvasApp, { initial: snapshot }));
+  renderCanvas(snapshot);
 };
 
 if (document.querySelector("#excalidrawRoot")) {
   initLibraryUi();
+  initNotifyButton();
   if (embedded) void initHostApp().catch(() => {});
   else connectStandaloneUpdates();
   void start().catch((error) => showError(error));

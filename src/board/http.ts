@@ -11,7 +11,9 @@ import {
   addBoardItem,
   addBoardItems,
   boardVisualDigest,
+  diagramToBoardItems,
   layoutBoardItems,
+  parseBoard,
   removeBoardItem,
   removeBoardItems,
   replaceBoardContent,
@@ -20,6 +22,7 @@ import {
   updateBoardItems,
   type BoardItemInput,
   type BoardLayoutInput,
+  type DiagramInput,
   type SimpleBoard,
 } from "./types.js";
 import { BoardRevisionConflictError } from "./errors.js";
@@ -60,14 +63,15 @@ function canvasSnapshot(board: SimpleBoard) {
     capabilities: {
       version: 1,
       canvasEngine: "excalidraw",
-      layouts: ["grid", "row", "column", "timeline", "cluster"],
+      layouts: ["grid", "row", "column", "timeline", "cluster", "architecture"],
       connectors: ["startItemId", "endItemId"],
       variants: ["plain", "card", "frame", "pill", "diamond", "callout", "heading"],
       roles: ["normal", "label", "frame", "column", "step", "decision", "annotation"],
-      recipes: ["flow", "compare", "cluster", "emphasis", "image-annotation"],
+      recipes: ["flow", "compare", "cluster", "emphasis", "image-annotation", "architecture", "diagram"],
     },
   };
 }
+
 
 export class BoardHttpServer {
   private app = express();
@@ -211,6 +215,27 @@ export class BoardHttpServer {
       if (body.confirmedBy !== "human") return res.status(403).json({ error: "Human confirmation is required" });
       if (body.board === undefined) return res.status(400).json({ error: "board is required" });
       await commit(res, (current) => replaceBoardContent(current, body.board));
+    });
+
+    this.app.post("/api/board/diagram", async (req, res) => {
+      const body = req.body as { confirmedBy?: string; diagram?: DiagramInput };
+      if (body.confirmedBy !== "human") return res.status(403).json({ error: "Human confirmation is required" });
+      if (!body.diagram || typeof body.diagram !== "object") return res.status(400).json({ error: "diagram is required" });
+      try {
+        diagramToBoardItems(body.diagram, "human");
+      } catch (error) {
+        return res.status(400).json({ error: error instanceof Error ? error.message : String(error) });
+      }
+      await commit(res, (current) => {
+        const generated = diagramToBoardItems(body.diagram!, "human");
+        const candidate = touchBoard({
+          ...current,
+          title: body.diagram!.title ?? current.title,
+          items: body.diagram!.replace ? generated : [...current.items, ...generated],
+        });
+        parseBoard(candidate);
+        return candidate;
+      });
     });
 
     this.app.get("/api/board/project", async (req, res) => {

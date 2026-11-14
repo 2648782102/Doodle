@@ -8,6 +8,7 @@ import {
   addBoardNote,
   boardCopyText,
   boardVisualDigest,
+  diagramToBoardItems,
   createEmptyBoard,
   createStarterBoard,
   parseBoard,
@@ -117,6 +118,87 @@ describe("simple shared board", () => {
     expect(board.items.find((item) => item.text === "输入")).toMatchObject({ x: 100, y: 100 });
     expect(() => addBoardItem(board, { type: "note", x: 0, y: 0, startItemId: source })).toThrow();
     expect(() => addBoardItem(board, { type: "rect", x: 0, y: 0, style: { fontSize: 200 } })).toThrow();
+  });
+
+  it("lays out architecture layers from connected nodes", () => {
+    let board = addBoardItems(createEmptyBoard(), [
+      { type: "rect", id: "source", x: 0, y: 0, w: 180, h: 90, text: "入口", author: "ai" },
+      { type: "rect", id: "core", x: 0, y: 0, w: 180, h: 90, text: "核心", author: "ai" },
+      { type: "rect", id: "target", x: 0, y: 0, w: 180, h: 90, text: "输出", author: "ai" },
+      { type: "line", id: "edge_one", x: 0, y: 0, w: 100, h: 0, text: "读", startItemId: "source", endItemId: "core", author: "ai" },
+      { type: "line", id: "edge_two", x: 0, y: 0, w: 100, h: 0, text: "写", startItemId: "core", endItemId: "target", author: "ai" },
+    ]);
+    board = layoutBoardItems(board, { mode: "architecture", origin: { x: 40, y: 120 }, gap: 48 });
+    const source = board.items.find((item) => item.id === "source");
+    const core = board.items.find((item) => item.id === "core");
+    const target = board.items.find((item) => item.id === "target");
+    expect(source).toMatchObject({ x: 40, y: 120 });
+    expect(core.x).toBeGreaterThan(source.x);
+    expect(target.x).toBeGreaterThan(core.x);
+    expect(board.items.find((item) => item.id === "edge_one").w).toBeGreaterThan(0);
+  });
+
+  it("builds a bounded semantic diagram from nodes and edges", () => {
+    const items = diagramToBoardItems({
+      title: "架构",
+      subtitle: "语义生成",
+      nodes: [
+        { id: "a", label: "入口", detail: "Codex / MCP" },
+        { id: "b", label: "内核", detail: "Board v1", color: "#b8e0d2" },
+        { id: "c", label: "画布", detail: "Excalidraw" },
+      ],
+      edges: [{ from: "a", to: "b", label: "读" }, { from: "b", to: "c", label: "画" }],
+      origin: { x: 40, y: 120 },
+    }, "ai");
+    expect(items.length).toBeGreaterThan(8);
+    expect(items.find((item) => item.id === "a")).toMatchObject({ text: "入口", x: 40, y: 120 });
+    expect(items.find((item) => item.id === "b").x).toBeGreaterThan(40);
+    expect(items.find((item) => item.id === "a_detail").text).toBe("Codex / MCP");
+    expect(items.some((item) => item.type === "line" && item.startItemId === "a" && item.endItemId === "b")).toBe(true);
+    expect(() => parseBoard({ ...createEmptyBoard(), items })).not.toThrow();
+    expect(() => diagramToBoardItems({ nodes: [{ id: "a", label: "A" }], edges: [{ from: "a", to: "missing" }] })).toThrow();
+    expect(() => diagramToBoardItems({
+      nodes: [{ id: "duplicate", label: "A" }, { id: "duplicate", label: "B" }],
+      edges: [],
+    })).toThrow();
+    expect(() => diagramToBoardItems({ nodes: [{ id: "diagram_title", label: "Reserved" }], edges: [] })).toThrow();
+    expect(() => diagramToBoardItems({
+      nodes: Array.from({ length: 49 }, (_, index) => ({ id: `n${index}`, label: `N${index}` })),
+      edges: [],
+    })).toThrow();
+    expect(items.every((item) => typeof item.z === "number")).toBe(true);
+  });
+
+  it("keeps cycles and back edges within version 1 bounds", () => {
+    const diagram = {
+      title: "Cycle",
+      nodes: ["a", "b", "c", "d", "e", "f"].map((id) => ({ id, label: id, detail: `${id} detail` })),
+      edges: [
+        { from: "a", to: "b", label: "one" }, { from: "b", to: "c", label: "two" },
+        { from: "c", to: "d", label: "three" }, { from: "c", to: "e", label: "four" },
+        { from: "d", to: "f", label: "five" }, { from: "f", to: "a", label: "back" },
+      ],
+    };
+    const items = diagramToBoardItems(diagram, "ai");
+    expect(() => parseBoard({ ...createEmptyBoard(), items })).not.toThrow();
+    expect(new Set(items.map((item) => item.id)).size).toBe(items.length);
+    expect(items.filter((item) => item.type === "line").every((item) => (
+      Math.abs(item.w) <= 2000 && Math.abs(item.h) <= 1200 && (item.w !== 0 || item.h !== 0)
+    ))).toBe(true);
+    expect(new Set(items.filter((item) => item.type === "rect").map((item) => item.x)).size).toBeGreaterThan(2);
+  });
+
+  it("architecture layout moves selected nodes without erasing labels", () => {
+    let board = addBoardItems(createEmptyBoard(), [
+      { type: "rect", id: "source", x: 0, y: 0, w: 180, h: 90, text: "Long source label", title: "Source", author: "ai" },
+      { type: "rect", id: "core", x: 0, y: 0, w: 180, h: 90, text: "Core", author: "ai" },
+      { type: "text", id: "untouched", x: 900, y: 900, w: 120, h: 30, text: "Do not move", author: "human" },
+      { type: "line", id: "edge", x: 0, y: 0, w: 100, h: 0, text: "read", startItemId: "source", endItemId: "core", author: "ai" },
+    ]);
+    board = layoutBoardItems(board, { mode: "architecture", ids: ["source", "core"], origin: { x: 40, y: 120 } });
+    expect(board.items.find((item) => item.id === "source")).toMatchObject({ title: "Source", text: "Long source label" });
+    expect(board.items.find((item) => item.id === "untouched")).toMatchObject({ x: 900, y: 900 });
+    expect(board.items.find((item) => item.id === "edge").text).toBe("read");
   });
 
   it("rejects malformed extended objects", () => {

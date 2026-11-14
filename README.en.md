@@ -55,7 +55,7 @@ The complete path is `npm run setup:codex → new session → first prompt → t
 |---|---|
 | `get_board` | Read the shared canvas; an empty board returns `FIRST_USE` / `NEXT_STEPS` and the drawing guide, while later reads use a concise `NEXT`. `BOARD_JSON`, object IDs, coordinates, authors, revision, `capabilities`, `visualDigest`, and the library index are always retained. |
 | `show_board` | Open the interactive shared canvas beside the agent conversation when a user wants to see or edit it. |
-| `draw_board` | Add items, apply precise updates/removals, deterministic layout, connected lines, variants/roles/styles/z-order, or use `library` to save/switch/import/export editable boards; supports notes, text, shapes, arrows, strokes, images, headings, and focus markers; writes are serialized against the latest state. |
+| `draw_board` | Add items, apply precise updates/removals, deterministic layout, connected lines, variants/roles/styles/z-order, or use `library` to save/switch/import/export editable boards; `diagram` adds one layered diagram generated from semantic nodes and edges; `replace: true` clears the board first; supports notes, text, shapes, arrows, strokes, images, headings, and focus markers; writes are serialized against the latest state. |
 | `scan_project` | Optional read-only project paths and bounded `file:line` evidence. It does not draw or write files. |
 
 The loop is two-way: `AI reads and draws → person draws or edits → final-state delta enters the current conversation context / person notifies the agent → AI reads and draws again`. `show_board` is the explicit render tool, while successful `draw_board` results also advertise the optional UI in compatible hosts. Project structure is only one possible subject; `scan_project` is optional and must be visualized with `draw_board` if needed.
@@ -97,7 +97,7 @@ Version 1 board files may contain old notes. They remain readable for compatibil
 - Use `remove_ids` only when replacing a whole diagram.
 - `draw_board.library` supports `list / get / create / save / switch / rename / duplicate / delete / import / export`; switching changes the active board, and subsequent `get_board` calls read the newly selected board.
 - Read `capabilities`, `visualDigest`, and `RECIPES` first: flow uses `role: "step"` with `startItemId`/`endItemId`, compare uses `role: "column"` or `variant: "frame"`, cluster uses `groupId` with `layout.mode: "cluster"`, and emphasis uses `emphasis: "focus"`.
-- Optional `variant / role / z / style / startItemId / endItemId` are version 1 compatible fields; `layout.mode` supports `grid / row / column / timeline / cluster`.
+- Prefer `draw_board.diagram` for complex diagrams: provide short labels, semantic nodes, and edges instead of hand-computed coordinates; it adds to the active board by default; set `replace: true` only when a full redraw is intended. `layout.mode: "architecture"` reflows an existing connected object set; supported modes are `grid / row / column / timeline / cluster / architecture`. Optional `variant / role / z / style / startItemId / endItemId` remain version 1 compatible fields.
 - Library files live in `OUTPUT_DIR/.doodle/boards/`; each saved image is a complete version 1 `board.json` snapshot, not a static picture.
 
 ## Safety

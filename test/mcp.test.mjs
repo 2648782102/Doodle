@@ -301,6 +301,57 @@ describe("MCP board server", () => {
     });
   }, 30_000);
 
+  it("generates a complex diagram from semantic nodes and edges", async () => {
+    await withClient(3427, async (client) => {
+      const existing = await client.callTool({
+        name: "draw_board",
+        arguments: { author: "human", items: [{ type: "note", x: 20, y: 20, w: 180, h: 100, text: "person note" }] },
+      });
+      expect(existing.isError).toBeFalsy();
+      const result = await client.callTool({
+        name: "draw_board",
+        arguments: {
+          author: "ai",
+          diagram: {
+            title: "Semantic Architecture",
+            subtitle: "Generated without manual coordinates",
+            nodes: [
+              { id: "entry", label: "入口", detail: "Codex 插件" },
+              { id: "core", label: "内核", detail: "Board v1" },
+              { id: "canvas", label: "画布", detail: "Excalidraw" },
+            ],
+            edges: [
+              { from: "entry", to: "core", label: "stdio" },
+              { from: "core", to: "canvas", label: "render" },
+            ],
+          },
+        },
+      });
+      expect(textOf(result)).toContain("图已生成");
+      expect(result.structuredContent.title).toBe("Semantic Architecture");
+      expect(result.structuredContent.items.some((item) => item.id === "entry")).toBe(true);
+      expect(result.structuredContent.items.some((item) => item.type === "line" && item.startItemId === "entry" && item.endItemId === "core")).toBe(true);
+      expect(result.structuredContent.items.some((item) => item.text === "person note")).toBe(true);
+      const rejected = await client.callTool({
+        name: "draw_board",
+        arguments: {
+          diagram: { nodes: [{ id: "only", label: "Only" }], edges: [] },
+          items: [{ type: "text", x: 0, y: 0, w: 100, h: 24, text: "extra" }],
+        },
+      });
+      expect(rejected.isError).toBe(true);
+      const replaced = await client.callTool({
+        name: "draw_board",
+        arguments: {
+          author: "ai",
+          diagram: { replace: true, nodes: [{ id: "only", label: "Only" }], edges: [] },
+        },
+      });
+      expect(replaced.isError).toBeFalsy();
+      expect(replaced.structuredContent.items.some((item) => item.text === "person note")).toBe(false);
+    });
+  }, 30_000);
+
   it("scans the project read-only as optional board context", async () => {
     await withClient(3423, async (client) => {
       const text = textOf(await client.callTool({

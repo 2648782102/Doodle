@@ -11,6 +11,9 @@
     .excalidraw .App-menu_top { z-index: 4; }
     .doodle-library-toggle { position: fixed; top: 14px; right: 140px; z-index: 20; height: 30px; padding: 0 10px; border: 1px solid #d9dde4; border-radius: 15px; background: rgba(255,255,255,.96); color: #6b7280; cursor: pointer; font-size: 12px; }
     .doodle-library-toggle:hover { color: #2563eb; }
+    .doodle-notify-agent { position: fixed; right: 14px; bottom: 14px; z-index: 20; height: 34px; padding: 0 13px; border: 1px solid #2563eb; border-radius: 17px; background: #2563eb; color: #fff; cursor: pointer; font-size: 12px; box-shadow: 0 6px 18px rgba(37,99,235,.22); }
+    .doodle-notify-agent:hover { background: #1d4ed8; }
+    .doodle-notify-agent[hidden] { display: none; }
     .doodle-library-panel { position: fixed; top: 50px; right: 12px; z-index: 20; width: min(300px, calc(100vw - 24px)); max-height: calc(100% - 64px); overflow: auto; padding: 12px; border: 1px solid #d9dde4; border-radius: 12px; background: #fff; box-shadow: 0 12px 30px rgba(15,23,42,.12); }
     .doodle-library-panel[hidden] { display: none; }
     .doodle-library-head { display: flex; align-items: center; gap: 8px; margin-bottom: 10px; }
@@ -32,6 +35,7 @@
 <body>
   <div id="excalidrawRoot"></div>
   <button class="doodle-library-toggle" id="doodleLibraryToggle">图库</button>
+  <button class="doodle-notify-agent" id="doodleNotifyAgent" hidden>通知 Agent</button>
   <section class="doodle-library-panel" id="doodleLibraryPanel" hidden aria-label="画板图库">
     <div class="doodle-library-head"><strong>画板图库</strong><button id="doodleLibraryClose">×</button></div>
     <div id="doodleLibraryCurrent" style="margin-bottom:8px;color:#6b7280;font-size:11px">当前：—</div>

@@ -90,6 +90,7 @@ check(packageJson.scripts.check.includes("setup:codex -- --dry-run"), "npm check
 check(ci.includes("npm run repo:plugin-check"), "CI does not run the plugin guard");
 check(ci.includes("npm run setup:codex -- --dry-run"), "CI does not dry-run the Codex setup");
 check(ci.includes("npm run build:submission"), "CI does not build the submission ZIP");
+check(ci.includes("resolveDiagramLayout") && ci.includes("diagramToBoardItems"), "CI does not verify deterministic semantic diagrams");
 check(ci.includes("BoardLibrary") && ci.includes("type: \"create\""), "CI does not verify the local board library");
 check(ci.includes("Verify final-state board context projection") && ci.includes("buildBoardModelContext") && ci.includes("doodle_board_context"), "CI does not verify the final-state context projection");
 check(publishWorkflow.includes("contents: write") && publishWorkflow.includes("gh release create"), "publish workflow cannot create a release");
@@ -132,6 +133,7 @@ check(instructions.includes("PANEL_URL") && !instructions.includes("reply_on_boa
 check(instructions.includes("Doodle is"), "MCP instructions do not introduce Doodle");
 check(instructions.includes("two-way") && instructions.includes("one kernel, two entry points, three capability layers"), "MCP instructions lost the two-way product story");
 check(instructions.includes("updateModelContext") && instructions.includes("final-state delta"), "MCP instructions do not describe host model context sync");
+check(instructions.includes("draw_board.diagram") && instructions.includes("never combines diagram"), "MCP instructions do not describe the exclusive semantic diagram path");
 check(sourceFiles.length === 12, `src/board has ${sourceFiles.length} TypeScript modules; expected the focused twelve-module structure`);
 check(!boardIndex.includes("preview-server") && !boardIndex.includes("session-store"), "board index re-exports legacy infrastructure");
 check((tools.match(/server\.registerTool\(/g) ?? []).length === 4 && !tools.includes("server.tool("), "tools.ts does not register exactly four annotated MCP tools");
@@ -143,7 +145,9 @@ check(tools.includes("getAppHtml()") && tools.includes("PANEL_URL"), "Excalidraw
 check(tools.includes("FIRST_USE:") && tools.includes("NEXT_STEPS:") && tools.includes("NEXT:"), "get_board does not use progressive first-use and next-step guidance");
 check(tools.includes("structuredContent: boardJson(board, libraryIndex)"), "board tools do not return an authoritative structured snapshot");
 check(tools.includes("boardCapabilities()") && tools.includes("visualDigest: boardVisualDigest(board)") && tools.includes("boardRecipes()"), "board tools lost AI visual language");
-check(tools.includes('startItemId: z.string()') && tools.includes('mode: z.enum(["grid", "row", "column", "timeline", "cluster"])'), "draw_board lost connector bindings or expanded layouts");
+check(tools.includes('startItemId: z.string()') && tools.includes('mode: z.enum(["grid", "row", "column", "timeline", "cluster", "architecture"])') && tools.includes("diagram: diagramInput.optional()"), "draw_board lost connector bindings, expanded layouts, or semantic diagram recipe");
+check(boardTypes.includes("resolveDiagramLayout") && boardTypes.includes("diagramToBoardItems") && !boardTypes.includes("diagramToExcalidrawScene"), "semantic diagrams are not generated through one deterministic Board v1 layout");
+check(!http.includes('"/api/board/scene"') && !excalidrawApp.includes("loadScene()"), "a second persisted Excalidraw scene source remains");
 check(tools.includes('"scan_project"') && tools.includes("Use draw_board to visualize"), "scan_project is not a read-only board-context tool");
 check(boardTypes.includes("signedWidth") && boardTypes.includes("signedHeight"), "board types lost signed directed-arrow deltas");
 check(boardTypes.includes("boardVisualDigest") && boardTypes.includes("startItemId") && boardTypes.includes("variant"), "board types lost visual-expression fields or deterministic visual digest");
@@ -156,6 +160,7 @@ check(!await exists("src/infra/templates/board.html") && !await exists("src/infr
 check(!tools.includes("engine=dom") && !http.includes("engine=dom"), "legacy DOM engine fallback still exists");
 check(buildScript.includes("excalidraw-app.tsx") && buildScript.includes("minify: true"), "build does not bundle the Excalidraw canvas client");
 check(excalidrawApp.includes("buildBoardModelContext") && appContext.includes("finalStateNotOperationLog"), "Excalidraw MCP App context is not a final-state delta");
+check(excalidrawApp.includes("sendMessage") && excalidrawTemplate.includes('id="doodleNotifyAgent"'), "embedded Excalidraw canvas lost the host notification button");
 check(appContext.includes("structuredContent") && !appContext.includes("operationLog"), "board model context lost its complete structured snapshot or added an operation log");
 check(instructions.includes("conversation") && !instructions.includes("reply_on_board"), "MCP instructions duplicate the host conversation");
 check(http.includes('"/api/board"') && http.includes("X-AI-Draw-Token"), "board HTTP server lost its authenticated API");
@@ -199,6 +204,7 @@ check(await exists("PRIVACY.md") && await exists("SUPPORT.md") && await exists("
 check(await exists("docs/FAQ.md") && await exists("docs/SUBMISSION.md"), "public plugin support or submission docs are missing");
 check(await exists("docs/GOAL_EXPERIENCE.md") && (await read("docs/GOAL_EXPERIENCE.md")).includes("## Acceptance"), "native visual expression goal document is missing");
 check(await exists("docs/GOAL_EXCALIDRAW.md") && (await read("docs/GOAL_EXCALIDRAW.md")).includes("## Acceptance"), "Excalidraw engine goal document is missing");
+check(await exists("docs/GOAL_BASIC.md") && (await read("docs/GOAL_BASIC.md")).includes("## Acceptance") && (await read("docs/README.md")).includes("GOAL_BASIC.md"), "active basic-loop goal document or documentation-map link is missing");
 check(packageJson.scripts["build:submission"]?.includes("build-submission.mjs"), "submission ZIP build script is missing");
 check(packageJson.scripts.check.includes("build:submission"), "npm check does not build the submission ZIP");
 check(packageJson.files.includes("PRIVACY.md") && packageJson.files.includes("SUPPORT.md") && packageJson.files.includes("TERMS.md"), "npm package omits public policy documents");

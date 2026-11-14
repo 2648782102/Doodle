@@ -71,6 +71,7 @@ check(marketplace.plugins?.[0]?.source?.path === "./.doodle-plugin/doodle", "mar
 check(skill.includes("get_board") && skill.includes("show_board") && skill.includes("draw_board") && skill.includes("scan_project"), "Doodle skill lacks the four-tool workflow");
 check(skill.includes("two-way board"), "Doodle skill lost the two-way product definition");
 check(skill.includes("FIRST_USE") && skill.includes("NEXT_STEPS") && skill.includes("打开 Doodle 画板"), "Doodle skill does not lead with the first-use path");
+check(skill.includes("draw_board.diagram") && skill.includes("architecture"), "Doodle skill does not describe semantic diagram authoring");
 check(!skill.includes("reply_on_board"), "Doodle skill references the removed reply tool");
 check(skill.includes("PANEL_URL") && !skill.includes("Open a browser"), "Doodle skill mishandles the human panel URL");
 check(buildScript.includes("bundle: true") && buildScript.includes("board.html") && buildScript.includes("excalidraw"), "plugin build is not self-contained");
@@ -91,6 +92,7 @@ check(indexSource.includes("Preview unavailable"), "preview failure does not kee
 check(ci.includes("npm run repo:plugin-check"), "CI does not run the plugin guard");
 check(ci.includes("npm run setup:codex -- --dry-run"), "CI does not dry-run the Codex setup");
 check(ci.includes("npm run build:submission"), "CI does not build the submission ZIP");
+check(ci.includes("resolveDiagramLayout") && ci.includes("diagramToBoardItems"), "CI does not verify deterministic semantic diagrams");
 check(ci.includes("BoardLibrary"), "CI does not verify the local board library");
 check(gitignore.includes(".doodle-plugin/") && gitignore.includes(".doodle-data/") && gitignore.includes("doodle-plugin-submission/"), "generated plugin output, plugin data, or submission ZIP is not ignored");
 check(goal.includes("## Objective") && goal.includes("show_board") && goal.includes("plugin"), "plugin goal document is incomplete");
@@ -112,6 +114,7 @@ check(toolsSource.includes("visualDigest: boardVisualDigest(board)") && toolsSou
 check(httpSource.includes('"/api/board/library"') && excalidrawTemplate.includes("Doodle · Excalidraw Canvas"), "bundled board library HTTP or Excalidraw-only UI surface is missing");
 check(appBundle.includes("updateModelContext") && appBundle.includes("callServerTool"), "bundled Excalidraw engine lacks host context refresh");
 check(appBundle.includes("doodle_board_context") && appBundle.includes("finalStateNotOperationLog"), "bundled Excalidraw engine lost final-state context projection");
+check(appBundle.includes("sendMessage") && excalidrawTemplate.includes('id="doodleNotifyAgent"'), "bundled Excalidraw engine lost the host notification button");
 check(excalidrawTemplate.includes("Doodle · Excalidraw Canvas") && excalidrawTemplate.includes("/excalidraw/excalidraw-app.js"), "Excalidraw template is missing");
 check(!await exists(".doodle-plugin/doodle/server/infra/templates/board-app.js"), "legacy DOM MCP App bundle still exists");
 check(excalidrawTemplate.includes("Doodle · Excalidraw Canvas") && excalidrawTemplate.includes("/excalidraw/excalidraw-app.js"), "Excalidraw template is missing");

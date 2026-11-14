@@ -44,7 +44,7 @@ Both runtime paths register exactly four tools:
 |---|---|---|
 | `get_board` | Reads one shared version 1 board | progressive `FIRST_USE` / `NEXT_STEPS` or `NEXT`, `BOARD_JSON`, `PANEL_URL`, structured board snapshot; drawing guide on an empty board |
 | `show_board` | Returns the optional MCP App resource beside the conversation | initial structured board snapshot and interactive UI |
-| `draw_board` | Adds items, applies precise updates/removals, arranges objects, and can reject stale app edits by expected revision | revision, counts, authoritative structured snapshot |
+| `draw_board` | Adds items, applies precise updates/removals, arranges objects, generates one complete semantic diagram, and can reject stale app edits by expected revision | revision, counts, authoritative structured snapshot |
 | `scan_project` | Reads bounded project paths and evidence | `PROJECT_JSON` and `PROJECT_TEXT` |
 
 All tools are registered through the MCP SDK config API with explicit annotations: `get_board`, `show_board`, and `scan_project` are read-only, non-destructive, and local-scope; `draw_board` is destructive because it can remove or overwrite visual objects. These values are integration-tested and guarded by the offline repository checks.
@@ -96,7 +96,7 @@ The canvas supports click-to-place defaults, drag-to-size shapes, directional dr
 
 `src/board/library.ts` stores snapshots in `OUTPUT_DIR/.doodle/boards/` with a separate lock and atomic JSON writes. The active `.doodle/board.json` remains authoritative. `get_board` and HTTP `GET /api/board` include the library index; `draw_board.library` and `POST /api/board/library` apply the same action vocabulary. Switching a board writes the selected version 1 snapshot into the active state with a higher revision and broadcasts the change so the canvas and embedded App reopen the new active board.
 
-`src/board/types.ts` derives `boardVisualDigest()` from final board objects: bounded reading order, group counts, connection labels/endpoints, focus markers, freehand/image counts. `get_board`, `show_board`, and HTTP `GET /api/board` also return `capabilities` and recipe names. These are deterministic visual summaries for agents, not operation logs, interpretations, or project-write authority.
+`src/board/types.ts` derives `boardVisualDigest()` from final board objects: bounded reading order, group counts, connection labels/endpoints, focus markers, freehand/image counts. `get_board`, `show_board`, and HTTP `GET /api/board` also return `capabilities` and recipe names. These are deterministic visual summaries for agents, not operation logs, interpretations, or project-write authority. `resolveDiagramLayout()` is the shared deterministic source for semantic diagrams and `diagramToBoardItems()` writes ordinary version 1 objects; no native Excalidraw scene is persisted alongside the board.
 
 Project scanning does not modify the board. If the AI wants to show structure, it calls `draw_board` with a layout derived from the scan result.
 

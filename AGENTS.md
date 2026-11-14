@@ -36,7 +36,7 @@ Shared visual context is anchored to objects, coordinates, text, and authors. Ei
 |---|---|
 | `get_board` | Read progressive `FIRST_USE` / `NEXT_STEPS` or `NEXT` guidance, `BOARD_JSON`: object IDs, coordinates, authors, `PANEL_URL`, and the drawing guide on an empty board. Read-only. |
 | `show_board` | Render the optional MCP App canvas in compatible hosts when the user asks to see or edit the board. |
-| `draw_board` | Add items, precise updates/removals, deterministic layout, visual-expression fields, and local board-library actions. Use `remove_ids` only when clearing old objects before a deliberate full redraw. |
+| `draw_board` | Add items, precise updates/removals, deterministic layout, visual-expression fields, local board-library actions, and `diagram` for one complete semantic diagram. Use `remove_ids` only when clearing old objects before a deliberate full redraw. |
 | `scan_project` | Optional bounded read-only project paths and `file:line` evidence. Visualize the result with `draw_board` only when useful. |
 
 Drawing contract:
@@ -45,6 +45,7 @@ Drawing contract:
 - Put `author` at the `draw_board` top level, not inside each item.
 - Use a strict grid, short labels, consistent sizes, and endpoints just outside source/target shapes.
 - A `line` is a directed arrow from `(x,y)` to `(x+w,y+h)`. `w` and `h` are signed endpoint deltas and may be negative; `shape` may be `straight`, `curve`, or `orthogonal`. `startItemId` / `endItemId` bind endpoints to object edges. Other objects use `(x,y)` as the top-left corner and positive width/height.
+- `draw_board.diagram` is the preferred AI authoring primitive for complex diagrams. It takes semantic nodes/edges, adds one deterministic bounded Board v1 diagram beside existing objects, and must not be combined with other mutation fields; only `replace: true` clears the board. `layout.mode: "architecture"` reflows existing connected objects.
 - `stroke.points` are local to the object bounds; `image.src` is a bounded `data:image/*;base64` source. `title`, `emphasis: focus`, and `groupId` are optional version 1 fields; old boards remain valid.
 - `variant`, `role`, `z`, `style`, `startItemId`, and `endItemId` are optional version 1 visual-expression fields. `get_board` returns `capabilities`, `visualDigest`, and recipe guidance; read them before drawing or interpreting a board.
 - In the human canvas, click to place a default-sized object or drag to size shapes, sketch strokes, and draw arrows in any direction. Double-click empty canvas creates a note; dragging on empty canvas marquee-selects; selected objects support batch move/delete/group/layout, undo/redo, arrow-key nudging, and alignment snapping. The `图库` panel saves, switches, renames, duplicates, deletes, imports, and exports editable board snapshots. `Ctrl/⌘+V` pastes a bounded local image. Space-drag or middle-drag pans; the wheel pans and Ctrl/Command-wheel zooms.

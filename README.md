@@ -56,7 +56,7 @@ npm run setup:codex
 |---|---|
 | `get_board` | 读取共享画布；空画板给 `FIRST_USE` / `NEXT_STEPS` 和画图规范，有内容后切到简短 `NEXT`，始终保留 revision、对象 ID、坐标、作者、`BOARD_JSON`、`capabilities`、`visualDigest` 与图库索引；默认第一步，只读 |
 | `show_board` | 在 Agent 对话旁打开可交互的共享画布；用户要求查看或编辑画布时使用 |
-| `draw_board` | 新增对象、精确更新、删除、确定性布局、连接线、变体 / 角色 / 样式 / 层级，以及通过 `library` 保存 / 切换 / 导入 / 导出可编辑画板；支持便签、文字、形状、箭头、手绘、图片、标题和重点标记；写入会串行应用到最新状态 |
+| `draw_board` | 新增对象、精确更新、删除、确定性布局、连接线、变体 / 角色 / 样式 / 层级，以及通过 `library` 保存 / 切换 / 导入 / 导出可编辑画板；`diagram` 用语义节点/边默认追加到当前画板，显式 `replace: true` 才替换整张画板并生成一张分层复杂图；支持便签、文字、形状、箭头、手绘、图片、标题和重点标记；写入会串行应用到最新状态 |
 | `scan_project` | 可选只读扫描当前项目结构，返回有界相对路径和 `file:line` 证据文本；不写文件、不自动画图 |
 
 默认双向闭环：
@@ -113,7 +113,7 @@ npm run preview:board
 - `author` 放在 `draw_board` 顶层参数，不放进 item。
 - `line` 可用 `shape: "straight" | "curve" | "orthogonal"`；`stroke` 的 `points` 是相对对象边界的局部坐标；`image` 使用有界的 `data:image/*;base64`。
 - 先读 `capabilities`、`visualDigest` 和 `RECIPES`：流程用 `role: "step"` + `startItemId` / `endItemId`，对比用 `role: "column"` 或 `variant: "frame"`，聚类用 `groupId` + `layout.mode: "cluster"`，重点用 `emphasis: "focus"`。
-- 可选 `variant / role / z / style / startItemId / endItemId` 都是版本 1 兼容字段；`layout.mode` 支持 `grid / row / column / timeline / cluster`。
+- 复杂图优先用 `draw_board.diagram`：只提供短标题、语义节点和边，AI 不必手算坐标；它默认保留已有对象并追加新图；仅显式 `replace: true` 才整张重画。普通整理可用 `layout.mode: "architecture"`；`layout.mode` 支持 `grid / row / column / timeline / cluster / architecture`。可选 `variant / role / z / style / startItemId / endItemId` 都是版本 1 兼容字段。
 - `draw_board.library` 支持 `list / get / create / save / switch / rename / duplicate / delete / import / export`；切换后会改变当前活动画板，`get_board` 随后读到的就是新图。
 - 图库文件保存在本地 `OUTPUT_DIR/.doodle/boards/`，每个图都是完整的版本 1 `board.json` 结构，不生成静态图片。
 - 结构化图用严格网格、短标签、一致尺寸。

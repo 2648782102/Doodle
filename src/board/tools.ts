@@ -14,10 +14,13 @@ import {
   addBoardItems,
   boardCopyText,
   boardVisualDigest,
+  diagramToBoardItems,
+  parseBoard,
   layoutBoardItems,
   removeBoardItems,
   updateBoardItems,
   replaceBoardContent,
+  touchBoard,
   type SimpleBoard,
 } from "./types.js";
 
@@ -58,9 +61,9 @@ function boardCapabilities() {
     objectTypes: ["note", "text", "rect", "ellipse", "line", "stroke", "image"],
     variants: ["plain", "card", "frame", "pill", "diamond", "callout", "heading"],
     roles: ["normal", "label", "frame", "column", "step", "decision", "annotation"],
-    layouts: ["grid", "row", "column", "timeline", "cluster"],
+    layouts: ["grid", "row", "column", "timeline", "cluster", "architecture"],
     connectors: ["startItemId", "endItemId"],
-    recipes: ["flow", "compare", "cluster", "emphasis", "image-annotation"],
+    recipes: ["flow", "compare", "cluster", "emphasis", "image-annotation", "architecture", "diagram"],
     style: ["borderColor", "borderWidth", "textColor", "fontSize", "fontWeight", "textAlign", "strokeWidth", "opacity", "radius", "fillOpacity"],
     library: ["list", "get", "create", "save", "switch", "rename", "duplicate", "delete", "import", "export"],
     canvasEngine: "excalidraw",
@@ -77,6 +80,8 @@ function boardRecipes(): string {
     "- Emphasis: set emphasis: focus, optionally circle it with stroke, and add a short title/note.",
     "- Image annotation: place a bounded image, nearby text/note, and connected arrows or strokes; do not overwrite the image.",
     "- Prefer updates and deterministic layout over clearing a whole board. Connected lines follow bound objects.",
+    "- Architecture: create short labelled nodes with connected lines, then call layout.mode: \"architecture\"; it moves selected objects by connection direction without changing their text.",
+    "- Diagram: use draw_board.diagram with semantic nodes/edges for complex diagrams; it adds bounded labels and connected arrows beside existing objects, or clears the board only with replace: true.",
   ].join("\n");
 }
 
@@ -172,7 +177,7 @@ const layoutInput = z.object({
   origin: z.object({ x: z.number().finite(), y: z.number().finite() }).optional().describe("Top-left grid origin"),
   columns: z.number().int().min(1).max(12).optional().describe("Grid columns, 1-12; defaults to 3"),
   gap: z.number().int().min(8).max(200).optional().describe("Gap in canvas units, 8-200; defaults to 24"),
-  mode: z.enum(["grid", "row", "column", "timeline", "cluster"]).optional().describe("Arrangement mode; defaults to grid"),
+  mode: z.enum(["grid", "row", "column", "timeline", "cluster", "architecture"]).optional().describe("Arrangement mode; architecture derives layers from connected line IDs"),
 });
 
 const libraryAction = z.discriminatedUnion("type", [
@@ -187,6 +192,31 @@ const libraryAction = z.discriminatedUnion("type", [
   z.object({ type: z.literal("import"), name: z.string().max(80).optional(), board: z.unknown(), switchTo: z.boolean().optional() }),
   z.object({ type: z.literal("export"), id: z.string().optional() }),
 ]);
+
+const diagramInput = z.object({
+  title: z.string().max(120).optional(),
+  replace: z.boolean().optional().describe("Replace all existing board objects; defaults to false and adds the generated diagram beside existing objects"),
+  subtitle: z.string().max(200).optional(),
+  nodes: z.array(z.object({
+    id: z.string().max(80),
+    label: z.string().max(80),
+    detail: z.string().max(120).optional(),
+    type: z.enum(["rect", "ellipse"]).optional(),
+    color: z.string().regex(/^#[0-9a-fA-F]{6}$/).optional(),
+    column: z.number().int().min(0).max(12).optional(),
+    row: z.number().int().min(0).max(12).optional(),
+  })).min(1).max(48),
+  edges: z.array(z.object({
+    from: z.string(),
+    to: z.string(),
+    label: z.string().max(40).optional(),
+  })).max(96),
+  origin: z.object({ x: z.number().finite(), y: z.number().finite() }).optional(),
+  columnGap: z.number().finite().min(20).max(200).optional(),
+  rowGap: z.number().finite().min(12).max(160).optional(),
+  nodeWidth: z.number().finite().min(120).max(320).optional(),
+  nodeHeight: z.number().finite().min(60).max(180).optional(),
+});
 
 export function registerBoardTools(server: McpServer, ctx: BoardToolContext): void {
   registerAppResource(server, "Doodle Excalidraw board", APP_RESOURCE_URI, {
@@ -297,12 +327,43 @@ export function registerBoardTools(server: McpServer, ctx: BoardToolContext): vo
         author: z.enum(["human", "ai"]).optional().describe("Author marker; AI responses should normally use ai"),
         expected_revision: z.number().int().nonnegative().optional().describe("Optional board revision for rejecting stale canvas edits"),
         library: libraryAction.optional().describe("Optional local board-library action for saving, switching, renaming, duplicating, importing, or exporting editable board snapshots"),
+        diagram: diagramInput.optional().describe("Semantic diagram recipe: nodes and edges generate one bounded Board v1 diagram with deterministic layout, short labels, and connected arrows; by default it is added beside existing objects, and replace:true clears the active board first"),
       }),
       annotations: BOARD_WRITE_ANNOTATIONS,
       _meta: CANVAS_UI_META,
     },
-    async ({ items, updates, remove_ids, layout, replace_board, author, expected_revision, library }) => {
+    async ({ items, updates, remove_ids, layout, replace_board, author, expected_revision, library, diagram }) => {
       try {
+        if (diagram) {
+          if (items !== undefined || updates !== undefined || remove_ids !== undefined
+            || layout !== undefined || replace_board !== undefined || library !== undefined) {
+            throw new Error("diagram replaces the active board and cannot be combined with other draw_board actions");
+          }
+          const current = await ctx.board.snapshot();
+          if (expected_revision !== undefined && expected_revision !== current.revision) {
+            throw new BoardRevisionConflictError(expected_revision, current.revision);
+          }
+          const generated = diagramToBoardItems(diagram, author ?? "ai");
+          const candidate = touchBoard({
+            ...current,
+            title: diagram.title ?? current.title,
+            items: diagram.replace ? generated : [...current.items, ...generated],
+          });
+          parseBoard(candidate);
+          const board = await ctx.board.replaceIfRevision(candidate, current.revision);
+          ctx.preview.broadcast({ type: "board_updated", revision: board.revision });
+          const libraryIndex = (await ctx.library.apply({ type: "list" }, board)).index;
+          return {
+            content: [{
+              type: "text" as const,
+              text: [
+                `✅ 图已生成 · ${diagram.nodes.length} 个节点 · ${diagram.edges.length} 条连接`,
+                `JSON: ${JSON.stringify({ revision: board.revision, created: generated.length })}`,
+              ].join("\n"),
+            }],
+            structuredContent: boardJson(board, libraryIndex),
+          };
+        }
         if (library) {
           const current = await ctx.board.snapshot();
           if (expected_revision !== undefined && expected_revision !== current.revision) {

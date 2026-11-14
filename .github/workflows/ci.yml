@@ -83,9 +83,13 @@ jobs:
         run: |
           node --input-type=module <<'NODE'
           import { boardItemsToExcalidrawSkeleton, excalidrawElementsToBoardItems } from "./dist/board/excalidraw-adapter.js";
+          import { diagramToBoardItems, resolveDiagramLayout } from "./dist/board/types.js";
           const skeletons = boardItemsToExcalidrawSkeleton([{ id: "a", type: "rect", x: 0, y: 0, w: 100, h: 60, text: "A", color: "#f6d365", author: "ai", createdAt: new Date(0).toISOString(), updatedAt: new Date(0).toISOString() }]);
           const items = excalidrawElementsToBoardItems([{ id: "a", type: "rectangle", x: 0, y: 0, width: 100, height: 60, backgroundColor: "#f6d365", customData: { doodle: { author: "ai" } } }]);
-          if (skeletons[0].id !== "a" || items[0].text !== "") process.exit(1);
+          const diagram = { nodes: [{ id: "a", label: "A" }, { id: "b", label: "B" }], edges: [{ from: "a", to: "b" }] };
+          const layout = resolveDiagramLayout(diagram);
+          const generated = diagramToBoardItems(diagram, "ai");
+          if (skeletons[0].id !== "a" || items[0].text !== "" || layout.positions.get("b").x <= layout.positions.get("a").x || !generated.some((item) => item.type === "line")) process.exit(1);
           NODE
       - run: npm run test:examples
       - run: npm run repo:check

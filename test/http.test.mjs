@@ -74,6 +74,52 @@ describe("board HTTP surface", () => {
     expect(result.board.title).toBe("Library HTTP");
   });
 
+  it("generates a semantic diagram through the local HTTP diagram API", async () => {
+    const html = await fetch(base).then((response) => response.text());
+    const token = html.match(/const PANEL_TOKEN = "([^"]+)"/)?.[1];
+    const before = await fetch(`${base}/api/board`).then((response) => response.json());
+    const result = await fetch(`${base}/api/board/diagram`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json", "X-AI-Draw-Token": token, "If-Match-Revision": String(before.revision) },
+      body: JSON.stringify({
+        confirmedBy: "human",
+        diagram: {
+          title: "HTTP Diagram",
+          nodes: [{ id: "n1", label: "A" }, { id: "n2", label: "B" }],
+          edges: [{ from: "n1", to: "n2", label: "next" }],
+        },
+      }),
+    }).then((response) => response.json());
+    expect(result.ok).toBe(true);
+    expect(result.board.title).toBe("HTTP Diagram");
+    expect(result.board.items.some((item) => item.id === "n1")).toBe(true);
+    expect(result.board.items.some((item) => item.id === "diagram_frame")).toBe(true);
+    expect(result.board.items.some((item) => item.type === "line" && item.startItemId === "n1" && item.endItemId === "n2")).toBe(true);
+    expect(result.board.items.some((item) => item.id === "n1_label")).toBe(false);
+    expect((await fetch(`${base}/api/board/scene`).then((response) => response.status))).toBe(404);
+    const invalid = await fetch(`${base}/api/board/diagram`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json", "X-AI-Draw-Token": token },
+      body: JSON.stringify({
+        confirmedBy: "human",
+        diagram: { nodes: [{ id: "a", label: "A" }, { id: "a", label: "Duplicate" }], edges: [] },
+      }),
+    });
+    expect(invalid.status).toBe(400);
+    const oversized = await fetch(`${base}/api/board/diagram`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json", "X-AI-Draw-Token": token },
+      body: JSON.stringify({
+        confirmedBy: "human",
+        diagram: {
+          nodes: Array.from({ length: 49 }, (_, index) => ({ id: `n${index}`, label: `N${index}` })),
+          edges: [],
+        },
+      }),
+    });
+    expect(oversized.status).toBe(400);
+  });
+
   it("serves the experimental Excalidraw engine and self-hosted assets", async () => {
     const html = await fetch(base).then((response) => response.text());
     expect(html).toContain("Doodle · Excalidraw Canvas");
