@@ -80,7 +80,7 @@ const hoverGeometry = [...excalidrawTemplate.matchAll(/([^{}]+)\{([^{}]*)\}/g)]
     return geometry ? [`${selectors.trim()} → ${geometry[0].trim()}`] : [];
   });
 
-check(packageJson.version === "0.7.0", "package.json is not version 0.7.0");
+check(packageJson.version === "0.8.0", "package.json is not version 0.8.0");
 check(pluginManifest.version === packageJson.version, "plugin version does not match package.json");
 check(pluginManifest.requires_local_executor === true, "plugin is not marked desktop-only");
 check(pluginMcp.mcpServers.doodle.args[0] === "${PLUGIN_ROOT}/server/index.mjs", "plugin MCP entrypoint is not self-contained");

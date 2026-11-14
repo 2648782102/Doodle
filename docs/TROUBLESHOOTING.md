@@ -23,9 +23,9 @@ Check that the browser is on the `PANEL_URL` reported by `get_board` and that th
 
 The board library keeps editable version 1 snapshots in `.doodle/boards/` under the same output directory as the active `board.json`. Switching changes the active board and broadcasts `board_library_updated`; reload the panel, then verify `get_board.library.activeId`. Import only JSON files exported from Doodle or matching the version 1 board schema.
 
-### Excalidraw experiment does not load
+### Excalidraw canvas does not load
 
-On `codex/excalidraw-spike`, Excalidraw is the only canvas engine and the default `PANEL_URL` opens it directly. There is no `?engine=dom` fallback on this feature branch; use `master` for the stable DOM engine. The local preview must serve `/excalidraw/index.css`, `/excalidraw/excalidraw-app.js`, and `/excalidraw/fonts/...` from its own package. If any of these returns 404, rebuild with `npm run build` and restart the server. The experiment does not use a CDN, hosted font, or license key.
+Since `0.8.0`, Excalidraw is the only canvas engine and the default `PANEL_URL` opens it directly. There is no `?engine=dom` fallback. The local preview must serve `/excalidraw/index.css`, `/excalidraw/excalidraw-app.js`, and `/excalidraw/fonts/...` from its own package. If any of these returns 404, rebuild with `npm run build` and restart the server. The canvas does not use a CDN, hosted font, or license key.
 
 ### The Agent does not see my canvas edits automatically
 

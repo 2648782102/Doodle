@@ -2,9 +2,13 @@
 
 All notable changes are documented here. Versions follow `VERSIONING.md`.
 
-## Unreleased — Richer shared canvas
+## 0.8.0 — Excalidraw canvas and richer board
 
 ### Added
+
+- Excalidraw is now the only human-facing canvas engine on this line. `@excalidraw/excalidraw` is bundled and self-hosted, a Board v1 ↔ Excalidraw adapter keeps version 1 as the single persisted state, and the legacy DOM canvas template and bundle are removed from source, build, plugin package, and guards. See `docs/GOAL_EXCALIDRAW.md`.
+- Added `docs/GOAL_BASIC.md` as the maintained acceptance record for the core two-way loop and `docs/EXCALIDRAW_COMPARISON.md` for the measured canvas comparison.
+- Added a `图库` drawer library UI on the Excalidraw branch: save, switch, create, rename, duplicate, delete, import, and export editable version 1 snapshots, sharing one action vocabulary with `draw_board.library`.
 - Added human-canvas static sharing snapshots for PNG, JPG, and SVG. These are download-only views; editable library save/import/export remains version 1 JSON.
 - Added layout regression coverage for the human canvas: the `图库` drawer must overlay rather than resize Excalidraw, keep one independently scrollable board list with fixed action rows, and hide its launcher while open; hover/active rules may change only color, border, and shadow.
 - The human canvas now uses a Doodle-owned main menu: local search, local help, and one GitHub link to the current Doodle repository. Upstream social links, help-header external links, the materials-library browse destination, arbitrary web embedding, and Excalidraw AI/Mermaid generation entries are removed.
@@ -18,8 +22,7 @@ All notable changes are documented here. Versions follow `VERSIONING.md`.
 - Added AI-facing visual expression: `capabilities`, deterministic `visualDigest`, recipes, variant/role/z/style fields, connector bindings, and deterministic layout modes. Connected arrows follow bound object edges; the canvas renders variants, styles, z-order, and multi-selection bounds.
 - Added `draw_board.diagram` and `/api/board/diagram` for semantic architecture diagrams. One bounded nodes/edges request adds a deterministic version 1 drawing beside existing objects by default; `replace: true` performs an intentional full redraw. Mixed mutations, duplicate node IDs, generated-ID collisions, unknown edge endpoints, and invalid Board v1 candidates are rejected. `layout.mode: "architecture"` reflows existing connected objects without erasing labels. Excalidraw renders only the Board v1 projection, with the embedded `通知 Agent` shortcut restored.
 - Added `docs/GOAL_EXPERIENCE.md` as the maintained objective for native visual expression and updated the documentation map and link checks.
-- Experimental `codex/excalidraw-spike`: added `@excalidraw/excalidraw` as an optional `?engine=excalidraw` canvas with self-hosted assets, a Board v1 ↔ Excalidraw adapter, and `docs/GOAL_EXCALIDRAW.md`. The default DOM canvas, four MCP tools, and Board v1 persistence remain authoritative.
-- Stabilized the Excalidraw-only branch: fixed bound-text duplication/overlay, preserved image files and element scene metadata, paused persistence during text editing, added standalone live refresh plus a board-library overlay, and removed duplicate production assets from generated bundles.
+- Stabilized the Excalidraw canvas: fixed bound-text duplication/overlay, preserved image files and element scene metadata, paused persistence during text editing, added standalone live refresh plus the board-library overlay, and removed duplicate production assets from generated bundles.
 - New local HTTP batch/replacement endpoints support these canvas operations with human confirmation and revision checks.
 
 ### Changed
@@ -30,6 +33,12 @@ All notable changes are documented here. Versions follow `VERSIONING.md`.
 - Canvas links are restricted to the Doodle repository. Object links and anchor clicks to any other destination are prevented; the local help, search, library, and board actions remain available.
 - MCP guidance, READMEs, agent handbook, architecture, decisions, product direction, experience audit, and guards now describe the richer two-way canvas.
 - Text projection for AI and model context includes titles and marks freehand/image/focus semantics without turning them into a message feed or project-write authority.
+- The Doodle and Excalidraw chrome now share one palette and one set of surface tokens; the canvas no longer ships two competing accents.
+
+### Compatibility
+
+- The four MCP tools, their schemas and annotations, version 1 persisted board state, `BOARD_JSON`, `PANEL_URL`, HTTP authorization, and revision-safe writes are unchanged from `0.7.0`.
+- Existing `0.7.0` board files and library snapshots load without migration; boards written on this version keep optional `scene` fidelity metadata that older readers ignore.
 
 ## 0.7.0 — Current-session board context sync
 

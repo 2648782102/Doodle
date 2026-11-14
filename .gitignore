@@ -15,3 +15,5 @@ output/manifest.json
 output/.ai-draw/
 output/.doodle/
 test-results/
+
+output/*.html

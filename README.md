@@ -15,7 +15,7 @@ Doodle 只有一个内核：**人和 AI 共用的无限画板**。AI 通过 MCP 
 
 画板图库保存的是**可编辑的版本 1 画板快照**：可以另存当前图、切换不同图、新建 / 重命名 / 复制 / 删除图，以及导入 / 导出 JSON。它不是第二套会话模型；静态 PNG / JPG / SVG 是分享快照，不参与图库和 AI 读写；`get_board`、MCP App 和本地画布始终读写同一张当前活动图。
 
-实验分支 `codex/excalidraw-spike` 已移除自研 DOM 画布，Excalidraw 是唯一的人类编辑/渲染画布；稳定 DOM 引擎仅保留在 `master`。Board v1 仍是唯一持久状态和 AI 权威入口。详见 [docs/GOAL_EXCALIDRAW.md](docs/GOAL_EXCALIDRAW.md)。
+自 `0.8.0` 起，自研 DOM 画布已移除，Excalidraw 是唯一的人类编辑/渲染画布。Board v1 仍是唯一持久状态和 AI 权威入口；Excalidraw 元素只由 Board v1 派生，不存在第二份画布状态。详见 [docs/GOAL_EXCALIDRAW.md](docs/GOAL_EXCALIDRAW.md)。
 
 `PANEL_URL` 属于当前 MCP server 进程：会话或宿主退出后它会失效，这是正常生命周期。需要脱离会话、手动开关的本地预览时，运行 `npm run preview:board`；它只启动画板 HTTP 服务，不注册 MCP stdio 工具，也不会安装后台服务。用 `Ctrl+C` 停止。
 
@@ -79,7 +79,7 @@ AI: get_board → draw_board → 看人怎么改
 npm run setup:codex
 ```
 
-`scripts/setup-codex.mjs` 只会在你主动运行时调用 Codex CLI：`npm install`（首次）、`npm run build`、`codex plugin marketplace add . --json`、`codex plugin add doodle@doodle --json`。重复运行是安全的；可用 `npm run setup:codex -- --dry-run` 预览命令。官方 OpenAI 文档说明本地 marketplace 与[公共插件目录](https://developers.openai.com/plugins/build/plugins)是不同路径，安装后应[开启新会话](https://learn.chatgpt.com/docs/plugins)再使用插件的 MCP 工具和 skill。插件包由 `scripts/build-plugin.mjs` 生成到忽略的 `.doodle-plugin/doodle/`，使用同一个自包含 stdio MCP server，不依赖仓库里的 `dist/` 或绝对路径。`npm run build:submission` 会生成忽略的 `doodle-plugin-submission/doodle-0.7.0.zip` 供提交审核；本仓库提供本地 / repo marketplace 安装路径，公共插件目录发布仍需要 OpenAI 侧资格、身份验证和审核。材料清单见 [docs/SUBMISSION.md](docs/SUBMISSION.md)。
+`scripts/setup-codex.mjs` 只会在你主动运行时调用 Codex CLI：`npm install`（首次）、`npm run build`、`codex plugin marketplace add . --json`、`codex plugin add doodle@doodle --json`。重复运行是安全的；可用 `npm run setup:codex -- --dry-run` 预览命令。官方 OpenAI 文档说明本地 marketplace 与[公共插件目录](https://developers.openai.com/plugins/build/plugins)是不同路径，安装后应[开启新会话](https://learn.chatgpt.com/docs/plugins)再使用插件的 MCP 工具和 skill。插件包由 `scripts/build-plugin.mjs` 生成到忽略的 `.doodle-plugin/doodle/`，使用同一个自包含 stdio MCP server，不依赖仓库里的 `dist/` 或绝对路径。`npm run build:submission` 会生成忽略的 `doodle-plugin-submission/doodle-0.8.0.zip` 供提交审核；本仓库提供本地 / repo marketplace 安装路径，公共插件目录发布仍需要 OpenAI 侧资格、身份验证和审核。材料清单见 [docs/SUBMISSION.md](docs/SUBMISSION.md)。
 
 ### 直接 MCP stdio
 
@@ -154,7 +154,7 @@ npm run doctor
 | [体验审计](docs/EXPERIENCE_AUDIT.md) | 双身份实测、问题优先级与闭环状态 |
 | [Plugin 目标](docs/GOAL_PLUGIN.md) | Codex plugin 的目标、范围与验收 |
 | [架构](docs/ARCHITECTURE.md) | 源码结构、协议、HTTP 与安全模型 |
-| [当前决策](docs/DECISIONS.md) | 0.7.0 会话上下文同步与历史 ADR 状态 |
+| [当前决策](docs/DECISIONS.md) | 0.8.0 Excalidraw 画布与历史 ADR 状态 |
 | [文档地图](docs/README.md) | 全部文档入口 |
 | [故障排查](docs/TROUBLESHOOTING.md) | 首用自检与常见问题 |
 | [贡献指南](CONTRIBUTING.md) | 本地验证与 PR 规范 |

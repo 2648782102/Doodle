@@ -8,7 +8,7 @@ Releases are made from `master` by a maintainer. CI and the publish workflow ver
 2. `package.json` version follows `VERSIONING.md`.
 3. `README.md`, `README.en.md`, `AGENTS.md`, `docs/GOAL_PLUGIN.md`, `docs/ARCHITECTURE.md`, `docs/DECISIONS.md`, `SECURITY.md`, `PRIVACY.md`, `SUPPORT.md`, `TERMS.md`, `docs/FAQ.md`, `docs/SUBMISSION.md`, and `CONTRIBUTING.md` are current.
 4. `npm run check` passes locally, including the versioned submission ZIP.
-5. `npm run repo:plugin-check` passes and `npm pack --dry-run` includes `dist/index.js`, `dist/infra/templates/board.html`, `dist/infra/templates/board-app.js`, `scripts/doctor.mjs`, `README.md`, `LICENSE`, `CHANGELOG.md`, `SECURITY.md`, `PRIVACY.md`, `SUPPORT.md`, and `TERMS.md`.
+5. `npm run repo:plugin-check` passes and `npm pack --dry-run` includes `dist/index.js`, `dist/infra/templates/board.html`, `dist/infra/templates/excalidraw/index.css`, `dist/infra/templates/excalidraw/excalidraw-app.js`, `scripts/doctor.mjs`, `README.md`, `LICENSE`, `CHANGELOG.md`, `SECURITY.md`, `PRIVACY.md`, `SUPPORT.md`, and `TERMS.md`.
 6. CI passes on Node 20, 22, and 24.
 7. `plugins/doodle/.codex-plugin/plugin.json` and `docs/LAUNCH_KIT.md` match the package version, GitHub About text, and topics.
 
@@ -18,7 +18,7 @@ Releases are made from `master` by a maintainer. CI and the publish workflow ver
 2. Push the versioned `vX.Y.Z` tag from `master`.
 3. The tag workflow in `.github/workflows/release.yml` runs the full check and package dry-run.
 4. `.github/workflows/publish-release.yml` runs on `master` after a full `npm run check`, creates the GitHub Release from the matching `CHANGELOG.md` section when absent, and attaches the versioned submission ZIP. It leaves existing releases unchanged; `workflow_dispatch` can retry with an explicit tag.
-5. Publish to npm only through an explicit maintainer action with the configured release environment. A bypass-2FA token can stage the package but `npm stage approve` still requires one OTP or web proof of presence; keep the `npx -y doodle-mcp` documentation honest until `npm view doodle-mcp@<version> version` resolves. Version `0.6.3` closed this gate through a maintainer security-key confirmation and a clean `npm exec --yes doodle-mcp` startup. The exact `0.7.0` tarball is staged and remains gated on the same form of maintainer confirmation; it must be verified separately after approval.
+5. Publish to npm only through an explicit maintainer action with a valid npm credential or the configured release environment. A bypass-2FA token can stage the package but `npm stage approve` still requires one OTP or web proof of presence; keep the `npx -y doodle-mcp` documentation honest until `npm view doodle-mcp@<version> version` resolves. Verify each new version with `npm view doodle-mcp@<version> version`, the `latest` dist-tag, and one clean `npm exec --yes doodle-mcp` startup before announcing it.
 6. Verify that `npm run setup:codex -- --dry-run`, `npm view doodle-mcp@<version> version`, one `npx -y doodle-mcp` startup, `npm run doctor`, the release asset, and the changelog version all pass or match the published package.
 
 ## Rollback

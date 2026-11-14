@@ -1,6 +1,6 @@
 # Excalidraw Canvas Comparison
 
-This note records a controlled comparison on 2026-11-14 between the `codex/excalidraw-spike` Excalidraw-only canvas and the `master` DOM canvas. Both servers were built from their current branches and connected through the same MCP SDK client. The same seven-object AI drawing was used for both: one heading, three connected steps, two arrows, and one freehand emphasis outline.
+This note records the controlled comparison run on 2026-11-14 that led to shipping Excalidraw as the only canvas in `0.8.0`. The Excalidraw canvas and the earlier DOM canvas were built separately and connected through the same MCP SDK client. The same seven-object AI drawing was used for both: one heading, three connected steps, two arrows, and one freehand emphasis outline.
 
 ## Token measurement
 
@@ -37,4 +37,4 @@ Its advantages are for human-side editing fidelity and host delivery: mature tex
 
 ## Recommendation
 
-Keep `master` on the lightweight DOM engine until the experiment branch proves: packaged plugin size is acceptable, MCP App resource loading is reliable in the target host, image/text/frame round-tripping is stable under live human edits, and users prefer the Excalidraw interaction. If those pass, Excalidraw-only is a better long-term human canvas; if not, borrow selected Excalidraw ideas into the DOM engine while keeping the small package.
+The decision was to ship Excalidraw-only in `0.8.0`. The browser canvas is clearer for people, round-tripping through Board v1 is stable, and the local assets keep working without a CDN. The accepted cost is a roughly 16 MB compressed package dominated by self-hosted fonts, locales, and lazily loaded Mermaid chunks. The DOM canvas is removed rather than kept as a second engine, so there is no dual-maintenance draw and no silent fallback with different rendering.

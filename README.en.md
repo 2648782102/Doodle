@@ -15,7 +15,7 @@ Host capability has three layers: the four tools always work; MCP Apps hosts sho
 
 The board library stores **editable version 1 board snapshots**: save the current image, switch between saved boards, create/rename/duplicate/delete boards, and import/export JSON. It is not a second session model; static PNG/JPG/SVG files are sharing snapshots, not library entries; `get_board`, the MCP App, and the standalone canvas always read and write the same active board.
 
-On `codex/excalidraw-spike`, the legacy DOM canvas has been removed and Excalidraw is the only human-facing canvas; the stable DOM engine remains on `master` until the experiment is accepted. Board v1 is still the sole persisted state and AI-authoritative contract. See `docs/GOAL_EXCALIDRAW.md`.
+Since `0.8.0` the legacy DOM canvas has been removed and Excalidraw is the only human-facing canvas. Board v1 is still the sole persisted state and AI-authoritative contract; Excalidraw elements are derived from Board v1 on every render, with no second canvas state. See `docs/GOAL_EXCALIDRAW.md`.
 
 `PANEL_URL` belongs to the current MCP server process: it becomes unavailable when that session or host exits. For a local preview independent of a conversation, run `npm run preview:board`. It starts only the board HTTP server, registers no MCP stdio tools, and installs no background service. Stop it with `Ctrl+C`.
 
@@ -70,7 +70,7 @@ Run one command from a Doodle checkout:
 npm run setup:codex
 ```
 
-`scripts/setup-codex.mjs` modifies Codex configuration only when you invoke it: it runs `npm install` when needed, `npm run build`, `codex plugin marketplace add . --json`, and `codex plugin add doodle@doodle --json`. It is safe to repeat; use `npm run setup:codex -- --dry-run` to preview the commands. Official OpenAI documentation distinguishes local marketplaces from the [universal public plugin directory](https://developers.openai.com/plugins/build/plugins) and says to [start a new session](https://learn.chatgpt.com/docs/plugins) before using installed plugin skills and MCP tools. `npm run build:submission` also produces an ignored `doodle-plugin-submission/doodle-0.7.0.zip` for review. Public plugin-directory publication remains a separate approved OpenAI submission; see `docs/SUBMISSION.md`, `PRIVACY.md`, `SUPPORT.md`, `TERMS.md`, and `docs/FAQ.md`.
+`scripts/setup-codex.mjs` modifies Codex configuration only when you invoke it: it runs `npm install` when needed, `npm run build`, `codex plugin marketplace add . --json`, and `codex plugin add doodle@doodle --json`. It is safe to repeat; use `npm run setup:codex -- --dry-run` to preview the commands. Official OpenAI documentation distinguishes local marketplaces from the [universal public plugin directory](https://developers.openai.com/plugins/build/plugins) and says to [start a new session](https://learn.chatgpt.com/docs/plugins) before using installed plugin skills and MCP tools. `npm run build:submission` also produces an ignored `doodle-plugin-submission/doodle-0.8.0.zip` for review. Public plugin-directory publication remains a separate approved OpenAI submission; see `docs/SUBMISSION.md`, `PRIVACY.md`, `SUPPORT.md`, `TERMS.md`, and `docs/FAQ.md`.
 
 ### Direct MCP stdio
 

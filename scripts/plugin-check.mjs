@@ -40,7 +40,7 @@ const terms = await read("TERMS.md");
 const submission = await read("docs/SUBMISSION.md");
 const submissionScript = await read("scripts/build-submission.mjs");
 
-check(packageJson.version === "0.7.0" && manifest.version === packageJson.version, "plugin version does not match package.json 0.7.0");
+check(packageJson.version === "0.8.0" && manifest.version === packageJson.version, "plugin version does not match package.json 0.8.0");
 check(packageJson.scripts.build.includes("build-plugin.mjs"), "npm build does not produce the plugin package");
 check(packageJson.scripts.check.includes("repo:plugin-check"), "npm check does not run the plugin guard");
 check(manifest.name === "doodle", "plugin identity is not doodle");

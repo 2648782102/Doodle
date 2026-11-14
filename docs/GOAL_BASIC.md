@@ -1,6 +1,6 @@
 # Goal: Doodle Basic Experience
 
-This document records the active "basic盘" objective for `codex/excalidraw-spike`. It is a maintained acceptance record, not an automation directive.
+This document records the shipped "basic盘" objective. It is a maintained acceptance record, not an automation directive.
 
 ## Objective
 
@@ -29,12 +29,12 @@ get_board → draw_board.diagram → Board v1 → Excalidraw projection
 - `test/excalidraw-adapter.test.mjs` proves stable Board v1 ↔ Excalidraw projection for bound text, arrows, strokes, and images.
 - CI verifies `resolveDiagramLayout`, `diagramToBoardItems`, final-state context, and the Excalidraw adapter.
 - A local preview serves the self-hosted Excalidraw canvas, and the generated plugin package contains the same templates, assets, and bundled server.
-- The branch is committed and pushed; `master` and npm publication are unchanged.
+- The release is committed, merged to `master`, tagged, and published; the tag workflow and `npm run check` pass.
 
 ## Authority and red lines
 
-- Allowed: normal commits and pushes to `codex/excalidraw-spike`, dependency-free source changes, docs, tests, CI, guards, local validation, and explicit local preview commands.
-- Forbidden: force push, history rewrite, tag movement, deleting user board data, committing secrets/generated `dist`/`output`, npm publish, merging into `master`, adding a fifth MCP tool, project writes triggered by board objects, hosted sync, CDN assets, or a second persisted board/scene format.
+- Allowed: normal commits and pushes, dependency-free source changes, docs, tests, CI, guards, local validation, explicit local preview commands, and maintainer-run release steps.
+- Forbidden: force push, history rewrite, tag movement, deleting user board data, committing secrets/generated `dist`/`output`, adding a fifth MCP tool, project writes triggered by board objects, hosted sync, CDN assets, or a second persisted board/scene format.
 
 ## Evidence
 
