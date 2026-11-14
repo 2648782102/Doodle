@@ -171,7 +171,6 @@ function CanvasApp({ initial }: { initial: BoardSnapshot }) {
       try {
         const updated = await replaceBoard(projected.items as unknown[], before.revision);
         setSnapshot(updated);
-        showToast("已同步到 Doodle 画板");
       } catch (error) {
         const refreshed = await loadBoard().catch(() => null);
         if (refreshed) {
