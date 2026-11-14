@@ -134,7 +134,7 @@ describe("post-cleanup repository shape", () => {
       "ROADMAP.md", "RELEASING.md", "VERSIONING.md", "CHANGELOG.md",
       "docs/README.md", "docs/PRODUCT_DIRECTION.md", "docs/ARCHITECTURE.md",
       "docs/DECISIONS.md", "docs/TROUBLESHOOTING.md", "docs/GOAL_MODE.md",
-      "docs/GOAL_PLUGIN.md", "docs/GOAL_EXPERIENCE.md", "docs/GOAL_EXCALIDRAW.md",
+      "docs/GOAL_PLUGIN.md", "docs/GOAL_EXPERIENCE.md", "docs/GOAL_EXCALIDRAW.md", "docs/EXCALIDRAW_COMPARISON.md",
       "docs/GOVERNANCE.md", "docs/COMPETITIVE_RESEARCH.md",
       "docs/DEPENDENCY_MAINTENANCE.md", "docs/LAUNCH_KIT.md",
     ];
