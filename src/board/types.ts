@@ -138,6 +138,7 @@ export interface DiagramInput {
   title?: string;
   subtitle?: string;
   replace?: boolean;
+  mode?: DiagramMode;
   nodes: DiagramNodeInput[];
   edges: DiagramEdgeInput[];
   origin?: BoardPoint;
@@ -146,6 +147,17 @@ export interface DiagramInput {
   nodeWidth?: number;
   nodeHeight?: number;
 }
+
+/**
+ * Semantic arrangements for `draw_board.diagram`.
+ *
+ * `flow` is a left-to-right dependency graph. The others exist because real
+ * explanations are not all graphs: `timeline` orders stages, `compare` puts two
+ * sides next to each other, and `matrix` is a strict grid. Each mode only
+ * changes coordinates, so the agent keeps expressing meaning, not geometry.
+ */
+export type DiagramMode = "flow" | "timeline" | "compare" | "matrix";
+const DIAGRAM_MODES: DiagramMode[] = ["flow", "timeline", "compare", "matrix"];
 
 export interface DiagramLayout {
   origin: BoardPoint;
@@ -306,6 +318,8 @@ function now(): string {
 
 export function resolveDiagramLayout(diagram: DiagramInput): DiagramLayout {
   if (diagram.nodes.length > 48 || diagram.edges.length > 96) throw new Error("Diagram is too large");
+  const mode = diagram.mode ?? "flow";
+  if (!DIAGRAM_MODES.includes(mode)) throw new Error("Diagram mode must be flow, timeline, compare, or matrix");
   const nodeIds = new Set<string>();
   const reserved = new Set(["diagram_title", "diagram_subtitle", "diagram_legend", "diagram_frame"]);
   for (const node of diagram.nodes) {
@@ -343,25 +357,35 @@ export function resolveDiagramLayout(diagram: DiagramInput): DiagramLayout {
     outgoing.get(edge.from)!.push(edge.to);
     incoming.set(edge.to, (incoming.get(edge.to) ?? 0) + 1);
   }
+  // Only `flow` derives columns from edges. The other modes are explicit: an
+  // author writing a timeline or a comparison already knows the order, and
+  // deriving it from edges would silently reorder their explanation.
   const layer = new Map(diagram.nodes.map((node) => [node.id, node.column ?? -1]));
-  const indegree = new Map(incoming);
-  const queue = diagram.nodes.filter((node) => (indegree.get(node.id) ?? 0) === 0).map((node) => node.id);
-  if (!queue.length && diagram.nodes.length) queue.push(diagram.nodes[0].id);
-  for (const id of queue) if ((layer.get(id) ?? -1) < 0) layer.set(id, 0);
-  const processed = new Set<string>();
-  while (queue.length) {
-    const id = queue.shift()!;
-    if (processed.has(id)) continue;
-    processed.add(id);
-    for (const target of outgoing.get(id) ?? []) {
-      if (nodes.get(target)?.column === undefined) layer.set(target, Math.max(layer.get(target) ?? 0, (layer.get(id) ?? 0) + 1));
-      indegree.set(target, Math.max(0, (indegree.get(target) ?? 1) - 1));
-      if ((indegree.get(target) ?? 0) === 0 && !processed.has(target)) queue.push(target);
+  if (mode === "flow") {
+    const indegree = new Map(incoming);
+    const queue = diagram.nodes.filter((node) => (indegree.get(node.id) ?? 0) === 0).map((node) => node.id);
+    if (!queue.length && diagram.nodes.length) queue.push(diagram.nodes[0].id);
+    for (const id of queue) if ((layer.get(id) ?? -1) < 0) layer.set(id, 0);
+    const processed = new Set<string>();
+    while (queue.length) {
+      const id = queue.shift()!;
+      if (processed.has(id)) continue;
+      processed.add(id);
+      for (const target of outgoing.get(id) ?? []) {
+        if (nodes.get(target)?.column === undefined) layer.set(target, Math.max(layer.get(target) ?? 0, (layer.get(id) ?? 0) + 1));
+        indegree.set(target, Math.max(0, (indegree.get(target) ?? 1) - 1));
+        if ((indegree.get(target) ?? 0) === 0 && !processed.has(target)) queue.push(target);
+      }
     }
   }
+  // Anything still unplaced - an explicit mode with no columns, or a cycle -
+  // keeps a stable declaration order instead of overlapping at (0, 0).
   let fallbackColumn = Math.max(0, ...layer.values()) + 1;
+  let fallbackIndex = 0;
   for (const node of diagram.nodes) {
-    if ((layer.get(node.id) ?? -1) < 0) layer.set(node.id, fallbackColumn++);
+    if ((layer.get(node.id) ?? -1) >= 0) continue;
+    if (mode === "flow") layer.set(node.id, fallbackColumn++);
+    else layer.set(node.id, fallbackIndex++);
   }
   const positions = new Map<string, BoardPoint>();
   const rows = new Map<number, number>();

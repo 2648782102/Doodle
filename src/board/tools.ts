@@ -67,6 +67,7 @@ function boardCapabilities() {
     layouts: ["grid", "row", "column", "timeline", "cluster", "architecture"],
     connectors: ["startItemId", "endItemId"],
     recipes: ["flow", "compare", "cluster", "emphasis", "image-annotation", "architecture", "diagram"],
+    diagramModes: ["flow", "timeline", "compare", "matrix"],
     style: ["borderColor", "borderWidth", "textColor", "fontSize", "fontWeight", "textAlign", "strokeWidth", "opacity", "radius", "fillOpacity"],
     library: ["list", "get", "create", "save", "switch", "rename", "duplicate", "delete", "import", "export"],
     canvasEngine: "excalidraw",
@@ -85,6 +86,7 @@ function boardRecipes(): string {
     "- Prefer updates and deterministic layout over clearing a whole board. Connected lines follow bound objects.",
     "- Architecture: create short labelled nodes with connected lines, then call layout.mode: \"architecture\"; it moves selected objects by connection direction without changing their text.",
     "- Diagram: use draw_board.diagram with semantic nodes/edges for complex diagrams; it adds bounded labels and connected arrows beside existing objects, or clears the board only with replace: true.",
+    "- Diagram modes: flow (default) derives columns from edges; timeline, compare, and matrix use your explicit column/row, so an ordered explanation is never silently reordered.",
   ].join("\n");
 }
 
@@ -234,6 +236,8 @@ const diagramInput = z.object({
   title: z.string().max(120).optional(),
   replace: z.boolean().optional().describe("Replace all existing board objects; defaults to false and adds the generated diagram beside existing objects"),
   subtitle: z.string().max(200).optional(),
+  mode: z.enum(["flow", "timeline", "compare", "matrix"]).optional()
+    .describe("Semantic arrangement. flow derives columns from edges; timeline/compare/matrix use your explicit column/row. Defaults to flow."),
   nodes: z.array(z.object({
     id: z.string().max(80),
     label: z.string().max(80),

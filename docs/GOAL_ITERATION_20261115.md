@@ -64,6 +64,9 @@ human canvas → keeps full scene fidelity locally
   repository and plugin guards, setup dry-run, submission ZIP, doctor, and
   `npm pack --dry-run`.
 - Documentation, guards, and the plugin skill describe the same contract.
+- `draw_board.diagram` can express more than a dependency graph: a timeline, a
+  side-by-side comparison, and a strict matrix are one `mode` away, and an
+  ordered explanation is never silently reordered by edge analysis.
 
 ## Measured result
 
@@ -87,6 +90,27 @@ stdio MCP client and the actual tool responses:
 - `test/agent-view.test.mjs` covers the pure projections and the revision cache;
   `test/mcp.test.mjs` covers guide-once, delta reads, and the guarantee that
   withheld fidelity is still persisted.
+
+## Second target: express kinds of diagrams, not just graphs
+
+`diagram` already removed hand-computed coordinates, but it could only lay out a
+dependency graph. Real explanations are not all graphs: a roadmap is ordered, a
+trade-off is two sides, a matrix is a table. Deriving columns from edges for those
+would silently reorder what the author wrote.
+
+`draw_board.diagram.mode` now selects the arrangement:
+
+| Mode | Arrangement | Columns come from |
+|---|---|---|
+| `flow` (default) | left-to-right dependency layers | edges |
+| `timeline` | one horizontal axis, stages stacked when they share a column | your `column` |
+| `compare` | two or more side-by-side columns | your `column` |
+| `matrix` | strict `row` × `column` grid | your `row` and `column` |
+
+Only `flow` reads edges for placement. Explicit `row`/`column` always wins, so an
+author's order is preserved. A node that is still unplaced after layout - an
+explicit mode with no columns, or a cycle - keeps declaration order instead of
+overlapping every node at the origin.
 
 ## Authority and red lines
 
