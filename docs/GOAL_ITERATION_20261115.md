@@ -90,6 +90,10 @@ stdio MCP client and the actual tool responses:
 - `test/agent-view.test.mjs` covers the pure projections and the revision cache;
   `test/mcp.test.mjs` covers guide-once, delta reads, and the guarantee that
   withheld fidelity is still persisted.
+- `test/handoff.test.mjs` covers attribution and the state-derived next step;
+  `test/diagram-modes.test.mjs` covers the four arrangements; and
+  `test/project-diagram.test.mjs` covers the scan draft.
+- `npm run check` passes with 97 tests across 11 files.
 
 ## Second target: express kinds of diagrams, not just graphs
 
