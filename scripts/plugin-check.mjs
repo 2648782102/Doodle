@@ -25,6 +25,7 @@ const buildScript = await read("scripts/build-plugin.mjs");
 const pluginCheckScript = await read("scripts/plugin-check.mjs");
 const boardTemplate = await read(".doodle-plugin/doodle/server/infra/templates/board.html");
 const appBundle = await read(".doodle-plugin/doodle/server/infra/templates/board-app.js");
+const excalidrawTemplate = await read(".doodle-plugin/doodle/server/infra/templates/excalidraw.html");
 const httpSource = await read("src/board/http.ts");
 const toolsSource = await read("src/board/tools.ts");
 const configSource = await read("src/infra/config.ts");
@@ -74,6 +75,7 @@ check(skill.includes("FIRST_USE") && skill.includes("NEXT_STEPS") && skill.inclu
 check(!skill.includes("reply_on_board"), "Doodle skill references the removed reply tool");
 check(skill.includes("PANEL_URL") && !skill.includes("Open a browser"), "Doodle skill mishandles the human panel URL");
 check(buildScript.includes("bundle: true") && buildScript.includes("board.html") && buildScript.includes("board-app.js"), "plugin build is not self-contained");
+check(buildScript.includes("excalidraw.html") && buildScript.includes("excalidraw"), "plugin build does not copy Excalidraw assets");
 check(buildScript.includes("__DOODLE_PLUGIN_VERSION__"), "plugin build does not inject the package version");
 check(pluginCheckScript.includes("requires_local_executor"), "plugin guard does not verify desktop-only status");
 check(httpSource.includes("templateCandidates(this.config)") && httpSource.includes('"server", "infra", "templates", "board.html"'), "bundled server cannot resolve plugin board templates");
@@ -123,6 +125,7 @@ check(boardTemplate.includes("function updateContextualTools()") && !boardTempla
 check(boardTemplate.includes('id="btnNotifyAgent"') && boardTemplate.includes("notifyAgent()"), "bundled board template lacks the host notification button");
 check(appBundle.includes("updateModelContext") && appBundle.includes("sendMessage"), "bundled MCP App bridge lacks host context and notification support");
 check(appBundle.includes("doodle_board_context") && appBundle.includes("finalStateNotOperationLog"), "bundled MCP App context is not a final-state delta");
+check(excalidrawTemplate.includes("Doodle · Excalidraw Canvas") && excalidrawTemplate.includes("/excalidraw/excalidraw-app.js"), "Excalidraw template is missing");
 
 const generatedFiles = [
   ".doodle-plugin/doodle/.codex-plugin/plugin.json",
@@ -133,8 +136,14 @@ const generatedFiles = [
   ".doodle-plugin/doodle/server/index.mjs",
   ".doodle-plugin/doodle/server/infra/templates/board.html",
   ".doodle-plugin/doodle/server/infra/templates/board-app.js",
+  ".doodle-plugin/doodle/server/infra/templates/excalidraw.html",
+  ".doodle-plugin/doodle/server/infra/templates/excalidraw/index.css",
+  ".doodle-plugin/doodle/server/infra/templates/excalidraw/excalidraw-app.js",
   ".doodle-plugin/doodle/infra/templates/board.html",
   ".doodle-plugin/doodle/infra/templates/board-app.js",
+  ".doodle-plugin/doodle/infra/templates/excalidraw.html",
+  ".doodle-plugin/doodle/infra/templates/excalidraw/index.css",
+  ".doodle-plugin/doodle/infra/templates/excalidraw/excalidraw-app.js",
 ];
 for (const relative of generatedFiles) {
   check(await exists(relative), `generated plugin file is missing: ${relative}`);

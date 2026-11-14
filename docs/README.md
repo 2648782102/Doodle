@@ -7,6 +7,7 @@ Start with [`../README.md`](../README.md) for installation and the product overv
 | [`PRODUCT_DIRECTION.md`](PRODUCT_DIRECTION.md) | Everyone | Product definition, boundaries, and experience principles |
 | [`EXPERIENCE_AUDIT.md`](EXPERIENCE_AUDIT.md) | Maintainers | Live AI/human experience friction, priorities, and closure status |
 | [`GOAL_EXPERIENCE.md`](GOAL_EXPERIENCE.md) | Contributors, reviewers | Objective, scope, acceptance, and red lines for native visual expression |
+| [`GOAL_EXCALIDRAW.md`](GOAL_EXCALIDRAW.md) | Contributors, reviewers | Experimental Excalidraw canvas engine, adapter boundary, and acceptance |
 | [`GOAL_PLUGIN.md`](GOAL_PLUGIN.md) | Contributors, reviewers | Objective, scope, acceptance, and evidence for the Codex plugin distribution |
 | [`ARCHITECTURE.md`](ARCHITECTURE.md) | Contributors, reviewers | Source layout, board state, MCP tools, HTTP API, and safety model |
 | [`DECISIONS.md`](DECISIONS.md) | Contributors, AI agents | Current decisions in force and the status of historical ADRs |

@@ -56,7 +56,7 @@ describe("post-cleanup repository shape", () => {
       expect(current.some((name) => pattern.test(name)), `unexpected legacy path matching ${pattern}`).toBe(false);
     }
     expect(extensions).toBe(false);
-    expect(source.filter((name) => name.endsWith(".ts"))).toHaveLength(19);
+    expect(source.filter((name) => name.endsWith(".ts"))).toHaveLength(20);
     expect(scripts.filter((name) => name.endsWith(".mjs")).sort()).toEqual([
       "scripts/build-plugin.mjs",
       "scripts/build-submission.mjs",
@@ -67,7 +67,7 @@ describe("post-cleanup repository shape", () => {
       "scripts/repo-check.mjs",
       "scripts/setup-codex.mjs",
     ]);
-    expect(tests.filter((name) => name.endsWith(".test.mjs"))).toHaveLength(6);
+    expect(tests.filter((name) => name.endsWith(".test.mjs"))).toHaveLength(7);
     const compiled = await listFiles(path.join(root, "dist"));
     expect(compiled.some((name) => /^dist\/(domain|tools)\//.test(name))).toBe(false);
     expect(compiled.some((name) => name === "dist/infra/templates/index.html")).toBe(false);
@@ -136,7 +136,7 @@ describe("post-cleanup repository shape", () => {
       "ROADMAP.md", "RELEASING.md", "VERSIONING.md", "CHANGELOG.md",
       "docs/README.md", "docs/PRODUCT_DIRECTION.md", "docs/ARCHITECTURE.md",
       "docs/DECISIONS.md", "docs/TROUBLESHOOTING.md", "docs/GOAL_MODE.md",
-      "docs/GOAL_PLUGIN.md", "docs/GOAL_EXPERIENCE.md",
+      "docs/GOAL_PLUGIN.md", "docs/GOAL_EXPERIENCE.md", "docs/GOAL_EXCALIDRAW.md",
       "docs/GOVERNANCE.md", "docs/COMPETITIVE_RESEARCH.md",
       "docs/DEPENDENCY_MAINTENANCE.md", "docs/LAUNCH_KIT.md",
     ];

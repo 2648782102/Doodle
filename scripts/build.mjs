@@ -8,6 +8,8 @@ const sourceRoot = path.join(root, "src");
 const distDir = path.join(root, "dist");
 const sourceDir = path.join(root, "src", "infra", "templates");
 const targetDir = path.join(distDir, "infra", "templates");
+const excalidrawProdDir = path.join(root, "node_modules", "@excalidraw", "excalidraw", "dist", "prod");
+const excalidrawTargetDir = path.join(targetDir, "excalidraw");
 
 async function expectedCompiledFiles(directory) {
   const result = new Set();
@@ -39,7 +41,8 @@ async function pruneCompiledFiles(directory, expected, prefix = "") {
 }
 
 const expected = await expectedCompiledFiles(sourceRoot);
-for (const name of ["board.html"]) expected.add(`infra/templates/${name}`);
+for (const name of ["board.html", "excalidraw.html"]) expected.add(`infra/templates/${name}`);
+expected.add("infra/templates/excalidraw");
 await fs.mkdir(distDir, { recursive: true });
 await pruneCompiledFiles(distDir, expected);
 await fs.mkdir(targetDir, { recursive: true });
@@ -51,6 +54,11 @@ for (const name of await fs.readdir(targetDir)) {
 for (const name of await fs.readdir(sourceDir)) {
   await fs.copyFile(path.join(sourceDir, name), path.join(targetDir, name));
 }
+await fs.mkdir(excalidrawTargetDir, { recursive: true });
+for (const name of await fs.readdir(excalidrawTargetDir)) {
+  await fs.rm(path.join(excalidrawTargetDir, name), { recursive: true, force: true });
+}
+await fs.cp(excalidrawProdDir, excalidrawTargetDir, { recursive: true });
 const appBundle = await bundle({
   entryPoints: [path.join(sourceRoot, "board", "app.ts")],
   bundle: true,
@@ -62,4 +70,22 @@ const appBundle = await bundle({
 });
 await fs.writeFile(path.join(targetDir, "board-app.js"), appBundle.outputFiles[0].text);
 console.log(`📦 Bundled MCP App (${Buffer.byteLength(appBundle.outputFiles[0].text)} bytes)`);
+const excalidrawBundle = await bundle({
+  entryPoints: [path.join(sourceDir, "excalidraw-app.tsx")],
+  bundle: true,
+  format: "esm",
+  platform: "browser",
+  target: "es2022",
+  minify: true,
+  outdir: excalidrawTargetDir,
+  entryNames: "excalidraw-app",
+  splitting: true,
+  conditions: ["production"],
+  write: false,
+  define: { "process.env.NODE_ENV": '"production"' },
+});
+for (const file of excalidrawBundle.outputFiles) {
+  await fs.writeFile(file.path, file.contents);
+}
+console.log(`📦 Bundled Excalidraw engine (${excalidrawBundle.outputFiles.reduce((size, file) => size + file.contents.length, 0)} bytes)`);
 console.log("✅ Copied board template");

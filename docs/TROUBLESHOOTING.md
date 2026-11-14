@@ -23,6 +23,10 @@ Check that the browser is on the `PANEL_URL` reported by `get_board` and that th
 
 The board library keeps editable version 1 snapshots in `.doodle/boards/` under the same output directory as the active `board.json`. Switching changes the active board and broadcasts `board_library_updated`; reload the panel, then verify `get_board.library.activeId`. Import only JSON files exported from Doodle or matching the version 1 board schema.
 
+### Excalidraw experiment does not load
+
+The experimental engine is available only on `codex/excalidraw-spike`. Append `?engine=excalidraw` to `PANEL_URL`; the default URL serves the stable DOM canvas. The local preview must serve `/excalidraw/index.css`, `/excalidraw/excalidraw-app.js`, and `/excalidraw/fonts/...` from its own package. If any of these returns 404, rebuild with `npm run build` and restart the server. The experiment does not use a CDN, hosted font, or license key.
+
 ### The Agent does not see my canvas edits automatically
 
 Automatic final-state context sync works only in an embedded MCP Apps view when the host advertises `updateModelContext`. Hosts normally deliver the latest context on the next conversation turn; click 「通知 Agent」 where available, or ask the AI to call `get_board`. If you are using the standalone `PANEL_URL` page, there is no bridge to the current host session: rereading through `get_board` is required. Hosts without `sendMessage` hide the notification button rather than reporting false success.

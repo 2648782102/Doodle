@@ -118,7 +118,7 @@ check(launchKit.includes(`Recommended topics: ${canonicalTopics.map((topic) => `
 check(readmeEn.includes(`> ${canonicalDescription}`), "English README does not use the canonical Doodle description");
 check(!packageJson.dependencies.mermaid && !packageJson.dependencies.sharp && !packageJson.dependencies.open && !packageJson.dependencies.nanoid, "package.json still has removed rendering/IDE dependencies");
 check(!packageJson.scripts["ui:shots"] && !packageJson.scripts["github:sync"], "package.json still has removed legacy scripts");
-check(Object.keys(packageJson.dependencies).sort().join(",") === "@modelcontextprotocol/ext-apps,@modelcontextprotocol/sdk,express,ws,zod", "runtime dependencies do not match the MCP Apps canvas");
+check(Object.keys(packageJson.dependencies).sort().join(",") === "@excalidraw/excalidraw,@modelcontextprotocol/ext-apps,@modelcontextprotocol/sdk,express,perfect-freehand,react,react-dom,ws,zod", "runtime dependencies do not match the Excalidraw experiment");
 check(packageJson.devDependencies.esbuild, "esbuild is missing for the MCP Apps browser bundle");
 check(packageJson.overrides?.["@hono/node-server"] && packageJson.overrides?.hono && packageJson.overrides?.["fast-uri"], "transitive security overrides are missing");
 check(server.includes("registerBoardTools") && server.includes("TOOL_COUNT = 4"), "server.ts is not the four-tool board composition root");
@@ -132,7 +132,7 @@ check(instructions.includes("PANEL_URL") && !instructions.includes("reply_on_boa
 check(instructions.includes("Doodle is"), "MCP instructions do not introduce Doodle");
 check(instructions.includes("two-way") && instructions.includes("one kernel, two entry points, three capability layers"), "MCP instructions lost the two-way product story");
 check(instructions.includes("updateModelContext") && instructions.includes("final-state delta"), "MCP instructions do not describe host model context sync");
-check(sourceFiles.length === 12, `src/board has ${sourceFiles.length} TypeScript modules; expected the focused twelve-module structure`);
+check(sourceFiles.length === 13, `src/board has ${sourceFiles.length} TypeScript modules; expected the focused thirteen-module structure`);
 check(!boardIndex.includes("preview-server") && !boardIndex.includes("session-store"), "board index re-exports legacy infrastructure");
 check((tools.match(/server\.registerTool\(/g) ?? []).length === 4 && !tools.includes("server.tool("), "tools.ts does not register exactly four annotated MCP tools");
 check(tools.includes("readOnlyHint: true") && tools.includes("destructiveHint: true") && tools.includes("openWorldHint: false"), "tool annotations are incomplete");
@@ -223,6 +223,7 @@ check(await exists("SECURITY.md"), "SECURITY.md is missing");
 check(await exists("PRIVACY.md") && await exists("SUPPORT.md") && await exists("TERMS.md"), "public plugin policy documents are missing");
 check(await exists("docs/FAQ.md") && await exists("docs/SUBMISSION.md"), "public plugin support or submission docs are missing");
 check(await exists("docs/GOAL_EXPERIENCE.md") && (await read("docs/GOAL_EXPERIENCE.md")).includes("## Acceptance"), "native visual expression goal document is missing");
+check(await exists("docs/GOAL_EXCALIDRAW.md") && (await read("docs/GOAL_EXCALIDRAW.md")).includes("## Acceptance"), "Excalidraw engine goal document is missing");
 check(packageJson.scripts["build:submission"]?.includes("build-submission.mjs"), "submission ZIP build script is missing");
 check(packageJson.scripts.check.includes("build:submission"), "npm check does not build the submission ZIP");
 check(packageJson.files.includes("PRIVACY.md") && packageJson.files.includes("SUPPORT.md") && packageJson.files.includes("TERMS.md"), "npm package omits public policy documents");
@@ -239,7 +240,7 @@ check(codexExample.includes('args = ["-y", "doodle-mcp"]') && !codexExample.incl
 check(setupScript.includes('"plugin", "marketplace", "add"') && setupScript.includes('"plugin", "add", "doodle@doodle"') && setupScript.includes("--dry-run"), "setup script does not safely install the local plugin");
 check(setupScript.includes('if (dryRun) return { status: 0 }') || setupScript.includes("if (dryRun) return { status: 0; }"), "setup dry-run can still execute commands");
 check(await exists("plugins/doodle/skills/doodle/SKILL.md") && await exists("scripts/build-plugin.mjs") && await exists("scripts/plugin-check.mjs"), "plugin packaging files are incomplete");
-check(totalSourceFiles.length === 19, `src has ${totalSourceFiles.length} TypeScript modules; expected the focused plugin-ready structure`);
+check(totalSourceFiles.length === 20, `src has ${totalSourceFiles.length} TypeScript modules; expected the focused plugin-ready structure`);
 
 if (failures.length) {
   console.error("❌ Offline repository checks failed:");

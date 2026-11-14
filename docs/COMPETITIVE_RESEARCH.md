@@ -32,3 +32,7 @@ The product is not the diagram, the hosted board, the approval workflow, or the 
 ## Non-goals reinforced by research
 
 No hosted collaboration, general chat product, mandatory workflow, diagram asset library, source-graph database, or built-in code-change approval system. These remain non-goals even if adjacent products offer them.
+
+## Excalidraw engine experiment
+
+The `codex/excalidraw-spike` branch evaluates `@excalidraw/excalidraw` as a mature MIT-licensed human canvas. The experiment keeps Doodle Board v1 as the authoritative persisted state and treats Excalidraw scene/appState as UI-only. tldraw is excluded because its SDK license is not open source and requires a license key for production; React Flow is excluded because it turns the board into a node editor; Konva/Fabric are lower-level engines rather than complete whiteboards. See `GOAL_EXCALIDRAW.md` for acceptance and red lines.

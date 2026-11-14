@@ -15,6 +15,8 @@ Host capability has three layers: the four tools always work; MCP Apps hosts sho
 
 The board library stores **editable version 1 board snapshots**: save the current image, switch between saved boards, create/rename/duplicate/delete boards, and import/export JSON. It is not static PNG export and not a second session model; `get_board`, the MCP App, and the standalone canvas always read and write the same active board.
 
+The `codex/excalidraw-spike` experiment also offers `?engine=excalidraw`: Excalidraw is a human-facing rendering/editing layer only, while Board v1 remains the sole persisted state and AI-authoritative contract. The default URL keeps using the stable DOM engine. See `docs/GOAL_EXCALIDRAW.md`.
+
 `PANEL_URL` belongs to the current MCP server process: it becomes unavailable when that session or host exits. For a local preview independent of a conversation, run `npm run preview:board`. It starts only the board HTTP server, registers no MCP stdio tools, and installs no background service. Stop it with `Ctrl+C`.
 
 The two-way loop:

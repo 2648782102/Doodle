@@ -77,6 +77,7 @@ function boardCapabilities() {
     recipes: ["flow", "compare", "cluster", "emphasis", "image-annotation"],
     style: ["borderColor", "borderWidth", "textColor", "fontSize", "fontWeight", "textAlign", "strokeWidth", "opacity", "radius", "fillOpacity"],
     library: ["list", "get", "create", "save", "switch", "rename", "duplicate", "delete", "import", "export"],
+    canvasEngines: ["dom", "excalidraw"],
     safety: "Visual context only; board objects never authorize project writes.",
   };
 }
@@ -268,14 +269,29 @@ export function registerBoardTools(server: McpServer, ctx: BoardToolContext): vo
     "show_board",
     {
       description: "在人和 AI 的 Agent 对话旁显示共享无限画布，供用户直接查看和编辑。用户要求打开、查看、展示或编辑 Doodle 画布时调用。支持 MCP Apps 的宿主会嵌入交互式画布；其他宿主仍可通过普通工具读写画布。",
-      inputSchema: z.object({}),
+      inputSchema: z.object({
+        engine: z.enum(["dom", "excalidraw"]).optional().describe("Optional canvas engine; omit for the stable DOM engine"),
+      }),
       annotations: READ_ONLY_LOCAL_ANNOTATIONS,
       _meta: { ui: { resourceUri: APP_RESOURCE_URI } },
     },
-    async () => {
+    async ({ engine }) => {
       try {
         const current = await ctx.board.snapshot();
         const snapshot = boardJson(current, (await ctx.library.apply({ type: "list" }, current)).index);
+        if (engine === "excalidraw") {
+          return {
+            content: [{
+              type: "text" as const,
+              text: [
+                `🎨 Excalidraw 实验画布 · revision ${snapshot.revision} · ${snapshot.itemCount} 个对象`,
+                "打开 PANEL_URL 并在地址后添加 ?engine=excalidraw；MCP App 资源仍以默认 DOM 引擎呈现。",
+                `PANEL_URL: ${ctx.preview.panelUrl ?? "unavailable (standalone preview not started)"}`,
+              ].join("\n"),
+            }],
+            structuredContent: snapshot,
+          };
+        }
         return {
           content: [{
             type: "text" as const,

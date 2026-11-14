@@ -72,6 +72,7 @@ describe("board HTTP surface", () => {
     expect(snapshot).toMatchObject({ version: 1 });
     expect(snapshot.library).toMatchObject({ version: 1 });
     expect(snapshot.capabilities.layouts).toContain("cluster");
+    expect(snapshot.capabilities.canvasEngines).toContain("excalidraw");
     expect(snapshot.visualDigest).toMatchObject({ version: 1 });
   });
 
@@ -89,6 +90,18 @@ describe("board HTTP surface", () => {
     expect(result.ok).toBe(true);
     expect(result.index.boards.some((entry) => entry.name === "Library HTTP")).toBe(true);
     expect(result.board.title).toBe("Library HTTP");
+  });
+
+  it("serves the experimental Excalidraw engine and self-hosted assets", async () => {
+    const html = await fetch(`${base}/?engine=excalidraw`).then((response) => response.text());
+    expect(html).toContain("Doodle · Excalidraw Canvas");
+    expect(html).toContain("/excalidraw/excalidraw-app.js");
+    expect(html).not.toContain("https://");
+    const app = await fetch(`${base}/excalidraw/excalidraw-app.js`);
+    expect(app.status).toBe(200);
+    const css = await fetch(`${base}/excalidraw/index.css`);
+    expect(css.status).toBe(200);
+    expect(await css.text()).toContain("fonts/Assistant");
   });
 
   it("uses a free loopback port when previewPort is null", async () => {

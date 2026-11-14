@@ -13,6 +13,7 @@ All notable changes are documented here. Versions follow `VERSIONING.md`.
 - Added a local editable board library: save the current image under a name, switch between saved boards, create/rename/duplicate/delete boards, and import/export version 1 JSON. `draw_board.library`, HTTP `/api/board/library`, the standalone `图库` panel, and the MCP App share the same action vocabulary without adding a fifth tool.
 - Added AI-facing visual expression: `capabilities`, deterministic `visualDigest`, recipes, variant/role/z/style fields, connector bindings, and five layout modes. Connected arrows follow bound object edges; the canvas renders variants, styles, z-order, and multi-selection bounds.
 - Added `docs/GOAL_EXPERIENCE.md` as the maintained objective for native visual expression and updated the documentation map and link checks.
+- Experimental `codex/excalidraw-spike`: added `@excalidraw/excalidraw` as an optional `?engine=excalidraw` canvas with self-hosted assets, a Board v1 ↔ Excalidraw adapter, and `docs/GOAL_EXCALIDRAW.md`. The default DOM canvas, four MCP tools, and Board v1 persistence remain authoritative.
 - New local HTTP batch/replacement endpoints support these canvas operations with human confirmation and revision checks.
 
 ### Changed

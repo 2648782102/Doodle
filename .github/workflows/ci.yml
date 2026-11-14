@@ -79,6 +79,14 @@ jobs:
           const context = buildBoardModelContext({ ...line, itemCount: line.items.length });
           if (digest.connections[0].label !== "next" || !context.content[0].text.includes("→")) process.exit(1);
           NODE
+      - name: Verify Excalidraw adapter
+        run: |
+          node --input-type=module <<'NODE'
+          import { boardItemsToExcalidrawSkeleton, excalidrawElementsToBoardItems } from "./dist/board/excalidraw-adapter.js";
+          const skeletons = boardItemsToExcalidrawSkeleton([{ id: "a", type: "rect", x: 0, y: 0, w: 100, h: 60, text: "A", color: "#f6d365", author: "ai", createdAt: new Date(0).toISOString(), updatedAt: new Date(0).toISOString() }]);
+          const items = excalidrawElementsToBoardItems([{ id: "a", type: "rectangle", x: 0, y: 0, width: 100, height: 60, backgroundColor: "#f6d365", customData: { doodle: { author: "ai" } } }]);
+          if (skeletons[0].id !== "a" || items[0].text !== "") process.exit(1);
+          NODE
       - run: npm run test:examples
       - run: npm run repo:check
       - run: npm run repo:plugin-check
