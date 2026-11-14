@@ -12,7 +12,7 @@ one-command install → new session → first prompt → plugin manifest → bun
 
 ## Product boundary
 
-Doodle is a local-first board. A person and an AI place notes, text, rectangles, ellipses, and directed arrows on one canvas. The AI normally uses MCP tools inside an agent; a person uses the standalone local canvas or the optional embedded MCP App. Conversation stays in the host chat. Project structure is only one subject that `scan_project` can inspect and `draw_board` can visualize.
+Doodle is a local-first board. A person and an AI place notes, text, rectangles, ellipses, directed arrows, freehand strokes, images, and richer visual variants on one canvas. The AI normally uses MCP tools inside an agent; a person uses the standalone local canvas or the optional embedded MCP App. A local library stores editable named snapshots of the same active board for save/switch workflows; `capabilities`, `visualDigest`, and recipes help the AI compose drawings with the same four tools. Conversation stays in the host chat. Project structure is only one subject that `scan_project` can inspect and `draw_board` can visualize.
 
 The plugin is a distribution layer around this product. It must not turn Doodle into a hosted service, general chat product, approval workflow, project dashboard, code-change authority, or a different MCP server with a different tool set.
 
@@ -26,7 +26,7 @@ The plugin is a distribution layer around this product. It must not turn Doodle 
 - Connect MCP stdio before the optional local HTTP preview; a preview failure must not disable MCP.
 - Use a free loopback port when `PREVIEW_PORT` is unset and report the active `PANEL_URL` through `get_board`, without opening a browser.
 - Prefer explicit `OUTPUT_DIR`, then plugin data, then workspace-local `.doodle-data` for board state. Resolve bounded project scanning against the launched workspace without exposing plugin-internal paths.
-- Preserve version 1 board state, the four-tool contract, drawing guide, HTTP authorization, stderr-only logging, tokenized human edits, revision-safe writes, and read-only project-scan safety.
+- Preserve version 1 board state, the four-tool contract, drawing guide, HTTP authorization, stderr-only logging, tokenized human edits, revision-safe writes, board-library snapshot safety, and read-only project-scan safety.
 - Synchronize the agent handbook, READMEs, product direction, architecture, decisions, changelog, release notes, examples, tests, CI, and offline repository/plugin guards.
 - Prepare review-facing publication materials: explicit tool annotations, a published privacy policy, support and terms URLs, a versioned submission ZIP, and a maintained record of OpenAI-side eligibility gates.
 - Automate idempotent GitHub Release publication and submission-ZIP attachment after the full check, using the built-in `GITHUB_TOKEN`.
@@ -35,7 +35,7 @@ The plugin is a distribution layer around this product. It must not turn Doodle 
 
 - Public universal plugin directory submission, partner allowlisting, organization verification, portal review actions, or publication approval. Repository-side submission materials are in scope; account eligibility is not.
 - Hosted accounts, multi-user SaaS, OAuth, public HTTPS endpoints, remote state, telemetry, or cloud storage.
-- A new board protocol, a fifth MCP tool, a second session/graph/proposal model, or a project-write approval protocol.
+- A new board protocol, a fifth MCP tool, a second session/graph/proposal model, a static image exporter, or a project-write approval protocol.
 - Browser, IDE, editor, or panel auto-opening from normal MCP tools.
 - npm publish, GitHub repository metadata changes, external promotion, or external mass messaging.
 - Lifecycle hooks, duplicate portable manifests, or plugin-created project files.

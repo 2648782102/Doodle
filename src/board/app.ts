@@ -6,6 +6,7 @@ type BoardSnapshot = BoardContextSnapshot;
 interface DoodleBoardAdapter {
   getBoard: () => Promise<BoardSnapshot>;
   drawBoard: (args: Record<string, unknown>) => Promise<BoardSnapshot>;
+  library: (action: Record<string, unknown>) => Promise<BoardLibraryResult>;
   readonly revision: number;
   readonly canFullscreen: boolean;
   readonly canNotifyAgent: boolean;
@@ -13,9 +14,16 @@ interface DoodleBoardAdapter {
   notifyAgent: () => Promise<void>;
 }
 
+interface BoardLibraryResult {
+  index: unknown;
+  board: BoardSnapshot;
+  exportBoard?: BoardSnapshot;
+}
+
 declare global {
   interface Window {
     DoodleBoardUpdate?: (snapshot: BoardSnapshot) => void;
+    DoodleBoardLibraryUpdate?: (index: unknown, snapshot: BoardSnapshot) => void;
     DoodleBoardInit?: (adapter: DoodleBoardAdapter) => void;
   }
 }
@@ -34,11 +42,17 @@ function readSnapshot(result: { structuredContent?: unknown }): BoardSnapshot {
   if (!data || !Array.isArray(data.items) || typeof data.revision !== "number" || typeof data.title !== "string") {
     throw new Error("The Doodle server returned an invalid board snapshot");
   }
-  if (snapshot && data.revision <= snapshot.revision) return snapshot;
-  snapshot = data;
-  window.DoodleBoardUpdate?.(data);
-  void publishBoardContext(data);
-  return data;
+  const library = (data as Record<string, unknown>).library;
+  const forceUpdate = Boolean(library);
+  if (snapshot && data.revision <= snapshot.revision && !forceUpdate) {
+    window.DoodleBoardLibraryUpdate?.(library, snapshot);
+    return snapshot;
+  }
+  const normalized = { ...data } as BoardSnapshot;
+  snapshot = normalized;
+  window.DoodleBoardUpdate?.(normalized);
+  void publishBoardContext(normalized);
+  return normalized;
 }
 
 async function publishBoardContext(current: BoardSnapshot): Promise<void> {
@@ -122,6 +136,24 @@ window.DoodleBoardInit?.({
       }
       throw error;
     }
+  },
+  async library(action: Record<string, unknown>) {
+    const result = await app.callServerTool({
+      name: "draw_board",
+      arguments: { library: action, expected_revision: snapshot?.revision ?? 0 },
+    });
+    if (result.isError) {
+      const message = result.content?.map((item) => item.type === "text" ? item.text : "").join("\n") || "Board library action failed";
+      throw new Error(message);
+    }
+    const structured = result.structuredContent as Record<string, unknown> | undefined;
+    const board = readSnapshot(result);
+    window.DoodleBoardLibraryUpdate?.(structured?.library, board);
+    return {
+      index: structured?.library,
+      board,
+      ...(structured?.exportBoard ? { exportBoard: structured.exportBoard as BoardSnapshot } : {}),
+    };
   },
   get revision() {
     return snapshot?.revision ?? 0;

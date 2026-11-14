@@ -15,6 +15,8 @@ Doodle is a simple shared infinite board. The roadmap protects that boundary rat
 - An idempotent publish workflow that creates the GitHub Release and attaches the submission ZIP after the full check.
 - A one-command `npm run setup:codex` install path, one first-use prompt, zero-configuration direct MCP examples, `FIRST_USE` / `NEXT_STEPS` agent guidance, and a dismissible canvas `?` help popover.
 - Optional MCP Apps host context sync: the current final board snapshot and final-state delta are attached to the current session's model context, with one user-initiated short notification button where supported.
+- Local editable board library for named board snapshots, save/switch workflows, and JSON import/export without static image export or a fifth MCP tool.
+- AI-facing capabilities, deterministic visual digest, visual recipes, connected lines, variants/roles/styles/z-order, and five deterministic layout modes.
 
 ## Near-term work
 
@@ -29,7 +31,7 @@ Doodle is a simple shared infinite board. The roadmap protects that boundary rat
 
 - Hosted accounts, multi-user SaaS, or social presence.
 - A general chat product or mandatory human/AI turn-taking workflow.
-- A Mermaid/diagram asset library, screenshot exporter, or project dashboard.
+- A Mermaid/diagram asset library, static screenshot/image exporter, or project dashboard.
 - A second graph/session/proposal state model or derived context catalogue.
 - Built-in code-change approval, diff review, one-time grants, or automatic project writes.
 - Browser or IDE windows opened as side effects of normal MCP tools.

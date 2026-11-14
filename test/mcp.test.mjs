@@ -114,7 +114,7 @@ describe("MCP board server", () => {
       expect(appResource.contents[0].mimeType).toBe("text/html;profile=mcp-app");
       expect(appResource.contents[0].text).toContain("DoodleBoardInit");
       expect(appResource.contents[0].text).not.toContain('id="noteInput"');
-      expect(appResource.contents[0].text).toContain('selectTool("select");\n      if (newest)');
+      expect(appResource.contents[0].text).toContain('if (itemType !== "stroke" && itemType !== "eraser") selectTool("select");\n      if (newest && itemType !== "stroke")');
       expect(appResource.contents[0].text).toContain('return updated;');
       expect(appResource.contents[0].text).toContain('lastChange: "remote"');
       expect(appResource.contents[0].text).toContain('id="btnEdit"');
@@ -125,6 +125,7 @@ describe("MCP board server", () => {
       });
       const shown = await client.callTool({ name: "show_board", arguments: {} });
       expect(shown.structuredContent).toMatchObject({ version: 1 });
+      expect(shown.structuredContent.capabilities.layouts).toContain("timeline");
       expect(shown.structuredContent.itemCount).toBeGreaterThan(0);
     });
   }, 30_000);
@@ -150,9 +151,14 @@ describe("MCP board server", () => {
       expect(text).toContain("NEXT_STEPS:");
       expect(text).toContain("Drawing guide:");
       expect(text).toMatch(/PANEL_URL: http:\/\/127\.0\.0\.1:\d+\//);
+      expect(text).toContain("CAPABILITIES:");
+      expect(text).toContain("VISUAL_DIGEST:");
+      expect(text).toContain("Visual recipes:");
       expect(text).toContain("(x,y) to (x+w,y+h)");
       const board = jsonAfter(text, "BOARD_JSON:");
       expect(board).toMatchObject({ version: 1, readOnly: true });
+      expect(board.capabilities.objectTypes).toContain("stroke");
+      expect(board.visualDigest).toMatchObject({ version: 1, itemCount: 0 });
       expect(Array.isArray(board.items)).toBe(true);
       expect(board.safety).toMatchObject({ projectWritesRequireHumanApproval: true });
     } finally {
@@ -272,6 +278,30 @@ describe("MCP board server", () => {
         },
       });
       expect(before.revision).toBeLessThan(after.revision);
+    });
+  }, 30_000);
+
+  it("saves and switches editable board snapshots through draw_board library actions", async () => {
+    await withClient(3424, async (client) => {
+      const initial = await client.callTool({
+        name: "draw_board",
+        arguments: { author: "ai", items: [{ type: "note", x: 0, y: 0, text: "library original" }] },
+      });
+      const firstId = initial.structuredContent.id;
+      expect(initial.structuredContent.library.boards).toHaveLength(1);
+      const created = await client.callTool({
+        name: "draw_board",
+        arguments: { library: { type: "create", name: "Library B", switchTo: true } },
+      });
+      expect(created.structuredContent.id).not.toBe(firstId);
+      expect(created.structuredContent.items).toHaveLength(0);
+      expect(created.structuredContent.library.activeId).toBe(created.structuredContent.id);
+      const switched = await client.callTool({
+        name: "draw_board",
+        arguments: { library: { type: "switch", id: firstId } },
+      });
+      expect(switched.structuredContent.id).toBe(firstId);
+      expect(switched.structuredContent.items.some((item) => item.text === "library original")).toBe(true);
     });
   }, 30_000);
 

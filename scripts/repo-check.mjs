@@ -29,6 +29,7 @@ const boardTemplate = await read("src/infra/templates/board.html");
 const http = await read("src/board/http.ts");
 const scanner = await read("src/board/project-scan.ts");
 const boardStore = await read("src/board/store.ts");
+const boardLibrary = await read("src/board/library.ts");
 const mutex = await read("src/board/mutex.ts");
 const launchKit = await read("docs/LAUNCH_KIT.md");
 const readme = await read("README.md");
@@ -89,6 +90,7 @@ check(packageJson.scripts.check.includes("setup:codex -- --dry-run"), "npm check
 check(ci.includes("npm run repo:plugin-check"), "CI does not run the plugin guard");
 check(ci.includes("npm run setup:codex -- --dry-run"), "CI does not dry-run the Codex setup");
 check(ci.includes("npm run build:submission"), "CI does not build the submission ZIP");
+check(ci.includes("BoardLibrary") && ci.includes("type: \"create\""), "CI does not verify the local board library");
 check(ci.includes("Verify final-state board context projection") && ci.includes("buildBoardModelContext") && ci.includes("doodle_board_context"), "CI does not verify the final-state context projection");
 check(publishWorkflow.includes("contents: write") && publishWorkflow.includes("gh release create"), "publish workflow cannot create a release");
 check(publishWorkflow.includes("npm run check") && publishWorkflow.includes("--notes-file"), "publish workflow does not verify the package or use changelog notes");
@@ -130,7 +132,7 @@ check(instructions.includes("PANEL_URL") && !instructions.includes("reply_on_boa
 check(instructions.includes("Doodle is"), "MCP instructions do not introduce Doodle");
 check(instructions.includes("two-way") && instructions.includes("one kernel, two entry points, three capability layers"), "MCP instructions lost the two-way product story");
 check(instructions.includes("updateModelContext") && instructions.includes("final-state delta"), "MCP instructions do not describe host model context sync");
-check(sourceFiles.length === 11, `src/board has ${sourceFiles.length} TypeScript modules; expected the focused eleven-module structure`);
+check(sourceFiles.length === 12, `src/board has ${sourceFiles.length} TypeScript modules; expected the focused twelve-module structure`);
 check(!boardIndex.includes("preview-server") && !boardIndex.includes("session-store"), "board index re-exports legacy infrastructure");
 check((tools.match(/server\.registerTool\(/g) ?? []).length === 4 && !tools.includes("server.tool("), "tools.ts does not register exactly four annotated MCP tools");
 check(tools.includes("readOnlyHint: true") && tools.includes("destructiveHint: true") && tools.includes("openWorldHint: false"), "tool annotations are incomplete");
@@ -139,9 +141,12 @@ check(tools.includes('"show_board"') && tools.includes('"get_board"'), "canvas r
 check(tools.includes("CANVAS_UI_META") && tools.includes("_meta: CANVAS_UI_META"), "draw_board does not advertise the canvas for automatic post-draw rendering");
 check(tools.includes("appBundleCandidates(ctx.config)") && tools.includes("PANEL_URL"), "MCP App resources are not plugin-safe and the panel URL is missing");
 check(tools.includes("FIRST_USE:") && tools.includes("NEXT_STEPS:") && tools.includes("NEXT:"), "get_board does not use progressive first-use and next-step guidance");
-check(tools.includes("structuredContent: boardJson(board)"), "board tools do not return an authoritative structured snapshot");
+check(tools.includes("structuredContent: boardJson(board, libraryIndex)"), "board tools do not return an authoritative structured snapshot");
+check(tools.includes("boardCapabilities()") && tools.includes("visualDigest: boardVisualDigest(board)") && tools.includes("boardRecipes()"), "board tools lost AI visual language");
+check(tools.includes('startItemId: z.string()') && tools.includes('mode: z.enum(["grid", "row", "column", "timeline", "cluster"])'), "draw_board lost connector bindings or expanded layouts");
 check(tools.includes('"scan_project"') && tools.includes("Use draw_board to visualize"), "scan_project is not a read-only board-context tool");
 check(boardTypes.includes("signedWidth") && boardTypes.includes("signedHeight"), "board types lost signed directed-arrow deltas");
+check(boardTypes.includes("boardVisualDigest") && boardTypes.includes("startItemId") && boardTypes.includes("variant"), "board types lost visual-expression fields or deterministic visual digest");
 check(boardTypes.includes("createStarterBoard") && boardTypes.includes("createEmptyBoard"), "board types lost the compatibility starter or empty board");
 check(boardStore.includes("createEmptyBoard") && !boardStore.includes("createStarterBoard()"), "new board state is not empty-first");
 check(boardTemplate.includes('data-tool="line"') && boardTemplate.includes("箭头"), "board template lost the arrow tool");
@@ -157,12 +162,15 @@ check(boardTemplate.includes("btnHelp") && boardTemplate.includes('event.key ===
 check(!boardTemplate.includes("doodleHelpSeen"), "board template still auto-opens help on first visit");
 check(boardTemplate.includes("canvas.focus();") && !boardTemplate.includes("helpCloseButton.focus();"), "board help steals persistent focus from the canvas");
 check(boardTemplate.includes('defaultText = { note: "", text: "", rect: "", ellipse: "", line: "", stroke: "", image: "" }'), "board template lost the extended object defaults");
-check(boardTemplate.includes('data-tool="stroke"') && boardTemplate.includes('data-tool="image"'), "board template lost freehand or image tools");
+check(boardTemplate.includes('data-tool="stroke"') && boardTemplate.includes('data-tool="eraser"') && boardTemplate.includes('data-tool="image"'), "board template lost freehand, eraser, or image tools");
+check(boardTemplate.includes('kind: "draw"') && boardTemplate.includes("strokeInk("), "board template does not draw ink immediately");
+check(boardTemplate.includes('kind: "eraser"') && boardTemplate.includes("commitEraser(") && boardTemplate.includes('if (item.type !== "stroke" || !item.points?.length) continue;'), "board template lost freehand-only drag-to-erase behavior");
 check(boardTemplate.includes('id="btnUndo"') && boardTemplate.includes('id="btnRedo"') && boardTemplate.includes('class="actionbar"'), "board template lost the separated history and selection controls");
 check(boardTemplate.includes("function snapMove(") && boardTemplate.includes("kind: tool === \"select\" ? \"marquee\" : \"pan\""), "board template lost marquee selection or snapping");
+check(boardTemplate.includes("function resolveConnector(") && boardTemplate.includes("function renderSelectionBounds("), "board template lost connected-arrow resolution or multi-selection bounds");
 check(boardTemplate.includes("window.addEventListener(\"paste\""), "board template lost image paste");
 check(boardTemplate.includes("findFreeSpot("), "board template no longer avoids overlapping new objects");
-check(boardTemplate.includes("selectTool(\"select\");\n      if (newest)"), "board template does not return to select after creating an object");
+check(boardTemplate.includes('if (itemType !== "stroke" && itemType !== "eraser") selectTool("select");\n      if (newest && itemType !== "stroke")'), "board template does not return to select after creating a normal object");
 check(boardTemplate.includes('tool !== "select" && !itemElement'), "board template creates objects when clicking an existing item");
 check(boardTemplate.includes('canvas.addEventListener("dblclick"') && boardTemplate.includes('selectTool("select");\n      canvas.focus();'), "board template lost reliable double-click editing");
 check(boardTemplate.includes('createItem("note", point, board.revision)'), "board template lost double-click-empty note creation");
@@ -179,10 +187,14 @@ check(http.includes('"/api/board"') && http.includes("X-AI-Draw-Token"), "board 
 check(http.includes("templateCandidates(this.config)") && http.includes("panelUrlValue"), "plugin bundle template resolution and dynamic panel URL are missing");
 check(http.includes("canvasSnapshot") && http.includes("notes: _legacyNotes"), "HTTP canvas API still exposes the retired message feed");
 check(http.includes('"/api/board/batch"') && http.includes('"/api/board/replace"'), "HTTP board API lost batch or replacement operations");
+check(http.includes("boardVisualDigest(board)") && http.includes("capabilities:"), "HTTP board API lost AI visual language");
 check(http.includes('"/api/board/project"') && !http.includes('"/project"'), "project scan is outside the authenticated board API namespace");
 check(!http.includes("/workbench") && !http.includes("/api/collab"), "board HTTP server still exposes workbench routes");
 check(store.includes("AsyncMutex") && store.includes("replaceIfRevision") && store.includes("BoardRevisionConflictError"), "board store lost serialized revision-safe writes");
 check(store.includes("new AsyncMutex(this.file)") && mutex.includes('fs.open(this.lockFile, "wx")'), "board store lost its cross-process write lock");
+check(boardLibrary.includes("class BoardLibrary") && boardLibrary.includes('".doodle", "boards"'), "board library is missing its local snapshot directory");
+check(tools.includes("libraryAction") && tools.includes("ctx.library.apply"), "draw_board lost board-library actions");
+check(http.includes('"/api/board/library"') && boardTemplate.includes('id="libraryPanel"'), "board library HTTP or UI surface is missing");
 check(tools.includes("replaceIfRevision") && tools.includes("BoardRevisionConflictError"), "draw_board does not use revision-checked writes");
 check(scanner.includes("readOnly: true") && scanner.includes('writes: "none"'), "project scan lost its read-only safety boundary");
 check(scanner.includes("workspaceName") && !scanner.includes("workspaceRoot:"), "project scan exposes an absolute workspace root");
@@ -210,6 +222,7 @@ check(await exists("LICENSE"), "LICENSE is missing");
 check(await exists("SECURITY.md"), "SECURITY.md is missing");
 check(await exists("PRIVACY.md") && await exists("SUPPORT.md") && await exists("TERMS.md"), "public plugin policy documents are missing");
 check(await exists("docs/FAQ.md") && await exists("docs/SUBMISSION.md"), "public plugin support or submission docs are missing");
+check(await exists("docs/GOAL_EXPERIENCE.md") && (await read("docs/GOAL_EXPERIENCE.md")).includes("## Acceptance"), "native visual expression goal document is missing");
 check(packageJson.scripts["build:submission"]?.includes("build-submission.mjs"), "submission ZIP build script is missing");
 check(packageJson.scripts.check.includes("build:submission"), "npm check does not build the submission ZIP");
 check(packageJson.files.includes("PRIVACY.md") && packageJson.files.includes("SUPPORT.md") && packageJson.files.includes("TERMS.md"), "npm package omits public policy documents");
@@ -226,7 +239,7 @@ check(codexExample.includes('args = ["-y", "doodle-mcp"]') && !codexExample.incl
 check(setupScript.includes('"plugin", "marketplace", "add"') && setupScript.includes('"plugin", "add", "doodle@doodle"') && setupScript.includes("--dry-run"), "setup script does not safely install the local plugin");
 check(setupScript.includes('if (dryRun) return { status: 0 }') || setupScript.includes("if (dryRun) return { status: 0; }"), "setup dry-run can still execute commands");
 check(await exists("plugins/doodle/skills/doodle/SKILL.md") && await exists("scripts/build-plugin.mjs") && await exists("scripts/plugin-check.mjs"), "plugin packaging files are incomplete");
-check(totalSourceFiles.length === 18, `src has ${totalSourceFiles.length} TypeScript modules; expected the focused plugin-ready structure`);
+check(totalSourceFiles.length === 19, `src has ${totalSourceFiles.length} TypeScript modules; expected the focused plugin-ready structure`);
 
 if (failures.length) {
   console.error("❌ Offline repository checks failed:");

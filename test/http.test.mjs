@@ -46,9 +46,14 @@ describe("board HTTP surface", () => {
     expect(html).toContain("/api/board");
     expect(html).not.toContain("/workbench");
     expect(html).toContain('data-tool="stroke"');
+    expect(html).toContain('data-tool="eraser"');
     expect(html).toContain('data-tool="image"');
     expect(html).toContain('id="btnUndo"');
+    expect(html).toContain('kind: "draw"');
+    expect(html).toContain('function strokeInk(');
     expect(html).toContain('function snapMove(');
+    expect(html).toContain("resolveConnector(");
+    expect(html).toContain("renderSelectionBounds(");
     expect(html).toContain('defaultText = { note: "", text: "", rect: "", ellipse: "", line: "", stroke: "", image: "" }');
     expect(html).toContain('tool !== "select" && !itemElement');
     expect(html).toContain('socket.addEventListener("open"');
@@ -60,9 +65,30 @@ describe("board HTTP surface", () => {
     expect(html).toContain('id="btnNotifyAgent"');
     expect(html).toContain('notifyButton.hidden = !adapter.canNotifyAgent');
     expect(html).toContain("AI 和你都能画");
+    expect(html).toContain('id="libraryPanel"');
+    expect(html).toContain('"/api/board/library"');
     expect(html).not.toContain("helpCloseButton.focus()");
     const snapshot = await fetch(`${base}/api/board`).then((response) => response.json());
     expect(snapshot).toMatchObject({ version: 1 });
+    expect(snapshot.library).toMatchObject({ version: 1 });
+    expect(snapshot.capabilities.layouts).toContain("cluster");
+    expect(snapshot.visualDigest).toMatchObject({ version: 1 });
+  });
+
+  it("exposes a human-confirmed local board library", async () => {
+    const html = await fetch(base).then((response) => response.text());
+    const token = html.match(/const PANEL_TOKEN = "([^"]+)"/)?.[1];
+    const library = await fetch(`${base}/api/board/library`).then((response) => response.json());
+    expect(library).toMatchObject({ version: 1 });
+    expect(library.boards.length).toBeGreaterThan(0);
+    const result = await fetch(`${base}/api/board/library`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json", "X-AI-Draw-Token": token },
+      body: JSON.stringify({ confirmedBy: "human", action: { type: "create", name: "Library HTTP", switchTo: true } }),
+    }).then((response) => response.json());
+    expect(result.ok).toBe(true);
+    expect(result.index.boards.some((entry) => entry.name === "Library HTTP")).toBe(true);
+    expect(result.board.title).toBe("Library HTTP");
   });
 
   it("uses a free loopback port when previewPort is null", async () => {

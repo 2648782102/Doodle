@@ -9,6 +9,10 @@ All notable changes are documented here. Versions follow `VERSIONING.md`.
 - Extended version 1 board objects with freehand `stroke`, bounded local `image`, `title`, `shape`, `groupId`, and `emphasis: focus`; older boards remain valid without migration.
 - `draw_board` now supports precise `updates`, batch `items`, `remove_ids`, and deterministic `layout` while keeping exactly four MCP tools.
 - Human canvas adds marquee multi-select, batch move/delete/group/layout, undo/redo, double-click-to-create notes, arrow-key nudging, alignment snapping, and bounded `Ctrl/⌘+V` image paste.
+- The pen now lays down ink immediately on pointer-down, tracks the full path while dragging, stays active for continuous strokes, and commits one stroke object on pointer-up. The eraser removes only touched freehand ink segments in one undoable batch and never deletes notes, shapes, arrows, or images.
+- Added a local editable board library: save the current image under a name, switch between saved boards, create/rename/duplicate/delete boards, and import/export version 1 JSON. `draw_board.library`, HTTP `/api/board/library`, the standalone `图库` panel, and the MCP App share the same action vocabulary without adding a fifth tool.
+- Added AI-facing visual expression: `capabilities`, deterministic `visualDigest`, recipes, variant/role/z/style fields, connector bindings, and five layout modes. Connected arrows follow bound object edges; the canvas renders variants, styles, z-order, and multi-selection bounds.
+- Added `docs/GOAL_EXPERIENCE.md` as the maintained objective for native visual expression and updated the documentation map and link checks.
 - New local HTTP batch/replacement endpoints support these canvas operations with human confirmation and revision checks.
 
 ### Changed

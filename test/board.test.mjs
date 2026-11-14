@@ -7,6 +7,7 @@ import {
   addBoardItems,
   addBoardNote,
   boardCopyText,
+  boardVisualDigest,
   createEmptyBoard,
   createStarterBoard,
   parseBoard,
@@ -84,6 +85,38 @@ describe("simple shared board", () => {
 
     board = removeBoardItems(board, [board.items[3].id, board.items[4].id]);
     expect(board.items.some((item) => item.type === "stroke" || item.type === "image")).toBe(false);
+  });
+
+  it("keeps visual-expression fields, connected lines, and deterministic layout modes", () => {
+    let board = createEmptyBoard();
+    board = addBoardItems(board, [
+      {
+        type: "rect", x: 0, y: 0, w: 180, h: 100, text: "输入", title: "开始",
+        role: "step", variant: "card", z: 2,
+        style: { fontSize: 18, fontWeight: "bold", textAlign: "left", fillOpacity: 0.6, radius: 14 },
+        author: "ai",
+      },
+      { type: "rect", x: 260, y: 0, w: 180, h: 100, text: "输出", role: "step", emphasis: "focus", author: "ai" },
+    ]);
+    const source = board.items[0].id;
+    const target = board.items[1].id;
+    board = addBoardItem(board, {
+      type: "line", x: 180, y: 50, w: 80, h: 0, text: "下一步", shape: "orthogonal",
+      startItemId: source, endItemId: target, author: "ai",
+    });
+    const parsed = parseBoard(JSON.parse(JSON.stringify(board)));
+    expect(parsed.items[0]).toMatchObject({ role: "step", variant: "card", z: 2 });
+    expect(parsed.items[0].style).toMatchObject({ fontSize: 18, textAlign: "left", fillOpacity: 0.6 });
+    expect(parsed.items[2]).toMatchObject({ startItemId: source, endItemId: target });
+    const digest = boardVisualDigest(parsed);
+    expect(digest.connections[0]).toMatchObject({ from: "开始", to: "输出", label: "下一步" });
+    expect(digest.focus).toHaveLength(1);
+    expect(digest.readingOrder[0]).toMatchObject({ role: "step", title: "开始" });
+
+    board = layoutBoardItems(board, { mode: "timeline", origin: { x: 100, y: 100 }, gap: 40 }, "ai");
+    expect(board.items.find((item) => item.text === "输入")).toMatchObject({ x: 100, y: 100 });
+    expect(() => addBoardItem(board, { type: "note", x: 0, y: 0, startItemId: source })).toThrow();
+    expect(() => addBoardItem(board, { type: "rect", x: 0, y: 0, style: { fontSize: 200 } })).toThrow();
   });
 
   it("rejects malformed extended objects", () => {

@@ -2,6 +2,23 @@ export type BoardAuthor = "human" | "ai";
 export type BoardItemType = "note" | "text" | "rect" | "ellipse" | "line" | "stroke" | "image";
 export type BoardLineShape = "straight" | "curve" | "orthogonal";
 export type BoardEmphasis = "normal" | "focus";
+export type BoardVariant = "plain" | "card" | "frame" | "pill" | "diamond" | "callout" | "heading";
+export type BoardRole = "normal" | "label" | "frame" | "column" | "step" | "decision" | "annotation";
+export type BoardTextAlign = "left" | "center" | "right";
+export type BoardLayoutMode = "grid" | "row" | "column" | "timeline" | "cluster";
+
+export interface BoardItemStyle {
+  borderColor?: string;
+  borderWidth?: number;
+  textColor?: string;
+  fontSize?: number;
+  fontWeight?: "normal" | "bold";
+  textAlign?: BoardTextAlign;
+  strokeWidth?: number;
+  opacity?: number;
+  radius?: number;
+  fillOpacity?: number;
+}
 
 export interface BoardPoint {
   x: number;
@@ -27,6 +44,12 @@ export interface BoardItem {
   mime?: string;
   groupId?: string;
   emphasis?: BoardEmphasis;
+  variant?: BoardVariant;
+  role?: BoardRole;
+  z?: number;
+  style?: BoardItemStyle;
+  startItemId?: string;
+  endItemId?: string;
 }
 
 export interface BoardNote {
@@ -64,6 +87,12 @@ export interface BoardItemInput {
   mime?: string;
   groupId?: string;
   emphasis?: BoardEmphasis;
+  variant?: BoardVariant;
+  role?: BoardRole;
+  z?: number;
+  style?: BoardItemStyle;
+  startItemId?: string;
+  endItemId?: string;
 }
 
 export interface BoardItemPatch {
@@ -76,12 +105,16 @@ export interface BoardLayoutInput {
   origin?: BoardPoint;
   columns?: number;
   gap?: number;
-  mode?: "grid" | "row" | "column";
+  mode?: BoardLayoutMode;
 }
 
 const ITEM_TYPES: BoardItemType[] = ["note", "text", "rect", "ellipse", "line", "stroke", "image"];
 const LINE_SHAPES: BoardLineShape[] = ["straight", "curve", "orthogonal"];
 const EMPHASES: BoardEmphasis[] = ["normal", "focus"];
+const VARIANTS: BoardVariant[] = ["plain", "card", "frame", "pill", "diamond", "callout", "heading"];
+const ROLES: BoardRole[] = ["normal", "label", "frame", "column", "step", "decision", "annotation"];
+const TEXT_ALIGNS: BoardTextAlign[] = ["left", "center", "right"];
+const LAYOUT_MODES: BoardLayoutMode[] = ["grid", "row", "column", "timeline", "cluster"];
 const COLORS = ["#f6d365", "#b8e0d2", "#c7d8ff", "#ffd1dc", "#e8e8e8", "#ffffff"];
 const IMAGE_MIMES = ["image/png", "image/jpeg", "image/gif", "image/webp"];
 const MAX_ITEMS = 400;
@@ -113,6 +146,55 @@ function isLineShape(value: unknown): value is BoardLineShape {
 
 function isEmphasis(value: unknown): value is BoardEmphasis {
   return EMPHASES.includes(value as BoardEmphasis);
+}
+
+function isVariant(value: unknown): value is BoardVariant {
+  return VARIANTS.includes(value as BoardVariant);
+}
+
+function isRole(value: unknown): value is BoardRole {
+  return ROLES.includes(value as BoardRole);
+}
+
+function isTextAlign(value: unknown): value is BoardTextAlign {
+  return TEXT_ALIGNS.includes(value as BoardTextAlign);
+}
+
+function isColor(value: unknown): value is string {
+  return typeof value === "string" && /^#[0-9a-fA-F]{6}$/.test(value);
+}
+
+function normalizeStyle(value: unknown): BoardItemStyle | undefined {
+  if (value === undefined) return undefined;
+  if (!value || typeof value !== "object") throw new Error("Invalid board item style");
+  const candidate = value as Partial<BoardItemStyle>;
+  const style: BoardItemStyle = {};
+  if (candidate.borderColor !== undefined) {
+    if (!isColor(candidate.borderColor)) throw new Error("Invalid board item border color");
+    style.borderColor = candidate.borderColor;
+  }
+  for (const [key, minimum, maximum] of [
+    ["borderWidth", 0, 12], ["fontSize", 8, 72], ["strokeWidth", 0.5, 24],
+    ["opacity", 0.1, 1], ["radius", 0, 64], ["fillOpacity", 0, 1],
+  ] as const) {
+    const raw = candidate[key];
+    if (raw === undefined) continue;
+    if (!isFiniteNumber(raw) || raw < minimum || raw > maximum) throw new Error(`Invalid board item ${key}`);
+    style[key] = raw;
+  }
+  if (candidate.textColor !== undefined) {
+    if (!isColor(candidate.textColor)) throw new Error("Invalid board item text color");
+    style.textColor = candidate.textColor;
+  }
+  if (candidate.fontWeight !== undefined) {
+    if (candidate.fontWeight !== "normal" && candidate.fontWeight !== "bold") throw new Error("Invalid board item font weight");
+    style.fontWeight = candidate.fontWeight;
+  }
+  if (candidate.textAlign !== undefined) {
+    if (!isTextAlign(candidate.textAlign)) throw new Error("Invalid board item text align");
+    style.textAlign = candidate.textAlign;
+  }
+  return Object.keys(style).length ? style : undefined;
 }
 
 function isPoint(value: unknown): value is BoardPoint {
@@ -278,6 +360,16 @@ export function parseBoard(value: unknown): SimpleBoard {
       throw new Error("Invalid board item group");
     if (candidate.mime !== undefined && !IMAGE_MIMES.includes(candidate.mime as string))
       throw new Error("Invalid image mime type");
+    const style = normalizeStyle(candidate.style);
+    if (candidate.variant !== undefined && !isVariant(candidate.variant)) throw new Error("Invalid board item variant");
+    if (candidate.role !== undefined && !isRole(candidate.role)) throw new Error("Invalid board item role");
+    if (candidate.z !== undefined && !isFiniteNumber(candidate.z)) throw new Error("Invalid board item z-order");
+    if (candidate.startItemId !== undefined && (typeof candidate.startItemId !== "string" || !itemIds.has(candidate.startItemId)))
+      throw new Error("Invalid line start item");
+    if (candidate.endItemId !== undefined && (typeof candidate.endItemId !== "string" || !itemIds.has(candidate.endItemId)))
+      throw new Error("Invalid line end item");
+    if ((candidate.startItemId || candidate.endItemId) && candidate.type !== "line")
+      throw new Error("Only line items can bind connectors");
     return {
       id: candidate.id,
       type: candidate.type as BoardItemType,
@@ -297,8 +389,19 @@ export function parseBoard(value: unknown): SimpleBoard {
       ...(candidate.mime ? { mime: candidate.mime } : {}),
       ...(candidate.groupId ? { groupId: candidate.groupId } : {}),
       ...(candidate.emphasis ? { emphasis: candidate.emphasis } : {}),
+      ...(candidate.variant ? { variant: candidate.variant } : {}),
+      ...(candidate.role ? { role: candidate.role } : {}),
+      ...(isFiniteNumber(candidate.z) ? { z: candidate.z } : {}),
+      ...(style ? { style } : {}),
+      ...(candidate.startItemId ? { startItemId: candidate.startItemId } : {}),
+      ...(candidate.endItemId ? { endItemId: candidate.endItemId } : {}),
     };
   });
+  const allItemIds = new Set(items.map((item) => item.id));
+  for (const item of items) {
+    if (item.startItemId && !allItemIds.has(item.startItemId)) throw new Error("Invalid line start item");
+    if (item.endItemId && !allItemIds.has(item.endItemId)) throw new Error("Invalid line end item");
+  }
   const itemIdSet = new Set(items.map((item) => item.id));
   const noteIds = new Set<string>();
   const notes = raw.notes.map((note) => {
@@ -362,6 +465,12 @@ function normalizeItem(input: BoardItemInput): Omit<BoardItem, "createdAt" | "up
   if (input.type === "image" && !isImageSource(input.src)) throw new Error("Image source is required");
   if (input.type === "line" && input.shape !== undefined && !isLineShape(input.shape)) throw new Error("Invalid line shape");
   if (input.emphasis !== undefined && !isEmphasis(input.emphasis)) throw new Error("Invalid item emphasis");
+  const style = normalizeStyle(input.style);
+  if (input.variant !== undefined && !isVariant(input.variant)) throw new Error("Invalid item variant");
+  if (input.role !== undefined && !isRole(input.role)) throw new Error("Invalid item role");
+  if (input.z !== undefined && (!isFiniteNumber(input.z) || input.z < -1000 || input.z > 1000))
+    throw new Error("Invalid item z-order");
+  if ((input.startItemId || input.endItemId) && input.type !== "line") throw new Error("Only line items can bind connectors");
   if (input.type === "stroke") {
     if (!Array.isArray(input.points) || input.points.length < 2 || input.points.length > MAX_STROKE_POINTS)
       throw new Error("Stroke needs bounded points");
@@ -391,6 +500,12 @@ function normalizeItem(input: BoardItemInput): Omit<BoardItem, "createdAt" | "up
     ...(input.mime && IMAGE_MIMES.includes(input.mime) ? { mime: input.mime } : {}),
     ...(groupId ? { groupId } : {}),
     ...(isEmphasis(input.emphasis) ? { emphasis: input.emphasis } : {}),
+    ...(isVariant(input.variant) ? { variant: input.variant } : {}),
+    ...(isRole(input.role) ? { role: input.role } : {}),
+    ...(isFiniteNumber(input.z) ? { z: input.z } : {}),
+    ...(style ? { style } : {}),
+    ...(input.startItemId ? { startItemId: input.startItemId } : {}),
+    ...(input.endItemId ? { endItemId: input.endItemId } : {}),
   };
 }
 
@@ -472,7 +587,8 @@ export function layoutBoardItems(
     item.type !== "line" && (!selected.size || selected.has(item.id)));
   if (candidates.length < 2) return board;
   const sorted = [...candidates].sort((left, right) => left.y - right.y || left.x - right.x);
-  const columns = Math.max(1, Math.min(12, Math.floor(layout.columns ?? 3)));
+  const mode = layout.mode && LAYOUT_MODES.includes(layout.mode) ? layout.mode : "grid";
+  const columns = Math.max(1, Math.min(12, Math.floor(layout.columns ?? (mode === "timeline" ? sorted.length : 3))));
   const gap = Math.max(8, Math.min(200, layout.gap ?? 24));
   const origin = layout.origin ?? {
     x: Math.min(...sorted.map((item) => item.x)),
@@ -485,8 +601,12 @@ export function layoutBoardItems(
   const updates = sorted.map((item, index) => ({
     id: item.id,
     patch: {
-      x: Math.round(layout.mode === "row" ? cellX(index) : layout.mode === "column" ? origin.x : cellX(index % columns)),
-      y: Math.round(layout.mode === "row" ? origin.y : layout.mode === "column" ? cellY(index) : cellY(Math.floor(index / columns))),
+      x: Math.round(mode === "row" || mode === "timeline" ? cellX(index)
+        : mode === "column" || mode === "cluster" ? origin.x : cellX(index % columns)),
+      y: Math.round(mode === "row" || mode === "timeline" ? origin.y
+        : mode === "column" ? cellY(index)
+          : mode === "cluster" ? cellY(Math.floor(index / Math.max(1, Math.ceil(Math.sqrt(sorted.length)))))
+            : cellY(Math.floor(index / columns))),
     },
   }));
   return updateBoardItems(board, updates, author);
@@ -535,4 +655,56 @@ export function boardCopyText(board: SimpleBoard): string {
     `最近留言 ${Math.min(board.notes.length, 12)}`,
     ...notes,
   ].join("\n");
+}
+
+function shortDigestText(text: string, limit = 60): string {
+  const normalized = text.replace(/\s+/g, " ").trim();
+  return normalized.length <= limit ? normalized : `${normalized.slice(0, limit - 1)}…`;
+}
+
+export function boardVisualDigest(board: SimpleBoard): Record<string, unknown> {
+  const byId = new Map(board.items.map((item) => [item.id, item]));
+  const labels = board.items
+    .filter((item) => item.text || item.title)
+    .sort((left, right) => left.y - right.y || left.x - right.x)
+    .slice(0, 12)
+    .map((item) => ({
+      id: item.id,
+      type: item.type,
+      role: item.role ?? "normal",
+      title: item.title ? shortDigestText(item.title, 40) : undefined,
+      text: item.text ? shortDigestText(item.text, 80) : undefined,
+      author: item.author,
+    }));
+  const groups = [...new Set(board.items.map((item) => item.groupId).filter((id): id is string => Boolean(id)))]
+    .map((id) => ({ groupId: id, itemCount: board.items.filter((item) => item.groupId === id).length }));
+  const connections = board.items.filter((item) => item.type === "line").slice(0, 40).map((line) => {
+    const source = line.startItemId ? byId.get(line.startItemId) : undefined;
+    const target = line.endItemId ? byId.get(line.endItemId) : undefined;
+    return {
+      id: line.id,
+      label: shortDigestText(line.text, 40),
+      from: source ? shortDigestText(source.title || source.text || source.id, 50) : undefined,
+      to: target ? shortDigestText(target.title || target.text || target.id, 50) : undefined,
+      coordinates: !source || !target ? {
+        from: { x: Math.round(line.x), y: Math.round(line.y) },
+        to: { x: Math.round(line.x + line.w), y: Math.round(line.y + line.h) },
+      } : undefined,
+    };
+  });
+  const focus = board.items.filter((item) => item.emphasis === "focus").map((item) => ({
+    id: item.id,
+    label: shortDigestText(item.title || item.text || item.type, 60),
+  }));
+  return {
+    version: 1,
+    itemCount: board.items.length,
+    readingOrder: labels,
+    groups,
+    connections,
+    focus,
+    freehandCount: board.items.filter((item) => item.type === "stroke").length,
+    imageCount: board.items.filter((item) => item.type === "image").length,
+    note: "Deterministic visual summary derived from final board objects; not an operation log or project-write authority.",
+  };
 }

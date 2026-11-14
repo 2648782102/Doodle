@@ -91,6 +91,7 @@ check(indexSource.includes("Preview unavailable"), "preview failure does not kee
 check(ci.includes("npm run repo:plugin-check"), "CI does not run the plugin guard");
 check(ci.includes("npm run setup:codex -- --dry-run"), "CI does not dry-run the Codex setup");
 check(ci.includes("npm run build:submission"), "CI does not build the submission ZIP");
+check(ci.includes("BoardLibrary"), "CI does not verify the local board library");
 check(gitignore.includes(".doodle-plugin/") && gitignore.includes(".doodle-data/") && gitignore.includes("doodle-plugin-submission/"), "generated plugin output, plugin data, or submission ZIP is not ignored");
 check(goal.includes("## Objective") && goal.includes("show_board") && goal.includes("plugin"), "plugin goal document is incomplete");
 check(await exists("src/infra/project-workspace.ts"), "plugin-safe workspace resolution is missing");
@@ -106,10 +107,15 @@ check(privacy.includes("Retention") && privacy.includes("User controls"), "priva
 check(submissionScript.includes("doodle-${packageJson.version}.zip"), "submission ZIP does not use the package version");
 check(toolsSource.includes("READ_ONLY_LOCAL_ANNOTATIONS") && toolsSource.includes("BOARD_WRITE_ANNOTATIONS"), "tool annotations are missing");
 check((toolsSource.match(/server\.registerTool\(/g) ?? []).length === 4, "tools are not all registered through the annotated config API");
-check(boardTemplate.includes('data-tool="stroke"') && boardTemplate.includes('data-tool="image"'), "bundled board template lost the extended drawing tools");
+check(toolsSource.includes("libraryAction") && toolsSource.includes("ctx.library.apply"), "bundled tools lost board-library actions");
+check(toolsSource.includes("visualDigest: boardVisualDigest(board)") && toolsSource.includes("boardRecipes()"), "bundled tools lost AI visual language");
+check(httpSource.includes('"/api/board/library"') && boardTemplate.includes('id="libraryPanel"'), "bundled board library HTTP or UI surface is missing");
+check(boardTemplate.includes('data-tool="stroke"') && boardTemplate.includes('data-tool="eraser"') && boardTemplate.includes('data-tool="image"'), "bundled board template lost the extended drawing tools");
+check(boardTemplate.includes('kind: "draw"') && boardTemplate.includes("strokeInk("), "bundled board template does not draw ink immediately");
 check(boardTemplate.includes("function snapMove(") && boardTemplate.includes("kind: tool === \"select\" ? \"marquee\" : \"pan\""), "bundled board template lost marquee selection or snapping");
+check(boardTemplate.includes("function resolveConnector(") && boardTemplate.includes("function renderSelectionBounds("), "bundled board template lost connected-arrow resolution or multi-selection bounds");
 check(boardTemplate.includes('id="btnUndo"') && boardTemplate.includes('id="btnRedo"'), "bundled board template lost undo/redo controls");
-check(boardTemplate.includes('selectTool("select");\n      if (newest)'), "bundled board template does not return to select after object creation");
+check(boardTemplate.includes('if (itemType !== "stroke" && itemType !== "eraser") selectTool("select");\n      if (newest && itemType !== "stroke")'), "bundled board template does not return to select after normal object creation");
 check(boardTemplate.includes('tool !== "select" && !itemElement'), "bundled board template creates objects when clicking an existing item");
 check(boardTemplate.includes("window.doodleBoardSocket") && boardTemplate.includes('socket.addEventListener("open"'), "bundled board template lacks singleton live updates");
 check(boardTemplate.includes('id="btnEdit"') && boardTemplate.includes('function editSelected()'), "bundled board template lacks the explicit text-edit entry point");

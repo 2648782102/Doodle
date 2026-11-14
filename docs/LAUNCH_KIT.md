@@ -14,7 +14,7 @@ Doodle is a small local MCP board you can install with one `npm run setup:codex`
 
 ## Longer post
 
-Most visual tools for agents are either static diagram generators or full dashboards. Doodle keeps the useful part: one local shared canvas with no second chat surface. A desktop-only plugin, four focused MCP tools, one versioned board state file, an optional MCP App, and a standalone local fallback all use the same server. `scan_project` can read bounded project structure, but the AI decides whether and how to draw it. The board never writes project files.
+Most visual tools for agents are either static diagram generators or full dashboards. Doodle keeps the useful part: one local shared canvas with no second chat surface. A desktop-only plugin, four focused MCP tools, one versioned board state file, a local editable board library, AI-facing visual recipes and connected compositions, an optional MCP App, and a standalone local fallback all use the same server. `scan_project` can read bounded project structure, but the AI decides whether and how to draw it. The board never writes project files.
 
 ## Release notes starter
 

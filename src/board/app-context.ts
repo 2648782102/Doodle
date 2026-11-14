@@ -10,7 +10,23 @@ export interface BoardContextSnapshot {
   itemCount?: number;
   copyText?: string;
   safety?: Record<string, unknown>;
+  library?: BoardLibraryContext;
+  capabilities?: Record<string, unknown>;
+  visualDigest?: Record<string, unknown>;
   [key: string]: unknown;
+}
+
+export interface BoardLibraryContext {
+  version: 1;
+  activeId: string;
+  boards: Array<{
+    id: string;
+    name: string;
+    revision: number;
+    itemCount: number;
+    updatedAt: string;
+    active: boolean;
+  }>;
 }
 export interface BoardStateDelta {
   baseRevision: number;
@@ -50,6 +66,7 @@ function itemFingerprint(item: BoardItem): string {
     item.id, item.type, item.x, item.y, item.w, item.h,
     item.text, item.color, item.author, item.createdAt, item.updatedAt,
     item.title, item.shape, item.points, item.src, item.mime, item.groupId, item.emphasis,
+    item.variant, item.role, item.z, item.style, item.startItemId, item.endItemId,
   ]);
 }
 
@@ -108,14 +125,26 @@ function textProjection(item: BoardItem, maxTextChars: number): Record<string, u
     ...(item.mime ? { mime: item.mime } : {}),
     ...(item.groupId ? { groupId: item.groupId } : {}),
     ...(item.emphasis ? { emphasis: item.emphasis } : {}),
+    ...(item.variant ? { variant: item.variant } : {}),
+    ...(item.role ? { role: item.role } : {}),
+    ...(isFiniteNumber(item.z) ? { z: item.z } : {}),
+    ...(item.style ? { style: item.style } : {}),
+    ...(item.startItemId ? { startItemId: item.startItemId } : {}),
+    ...(item.endItemId ? { endItemId: item.endItemId } : {}),
   };
+}
+
+function isFiniteNumber(value: unknown): value is number {
+  return typeof value === "number" && Number.isFinite(value);
 }
 
 function summarizeItems(items: BoardItem[]): string[] {
   return items.slice(0, DELTA_SUMMARY_LIMIT).map((item) => {
     const label = shortText(item.text) || "（无文字）";
     const detail = item.title ? ` · ${shortText(item.title)}` : item.type === "image" ? " · 图片" : item.type === "stroke" ? " · 手绘" : item.shape && item.shape !== "straight" ? ` · ${item.shape}` : "";
-    return `- ${item.id} · ${item.type} · ${item.author} · (${item.x}, ${item.y}) · ${label}${detail}`;
+    const visual = item.role && item.role !== "normal" ? ` · ${item.role}` : item.variant && item.variant !== "plain" ? ` · ${item.variant}` : "";
+    const connection = item.startItemId || item.endItemId ? ` · ${item.startItemId ?? "?"} → ${item.endItemId ?? "?"}` : "";
+    return `- ${item.id} · ${item.type} · ${item.author} · (${item.x}, ${item.y}) · ${label}${detail}${visual}${connection}`;
   }).concat(items.length > DELTA_SUMMARY_LIMIT ? [`- …另有 ${items.length - DELTA_SUMMARY_LIMIT} 个对象，见结构化最终快照`] : []);
 }
 

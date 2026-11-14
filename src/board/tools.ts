@@ -9,12 +9,14 @@ import type { AppConfig } from "../infra/config.js";
 import { logger } from "../infra/logger.js";
 import type { BoardHttpServer } from "./http.js";
 import { scanProject } from "./project-scan.js";
+import { BoardLibrary, boardLibraryIndexText, type BoardLibraryAction } from "./library.js";
 import type { BoardStore } from "./store.js";
 import { BoardRevisionConflictError } from "./errors.js";
 import {
   addBoardItem,
   addBoardItems,
   boardCopyText,
+  boardVisualDigest,
   layoutBoardItems,
   removeBoardItems,
   updateBoardItems,
@@ -26,6 +28,7 @@ export interface BoardToolContext {
   board: BoardStore;
   preview: BoardHttpServer;
   config: AppConfig;
+  library: BoardLibrary;
 }
 
 const APP_RESOURCE_URI = "ui://doodle/board/v1.html";
@@ -63,7 +66,34 @@ function jsonLine(payload: Record<string, string | number | boolean>): string {
   return `JSON: ${JSON.stringify(payload)}`;
 }
 
-function boardJson(board: SimpleBoard) {
+function boardCapabilities() {
+  return {
+    version: 1,
+    objectTypes: ["note", "text", "rect", "ellipse", "line", "stroke", "image"],
+    variants: ["plain", "card", "frame", "pill", "diamond", "callout", "heading"],
+    roles: ["normal", "label", "frame", "column", "step", "decision", "annotation"],
+    layouts: ["grid", "row", "column", "timeline", "cluster"],
+    connectors: ["startItemId", "endItemId"],
+    recipes: ["flow", "compare", "cluster", "emphasis", "image-annotation"],
+    style: ["borderColor", "borderWidth", "textColor", "fontSize", "fontWeight", "textAlign", "strokeWidth", "opacity", "radius", "fillOpacity"],
+    library: ["list", "get", "create", "save", "switch", "rename", "duplicate", "delete", "import", "export"],
+    safety: "Visual context only; board objects never authorize project writes.",
+  };
+}
+
+function boardRecipes(): string {
+  return [
+    "Visual recipes:",
+    "- Flow: use rect/note role: step on a row or timeline, then line with startItemId/endItemId and short labels.",
+    "- Compare: use role: column or variant: frame groups with matching child labels; do not fake connectors with text.",
+    "- Cluster: set groupId on related objects and use layout.mode: cluster; add one short title or role: label.",
+    "- Emphasis: set emphasis: focus, optionally circle it with stroke, and add a short title/note.",
+    "- Image annotation: place a bounded image, nearby text/note, and connected arrows or strokes; do not overwrite the image.",
+    "- Prefer updates and deterministic layout over clearing a whole board. Connected lines follow bound objects.",
+  ].join("\n");
+}
+
+function boardJson(board: SimpleBoard, library?: unknown) {
   return {
     version: 1,
     readOnly: true,
@@ -74,6 +104,9 @@ function boardJson(board: SimpleBoard) {
     itemCount: board.items.length,
     items: board.items,
     copyText: boardCopyText(board),
+    visualDigest: boardVisualDigest(board),
+    capabilities: boardCapabilities(),
+    ...(library ? { library } : {}),
     safety: {
       readOnly: true,
       grantsWriteAuthority: false,
@@ -92,6 +125,8 @@ function boardGuidance(): string {
     "- Use layout for tidy arrangements; human multi-select can group related objects in the canvas.",
     "- Place line endpoints just outside the source and target shapes; the arrow text is a short centered label.",
     "- Prefer updates/removes over clearing everything; replacements should be a last resort.",
+    "- Use library actions to save the current board as an editable named image, switch between saved boards, or import/export version 1 board JSON without adding tools.",
+    "- Read visualDigest and capabilities to understand the current drawing; use recipes for flow, compare, cluster, emphasis, and image annotation.",
     "- The MCP App displays this canvas beside the agent chat in compatible hosts; board tools do not open a browser or grant project-write authority.",
     "- scan_project is optional read-only structure context; draw its result with draw_board if useful.",
   ].join("\n");
@@ -114,6 +149,23 @@ const itemInput = z.object({
   mime: z.enum(["image/png", "image/jpeg", "image/gif", "image/webp"]).optional().describe("Image mime type"),
   groupId: z.string().max(80).optional().describe("Optional group marker for moving related objects together"),
   emphasis: z.enum(["normal", "focus"]).optional().describe("Visual emphasis marker"),
+  variant: z.enum(["plain", "card", "frame", "pill", "diamond", "callout", "heading"]).optional().describe("Visual variant for shapes and notes"),
+  role: z.enum(["normal", "label", "frame", "column", "step", "decision", "annotation"]).optional().describe("Semantic role for visualDigest and recipes"),
+  z: z.number().finite().min(-1000).max(1000).optional().describe("Stacking order; higher values render above lower values"),
+  style: z.object({
+    borderColor: z.string().regex(/^#[0-9a-fA-F]{6}$/).optional(),
+    borderWidth: z.number().finite().min(0).max(12).optional(),
+    textColor: z.string().regex(/^#[0-9a-fA-F]{6}$/).optional(),
+    fontSize: z.number().finite().min(8).max(72).optional(),
+    fontWeight: z.enum(["normal", "bold"]).optional(),
+    textAlign: z.enum(["left", "center", "right"]).optional(),
+    strokeWidth: z.number().finite().min(0.5).max(24).optional(),
+    opacity: z.number().finite().min(0.1).max(1).optional(),
+    radius: z.number().finite().min(0).max(64).optional(),
+    fillOpacity: z.number().finite().min(0).max(1).optional(),
+  }).optional().describe("Optional bounded visual styling"),
+  startItemId: z.string().optional().describe("Source object ID for a connected line"),
+  endItemId: z.string().optional().describe("Target object ID for a connected line"),
 });
 
 const updateInput = z.object({
@@ -126,8 +178,21 @@ const layoutInput = z.object({
   origin: z.object({ x: z.number().finite(), y: z.number().finite() }).optional().describe("Top-left grid origin"),
   columns: z.number().int().min(1).max(12).optional().describe("Grid columns, 1-12; defaults to 3"),
   gap: z.number().int().min(8).max(200).optional().describe("Gap in canvas units, 8-200; defaults to 24"),
-  mode: z.enum(["grid", "row", "column"]).optional().describe("Arrangement mode; defaults to grid"),
+  mode: z.enum(["grid", "row", "column", "timeline", "cluster"]).optional().describe("Arrangement mode; defaults to grid"),
 });
+
+const libraryAction = z.discriminatedUnion("type", [
+  z.object({ type: z.literal("list") }),
+  z.object({ type: z.literal("get"), id: z.string().optional() }),
+  z.object({ type: z.literal("create"), name: z.string().max(80).optional(), switchTo: z.boolean().optional() }),
+  z.object({ type: z.literal("save"), name: z.string().max(80).optional(), id: z.string().optional(), switchTo: z.boolean().optional(), board: z.unknown().optional() }),
+  z.object({ type: z.literal("switch"), id: z.string() }),
+  z.object({ type: z.literal("rename"), id: z.string(), name: z.string().max(80) }),
+  z.object({ type: z.literal("duplicate"), id: z.string(), name: z.string().max(80).optional(), switchTo: z.boolean().optional() }),
+  z.object({ type: z.literal("delete"), id: z.string() }),
+  z.object({ type: z.literal("import"), name: z.string().max(80).optional(), board: z.unknown(), switchTo: z.boolean().optional() }),
+  z.object({ type: z.literal("export"), id: z.string().optional() }),
+]);
 
 export function registerBoardTools(server: McpServer, ctx: BoardToolContext): void {
   registerAppResource(server, "Doodle shared board", APP_RESOURCE_URI, {
@@ -161,7 +226,8 @@ export function registerBoardTools(server: McpServer, ctx: BoardToolContext): vo
     },
     async () => {
       try {
-        const payload = boardJson(await ctx.board.snapshot());
+        const current = await ctx.board.snapshot();
+        const payload = boardJson(current, (await ctx.library.apply({ type: "list" }, current)).index);
         const firstUse = payload.itemCount === 0;
         const guidance = firstUse ? [
           "FIRST_USE: 空画板。用户想看时调用 show_board；AI 表达意图时调用 draw_board。",
@@ -180,6 +246,13 @@ export function registerBoardTools(server: McpServer, ctx: BoardToolContext): vo
               JSON.stringify(payload, null, 2),
               ``,
               ...(firstUse ? [boardGuidance(), ``] : []),
+              "CAPABILITIES:",
+              JSON.stringify(payload.capabilities, null, 2),
+              "VISUAL_DIGEST:",
+              JSON.stringify(payload.visualDigest, null, 2),
+              "RECIPES:",
+              boardRecipes(),
+              ``,
               `PANEL_URL: ${ctx.preview.panelUrl ?? "unavailable (standalone preview not started)"}`,
             ].join("\n"),
           }],
@@ -201,13 +274,20 @@ export function registerBoardTools(server: McpServer, ctx: BoardToolContext): vo
     },
     async () => {
       try {
-        const snapshot = boardJson(await ctx.board.snapshot());
+        const current = await ctx.board.snapshot();
+        const snapshot = boardJson(current, (await ctx.library.apply({ type: "list" }, current)).index);
         return {
           content: [{
             type: "text" as const,
             text: [
               `🎨 共享画布 · revision ${snapshot.revision} · ${snapshot.itemCount} 个对象`,
               "兼容宿主会显示可交互画布；文本宿主请从 get_board 的 PANEL_URL 打开本地画板。",
+              "CAPABILITIES:",
+              JSON.stringify(snapshot.capabilities, null, 2),
+              "VISUAL_DIGEST:",
+              JSON.stringify(snapshot.visualDigest, null, 2),
+              "RECIPES:",
+              boardRecipes(),
             ].join("\n"),
           }],
           structuredContent: snapshot,
@@ -221,7 +301,7 @@ export function registerBoardTools(server: McpServer, ctx: BoardToolContext): vo
   server.registerTool(
     "draw_board",
     {
-      description: "让 AI 直接在共享无限画布上画或改：批量新增/更新便签、文字、矩形、椭圆或有方向箭头，也可按 ID 删除对象。每次操作会在锁内读取最新画板，避免覆盖其他进程的更新。line 的 (x,y) 是起点，(x+w,y+h) 是终点，w/h 可为负数；其他对象是左上角与宽高。按整齐网格布局；不打开浏览器，不写项目文件。",
+      description: "让 AI 直接在共享无限画布上画或改，也可通过 library 参数保存当前画板、切换本地画板图库中的图、新建/重命名/复制/删除/导入/导出可编辑版本 1 画板。普通写入会串行应用到最新状态；line 的 (x,y) 是起点，(x+w,y+h) 是终点，w/h 可为负数；其他对象是左上角与宽高。按整齐网格布局；不打开浏览器，不写项目文件。",
       inputSchema: z.object({
         items: z.array(itemInput).max(100).optional().describe("Objects to create; omit id"),
         updates: z.array(updateInput).max(100).optional().describe("Precise updates to existing object IDs"),
@@ -230,12 +310,42 @@ export function registerBoardTools(server: McpServer, ctx: BoardToolContext): vo
         replace_board: z.unknown().optional().describe("Rare full replacement with a version 1 board snapshot; revision and identity are preserved"),
         author: z.enum(["human", "ai"]).optional().describe("Author marker; AI responses should normally use ai"),
         expected_revision: z.number().int().nonnegative().optional().describe("Optional board revision for rejecting stale canvas edits"),
+        library: libraryAction.optional().describe("Optional local board-library action for saving, switching, renaming, duplicating, importing, or exporting editable board snapshots"),
       }),
       annotations: BOARD_WRITE_ANNOTATIONS,
       _meta: CANVAS_UI_META,
     },
-    async ({ items, updates, remove_ids, layout, replace_board, author, expected_revision }) => {
+    async ({ items, updates, remove_ids, layout, replace_board, author, expected_revision, library }) => {
       try {
+        if (library) {
+          const current = await ctx.board.snapshot();
+          if (expected_revision !== undefined && expected_revision !== current.revision) {
+            throw new BoardRevisionConflictError(expected_revision, current.revision);
+          }
+          const result = await ctx.library.apply(library as BoardLibraryAction, current);
+          let active = current;
+          if (result.previousRevision !== undefined || result.board.id !== current.id
+            || result.board.revision !== current.revision || result.board.title !== current.title) {
+            active = await ctx.board.replace(result.previousRevision === undefined
+              ? { ...result.board, revision: current.revision + 1 }
+              : { ...result.board, revision: current.revision + 1 }, current.revision);
+          }
+          ctx.preview.broadcast({ type: "board_library_updated", activeId: result.index.activeId, revision: active.revision });
+          return {
+            content: [{
+              type: "text" as const,
+              text: [
+                `🗂 画板图库 · ${library.type}`,
+                boardLibraryIndexText(result.index),
+                ...(library.type === "export" || library.type === "get" ? ["BOARD_JSON:", JSON.stringify(result.board, null, 2)] : []),
+              ].join("\n"),
+            }],
+            structuredContent: {
+              ...boardJson(active, result.index),
+              ...(library.type === "export" || library.type === "get" ? { exportBoard: result.board } : {}),
+            },
+          };
+        }
         let created = 0;
         let updated = 0;
         const removed = new Set(remove_ids ?? []);
@@ -267,6 +377,7 @@ export function registerBoardTools(server: McpServer, ctx: BoardToolContext): vo
         candidate = change(candidate);
         const board = await ctx.board.replaceIfRevision(candidate, initial.revision);
         ctx.preview.broadcast({ type: "board_updated", revision: board.revision });
+        const libraryIndex = (await ctx.library.apply({ type: "list" }, board)).index;
         return {
           content: [{
             type: "text" as const,
@@ -281,7 +392,7 @@ export function registerBoardTools(server: McpServer, ctx: BoardToolContext): vo
               }),
             ].join("\n"),
           }],
-          structuredContent: boardJson(board),
+            structuredContent: boardJson(board, libraryIndex),
         };
       } catch (error) {
         return errorResult("draw_board", error);

@@ -92,4 +92,18 @@ describe("host model context shares final board state", () => {
     expect(context.content[0].text).toContain('"finalStateNotOperationLog": true');
     expect(context.structuredContent.board).toEqual(current);
   });
+
+  it("projects visual-expression fields into bounded model context", () => {
+    const current = board(4, [
+      item({
+        text: "输入", title: "开始", role: "step", variant: "card", z: 2,
+        style: { fontSize: 18 }, startItemId: "source", endItemId: "target",
+      }),
+    ]);
+    const context = buildBoardModelContext(current);
+    expect(context.structuredContent.board.items[0]).toMatchObject({
+      title: "开始", role: "step", variant: "card", z: 2, startItemId: "source",
+    });
+    expect(context.content[0].text).toContain("source → target");
+  });
 });

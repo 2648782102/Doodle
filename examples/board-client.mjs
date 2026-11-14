@@ -15,6 +15,9 @@ try {
   console.log(`Tool annotations: ${JSON.stringify(Object.fromEntries(tools.map((tool) => [tool.name, tool.annotations])))}`);
   const board = await client.callTool({ name: "get_board", arguments: {} });
   console.log(board.content.map((item) => item.text ?? "").join("\n").slice(0, 400));
+  console.log(`Board library entries: ${board.structuredContent?.library?.boards?.length ?? 0}`);
+  console.log(`Capabilities: ${board.structuredContent?.capabilities?.layouts?.join(", ") ?? "n/a"}`);
+  console.log(`Visual digest: ${board.structuredContent?.visualDigest?.itemCount ?? 0} objects`);
   const view = await client.callTool({ name: "show_board", arguments: {} });
   console.log(view.content.map((item) => item.text ?? "").join("\n"));
   console.log("Embedded hosts may publish final-state board context to the current session; standalone PANEL_URL edits require get_board rereading.");

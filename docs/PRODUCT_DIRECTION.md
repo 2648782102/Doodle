@@ -4,7 +4,7 @@
 
 The product story is deliberately small: one kernel, two entry points, three capability layers.
 
-- One kernel: the shared infinite board and version 1 state with optional extended object fields.
+- One kernel: the shared infinite board and version 1 state with optional extended object fields; a local library stores named editable snapshots of that same state.
 - Two entry points: the recommended Codex plugin and direct MCP / `npx` for any MCP host.
 - Three layers: four tools always work; MCP Apps hosts render the canvas; hosts with `updateModelContext` / `sendMessage` add automatic final-state sync and a short notification. The standalone `PANEL_URL` page is the fallback when no embedded canvas is available.
 
@@ -26,8 +26,10 @@ The loop can start from either side and pause at any point. `get_board` remains 
 ## Product model
 
 - **Canvas:** an infinite surface with bounded objects: notes, text, rectangles, ellipses, directed arrows, freehand strokes, and local `data:image/*` images. A line runs from `(x,y)` to `(x+w,y+h)` and can route as a straight, curve, or orthogonal path. Click to place a default-sized object or drag to size shapes, sketch, and draw arrows in any direction. Space-drag or middle-drag pans; the wheel pans and Ctrl/Command-wheel zooms.
-- **Human input:** clicking, dragging, double-click-to-create, text editing, marquee multi-select, batch move/delete/group/layout, undo/redo, image paste, arrow-key nudging, alignment snapping, and drawing new visual context. Discussion happens in the agent host conversation; an optional `通知 Agent` button adds one short message there, never a second chat surface.
-- **AI input:** `get_board` reads progressive first-use or concise next-step guidance, canvas data, and the active loopback `PANEL_URL`; `show_board` returns the optional MCP App view; `draw_board` adds items, applies precise updates/removals, arranges objects, and rejects stale UI edits by revision. The visible App refreshes the shared board so either side sees the other's drawings in place. `scan_project` optionally reads bounded project structure.
+- **Human input:** clicking, dragging, immediate freehand ink, freehand-only drag-to-erase, double-click-to-create, text editing, marquee multi-select, batch move/delete/group/layout, undo/redo, image paste, arrow-key nudging, alignment snapping, and drawing new visual context. Discussion happens in the agent host conversation; an optional `通知 Agent` button adds one short message there, never a second chat surface.
+- **AI input:** `get_board` reads progressive first-use or concise next-step guidance, canvas data, `capabilities`, `visualDigest`, recipes, and the active loopback `PANEL_URL`; `show_board` returns the optional MCP App view; `draw_board` adds items, applies precise updates/removals, deterministic layouts, connected lines, visual-expression fields, and rejects stale UI edits by revision. The visible App refreshes the shared board so either side sees the other's drawings in place. `scan_project` optionally reads bounded project structure.
+- **Board library:** local version 1 snapshots can be saved, listed, switched, renamed, duplicated, deleted, imported, and exported as editable JSON. The active board remains the single shared communication surface; switching changes which saved board is active for both the person and the AI.
+- **Visual expression:** a small set of optional version 1 fields and deterministic recipes turns primitives into intentional diagrams without a template library: variants, roles, z-order, bounded styles, connector bindings, group IDs, and five layout modes. The board remains a whiteboard, not a Figma clone.
 - **Authors:** every object records whether a person or AI created it. Legacy board notes remain in version 1 state for compatibility but are hidden from current tools and UI.
 - **Approval:** this product has no built-in code-change approval protocol. Board content never authorizes project writes.
 
@@ -49,13 +51,14 @@ The loop can start from either side and pause at any point. `get_board` remains 
 - No hosted accounts, multi-user SaaS, social presence, or mandatory turn-taking workflow.
 - No duplicate chat product, second session model, or board message feed. A host notification is one short message in the existing conversation.
 - No project dashboard, Mermaid diagram library, IDE extension, or static image exporter.
+- No static PNG/SVG board export; saved “图” are editable version 1 board snapshots.
 - No `SessionSnapshot`, `VisualGraph`, annotation threads, proposals, diff review, approval receipts, or derived context catalogues.
 - No AI project writes triggered by drawing or scans. Code changes remain a separately reviewed coding-agent action.
 - No browser or IDE window opening from normal MCP tools.
 
 ## Acceptance
 
-A fresh checkout installs through `npm run setup:codex`, and any MCP host can use the zero-configuration `npx -y doodle-mcp` CLI. Both paths build or expose exactly four tools. Text-only hosts can use all tools without rendering UI. MCP Apps-compatible hosts can show and edit the shared canvas beside their conversation; the UI reads and writes only through the host's `get_board` and `draw_board` calls. Hosts that advertise `updateModelContext` receive a complete current structured snapshot plus `added` / `updated` / `removed` final-state differences, never an operation log; `sendMessage` is used only by the user-initiated notification button. A person can open the standalone local page at the reported `PANEL_URL`, move objects, edit text, draw new objects, and see AI changes on the same board; this fallback has no current-host-session bridge. Official OpenAI documentation says local marketplace installs are separate from the public directory and should be used in a new session.
+A fresh checkout installs through `npm run setup:codex`, and any MCP host can use the zero-configuration `npx -y doodle-mcp` CLI. Both paths build or expose exactly four tools. Text-only hosts can use all tools without rendering UI. MCP Apps-compatible hosts can show and edit the shared canvas beside their conversation; the UI reads and writes only through the host's `get_board` and `draw_board` calls. Hosts that advertise `updateModelContext` receive a complete current structured snapshot plus `added` / `updated` / `removed` final-state differences, never an operation log; `sendMessage` is used only by the user-initiated notification button. A person can open the standalone local page at the reported `PANEL_URL`, move objects, edit text, draw new objects, save/switch editable board snapshots, and see AI changes on the same active board; this fallback has no current-host-session bridge. Official OpenAI documentation says local marketplace installs are separate from the public directory and should be used in a new session.
 
 ## Next work
 

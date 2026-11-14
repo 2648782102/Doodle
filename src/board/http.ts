@@ -10,10 +10,12 @@ import { logger } from "../infra/logger.js";
 import {
   addBoardItem,
   addBoardItems,
+  boardVisualDigest,
   layoutBoardItems,
   removeBoardItem,
   removeBoardItems,
   replaceBoardContent,
+  touchBoard,
   updateBoardItem,
   updateBoardItems,
   type BoardItemInput,
@@ -21,6 +23,7 @@ import {
   type SimpleBoard,
 } from "./types.js";
 import { BoardRevisionConflictError } from "./errors.js";
+import { BoardLibrary, boardLibraryIndexText, type BoardLibraryAction } from "./library.js";
 import type { BoardStore } from "./store.js";
 import { projectSnapshotText, scanProject, type ProjectScanOptions } from "./project-scan.js";
 
@@ -39,7 +42,18 @@ function templateCandidates(config: AppConfig): string[] {
 
 function canvasSnapshot(board: SimpleBoard) {
   const { notes: _legacyNotes, ...snapshot } = board;
-  return snapshot;
+  return {
+    ...snapshot,
+    visualDigest: boardVisualDigest(board),
+    capabilities: {
+      version: 1,
+      layouts: ["grid", "row", "column", "timeline", "cluster"],
+      connectors: ["startItemId", "endItemId"],
+      variants: ["plain", "card", "frame", "pill", "diamond", "callout", "heading"],
+      roles: ["normal", "label", "frame", "column", "step", "decision", "annotation"],
+      recipes: ["flow", "compare", "cluster", "emphasis", "image-annotation"],
+    },
+  };
 }
 
 export class BoardHttpServer {
@@ -49,12 +63,14 @@ export class BoardHttpServer {
   private readonly panelToken = crypto.randomBytes(24).toString("hex");
   private appBundle = "";
   private panelUrlValue: string | null = null;
+  private readonly library: BoardLibrary;
 
   constructor(
     private board: BoardStore,
     private config: AppConfig,
   ) {
     this.app.use(express.json({ limit: "2mb" }));
+    this.library = new BoardLibrary(config.outputDir);
     this.setupRoutes();
   }
 
@@ -68,7 +84,36 @@ export class BoardHttpServer {
     });
 
     this.app.get("/api/board", async (_req, res) => {
-      res.json(canvasSnapshot(await this.board.snapshot()));
+      const current = await this.board.snapshot();
+      const index = (await this.library.apply({ type: "list" }, current)).index;
+      res.json({ ...canvasSnapshot(current), library: index });
+    });
+
+    this.app.get("/api/board/library", async (_req, res) => {
+      const result = await this.library.apply({ type: "list" }, await this.board.snapshot());
+      res.json(result.index);
+    });
+
+    this.app.post("/api/board/library", async (req, res) => {
+      const body = req.body as { action?: BoardLibraryAction; confirmedBy?: string };
+      if (body.confirmedBy !== "human") return res.status(403).json({ error: "Human confirmation is required" });
+      if (!body.action || typeof body.action !== "object") return res.status(400).json({ error: "action is required" });
+      const current = await this.board.snapshot();
+      const result = await this.library.apply(body.action, current);
+      if (result.previousRevision !== undefined || result.board.id !== current.id
+        || result.board.revision !== current.revision || result.board.title !== current.title) {
+        const next = await this.board.replace(result.previousRevision === undefined
+          ? touchBoard(result.board)
+          : { ...result.board, revision: current.revision + 1 }, current.revision);
+        result.board = next;
+      }
+      this.broadcast({ type: "board_library_updated", activeId: result.index.activeId, revision: result.board.revision });
+      res.json({
+        ok: true,
+        index: result.index,
+        board: canvasSnapshot(result.board),
+        ...(body.action.type === "export" || body.action.type === "get" ? { exportBoard: result.board } : {}),
+      });
     });
 
     const commit = async (

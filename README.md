@@ -13,6 +13,8 @@ Doodle 只有一个内核：**人和 AI 共用的无限画板**。AI 通过 MCP 
 
 宿主能力分三层：四工具始终可用；支持 MCP Apps 时把同一张画布显示在对话旁；支持 `updateModelContext` / `sendMessage` 时增加自动同步和短通知。宿主不渲染画布时，`get_board` 返回的 `PANEL_URL` 是本地兜底页面。项目结构只是可选素材，不是产品主体。
 
+画板图库保存的是**可编辑的版本 1 画板快照**：可以另存当前图、切换不同图、新建 / 重命名 / 复制 / 删除图，以及导入 / 导出 JSON。它不是静态 PNG 导出，也不是第二套会话模型；`get_board`、MCP App 和本地画布始终读写同一张当前活动图。
+
 `PANEL_URL` 属于当前 MCP server 进程：会话或宿主退出后它会失效，这是正常生命周期。需要脱离会话、手动开关的本地预览时，运行 `npm run preview:board`；它只启动画板 HTTP 服务，不注册 MCP stdio 工具，也不会安装后台服务。用 `Ctrl+C` 停止。
 
 双向主流程：
@@ -40,7 +42,7 @@ npm run setup:codex
 打开 Doodle 画板，我们先用画板交流。
 ```
 
-兼容 MCP Apps 的宿主会直接显示画布；AI 会先读画板，再放一个起步对象。你可以选工具点按 / 拖拽直接画，双击对象改字、双击空白新建便签；空白处拖拽可框选并批量移动 / 删除 / 成组 / 整理，支持 `Ctrl/⌘+Z` 撤销重做、方向键微调、对齐吸附和 `Ctrl/⌘+V` 粘贴图片。`?` 可随时查看提示。人画完后，宿主会自动同步最终状态（若支持），也可点「通知 Agent」发一句短提醒；AI 会看画、用文字或继续画图回应。若宿主不显示画布，就问 AI 要 `PANEL_URL`，打开本地地址，并在聊天里让 AI 重读。
+兼容 MCP Apps 的宿主会直接显示画布；AI 会先读画板，再放一个起步对象。你可以选工具点按 / 拖拽直接画，画笔按下即出墨并可连续画，橡皮擦只擦画笔笔迹；双击对象改字、双击空白新建便签；空白处拖拽可框选并批量移动 / 删除 / 成组 / 整理，支持 `Ctrl/⌘+Z` 撤销重做、方向键微调、对齐吸附和 `Ctrl/⌘+V` 粘贴图片。右上角「图库」可保存当前图、切换不同图，以及导入 / 导出可编辑 JSON。`?` 可随时查看提示。人画完后，宿主会自动同步最终状态（若支持），也可点「通知 Agent」发一句短提醒；AI 会看画、用文字或继续画图回应。若宿主不显示画布，就问 AI 要 `PANEL_URL`，打开本地地址，并在聊天里让 AI 重读。
 
 完整链路：`npm run setup:codex → 新会话 → 首句提示 → AI 和人双向画 / 改 → 最终状态同步 / 通知 Agent → AI 再看 / 再画`。
 
@@ -50,9 +52,9 @@ npm run setup:codex
 
 | 工具 | 用途 |
 |---|---|
-| `get_board` | 读取共享画布；空画板给 `FIRST_USE` / `NEXT_STEPS` 和画图规范，有内容后切到简短 `NEXT`，始终保留 revision、对象 ID、坐标、作者与 `BOARD_JSON`；默认第一步，只读 |
+| `get_board` | 读取共享画布；空画板给 `FIRST_USE` / `NEXT_STEPS` 和画图规范，有内容后切到简短 `NEXT`，始终保留 revision、对象 ID、坐标、作者、`BOARD_JSON`、`capabilities`、`visualDigest` 与图库索引；默认第一步，只读 |
 | `show_board` | 在 Agent 对话旁打开可交互的共享画布；用户要求查看或编辑画布时使用 |
-| `draw_board` | 新增对象、精确更新、删除或自动整理；支持便签、文字、形状、箭头、手绘、图片、标题和重点标记；写入会串行应用到最新状态 |
+| `draw_board` | 新增对象、精确更新、删除、确定性布局、连接线、变体 / 角色 / 样式 / 层级，以及通过 `library` 保存 / 切换 / 导入 / 导出可编辑画板；支持便签、文字、形状、箭头、手绘、图片、标题和重点标记；写入会串行应用到最新状态 |
 | `scan_project` | 可选只读扫描当前项目结构，返回有界相对路径和 `file:line` 证据文本；不写文件、不自动画图 |
 
 默认双向闭环：
@@ -108,6 +110,10 @@ npm run preview:board
 - 尽量用 `draw_board.updates` 精确修改；确需重画时再用 `remove_ids` 清理旧对象。
 - `author` 放在 `draw_board` 顶层参数，不放进 item。
 - `line` 可用 `shape: "straight" | "curve" | "orthogonal"`；`stroke` 的 `points` 是相对对象边界的局部坐标；`image` 使用有界的 `data:image/*;base64`。
+- 先读 `capabilities`、`visualDigest` 和 `RECIPES`：流程用 `role: "step"` + `startItemId` / `endItemId`，对比用 `role: "column"` 或 `variant: "frame"`，聚类用 `groupId` + `layout.mode: "cluster"`，重点用 `emphasis: "focus"`。
+- 可选 `variant / role / z / style / startItemId / endItemId` 都是版本 1 兼容字段；`layout.mode` 支持 `grid / row / column / timeline / cluster`。
+- `draw_board.library` 支持 `list / get / create / save / switch / rename / duplicate / delete / import / export`；切换后会改变当前活动画板，`get_board` 随后读到的就是新图。
+- 图库文件保存在本地 `OUTPUT_DIR/.doodle/boards/`，每个图都是完整的版本 1 `board.json` 结构，不生成静态图片。
 - 结构化图用严格网格、短标签、一致尺寸。
 - `line` 是箭头：`(x,y)` 为起点，`(x+w,y+h)` 为终点；`w` / `h` 可为负数。
 - 箭头端点贴着源对象和目标对象的外缘，标签保持短。

@@ -1,6 +1,7 @@
 import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import {
   BoardHttpServer,
+  BoardLibrary,
   BoardStore,
   MCP_INSTRUCTIONS,
   registerBoardTools,
@@ -17,13 +18,14 @@ export async function createServer() {
 
   const board = new BoardStore(config.outputDir);
   await board.init();
+  const library = new BoardLibrary(config.outputDir);
   const preview = new BoardHttpServer(board, config);
   const mcp = new McpServer(
     { name: "doodle-mcp", version: SERVER_VERSION },
     { instructions: MCP_INSTRUCTIONS },
   );
 
-  registerBoardTools(mcp, { board, preview, config });
+  registerBoardTools(mcp, { board, preview, config, library });
   logger.info(`${TOOL_COUNT} MCP tools registered`);
 
   return { mcp, preview, config, board };

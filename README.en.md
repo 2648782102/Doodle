@@ -13,6 +13,8 @@ There are two supported entry points:
 
 Host capability has three layers: the four tools always work; MCP Apps hosts show the same canvas beside the chat; hosts with `updateModelContext` / `sendMessage` add automatic final-state sync and a short notification. When a host cannot render the canvas, `PANEL_URL` from `get_board` is the local fallback page. Project structure is optional source material, not the product.
 
+The board library stores **editable version 1 board snapshots**: save the current image, switch between saved boards, create/rename/duplicate/delete boards, and import/export JSON. It is not static PNG export and not a second session model; `get_board`, the MCP App, and the standalone canvas always read and write the same active board.
+
 `PANEL_URL` belongs to the current MCP server process: it becomes unavailable when that session or host exits. For a local preview independent of a conversation, run `npm run preview:board`. It starts only the board HTTP server, registers no MCP stdio tools, and installs no background service. Stop it with `Ctrl+C`.
 
 The two-way loop:
@@ -39,7 +41,7 @@ It installs dependencies when needed, builds the self-contained plugin, register
 Open the Doodle board so we can communicate on it.
 ```
 
-MCP Apps-compatible hosts show the canvas beside the chat. The AI reads the board first, then draws a starter object. Pick a tool to click or drag to draw directly; double-click an object to edit text and double-click empty canvas to create a note. Drag on empty canvas to marquee-select for batch move/delete/group/layout, with undo/redo, arrow-key nudging, alignment snapping, and `Ctrl/⌘+V` image paste. Use `?` for the short gesture guide. After a person draws, capable hosts sync the final state automatically; `Notify Agent` sends one short reminder where supported. The AI replies in chat or keeps drawing on the board. If the host cannot render the canvas, ask for `PANEL_URL`, open that local address, and ask the AI to reread the board in chat.
+MCP Apps-compatible hosts show the canvas beside the chat. The AI reads the board first, then draws a starter object. Pick a tool to click or drag to draw directly; the pen lays down ink on pointer-down and stays active for continuous drawing, while the eraser removes only freehand ink segments. Double-click an object to edit text and double-click empty canvas to create a note. Drag on empty canvas to marquee-select for batch move/delete/group/layout, with undo/redo, arrow-key nudging, alignment snapping, and `Ctrl/⌘+V` image paste. The top-right `Library` panel saves the current board, switches saved boards, and imports/exports editable JSON. Use `?` for the short gesture guide. After a person draws, capable hosts sync the final state automatically; `Notify Agent` sends one short reminder where supported. The AI replies in chat or keeps drawing on the board. If the host cannot render the canvas, ask for `PANEL_URL`, open that local address, and ask the AI to reread the board in chat.
 
 The complete path is `npm run setup:codex → new session → first prompt → two-way drawing and editing → final-state context sync / notification → AI reads and draws again`.
 
@@ -49,9 +51,9 @@ The complete path is `npm run setup:codex → new session → first prompt → t
 
 | Tool | Purpose |
 |---|---|
-| `get_board` | Read the shared canvas; an empty board returns `FIRST_USE` / `NEXT_STEPS` and the drawing guide, while later reads use a concise `NEXT`. `BOARD_JSON`, object IDs, coordinates, authors, and revision are always retained. |
+| `get_board` | Read the shared canvas; an empty board returns `FIRST_USE` / `NEXT_STEPS` and the drawing guide, while later reads use a concise `NEXT`. `BOARD_JSON`, object IDs, coordinates, authors, revision, `capabilities`, `visualDigest`, and the library index are always retained. |
 | `show_board` | Open the interactive shared canvas beside the agent conversation when a user wants to see or edit it. |
-| `draw_board` | Add items, apply precise updates/removals, or arrange objects; supports notes, text, shapes, arrows, strokes, images, headings, and focus markers; writes are serialized against the latest state. |
+| `draw_board` | Add items, apply precise updates/removals, deterministic layout, connected lines, variants/roles/styles/z-order, or use `library` to save/switch/import/export editable boards; supports notes, text, shapes, arrows, strokes, images, headings, and focus markers; writes are serialized against the latest state. |
 | `scan_project` | Optional read-only project paths and bounded `file:line` evidence. It does not draw or write files. |
 
 The loop is two-way: `AI reads and draws → person draws or edits → final-state delta enters the current conversation context / person notifies the agent → AI reads and draws again`. `show_board` is the explicit render tool, while successful `draw_board` results also advertise the optional UI in compatible hosts. Project structure is only one possible subject; `scan_project` is optional and must be visualized with `draw_board` if needed.
@@ -91,6 +93,10 @@ Version 1 board files may contain old notes. They remain readable for compatibil
 - A `line` is a directed arrow from `(x,y)` to `(x+w,y+h)`; `w` and `h` may be negative. Set `shape` to `straight`, `curve`, or `orthogonal`. Other objects use `(x,y)` as the top-left corner.
 - `stroke.points` are local to the item bounds; `image.src` is a bounded `data:image/*;base64` source.
 - Use `remove_ids` only when replacing a whole diagram.
+- `draw_board.library` supports `list / get / create / save / switch / rename / duplicate / delete / import / export`; switching changes the active board, and subsequent `get_board` calls read the newly selected board.
+- Read `capabilities`, `visualDigest`, and `RECIPES` first: flow uses `role: "step"` with `startItemId`/`endItemId`, compare uses `role: "column"` or `variant: "frame"`, cluster uses `groupId` with `layout.mode: "cluster"`, and emphasis uses `emphasis: "focus"`.
+- Optional `variant / role / z / style / startItemId / endItemId` are version 1 compatible fields; `layout.mode` supports `grid / row / column / timeline / cluster`.
+- Library files live in `OUTPUT_DIR/.doodle/boards/`; each saved image is a complete version 1 `board.json` snapshot, not a static picture.
 
 ## Safety
 

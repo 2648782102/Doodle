@@ -44,6 +44,41 @@ jobs:
             process.exit(1);
           }
           NODE
+      - name: Verify local board library snapshots
+        run: |
+          node --input-type=module <<'NODE'
+          import fs from "node:fs/promises";
+          import os from "node:os";
+          import path from "node:path";
+          import { BoardLibrary } from "./dist/board/library.js";
+          import { createEmptyBoard, touchBoard } from "./dist/board/types.js";
+          const outputDir = await fs.mkdtemp(path.join(os.tmpdir(), "doodle-ci-library-"));
+          try {
+            const library = new BoardLibrary(outputDir);
+            const current = touchBoard(createEmptyBoard());
+            const seeded = await library.apply({ type: "list" }, current);
+            const created = await library.apply({ type: "create", name: "CI board", switchTo: true }, seeded.board);
+            if (created.index.boards.length !== 2 || created.index.activeId === seeded.index.activeId) process.exit(1);
+            const switched = await library.apply({ type: "switch", id: seeded.index.activeId }, created.board);
+            if (switched.index.activeId !== seeded.index.activeId) process.exit(1);
+          } finally {
+            await fs.rm(outputDir, { recursive: true, force: true });
+          }
+          NODE
+      - name: Verify AI visual language
+        run: |
+          node --input-type=module <<'NODE'
+          import { createEmptyBoard, addBoardItems, boardVisualDigest } from "./dist/board/types.js";
+          import { buildBoardModelContext } from "./dist/board/app-context.js";
+          const board = addBoardItems(createEmptyBoard(), [
+            { type: "rect", x: 0, y: 0, w: 120, h: 80, text: "A", role: "step", author: "ai" },
+            { type: "rect", x: 200, y: 0, w: 120, h: 80, text: "B", role: "step", author: "ai" },
+          ]);
+          const line = addBoardItems(board, [{ type: "line", x: 120, y: 40, w: 80, h: 0, text: "next", startItemId: board.items[0].id, endItemId: board.items[1].id, author: "ai" }]);
+          const digest = boardVisualDigest(line);
+          const context = buildBoardModelContext({ ...line, itemCount: line.items.length });
+          if (digest.connections[0].label !== "next" || !context.content[0].text.includes("→")) process.exit(1);
+          NODE
       - run: npm run test:examples
       - run: npm run repo:check
       - run: npm run repo:plugin-check

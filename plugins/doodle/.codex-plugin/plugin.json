@@ -15,7 +15,7 @@
   "interface": {
     "displayName": "Doodle Shared Board",
     "shortDescription": "Two-way human + AI board",
-    "longDescription": "Doodle is a local-first two-way board. A person and an AI both draw notes, text, shapes, and directed arrows on one canvas to express intent; either side can read and continue what the other drew. Four focused MCP tools work in every host; MCP Apps rendering, final-state context sync, and notification are optional capabilities. Conversation stays in the host chat. Project structure is only one possible subject, and the board never writes project files.",
+    "longDescription": "Doodle is a local-first two-way board. A person and an AI both draw notes, text, shapes, arrows, freehand ink, images, and connected visual compositions on one canvas to express intent; either side can read and continue what the other drew. Four focused MCP tools work in every host; MCP Apps rendering, final-state context sync, notification, and an editable board library are local capabilities. Conversation stays in the host chat. Project structure is only one possible subject, and the board never writes project files.",
     "developerName": "Doodle open-source contributors",
     "category": "Developer Tools",
     "capabilities": ["Read", "Write"],
