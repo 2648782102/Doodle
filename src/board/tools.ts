@@ -11,6 +11,7 @@ import type { BoardStore } from "./store.js";
 import { BoardRevisionConflictError } from "./errors.js";
 import { boardAgentDelta, boardAgentView, summarizeAgentBoard } from "./agent-view.js";
 import { BoardRevisionCache } from "./revision-cache.js";
+import { describeHandoff } from "./handoff.js";
 import {
   addBoardItem,
   addBoardItems,
@@ -308,9 +309,16 @@ export function registerBoardTools(server: McpServer, ctx: BoardToolContext): vo
 
         if (since_revision !== undefined && previous) {
           const delta = boardAgentDelta(current, previous);
+          const handoff = describeHandoff(current, previous);
           const deltaText = [
             `🎨 共享画布 · rev ${delta.baseRevision} → rev ${delta.revision} · ${delta.unchanged ? "无变化" : `新增 ${delta.added.length} · 更新 ${delta.updated.length} · 删除 ${delta.removed.length}`}`,
             "",
+            `HANDOFF: ${handoff.summary}`,
+            ...(handoff.needsAttention ? [
+              "HANDOFF_JSON:",
+              JSON.stringify(handoff, null, 2),
+              "",
+            ] : []),
             "BOARD_DELTA_JSON:",
             JSON.stringify(delta, null, 2),
             "",
@@ -327,6 +335,7 @@ export function registerBoardTools(server: McpServer, ctx: BoardToolContext): vo
               readOnly: true,
               mode: "delta",
               ...delta,
+              handoff,
               summary: summarizeAgentBoard(current),
             },
           };

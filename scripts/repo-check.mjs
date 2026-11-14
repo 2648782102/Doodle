@@ -140,7 +140,7 @@ check(instructions.includes("Doodle is"), "MCP instructions do not introduce Doo
 check(instructions.includes("two-way") && instructions.includes("one kernel, two entry points, three capability layers"), "MCP instructions lost the two-way product story");
 check(instructions.includes("updateModelContext") && instructions.includes("final-state delta"), "MCP instructions do not describe host model context sync");
 check(instructions.includes("draw_board.diagram") && instructions.includes("never combines diagram"), "MCP instructions do not describe the exclusive semantic diagram path");
-check(sourceFiles.length === 14, `src/board has ${sourceFiles.length} TypeScript modules; expected the focused fourteen-module structure`);
+check(sourceFiles.length === 15, `src/board has ${sourceFiles.length} TypeScript modules; expected the focused fourteen-module structure`);
 check(!boardIndex.includes("preview-server") && !boardIndex.includes("session-store"), "board index re-exports legacy infrastructure");
 check((tools.match(/server\.registerTool\(/g) ?? []).length === 4 && !tools.includes("server.tool("), "tools.ts does not register exactly four annotated MCP tools");
 check(tools.includes("readOnlyHint: true") && tools.includes("destructiveHint: true") && tools.includes("openWorldHint: false"), "tool annotations are incomplete");
@@ -152,6 +152,8 @@ check(tools.includes("FIRST_USE:") && tools.includes("NEXT_STEPS:") && tools.inc
 check(tools.includes("structuredContent: boardAgentPayload(board, libraryIndex)"), "board tools do not return an authoritative agent-view snapshot");
 check(tools.includes("function boardAgentPayload") && tools.includes("canvasFidelityItems") && tools.includes("function boardJson("), "agent payload and full canvas payload are not separated");
 check(tools.includes("since_revision") && tools.includes("boardAgentDelta") && tools.includes("BoardRevisionCache"), "incremental rereads or their revision cache are missing");
+check(tools.includes("describeHandoff") && tools.includes("handoff") && tools.includes("needsAttention"), "delta reads do not attribute human edits");
+check(buildScript.includes("excalidraw-app.tsx"), "build is missing the canvas client");
 check(tools.includes("guideSent") && tools.includes("include_guide"), "the guide is not sent once with an explicit opt-in");
 check(tools.includes("boardCapabilities()") && tools.includes("visualDigest: boardVisualDigest(board)") && tools.includes("boardRecipes()"), "board tools lost AI visual language");
 check(tools.includes('startItemId: z.string()') && tools.includes('mode: z.enum(["grid", "row", "column", "timeline", "cluster", "architecture"])') && tools.includes("diagram: diagramInput.optional()"), "draw_board lost connector bindings, expanded layouts, or semantic diagram recipe");
@@ -251,7 +253,7 @@ check(codexExample.includes('args = ["-y", "doodle-mcp"]') && !codexExample.incl
 check(setupScript.includes('"plugin", "marketplace", "add"') && setupScript.includes('"plugin", "add", "doodle@doodle"') && setupScript.includes("--dry-run"), "setup script does not safely install the local plugin");
 check(setupScript.includes('if (dryRun) return { status: 0 }') || setupScript.includes("if (dryRun) return { status: 0; }"), "setup dry-run can still execute commands");
 check(await exists("plugins/doodle/skills/doodle/SKILL.md") && await exists("scripts/build-plugin.mjs") && await exists("scripts/plugin-check.mjs"), "plugin packaging files are incomplete");
-check(totalSourceFiles.length === 21, `src has ${totalSourceFiles.length} TypeScript modules; expected the focused plugin-ready structure`);
+check(totalSourceFiles.length === 22, `src has ${totalSourceFiles.length} TypeScript modules; expected the focused plugin-ready structure`);
 
 if (failures.length) {
   console.error("❌ Offline repository checks failed:");

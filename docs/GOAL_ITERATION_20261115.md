@@ -112,6 +112,24 @@ author's order is preserved. A node that is still unplaced after layout - an
 explicit mode with no columns, or a cycle - keeps declaration order instead of
 overlapping every node at the origin.
 
+## Third target: tell the agent what the person did
+
+`visualDigest` answers "what is on the board now". It does not answer the
+question that actually drives the next turn: *what did the person change since I
+last looked?* Without it the agent redraws from scratch or asks the person to
+repeat themselves, which is the opposite of a two-way board.
+
+A delta read now also carries `HANDOFF`:
+
+- Only human-attributed changes are reported. A change counts as human when the
+  item's author is `human` now, or when a human-authored item disappeared. The
+  agent is never told to review its own last write.
+- Each edit reports the final values that differ - `added`, `edited`, or
+  `removed`, the changed field names, and the clipped final text and position -
+  so no second read is needed to see what the person meant.
+- The payload is bounded: at most 12 edits, with `omitted` counting the rest.
+- When nothing human changed, the agent gets one line saying so, not silence.
+
 ## Authority and red lines
 
 - Allowed: normal commits and pushes on this branch, source, tests, docs, CI,

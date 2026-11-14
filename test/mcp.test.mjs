@@ -290,6 +290,43 @@ describe("MCP board server", () => {
     });
   }, 30_000);
 
+  it("tells the agent what the person changed since its last read", async () => {
+    await withClient(3447, async (client) => {
+      await client.callTool({
+        name: "draw_board",
+        arguments: { author: "ai", items: [{ type: "note", x: 0, y: 0, w: 160, h: 90, text: "开始" }] },
+      });
+      const first = await client.callTool({ name: "get_board", arguments: {} });
+      const base = first.structuredContent.revision;
+      const note = first.structuredContent.items[0];
+
+      // The person edits that object on the canvas.
+      await client.callTool({
+        name: "draw_board",
+        arguments: { author: "human", updates: [{ id: note.id, patch: { text: "从需求开始" } }] },
+      });
+
+      const reread = await client.callTool({ name: "get_board", arguments: { since_revision: base } });
+      const text = textOf(reread);
+      expect(reread.structuredContent.handoff.needsAttention).toBe(true);
+      expect(reread.structuredContent.handoff.humanEdits).toHaveLength(1);
+      expect(reread.structuredContent.handoff.humanEdits[0]).toMatchObject({ id: note.id, change: "edited" });
+      expect(reread.structuredContent.handoff.humanEdits[0].now.text).toBe("从需求开始");
+      expect(text).toContain("HANDOFF:");
+      expect(text).toContain("HANDOFF_JSON:");
+
+      // An AI-only follow-up must not claim the person did anything.
+      const afterAi = await client.callTool({ name: "get_board", arguments: { since_revision: reread.structuredContent.revision } });
+      await client.callTool({
+        name: "draw_board",
+        arguments: { author: "ai", items: [{ type: "note", x: 240, y: 0, w: 160, h: 90, text: "AI 补充" }] },
+      });
+      const aiOnly = await client.callTool({ name: "get_board", arguments: { since_revision: afterAi.structuredContent.revision } });
+      expect(aiOnly.structuredContent.handoff.needsAttention).toBe(false);
+      expect(textOf(aiOnly)).toContain("没有改动");
+    });
+  }, 30_000);
+
   it("treats PREVIEW_PORT=0 as automatic port selection", async () => {
     const transport = new StdioClientTransport({
       command: "node",
