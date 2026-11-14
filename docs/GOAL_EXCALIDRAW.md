@@ -29,7 +29,7 @@ BoardStore / MCP tools / HTTP API / BoardLibrary
 
 ## Acceptance
 
-1. `@excalidraw/excalidraw`, React, ReactDOM, and `perfect-freehand` are pinned and built locally with esbuild; no CDN references exist.
+1. `@excalidraw/excalidraw`, React, and ReactDOM are pinned and built locally with esbuild; no CDN references exist. `perfect-freehand` and the old `board-app.js` bridge were removed as redundant because Excalidraw bundles its own freehand implementation and the context bridge now lives in `excalidraw-app.tsx`.
 2. Excalidraw production CSS and fonts are copied into `dist/infra/templates/excalidraw/` and the generated plugin package.
 3. `GET /` serves the Excalidraw-based canvas; there is no DOM-engine fallback on this feature branch.
 4. Board v1 objects project into Excalidraw elements with stable IDs and `customData.doodle` metadata.

@@ -20,8 +20,8 @@ const packageJson = JSON.parse(await read("package.json"));
 const server = await read("src/server.ts");
 const buildScript = await read("scripts/build.mjs");
 const instructions = await read("src/board/instructions.ts");
-const appSource = await read("src/board/app.ts");
 const appContext = await read("src/board/app-context.ts");
+const excalidrawApp = await read("src/infra/templates/excalidraw-app.tsx");
 const boardIndex = await read("src/board/index.ts");
 const tools = await read("src/board/tools.ts");
 const boardTypes = await read("src/board/types.ts");
@@ -118,7 +118,7 @@ check(launchKit.includes(`Recommended topics: ${canonicalTopics.map((topic) => `
 check(readmeEn.includes(`> ${canonicalDescription}`), "English README does not use the canonical Doodle description");
 check(!packageJson.dependencies.mermaid && !packageJson.dependencies.sharp && !packageJson.dependencies.open && !packageJson.dependencies.nanoid, "package.json still has removed rendering/IDE dependencies");
 check(!packageJson.scripts["ui:shots"] && !packageJson.scripts["github:sync"], "package.json still has removed legacy scripts");
-check(Object.keys(packageJson.dependencies).sort().join(",") === "@excalidraw/excalidraw,@modelcontextprotocol/ext-apps,@modelcontextprotocol/sdk,express,perfect-freehand,react,react-dom,ws,zod", "runtime dependencies do not match the Excalidraw experiment");
+check(Object.keys(packageJson.dependencies).sort().join(",") === "@excalidraw/excalidraw,@modelcontextprotocol/ext-apps,@modelcontextprotocol/sdk,express,react,react-dom,ws,zod", "runtime dependencies do not match the Excalidraw-only experiment");
 check(packageJson.devDependencies.esbuild, "esbuild is missing for the MCP Apps browser bundle");
 check(packageJson.overrides?.["@hono/node-server"] && packageJson.overrides?.hono && packageJson.overrides?.["fast-uri"], "transitive security overrides are missing");
 check(server.includes("registerBoardTools") && server.includes("TOOL_COUNT = 4"), "server.ts is not the four-tool board composition root");
@@ -132,7 +132,7 @@ check(instructions.includes("PANEL_URL") && !instructions.includes("reply_on_boa
 check(instructions.includes("Doodle is"), "MCP instructions do not introduce Doodle");
 check(instructions.includes("two-way") && instructions.includes("one kernel, two entry points, three capability layers"), "MCP instructions lost the two-way product story");
 check(instructions.includes("updateModelContext") && instructions.includes("final-state delta"), "MCP instructions do not describe host model context sync");
-check(sourceFiles.length === 13, `src/board has ${sourceFiles.length} TypeScript modules; expected the focused thirteen-module structure`);
+check(sourceFiles.length === 12, `src/board has ${sourceFiles.length} TypeScript modules; expected the focused twelve-module structure`);
 check(!boardIndex.includes("preview-server") && !boardIndex.includes("session-store"), "board index re-exports legacy infrastructure");
 check((tools.match(/server\.registerTool\(/g) ?? []).length === 4 && !tools.includes("server.tool("), "tools.ts does not register exactly four annotated MCP tools");
 check(tools.includes("readOnlyHint: true") && tools.includes("destructiveHint: true") && tools.includes("openWorldHint: false"), "tool annotations are incomplete");
@@ -155,8 +155,7 @@ check(excalidrawTemplate.includes('id="doodleLibraryPanel"') && !excalidrawTempl
 check(!await exists("src/infra/templates/board.html") && !await exists("src/infra/templates/board-app.js"), "legacy DOM canvas template or bundle still exists");
 check(!tools.includes("engine=dom") && !http.includes("engine=dom"), "legacy DOM engine fallback still exists");
 check(buildScript.includes("excalidraw-app.tsx") && buildScript.includes("minify: true"), "build does not bundle the Excalidraw canvas client");
-check(appSource.includes("updateModelContext") && appSource.includes("sendMessage") && appSource.includes("getHostCapabilities"), "MCP App bridge does not use host context and message capabilities");
-check(appSource.includes("buildBoardModelContext") && appContext.includes("finalStateNotOperationLog"), "MCP App context is not a final-state delta");
+check(excalidrawApp.includes("buildBoardModelContext") && appContext.includes("finalStateNotOperationLog"), "Excalidraw MCP App context is not a final-state delta");
 check(appContext.includes("structuredContent") && !appContext.includes("operationLog"), "board model context lost its complete structured snapshot or added an operation log");
 check(instructions.includes("conversation") && !instructions.includes("reply_on_board"), "MCP instructions duplicate the host conversation");
 check(http.includes('"/api/board"') && http.includes("X-AI-Draw-Token"), "board HTTP server lost its authenticated API");
@@ -216,7 +215,7 @@ check(codexExample.includes('args = ["-y", "doodle-mcp"]') && !codexExample.incl
 check(setupScript.includes('"plugin", "marketplace", "add"') && setupScript.includes('"plugin", "add", "doodle@doodle"') && setupScript.includes("--dry-run"), "setup script does not safely install the local plugin");
 check(setupScript.includes('if (dryRun) return { status: 0 }') || setupScript.includes("if (dryRun) return { status: 0; }"), "setup dry-run can still execute commands");
 check(await exists("plugins/doodle/skills/doodle/SKILL.md") && await exists("scripts/build-plugin.mjs") && await exists("scripts/plugin-check.mjs"), "plugin packaging files are incomplete");
-check(totalSourceFiles.length === 20, `src has ${totalSourceFiles.length} TypeScript modules; expected the focused plugin-ready structure`);
+check(totalSourceFiles.length === 19, `src has ${totalSourceFiles.length} TypeScript modules; expected the focused plugin-ready structure`);
 
 if (failures.length) {
   console.error("❌ Offline repository checks failed:");

@@ -110,8 +110,8 @@ check((toolsSource.match(/server\.registerTool\(/g) ?? []).length === 4, "tools 
 check(toolsSource.includes("libraryAction") && toolsSource.includes("ctx.library.apply"), "bundled tools lost board-library actions");
 check(toolsSource.includes("visualDigest: boardVisualDigest(board)") && toolsSource.includes("boardRecipes()"), "bundled tools lost AI visual language");
 check(httpSource.includes('"/api/board/library"') && excalidrawTemplate.includes("Doodle · Excalidraw Canvas"), "bundled board library HTTP or Excalidraw-only UI surface is missing");
-check(appBundle.includes("updateModelContext") && appBundle.includes("sendMessage"), "bundled MCP App bridge lacks host context and notification support");
-check(appBundle.includes("doodle_board_context") && appBundle.includes("finalStateNotOperationLog"), "bundled MCP App context is not a final-state delta");
+check(appBundle.includes("updateModelContext") && appBundle.includes("callServerTool"), "bundled Excalidraw engine lacks host context refresh");
+check(appBundle.includes("doodle_board_context") && appBundle.includes("finalStateNotOperationLog"), "bundled Excalidraw engine lost final-state context projection");
 check(excalidrawTemplate.includes("Doodle · Excalidraw Canvas") && excalidrawTemplate.includes("/excalidraw/excalidraw-app.js"), "Excalidraw template is missing");
 check(!await exists(".doodle-plugin/doodle/server/infra/templates/board-app.js"), "legacy DOM MCP App bundle still exists");
 check(excalidrawTemplate.includes("Doodle · Excalidraw Canvas") && excalidrawTemplate.includes("/excalidraw/excalidraw-app.js"), "Excalidraw template is missing");

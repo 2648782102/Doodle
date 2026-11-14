@@ -16,7 +16,6 @@ src/
 │   ├── project-scan.ts         bounded read-only workspace path/evidence scan
 │   ├── http.ts                 local board API, HTML and WebSocket updates
 │   ├── tools.ts                get / draw / scan tools and MCP App resource
-│   ├── app.ts                  MCP Apps bridge client for embedded canvas edits
 │   ├── app-context.ts          final-state delta and bounded model context projection
 │   ├── instructions.ts         MCP initialization guidance for agents
 │   └── index.ts                board module entrypoint
@@ -54,7 +53,7 @@ The optional canvas resource uses `text/html;profile=mcp-app` and is attached to
 
 ### Host model context bridge
 
-After `app.connect()`, `src/board/app.ts` reads `getHostCapabilities()`. When `updateModelContext.text` is available, every newly observed board revision produces one context update. `src/board/app-context.ts` compares the current snapshot with the last successfully published snapshot by object ID and stable object fields; its `added`, `updated`, and `removed` arrays contain final object values or removed IDs, never click, drag, or edit events. Because `updateModelContext` overwrites prior context, the request also carries the complete current structured snapshot. The text content is a bounded Chinese projection; `structuredContent` preserves the untruncated final state and fixed read-only safety flags. A failed update is not marked as published, so the next refresh retries the latest delta.
+After `app.connect()` inside `src/infra/templates/excalidraw-app.tsx`, the embedded canvas reads `getHostCapabilities()`. When `updateModelContext.text` is available, every newly observed board revision produces one context update. `src/board/app-context.ts` compares the current snapshot with the last successfully published snapshot by object ID and stable object fields; its `added`, `updated`, and `removed` arrays contain final object values or removed IDs, never click, drag, or edit events. Because `updateModelContext` overwrites prior context, the request also carries the complete current structured snapshot. The text content is a bounded Chinese projection; `structuredContent` preserves the untruncated final state and fixed read-only safety flags. A failed update is not marked as published, so the next refresh retries the latest delta.
 
 Context updates do not trigger a model turn. If `message.text` is also available, the embedded toolbar shows `通知 Agent`; its click handler ensures the latest context has been published, then sends exactly `我改了 Doodle 画板，你看下图。` through `app.sendMessage({ role: "user" })`. The button is hidden in the standalone fallback and in hosts lacking either capability. `get_board` remains the authoritative reread path, especially for standalone `PANEL_URL` pages that have no bridge to the current host session.
 

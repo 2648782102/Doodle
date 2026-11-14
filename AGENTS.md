@@ -63,7 +63,6 @@ src/
 │   ├── project-scan.ts         bounded read-only workspace scan
 │   ├── http.ts                 local board API, HTML, and WebSocket updates
 │   ├── tools.ts                four MCP tools and optional MCP App resource
-│   ├── app.ts                  MCP Apps bridge for the embedded canvas
 │   ├── app-context.ts          final-state board delta and model context projection
 │   ├── instructions.ts         MCP initialization instructions
 │   ├── library.ts              local editable board snapshot index and actions
