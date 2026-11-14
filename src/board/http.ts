@@ -28,18 +28,6 @@ import type { BoardStore } from "./store.js";
 import { projectSnapshotText, scanProject, type ProjectScanOptions } from "./project-scan.js";
 
 const sourceDir = path.dirname(fileURLToPath(import.meta.url));
-function templateCandidates(config: AppConfig): string[] {
-  return [
-    path.resolve(config.cwd, "server", "infra", "templates", "board.html"),
-    path.resolve(config.cwd, "infra", "templates", "board.html"),
-    path.resolve(sourceDir, "../../../infra/templates/board.html"),
-    path.resolve(sourceDir, "../../src/infra/templates/board.html"),
-    path.resolve(sourceDir, "../infra/templates/board.html"),
-    path.resolve(sourceDir, "../templates/board.html"),
-    path.resolve(sourceDir, "../../dist/infra/templates/board.html"),
-  ];
-}
-
 function excalidrawTemplateCandidates(config: AppConfig): string[] {
   return [
     path.resolve(config.cwd, "server", "infra", "templates", "excalidraw.html"),
@@ -85,7 +73,7 @@ export class BoardHttpServer {
   private app = express();
   private server: http.Server | null = null;
   private wss: WebSocketServer | null = null;
-  private readonly panelToken = crypto.randomBytes(24).toString("hex");
+  readonly panelToken = crypto.randomBytes(24).toString("hex");
   private appBundle = "";
   private panelUrlValue: string | null = null;
   private readonly library: BoardLibrary;
@@ -239,7 +227,7 @@ export class BoardHttpServer {
       res.type("text/plain").send(projectSnapshotText(snapshot));
     });
 
-    this.app.get("/", (req, res) => this.serveBoard(res, req.query.engine !== "dom"));
+    this.app.get("/", (_req, res) => this.serveBoard(res));
     this.app.use("/excalidraw", async (req, res, next) => {
       const assetRoot = await this.findExisting(assetCandidates(this.config));
       if (!assetRoot) return res.status(404).send("Excalidraw assets not found");
@@ -276,19 +264,19 @@ export class BoardHttpServer {
     });
   }
 
-  private async serveBoard(res: express.Response, excalidraw = false): Promise<void> {
+  private async serveBoard(res: express.Response): Promise<void> {
     res.set("Cache-Control", "no-store, max-age=0");
-    const candidates = excalidraw ? excalidrawTemplateCandidates(this.config) : templateCandidates(this.config);
-    for (const candidate of candidates) {
+    for (const candidate of excalidrawTemplateCandidates(this.config)) {
       try {
         const html = (await fs.readFile(candidate, "utf8"))
+          .replace('"__DOODLE_MCP_APP__"', '"0"')
           .replace("__DOODLE_PANEL_TOKEN__", this.panelToken)
           .replace("__AI_DRAW_PANEL_TOKEN__", this.panelToken);
         res.type("html").send(html);
         return;
       } catch {}
     }
-    res.status(500).send(excalidraw ? "Excalidraw template not found" : "Board template not found");
+    res.status(500).send("Excalidraw template not found");
   }
 
   private async findExisting(candidates: string[]): Promise<string | null> {
@@ -304,17 +292,15 @@ export class BoardHttpServer {
   async getAppHtml(bundle?: string): Promise<string> {
     if (bundle !== undefined) this.appBundle = bundle;
     let template: string | undefined;
-    for (const candidate of templateCandidates(this.config)) {
+    for (const candidate of excalidrawTemplateCandidates(this.config)) {
       try {
         template = await fs.readFile(candidate, "utf8");
         break;
       } catch {}
     }
-    if (!template) throw new Error("Board template not found");
+    if (!template) throw new Error("Excalidraw template not found");
     return template
-      .replace(/\s*<aside class="side"[\s\S]*?<\/aside>/, "")
-      .replace('const MCP_APP_BUNDLE = "";', 'const MCP_APP_BUNDLE = "embedded";')
-      .replace("/*__DOODLE_MCP_APP_BUNDLE__*/", () => this.appBundle.replace(/<\/script/gi, "<\\/script"))
+      .replace('"__DOODLE_MCP_APP__"', '"1"')
       .replace("__DOODLE_PANEL_TOKEN__", "")
       .replace("__AI_DRAW_PANEL_TOKEN__", "");
   }

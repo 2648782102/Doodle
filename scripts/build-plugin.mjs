@@ -17,7 +17,7 @@ await fs.mkdir(serverTemplateDir, { recursive: true });
 await fs.mkdir(rootTemplateDir, { recursive: true });
 await fs.cp(sourceDir, targetDir, { recursive: true });
 
-for (const name of ["board.html", "board-app.js", "excalidraw.html"]) {
+for (const name of ["board.html", "excalidraw.html"]) {
   const source = path.join(distTemplateDir, name);
   await fs.copyFile(source, path.join(serverTemplateDir, name));
   await fs.copyFile(source, path.join(rootTemplateDir, name));

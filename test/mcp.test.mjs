@@ -94,8 +94,8 @@ describe("MCP board server", () => {
       const { tools } = await client.listTools();
       expect(tools.map((tool) => tool.name).sort()).toEqual([...EXPECTED_TOOLS].sort());
       expect(tools.find((tool) => tool.name === "get_board")._meta).toBeUndefined();
-      expect(tools.find((tool) => tool.name === "show_board")._meta.ui.resourceUri).toBe("ui://doodle/board/v1.html");
-      expect(tools.find((tool) => tool.name === "draw_board")._meta.ui.resourceUri).toBe("ui://doodle/board/v1.html");
+      expect(tools.find((tool) => tool.name === "show_board")._meta.ui.resourceUri).toBe("ui://doodle/board/excalidraw/v1.html");
+      expect(tools.find((tool) => tool.name === "draw_board")._meta.ui.resourceUri).toBe("ui://doodle/board/excalidraw/v1.html");
       const readOnly = { readOnlyHint: true, destructiveHint: false, openWorldHint: false };
       expect(tools.find((tool) => tool.name === "get_board").annotations).toEqual(readOnly);
       expect(tools.find((tool) => tool.name === "show_board").annotations).toEqual(readOnly);
@@ -110,15 +110,11 @@ describe("MCP board server", () => {
 
   it("serves the embedded board app and advertises it after drawing", async () => {
     await withClient(3442, async (client) => {
-      const appResource = await client.readResource({ uri: "ui://doodle/board/v1.html" });
+      const appResource = await client.readResource({ uri: "ui://doodle/board/excalidraw/v1.html" });
       expect(appResource.contents[0].mimeType).toBe("text/html;profile=mcp-app");
-      expect(appResource.contents[0].text).toContain("DoodleBoardInit");
+      expect(appResource.contents[0].text).toContain("Doodle · Excalidraw Canvas");
       expect(appResource.contents[0].text).not.toContain('id="noteInput"');
-      expect(appResource.contents[0].text).toContain('if (itemType !== "stroke" && itemType !== "eraser") selectTool("select");\n      if (newest && itemType !== "stroke")');
-      expect(appResource.contents[0].text).toContain('return updated;');
-      expect(appResource.contents[0].text).toContain('lastChange: "remote"');
-      expect(appResource.contents[0].text).toContain('id="btnEdit"');
-      expect(appResource.contents[0].text).toContain('id="btnNotifyAgent"');
+      expect(appResource.contents[0].text).toContain("/excalidraw/excalidraw-app.js");
       await client.callTool({
         name: "draw_board",
         arguments: { author: "ai", items: [{ type: "note", x: 0, y: 0, w: 160, h: 90, text: "embedded app" }] },

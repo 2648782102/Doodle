@@ -115,11 +115,9 @@ describe("post-cleanup repository shape", () => {
   });
 
   it("keeps current user-facing surfaces on the Doodle name and current endpoints", async () => {
-    const template = await fs.readFile(path.join(root, "src", "infra", "templates", "board.html"), "utf8");
-    expect(template).toContain("<title>Doodle</title>");
-    expect(template).toContain('class="brand">Doodle');
-    expect(template).not.toContain('setItem("aiDrawBoardViewport"');
-    expect(template).toContain("doodleBoardViewport");
+    const template = await fs.readFile(path.join(root, "src", "infra", "templates", "excalidraw.html"), "utf8");
+    expect(template).toContain("Doodle · Excalidraw Canvas");
+    expect(template).toContain('id="excalidrawRoot"');
     const architecture = await fs.readFile(path.join(root, "docs", "ARCHITECTURE.md"), "utf8");
     expect(architecture).toContain("GET /api/board/project");
     expect(architecture).not.toContain("GET /project");

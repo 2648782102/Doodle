@@ -2,9 +2,6 @@ import { z } from "zod";
 import type { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import type { CallToolResult } from "@modelcontextprotocol/sdk/types.js";
 import { registerAppResource, RESOURCE_MIME_TYPE } from "@modelcontextprotocol/ext-apps/server";
-import fs from "node:fs/promises";
-import path from "node:path";
-import { fileURLToPath } from "node:url";
 import type { AppConfig } from "../infra/config.js";
 import { logger } from "../infra/logger.js";
 import type { BoardHttpServer } from "./http.js";
@@ -31,7 +28,7 @@ export interface BoardToolContext {
   library: BoardLibrary;
 }
 
-const APP_RESOURCE_URI = "ui://doodle/board/v1.html";
+const APP_RESOURCE_URI = "ui://doodle/board/excalidraw/v1.html";
 const CANVAS_UI_META = {
   ui: { resourceUri: APP_RESOURCE_URI, prefersBorder: true },
 } as const;
@@ -45,17 +42,6 @@ const BOARD_WRITE_ANNOTATIONS = {
   destructiveHint: true,
   openWorldHint: false,
 } as const;
-const moduleDir = path.dirname(fileURLToPath(import.meta.url));
-function appBundleCandidates(config: AppConfig): string[] {
-  return [
-    path.resolve(config.cwd, "infra", "templates", "board-app.js"),
-    path.resolve(config.cwd, "server", "infra", "templates", "board-app.js"),
-    path.resolve(moduleDir, "../../../infra/templates/board-app.js"),
-    path.resolve(moduleDir, "../infra/templates/board-app.js"),
-    path.resolve(moduleDir, "../../dist/infra/templates/board-app.js"),
-  ];
-}
-
 function errorResult(tool: string, error: unknown): CallToolResult {
   const message = error instanceof Error ? error.message : String(error);
   logger.error(`${tool} failed: ${message}`);
@@ -196,18 +182,10 @@ const libraryAction = z.discriminatedUnion("type", [
 ]);
 
 export function registerBoardTools(server: McpServer, ctx: BoardToolContext): void {
-  registerAppResource(server, "Doodle shared board", APP_RESOURCE_URI, {
+  registerAppResource(server, "Doodle Excalidraw board", APP_RESOURCE_URI, {
     _meta: { ui: { prefersBorder: true } },
   }, async () => {
-    let bundle = "";
-    for (const candidate of appBundleCandidates(ctx.config)) {
-      try {
-        bundle = await fs.readFile(candidate, "utf8");
-        break;
-      } catch {}
-    }
-    if (!bundle) throw new Error("Doodle MCP App bundle is missing; rebuild the package");
-    const html = await ctx.preview.getAppHtml(bundle);
+    const html = await ctx.preview.getAppHtml();
     return {
       contents: [{
         uri: APP_RESOURCE_URI,
@@ -269,29 +247,14 @@ export function registerBoardTools(server: McpServer, ctx: BoardToolContext): vo
     "show_board",
     {
       description: "在人和 AI 的 Agent 对话旁显示共享无限画布，供用户直接查看和编辑。用户要求打开、查看、展示或编辑 Doodle 画布时调用。支持 MCP Apps 的宿主会嵌入交互式画布；其他宿主仍可通过普通工具读写画布。",
-      inputSchema: z.object({
-        engine: z.enum(["dom", "excalidraw"]).optional().describe("Optional canvas engine; omit for the stable DOM engine"),
-      }),
+      inputSchema: z.object({}),
       annotations: READ_ONLY_LOCAL_ANNOTATIONS,
       _meta: { ui: { resourceUri: APP_RESOURCE_URI } },
     },
-    async ({ engine }) => {
+    async () => {
       try {
         const current = await ctx.board.snapshot();
         const snapshot = boardJson(current, (await ctx.library.apply({ type: "list" }, current)).index);
-        if (engine === "excalidraw") {
-          return {
-            content: [{
-              type: "text" as const,
-              text: [
-                `🎨 Excalidraw 实验画布 · revision ${snapshot.revision} · ${snapshot.itemCount} 个对象`,
-                "此特性分支默认打开 Excalidraw 画布；如需回退稳定 DOM 引擎，在 PANEL_URL 后添加 ?engine=dom。",
-                `PANEL_URL: ${ctx.preview.panelUrl ?? "unavailable (standalone preview not started)"}`,
-              ].join("\n"),
-            }],
-            structuredContent: snapshot,
-          };
-        }
         return {
           content: [{
             type: "text" as const,

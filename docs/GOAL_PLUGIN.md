@@ -21,7 +21,7 @@ The plugin is a distribution layer around this product. It must not turn Doodle 
 - Add one Codex-compatible `.codex-plugin/plugin.json` and `.mcp.json` layout with a `${PLUGIN_ROOT}` server entrypoint, a concise agent skill, presentation metadata, and simple local-only assets.
 - Add a repository-scoped marketplace at `.agents/plugins/marketplace.json` that points at the generated `.doodle-plugin/doodle` package.
 - Add `npm run setup:codex` as the recommended install path. It installs dependencies when needed, builds the plugin, adds the local marketplace, installs the plugin, and prints one first-use prompt. Official OpenAI documentation treats local marketplaces as separate from the public directory and recommends a new session after installation.
-- Build a self-contained `server/index.mjs` with the same four tools, the shared `board.html`, the MCP App `board-app.js` with optional final-state host context sync, and an injected package version.
+- Build a self-contained `server/index.mjs` with the same four tools, the Excalidraw-only canvas template/assets, optional final-state host context sync, and an injected package version.
 - Keep the direct npm CLI and direct MCP host examples as supported development paths.
 - Connect MCP stdio before the optional local HTTP preview; a preview failure must not disable MCP.
 - Use a free loopback port when `PREVIEW_PORT` is unset and report the active `PANEL_URL` through `get_board`, without opening a browser.

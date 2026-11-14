@@ -26,7 +26,7 @@ src/
 │   ├── project-workspace.ts    plugin-safe workspace resolution
 │   ├── workspace.ts            DOODLE_WORKSPACE_ROOT resolution
 │   ├── version.ts              package version read
-│   └── templates/board.html    shared standalone and embedded infinite canvas
+│   └── templates/excalidraw.html  Excalidraw-only standalone and embedded canvas
 plugins/doodle/                 compatibility manifest, MCP config, skill, assets
 .agents/plugins/                repository-scoped plugin marketplace
 scripts/setup-codex.mjs         one-command local Codex plugin install and first-use guide

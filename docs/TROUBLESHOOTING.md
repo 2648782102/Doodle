@@ -25,7 +25,7 @@ The board library keeps editable version 1 snapshots in `.doodle/boards/` under 
 
 ### Excalidraw experiment does not load
 
-The experimental engine is available on `codex/excalidraw-spike` and is the default canvas there. Append `?engine=dom` to `PANEL_URL` only when testing the stable DOM fallback. The local preview must serve `/excalidraw/index.css`, `/excalidraw/excalidraw-app.js`, and `/excalidraw/fonts/...` from its own package. If any of these returns 404, rebuild with `npm run build` and restart the server. The experiment does not use a CDN, hosted font, or license key.
+On `codex/excalidraw-spike`, Excalidraw is the only canvas engine and the default `PANEL_URL` opens it directly. There is no `?engine=dom` fallback on this feature branch; use `master` for the stable DOM engine. The local preview must serve `/excalidraw/index.css`, `/excalidraw/excalidraw-app.js`, and `/excalidraw/fonts/...` from its own package. If any of these returns 404, rebuild with `npm run build` and restart the server. The experiment does not use a CDN, hosted font, or license key.
 
 ### The Agent does not see my canvas edits automatically
 

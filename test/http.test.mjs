@@ -40,34 +40,14 @@ afterAll(async () => {
 
 describe("board HTTP surface", () => {
   it("serves the human board and the read-only board API", async () => {
-    const html = await fetch(`${base}/?engine=dom`).then((response) => response.text());
+    const html = await fetch(base).then((response) => response.text());
     expect(preview.panelUrl).toBe(`${base}/`);
-    expect(html).toContain("Doodle");
-    expect(html).toContain("/api/board");
+    expect(html).toContain("Doodle · Excalidraw Canvas");
+    expect(html).toContain("const PANEL_TOKEN");
     expect(html).not.toContain("/workbench");
-    expect(html).toContain('data-tool="stroke"');
-    expect(html).toContain('data-tool="eraser"');
-    expect(html).toContain('data-tool="image"');
-    expect(html).toContain('id="btnUndo"');
-    expect(html).toContain('kind: "draw"');
-    expect(html).toContain('function strokeInk(');
-    expect(html).toContain('function snapMove(');
-    expect(html).toContain("resolveConnector(");
-    expect(html).toContain("renderSelectionBounds(");
-    expect(html).toContain('defaultText = { note: "", text: "", rect: "", ellipse: "", line: "", stroke: "", image: "" }');
-    expect(html).toContain('tool !== "select" && !itemElement');
-    expect(html).toContain('socket.addEventListener("open"');
-    expect(html).toContain('id="btnEdit"');
-    expect(html).toContain('function editSelected()');
-    expect(html).toContain('.tool.contextual { display: none; }');
-    expect(html).toContain('function updateContextualTools()');
-    expect(html).not.toContain('storageGet("doodleHelpSeen")');
-    expect(html).toContain('id="btnNotifyAgent"');
-    expect(html).toContain('notifyButton.hidden = !adapter.canNotifyAgent');
-    expect(html).toContain("AI 和你都能画");
-    expect(html).toContain('id="libraryPanel"');
-    expect(html).toContain('"/api/board/library"');
-    expect(html).not.toContain("helpCloseButton.focus()");
+    expect(html).toContain("/excalidraw/excalidraw-app.js");
+    expect(html).toContain('id="excalidrawRoot"');
+    expect(html).not.toContain('id="libraryPanel"');
     const snapshot = await fetch(`${base}/api/board`).then((response) => response.json());
     expect(snapshot).toMatchObject({ version: 1 });
     expect(snapshot.library).toMatchObject({ version: 1 });
@@ -77,7 +57,7 @@ describe("board HTTP surface", () => {
   });
 
   it("exposes a human-confirmed local board library", async () => {
-    const html = await fetch(`${base}/?engine=dom`).then((response) => response.text());
+    const html = await fetch(base).then((response) => response.text());
     const token = html.match(/const PANEL_TOKEN = "([^"]+)"/)?.[1];
     const library = await fetch(`${base}/api/board/library`).then((response) => response.json());
     expect(library).toMatchObject({ version: 1 });
@@ -98,8 +78,7 @@ describe("board HTTP surface", () => {
     expect(html).toContain("/excalidraw/excalidraw-app.js");
     expect(html).toContain('const PANEL_TOKEN =');
     expect(html).not.toContain("https://");
-    const fallback = await fetch(`${base}/?engine=dom`).then((response) => response.text());
-    expect(fallback).toContain("<title>Doodle</title>");
+    expect(html).not.toContain("?engine=dom");
     const app = await fetch(`${base}/excalidraw/excalidraw-app.js`);
     expect(app.status).toBe(200);
     const css = await fetch(`${base}/excalidraw/index.css`);
@@ -135,7 +114,7 @@ describe("board HTTP surface", () => {
       body: JSON.stringify({ confirmedBy: "human", item: { type: "note", x: 0, y: 0 } }),
     });
     expect(unauthenticated.status).toBe(401);
-    const html = await fetch(`${base}/?engine=dom`).then((response) => response.text());
+    const html = await fetch(base).then((response) => response.text());
     const token = html.match(/const PANEL_TOKEN = "([^"]+)"/)?.[1];
     expect(token).toBeTruthy();
     const unconfirmed = await fetch(`${base}/api/board/items`, {
@@ -155,7 +134,7 @@ describe("board HTTP surface", () => {
   });
 
   it("marks human edits to AI objects with the human author", async () => {
-    const html = await fetch(`${base}/?engine=dom`).then((response) => response.text());
+    const html = await fetch(base).then((response) => response.text());
     const token = html.match(/const PANEL_TOKEN = "([^"]+)"/)?.[1];
     const created = await board.mutate((current) => addBoardItem(current, {
       type: "note", x: 0, y: 0, text: "AI note", author: "ai",

@@ -23,8 +23,7 @@ const marketplace = JSON.parse(await read(".agents/plugins/marketplace.json"));
 const skill = await read("plugins/doodle/skills/doodle/SKILL.md");
 const buildScript = await read("scripts/build-plugin.mjs");
 const pluginCheckScript = await read("scripts/plugin-check.mjs");
-const boardTemplate = await read(".doodle-plugin/doodle/server/infra/templates/board.html");
-const appBundle = await read(".doodle-plugin/doodle/server/infra/templates/board-app.js");
+const appBundle = await read(".doodle-plugin/doodle/server/infra/templates/excalidraw/excalidraw-app.js");
 const excalidrawTemplate = await read(".doodle-plugin/doodle/server/infra/templates/excalidraw.html");
 const httpSource = await read("src/board/http.ts");
 const toolsSource = await read("src/board/tools.ts");
@@ -74,13 +73,12 @@ check(skill.includes("two-way board"), "Doodle skill lost the two-way product de
 check(skill.includes("FIRST_USE") && skill.includes("NEXT_STEPS") && skill.includes("打开 Doodle 画板"), "Doodle skill does not lead with the first-use path");
 check(!skill.includes("reply_on_board"), "Doodle skill references the removed reply tool");
 check(skill.includes("PANEL_URL") && !skill.includes("Open a browser"), "Doodle skill mishandles the human panel URL");
-check(buildScript.includes("bundle: true") && buildScript.includes("board.html") && buildScript.includes("board-app.js"), "plugin build is not self-contained");
+check(buildScript.includes("bundle: true") && buildScript.includes("board.html") && buildScript.includes("excalidraw"), "plugin build is not self-contained");
 check(buildScript.includes("excalidraw.html") && buildScript.includes("excalidraw"), "plugin build does not copy Excalidraw assets");
 check(buildScript.includes("__DOODLE_PLUGIN_VERSION__"), "plugin build does not inject the package version");
 check(pluginCheckScript.includes("requires_local_executor"), "plugin guard does not verify desktop-only status");
-check(httpSource.includes("templateCandidates(this.config)") && httpSource.includes('"server", "infra", "templates", "board.html"'), "bundled server cannot resolve plugin board templates");
-check(httpSource.includes('"../infra/templates/board.html"'), "bundled server cannot resolve board templates relative to its own server bundle");
-check(toolsSource.includes("appBundleCandidates(ctx.config)") && toolsSource.includes('"server", "infra", "templates", "board-app.js"'), "bundled server cannot resolve the MCP App bundle");
+check(httpSource.includes("excalidrawTemplateCandidates(this.config)") && httpSource.includes('"server", "infra", "templates", "excalidraw.html"'), "bundled server cannot resolve plugin Excalidraw templates");
+check(toolsSource.includes("getAppHtml()") && toolsSource.includes('ui://doodle/board/excalidraw/v1.html'), "bundled server cannot resolve the Excalidraw MCP App resource");
 check(toolsSource.includes("CANVAS_UI_META") && toolsSource.includes("_meta: CANVAS_UI_META"), "bundled draw_board path does not advertise automatic post-draw rendering");
 check(toolsSource.includes("FIRST_USE:") && toolsSource.includes("NEXT_STEPS:") && toolsSource.includes("NEXT:"), "bundled get_board path lacks progressive first-use guidance");
 check(toolsSource.includes("PANEL_URL") && instructions.includes("PANEL_URL"), "active local panel URL is not exposed to the agent");
@@ -111,20 +109,11 @@ check(toolsSource.includes("READ_ONLY_LOCAL_ANNOTATIONS") && toolsSource.include
 check((toolsSource.match(/server\.registerTool\(/g) ?? []).length === 4, "tools are not all registered through the annotated config API");
 check(toolsSource.includes("libraryAction") && toolsSource.includes("ctx.library.apply"), "bundled tools lost board-library actions");
 check(toolsSource.includes("visualDigest: boardVisualDigest(board)") && toolsSource.includes("boardRecipes()"), "bundled tools lost AI visual language");
-check(httpSource.includes('"/api/board/library"') && boardTemplate.includes('id="libraryPanel"'), "bundled board library HTTP or UI surface is missing");
-check(boardTemplate.includes('data-tool="stroke"') && boardTemplate.includes('data-tool="eraser"') && boardTemplate.includes('data-tool="image"'), "bundled board template lost the extended drawing tools");
-check(boardTemplate.includes('kind: "draw"') && boardTemplate.includes("strokeInk("), "bundled board template does not draw ink immediately");
-check(boardTemplate.includes("function snapMove(") && boardTemplate.includes("kind: tool === \"select\" ? \"marquee\" : \"pan\""), "bundled board template lost marquee selection or snapping");
-check(boardTemplate.includes("function resolveConnector(") && boardTemplate.includes("function renderSelectionBounds("), "bundled board template lost connected-arrow resolution or multi-selection bounds");
-check(boardTemplate.includes('id="btnUndo"') && boardTemplate.includes('id="btnRedo"'), "bundled board template lost undo/redo controls");
-check(boardTemplate.includes('if (itemType !== "stroke" && itemType !== "eraser") selectTool("select");\n      if (newest && itemType !== "stroke")'), "bundled board template does not return to select after normal object creation");
-check(boardTemplate.includes('tool !== "select" && !itemElement'), "bundled board template creates objects when clicking an existing item");
-check(boardTemplate.includes("window.doodleBoardSocket") && boardTemplate.includes('socket.addEventListener("open"'), "bundled board template lacks singleton live updates");
-check(boardTemplate.includes('id="btnEdit"') && boardTemplate.includes('function editSelected()'), "bundled board template lacks the explicit text-edit entry point");
-check(boardTemplate.includes("function updateContextualTools()") && !boardTemplate.includes("doodleHelpSeen"), "bundled board template lost contextual tools or auto-opens help");
-check(boardTemplate.includes('id="btnNotifyAgent"') && boardTemplate.includes("notifyAgent()"), "bundled board template lacks the host notification button");
+check(httpSource.includes('"/api/board/library"') && excalidrawTemplate.includes("Doodle · Excalidraw Canvas"), "bundled board library HTTP or Excalidraw-only UI surface is missing");
 check(appBundle.includes("updateModelContext") && appBundle.includes("sendMessage"), "bundled MCP App bridge lacks host context and notification support");
 check(appBundle.includes("doodle_board_context") && appBundle.includes("finalStateNotOperationLog"), "bundled MCP App context is not a final-state delta");
+check(excalidrawTemplate.includes("Doodle · Excalidraw Canvas") && excalidrawTemplate.includes("/excalidraw/excalidraw-app.js"), "Excalidraw template is missing");
+check(!await exists(".doodle-plugin/doodle/server/infra/templates/board-app.js"), "legacy DOM MCP App bundle still exists");
 check(excalidrawTemplate.includes("Doodle · Excalidraw Canvas") && excalidrawTemplate.includes("/excalidraw/excalidraw-app.js"), "Excalidraw template is missing");
 
 const generatedFiles = [
@@ -135,12 +124,10 @@ const generatedFiles = [
   ".doodle-plugin/doodle/assets/doodle-dark.svg",
   ".doodle-plugin/doodle/server/index.mjs",
   ".doodle-plugin/doodle/server/infra/templates/board.html",
-  ".doodle-plugin/doodle/server/infra/templates/board-app.js",
   ".doodle-plugin/doodle/server/infra/templates/excalidraw.html",
   ".doodle-plugin/doodle/server/infra/templates/excalidraw/index.css",
   ".doodle-plugin/doodle/server/infra/templates/excalidraw/excalidraw-app.js",
   ".doodle-plugin/doodle/infra/templates/board.html",
-  ".doodle-plugin/doodle/infra/templates/board-app.js",
   ".doodle-plugin/doodle/infra/templates/excalidraw.html",
   ".doodle-plugin/doodle/infra/templates/excalidraw/index.css",
   ".doodle-plugin/doodle/infra/templates/excalidraw/excalidraw-app.js",
@@ -149,7 +136,7 @@ for (const relative of generatedFiles) {
   check(await exists(relative), `generated plugin file is missing: ${relative}`);
 }
 check(await exists(".doodle-plugin/doodle/server/index.mjs") && await sizeOf(".doodle-plugin/doodle/server/index.mjs") > 100_000, "generated plugin server is unexpectedly small");
-check(await exists(".doodle-plugin/doodle/infra/templates/board-app.js") && await sizeOf(".doodle-plugin/doodle/infra/templates/board-app.js") > 1_000, "generated MCP App bundle is unexpectedly small");
+check(await exists(".doodle-plugin/doodle/infra/templates/excalidraw/excalidraw-app.js") && await sizeOf(".doodle-plugin/doodle/infra/templates/excalidraw/excalidraw-app.js") > 1_000, "generated Excalidraw bundle is unexpectedly small");
 
 if (failures.length) {
   console.error("❌ Plugin checks failed:");

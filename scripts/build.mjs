@@ -41,7 +41,7 @@ async function pruneCompiledFiles(directory, expected, prefix = "") {
 }
 
 const expected = await expectedCompiledFiles(sourceRoot);
-for (const name of ["board.html", "excalidraw.html"]) expected.add(`infra/templates/${name}`);
+expected.add("infra/templates/board.html");
 expected.add("infra/templates/excalidraw");
 await fs.mkdir(distDir, { recursive: true });
 await pruneCompiledFiles(distDir, expected);
@@ -51,25 +51,15 @@ for (const name of await fs.readdir(targetDir)) {
     await fs.rm(path.join(targetDir, name), { recursive: true, force: true });
   }
 }
-for (const name of await fs.readdir(sourceDir)) {
+for (const name of ["excalidraw.html"]) {
   await fs.copyFile(path.join(sourceDir, name), path.join(targetDir, name));
 }
+await fs.copyFile(path.join(sourceDir, "excalidraw.html"), path.join(targetDir, "board.html"));
 await fs.mkdir(excalidrawTargetDir, { recursive: true });
 for (const name of await fs.readdir(excalidrawTargetDir)) {
   await fs.rm(path.join(excalidrawTargetDir, name), { recursive: true, force: true });
 }
 await fs.cp(excalidrawProdDir, excalidrawTargetDir, { recursive: true });
-const appBundle = await bundle({
-  entryPoints: [path.join(sourceRoot, "board", "app.ts")],
-  bundle: true,
-  format: "esm",
-  platform: "browser",
-  target: "es2022",
-  minify: true,
-  write: false,
-});
-await fs.writeFile(path.join(targetDir, "board-app.js"), appBundle.outputFiles[0].text);
-console.log(`📦 Bundled MCP App (${Buffer.byteLength(appBundle.outputFiles[0].text)} bytes)`);
 const excalidrawBundle = await bundle({
   entryPoints: [path.join(sourceDir, "excalidraw-app.tsx")],
   bundle: true,
@@ -88,4 +78,4 @@ for (const file of excalidrawBundle.outputFiles) {
   await fs.writeFile(file.path, file.contents);
 }
 console.log(`📦 Bundled Excalidraw engine (${excalidrawBundle.outputFiles.reduce((size, file) => size + file.contents.length, 0)} bytes)`);
-console.log("✅ Copied board template");
+console.log("✅ Copied Excalidraw-only board template");

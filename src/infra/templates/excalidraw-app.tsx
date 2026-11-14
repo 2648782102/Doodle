@@ -6,6 +6,8 @@ import {
   boardItemsToExcalidrawSkeleton,
   type ExcalidrawLikeElement,
 } from "../../board/excalidraw-adapter.js";
+import { App } from "@modelcontextprotocol/ext-apps";
+import { buildBoardModelContext } from "../../board/app-context.js";
 
 type BoardSnapshot = {
   version: 1;
@@ -40,6 +42,54 @@ let activeSnapshot: BoardSnapshot | null = null;
 let activeMcpApp: { drawBoard?: (args: Record<string, unknown>) => Promise<unknown> } | null = null;
 const apiRef: { current: ExcalidrawAPI | null } = { current: null };
 const applyingRemote = { current: false };
+const embedded = Boolean((window as unknown as { DOODLE_MCP_APP_EMBEDDED?: boolean }).DOODLE_MCP_APP_EMBEDDED);
+const hostApp = embedded ? new App({ name: "Doodle", version: "1.0.0" }, { availableDisplayModes: ["inline", "fullscreen"] }) : null;
+let publishedRevision = -1;
+
+async function publishContext(snapshot: BoardSnapshot) {
+  if (!hostApp || publishedRevision === snapshot.revision) return;
+  const capabilities = hostApp.getHostCapabilities();
+  if (!capabilities?.updateModelContext?.text) return;
+  const context = buildBoardModelContext(snapshot as never, undefined, {
+    includeStructuredContent: Boolean(capabilities.updateModelContext.structuredContent),
+  });
+  await hostApp.updateModelContext({
+    content: context.content,
+    ...(capabilities.updateModelContext.structuredContent ? { structuredContent: context.structuredContent } : {}),
+  });
+  publishedRevision = snapshot.revision;
+}
+
+async function initHostApp() {
+  if (!hostApp) return;
+  hostApp.ontoolresult = (result) => {
+    if (result.isError) return;
+    const data = result.structuredContent as BoardSnapshot | undefined;
+    if (!data || !Array.isArray(data.items) || typeof data.revision !== "number") return;
+    activeSnapshot = data;
+    applyingRemote.current = true;
+    apiRef.current?.updateScene({ elements: toElements(data) });
+    window.setTimeout(() => { applyingRemote.current = false; }, 0);
+    void publishContext(data).catch(() => {});
+  };
+  await hostApp.connect();
+  const timer = window.setInterval(async () => {
+    if (document.visibilityState === "hidden") return;
+    try {
+      const result = await hostApp.callServerTool({ name: "get_board", arguments: {} });
+      if (result.isError) return;
+      const data = result.structuredContent as BoardSnapshot | undefined;
+      if (!data || !Array.isArray(data.items) || typeof data.revision !== "number") return;
+      if (activeSnapshot?.revision === data.revision && activeSnapshot.id === data.id) return;
+      activeSnapshot = data;
+      applyingRemote.current = true;
+      apiRef.current?.updateScene({ elements: toElements(data) });
+      window.setTimeout(() => { applyingRemote.current = false; }, 0);
+      void publishContext(data).catch(() => {});
+    } catch {}
+  }, 4000);
+  window.addEventListener("pagehide", () => window.clearInterval(timer), { once: true });
+}
 
 function toElements(snapshot: BoardSnapshot) {
   return convertToExcalidrawElements(boardItemsToExcalidrawSkeleton(snapshot.items as never[]), { regenerateIds: false });
@@ -52,6 +102,14 @@ async function loadBoard(): Promise<BoardSnapshot> {
 }
 
 async function replaceBoard(items: unknown[], expectedRevision: number): Promise<BoardSnapshot> {
+  if (hostApp) {
+    const result = await hostApp.callServerTool({
+      name: "draw_board",
+      arguments: { replace_board: { ...activeSnapshot, items, notes: [] }, expected_revision: expectedRevision },
+    });
+    if (result.isError) throw new Error("Board update failed");
+    return result.structuredContent as BoardSnapshot;
+  }
   if (activeMcpApp?.drawBoard) {
     const result = await activeMcpApp.drawBoard({
       replace_board: { ...activeSnapshot, items, notes: [] },
@@ -166,4 +224,7 @@ window.DoodleExcalidrawInit = (snapshot, mcpApp) => {
   createRoot(root).render(React.createElement(CanvasApp, { initial: snapshot }));
 };
 
-if (document.querySelector("#excalidrawRoot")) void start().catch((error) => showToast(error.message));
+if (document.querySelector("#excalidrawRoot")) {
+  void initHostApp().catch(() => {});
+  void start().catch((error) => showToast(error.message));
+}

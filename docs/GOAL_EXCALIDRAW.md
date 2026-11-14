@@ -25,13 +25,13 @@ BoardStore / MCP tools / HTTP API / BoardLibrary
 6. Excalidraw assets, CSS, fonts, and locales must be self-hosted from the local preview/plugin package. No CDN or hosted endpoint is used.
 7. Conversation stays in the host chat. Doodle does not add Excalidraw collaboration, accounts, chat, or hosted state.
 8. Static PNG/SVG export remains a non-goal, even though Excalidraw can do it.
-9. On this feature branch the Excalidraw canvas is the default human-facing engine. The DOM canvas engine from `master` remains available as a fallback through `?engine=dom`.
+9. On this feature branch Excalidraw is the only human-facing canvas engine. The legacy DOM canvas and `board-app.js` bundle are removed from source, build, plugin package, and guards.
 
 ## Acceptance
 
 1. `@excalidraw/excalidraw`, React, ReactDOM, and `perfect-freehand` are pinned and built locally with esbuild; no CDN references exist.
 2. Excalidraw production CSS and fonts are copied into `dist/infra/templates/excalidraw/` and the generated plugin package.
-3. `GET /` serves the Excalidraw-based canvas on this feature branch, while `GET /?engine=dom` serves the stable DOM canvas fallback.
+3. `GET /` serves the Excalidraw-based canvas; there is no DOM-engine fallback on this feature branch.
 4. Board v1 objects project into Excalidraw elements with stable IDs and `customData.doodle` metadata.
 5. Human edits project back into Board v1 objects; common rectangle, ellipse, diamond, text, arrow, line, freedraw, image, frame, and grouped elements have deterministic mappings.
 6. AI writes from `draw_board`, HTTP batch/replace, and board-library switch refresh the Excalidraw scene.
@@ -44,7 +44,7 @@ BoardStore / MCP tools / HTTP API / BoardLibrary
 
 With Excalidraw production assets copied into `dist/` and the generated plugin package, `npm pack --dry-run` grows from roughly 260 KB to about 17.3 MB compressed and 27.2 MB unpacked, with 582 files. The Excalidraw engine bundle itself is about 8.4 MB before compression. This confirms the experiment must remain isolated from the stable default distribution until product value outweighs packaging cost.
 
-On this feature branch, the active `PANEL_URL` opens Excalidraw by default; append `?engine=dom` only when testing the stable DOM fallback.
+On this feature branch, the active `PANEL_URL` opens the Excalidraw canvas directly. `master` remains the stable DOM-engine branch until this experiment is accepted.
 
 ## Red lines
 
