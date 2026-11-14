@@ -15,14 +15,7 @@
     "SECURITY.md",
     "PRIVACY.md",
     "SUPPORT.md",
-    "TERMS.md",
-    "dsh/package.json",
-    "dsh/cordis.patch.yml",
-    "dsh/index.json",
-    "dsh/locale/",
-    "dsh/docs/",
-    "dsh/icon.svg",
-    "dsh/README.md"
+    "TERMS.md"
   ],
   "repository": {
     "type": "git",
