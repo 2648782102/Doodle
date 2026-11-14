@@ -38,7 +38,7 @@ The loop can start from either side and pause at any point. `get_board` remains 
 1. Keep one shared canvas and one four-tool MCP server as the product.
 2. Make plugin installation one command and first use one prompt, while preserving zero-configuration direct MCP configuration.
 3. Keep conversation in the host. Do not reproduce its composer or message feed inside Doodle.
-4. Keep drawing obvious with direct click and drag gestures, one dismissible help popover, and progressive shortcuts rather than permanent control panels. The board library is an overlay drawer with one scrollable list and fixed actions; it never resizes the canvas or covers Excalidraw's toolbar. Hover feedback is color-only and must not move, scale, or resize controls.
+4. Keep drawing obvious with direct click and drag gestures, one dismissible help popover, and progressive shortcuts rather than permanent control panels. The board library is an overlay drawer with one scrollable list and fixed actions; it never resizes the canvas or covers Excalidraw's toolbar. Transient Excalidraw menus and modals take precedence over Doodle chrome. Hover feedback is color-only and must not move, scale, or resize controls.
 5. Keep the MCP App optional, attach it to `show_board`, and advertise it on successful `draw_board` results so AI drawings are visible immediately in compatible hosts. In capable hosts, publish the latest final board snapshot plus a delta from the last published state to the current session's model context without triggering a turn.
 6. Keep the local browser page as a standalone fallback; normal MCP tool calls do not open the system browser.
 7. Keep project context optional, bounded, read-only, and free of absolute paths or secrets.

@@ -52,6 +52,8 @@ describe("board HTTP surface", () => {
     expect(html).not.toContain('id="toast"');
     expect(html).toContain("body.doodle-drawer-open .doodle-topbar");
     expect(html).not.toContain("body.doodle-drawer-open .excalidraw-host > .excalidraw");
+    expect(html).toContain("body:has(.excalidraw .dropdown-menu) .doodle-topbar");
+    expect(html).toContain("body:has(.excalidraw .Modal) .doodle-topbar");
     expect(html).toContain(".doodle-library-section--boards");
     expect(html).toContain(".doodle-library-section--shares");
     const snapshot = await fetch(`${base}/api/board`).then((response) => response.json());

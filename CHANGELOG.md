@@ -23,6 +23,7 @@ All notable changes are documented here. Versions follow `VERSIONING.md`.
 ### Changed
 
 - The `图库` drawer no longer adds padding to the Excalidraw host, so its three-column top toolbar stays inside the viewport and controls no longer overlap. Its board list is the only scroll region; action and share rows remain pinned and fully visible at desktop and narrow widths.
+- Doodle's top bar now yields to Excalidraw's own dropdown menus and modals instead of stacking above them, so native menu items such as “Find on canvas” remain fully visible and clickable.
 - Replaced geometry-changing hover/active transforms with color, border, background, and shadow feedback, and added an offline guard that rejects transform, spacing, size, and font geometry in hover/active blocks.
 - MCP guidance, READMEs, agent handbook, architecture, decisions, product direction, experience audit, and guards now describe the richer two-way canvas.
 - Text projection for AI and model context includes titles and marks freehand/image/focus semantics without turning them into a message feed or project-write authority.
