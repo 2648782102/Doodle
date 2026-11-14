@@ -290,12 +290,30 @@ function initLibraryUi() {
     status.textContent = message;
     status.style.color = isError ? "#b91c1c" : "#6b7280";
   };
+  let closeTimer: number | null = null;
+  const openPanel = () => {
+    if (closeTimer !== null) window.clearTimeout(closeTimer);
+    closeTimer = null;
+    panel.hidden = false;
+    toggle.setAttribute("aria-expanded", "true");
+    void panel.offsetWidth;
+    panel.classList.add("is-open");
+    void refreshLibraryUi().catch(() => {});
+  };
+  const closePanel = () => {
+    if (closeTimer !== null) window.clearTimeout(closeTimer);
+    panel.classList.remove("is-open");
+    toggle.setAttribute("aria-expanded", "false");
+    closeTimer = window.setTimeout(() => {
+      panel.hidden = true;
+      closeTimer = null;
+    }, 220);
+  };
   toggle.addEventListener("click", () => {
-    panel.hidden = !panel.hidden;
-    toggle.setAttribute("aria-expanded", String(!panel.hidden));
-    if (!panel.hidden) void refreshLibraryUi().catch(() => {});
+    if (panel.hidden || !panel.classList.contains("is-open")) openPanel();
+    else closePanel();
   });
-  close.addEventListener("click", () => { panel.hidden = true; toggle.setAttribute("aria-expanded", "false"); });
+  close.addEventListener("click", closePanel);
   for (const button of document.querySelectorAll<HTMLButtonElement>("[data-library-action]")) {
     button.addEventListener("click", () => void (async () => {
       try {
@@ -322,7 +340,7 @@ function initLibraryUi() {
     }
   });
   window.addEventListener("keydown", (event) => {
-    if (event.key === "Escape" && !panel.hidden) panel.hidden = true;
+    if (event.key === "Escape" && !panel.hidden) closePanel();
   });
 }
 

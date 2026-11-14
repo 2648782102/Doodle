@@ -24,6 +24,8 @@
       --doodle-radius: 12px;
       --doodle-radius-sm: 8px;
       --doodle-space: 8px;
+      --doodle-ease: cubic-bezier(0.22, 1, 0.36, 1);
+      --doodle-duration: 220ms;
       --doodle-font: "Avenir Next", "PingFang SC", "Hiragino Sans GB", "Microsoft YaHei", sans-serif;
     }
     :root[data-doodle-theme="dark"] {
@@ -52,17 +54,21 @@
     .excalidraw-host > .excalidraw { position: relative; background: transparent; }
     .excalidraw .App-menu_top { z-index: 4; }
     .excalidraw .App-menu_top .App-toolbar, .excalidraw .App-menu_bottom, .excalidraw .layer-ui__wrapper__top-right { filter: saturate(0.86); }
-    .doodle-topbar { position: fixed; top: 14px; right: 14px; z-index: 20; display: flex; gap: 6px; align-items: center; padding: 4px; border: 1px solid var(--doodle-border); border-radius: 14px; background: var(--doodle-surface); box-shadow: var(--doodle-shadow); backdrop-filter: blur(12px); }
-    .doodle-tool { min-height: 30px; padding: 0 11px; border: 1px solid transparent; border-radius: 9px; background: transparent; color: var(--doodle-muted); cursor: pointer; font-size: 12px; letter-spacing: 0.01em; }
+    .doodle-topbar { position: fixed; top: 14px; right: 14px; z-index: 20; display: flex; gap: 6px; align-items: center; padding: 4px; border: 1px solid var(--doodle-border); border-radius: 14px; background: var(--doodle-surface); box-shadow: var(--doodle-shadow); backdrop-filter: blur(12px); transition: box-shadow var(--doodle-duration) var(--doodle-ease), border-color var(--doodle-duration) var(--doodle-ease); }
+    .doodle-topbar:has(#doodleLibraryToggle[aria-expanded="true"]) { border-color: var(--doodle-border-strong); }
+    .doodle-tool { min-height: 30px; padding: 0 11px; border: 1px solid transparent; border-radius: 9px; background: transparent; color: var(--doodle-muted); cursor: pointer; font-size: 12px; letter-spacing: 0.01em; transition: color var(--doodle-duration) var(--doodle-ease), background-color var(--doodle-duration) var(--doodle-ease), border-color var(--doodle-duration) var(--doodle-ease), transform var(--doodle-duration) var(--doodle-ease); }
+    .doodle-tool:active { transform: scale(0.96); }
     .doodle-tool:hover { border-color: var(--doodle-border); color: var(--doodle-ink); background: var(--doodle-accent-soft); }
     .doodle-tool[aria-expanded="true"] { color: var(--doodle-ink); background: var(--doodle-accent-soft); }
     .doodle-tool-primary { background: var(--doodle-accent); color: var(--doodle-accent-ink); border-color: transparent; }
     .doodle-tool-primary:hover { color: var(--doodle-accent-ink); filter: brightness(1.05); }
     .doodle-tool-icon { width: 30px; padding: 0; font-size: 14px; }
+    #doodleThemeToggle:hover { transform: rotate(12deg); }
     .doodle-notify-agent { position: fixed; right: 14px; bottom: 14px; z-index: 20; height: 36px; padding: 0 14px; border: 1px solid transparent; border-radius: 18px; background: var(--doodle-accent); color: var(--doodle-accent-ink); cursor: pointer; font-size: 12px; box-shadow: var(--doodle-shadow); }
     .doodle-notify-agent:hover { filter: brightness(1.05); }
     .doodle-notify-agent[hidden] { display: none; }
-    .doodle-library-panel { position: fixed; top: 58px; right: 14px; z-index: 20; width: min(320px, calc(100vw - 28px)); max-height: calc(100% - 76px); overflow: auto; padding: 16px; border: 1px solid var(--doodle-border); border-radius: var(--doodle-radius); background: var(--doodle-panel); box-shadow: var(--doodle-shadow); backdrop-filter: blur(16px); }
+    .doodle-library-panel { position: fixed; top: 58px; right: 14px; z-index: 20; width: min(320px, calc(100vw - 28px)); max-height: calc(100% - 76px); overflow: auto; padding: 16px; border: 1px solid var(--doodle-border); border-radius: var(--doodle-radius); background: var(--doodle-panel); box-shadow: var(--doodle-shadow); backdrop-filter: blur(16px); transform-origin: top right; opacity: 0; transform: translateY(-8px) scale(0.97); visibility: hidden; pointer-events: none; transition: opacity var(--doodle-duration) var(--doodle-ease), transform var(--doodle-duration) var(--doodle-ease), visibility 0s linear var(--doodle-duration); }
+    .doodle-library-panel.is-open { opacity: 1; transform: translateY(0) scale(1); visibility: visible; pointer-events: auto; transition: opacity var(--doodle-duration) var(--doodle-ease), transform var(--doodle-duration) var(--doodle-ease), visibility 0s linear 0s; }
     .doodle-library-panel[hidden] { display: none; }
     .doodle-library-head { display: flex; align-items: center; gap: 8px; margin-bottom: 10px; }
     .doodle-library-head strong { font-size: 14px; font-weight: 650; letter-spacing: 0.01em; }
@@ -74,11 +80,13 @@
     .doodle-library-section > strong { display: block; margin-bottom: 8px; color: var(--doodle-muted); font-size: 11px; font-weight: 600; }
     .doodle-library-actions, .doodle-library-footer, .doodle-library-shares { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 6px; }
     .doodle-library-footer { grid-template-columns: repeat(2, minmax(0, 1fr)); margin-top: 8px; }
-    .doodle-library-actions button, .doodle-library-footer button, .doodle-library-shares button { min-height: 32px; padding: 0 7px; border: 1px solid var(--doodle-border); border-radius: var(--doodle-radius-sm); background: var(--doodle-surface-solid); color: var(--doodle-ink); cursor: pointer; font-size: 11px; }
+    .doodle-library-actions button, .doodle-library-footer button, .doodle-library-shares button { min-height: 32px; padding: 0 7px; border: 1px solid var(--doodle-border); border-radius: var(--doodle-radius-sm); background: var(--doodle-surface-solid); color: var(--doodle-ink); cursor: pointer; font-size: 11px; transition: background-color var(--doodle-duration) var(--doodle-ease), border-color var(--doodle-duration) var(--doodle-ease), transform var(--doodle-duration) var(--doodle-ease); }
+    .doodle-library-actions button:active, .doodle-library-footer button:active, .doodle-library-shares button:active { transform: scale(0.97); }
     .doodle-library-actions button:hover, .doodle-library-footer button:hover, .doodle-library-shares button:hover { border-color: var(--doodle-accent); background: var(--doodle-accent-soft); }
     .doodle-library-actions button[data-library-action="delete"] { color: var(--doodle-danger); }
     .doodle-library-list { display: grid; gap: 6px; max-height: 220px; overflow: auto; }
-    .doodle-library-entry { display: grid; grid-template-columns: 1fr auto; gap: 6px; align-items: center; padding: 8px; border: 1px solid var(--doodle-border); border-radius: 9px; background: var(--doodle-surface-solid); }
+    .doodle-library-entry { display: grid; grid-template-columns: 1fr auto; gap: 6px; align-items: center; padding: 8px; border: 1px solid var(--doodle-border); border-radius: 9px; background: var(--doodle-surface-solid); transition: border-color var(--doodle-duration) var(--doodle-ease), background-color var(--doodle-duration) var(--doodle-ease), transform var(--doodle-duration) var(--doodle-ease); }
+    .doodle-library-entry:hover { border-color: var(--doodle-border-strong); transform: translateX(-2px); }
     .doodle-library-entry.active { border-color: var(--doodle-accent); background: var(--doodle-accent-soft); }
     .doodle-library-entry button { border: 0; background: transparent; color: var(--doodle-ink); text-align: left; cursor: pointer; padding: 0; font-size: 12px; }
     .doodle-library-entry small { display: block; color: var(--doodle-muted); font-size: 10px; margin-top: 2px; }
@@ -87,7 +95,7 @@
       .doodle-library-panel { top: 52px; right: 8px; width: calc(100vw - 16px); }
       .doodle-notify-agent { right: 8px; bottom: 8px; }
     }
-    @media (prefers-reduced-motion: reduce) { .doodle-tool, .doodle-notify-agent, .doodle-library-panel { transition: none; } }
+    @media (prefers-reduced-motion: reduce) { .doodle-tool, .doodle-notify-agent, .doodle-library-panel, .doodle-library-entry, .doodle-library-actions button, .doodle-library-footer button, .doodle-library-shares button { transition: none !important; } #doodleThemeToggle:hover, .doodle-library-entry:hover { transform: none; } }
   </style>
   <link rel="stylesheet" href="/excalidraw/index.css">
 </head>
