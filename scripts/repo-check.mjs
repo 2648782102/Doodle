@@ -173,6 +173,13 @@ check(excalidrawTemplate.includes("body:has(.excalidraw .dropdown-menu) .doodle-
 check(excalidrawTemplate.includes(".doodle-library-section--boards") && excalidrawTemplate.includes(".doodle-library-section--shares") && excalidrawTemplate.indexOf(".doodle-library-section--boards") < excalidrawTemplate.indexOf('data-library-action="duplicate"'), "library drawer does not separate its scrollable list from fixed actions");
 check(hoverGeometry.length === 0, `hover or active feedback changes layout geometry: ${hoverGeometry.join(", ")}`);
 check(excalidrawApp.includes("scrim.hidden = false") && excalidrawApp.includes("scrim?.addEventListener(\"click\", closePanel)") && excalidrawApp.includes("event.key === \"Escape\""), "library drawer lost its scrim, outside-click, or Escape dismissal");
+check(excalidrawApp.includes("https://github.com/2648782102/Doodle") && excalidrawApp.includes("MainMenu.ItemLink") && excalidrawApp.includes("group.querySelector(\"a[href]\")"), "canvas menu does not replace upstream social links with the Doodle repository");
+check(excalidrawApp.includes("DoodleMainMenu") && excalidrawApp.includes("MainMenu.DefaultItems.SearchMenu") && excalidrawApp.includes("MainMenu.DefaultItems.Help"), "custom canvas menu lost its local search or help entries");
+check(excalidrawApp.includes("isDoodleProjectLink") && excalidrawApp.includes("onLinkOpen") && excalidrawApp.includes("blockExternalCanvasLinks"), "canvas link policy does not allow only the Doodle repository");
+check(excalidrawApp.includes("HelpDialog__header") === false && excalidrawTemplate.includes(".excalidraw .HelpDialog__header { display: none; }"), "native help dialog still exposes upstream external links");
+check(excalidrawApp.includes("library-menu-browse-button") && excalidrawApp.includes("toolbar-embeddable") && excalidrawApp.includes("dropdown-menu-container"), "external embed or library-browse entries are not removed");
+check(excalidrawApp.includes("aiEnabled: false"), "Excalidraw AI generation entries are enabled");
+check(excalidrawTemplate.indexOf('href="/excalidraw/index.css"') < excalidrawTemplate.indexOf("<style>"), "Doodle overrides load before Excalidraw CSS and lose specificity");
 check(!await exists("src/infra/templates/board.html") && !await exists("src/infra/templates/board-app.js"), "legacy DOM canvas template or bundle still exists");
 check(!tools.includes("engine=dom") && !http.includes("engine=dom"), "legacy DOM engine fallback still exists");
 check(buildScript.includes("excalidraw-app.tsx") && buildScript.includes("minify: true"), "build does not bundle the Excalidraw canvas client");

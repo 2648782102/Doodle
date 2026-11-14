@@ -7,6 +7,7 @@ All notable changes are documented here. Versions follow `VERSIONING.md`.
 ### Added
 - Added human-canvas static sharing snapshots for PNG, JPG, and SVG. These are download-only views; editable library save/import/export remains version 1 JSON.
 - Added layout regression coverage for the human canvas: the `图库` drawer must overlay rather than resize Excalidraw, keep one independently scrollable board list with fixed action rows, and hide its launcher while open; hover/active rules may change only color, border, and shadow.
+- The human canvas now uses a Doodle-owned main menu: local search, local help, and one GitHub link to the current Doodle repository. Upstream social links, help-header external links, the materials-library browse destination, arbitrary web embedding, and Excalidraw AI/Mermaid generation entries are removed.
 
 - Extended version 1 board objects with freehand `stroke`, bounded local `image`, `title`, `shape`, `groupId`, and `emphasis: focus`; older boards remain valid without migration.
 - `draw_board` now supports precise `updates`, batch `items`, `remove_ids`, and deterministic `layout` while keeping exactly four MCP tools.
@@ -25,6 +26,7 @@ All notable changes are documented here. Versions follow `VERSIONING.md`.
 - The `图库` drawer no longer adds padding to the Excalidraw host, so its three-column top toolbar stays inside the viewport and controls no longer overlap. Its board list is the only scroll region; action and share rows remain pinned and fully visible at desktop and narrow widths.
 - Doodle's top bar now yields to Excalidraw's own dropdown menus and modals instead of stacking above them, so native menu items such as “Find on canvas” remain fully visible and clickable.
 - Replaced geometry-changing hover/active transforms with color, border, background, and shadow feedback, and added an offline guard that rejects transform, spacing, size, and font geometry in hover/active blocks.
+- Canvas links are restricted to the Doodle repository. Object links and anchor clicks to any other destination are prevented; the local help, search, library, and board actions remain available.
 - MCP guidance, READMEs, agent handbook, architecture, decisions, product direction, experience audit, and guards now describe the richer two-way canvas.
 - Text projection for AI and model context includes titles and marks freehand/image/focus semantics without turning them into a message feed or project-write authority.
 

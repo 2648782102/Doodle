@@ -97,6 +97,7 @@ docs/                           product, architecture, decisions, and maintenanc
 - Non-GET `/api/board/*` requests require the random HTML-injected `X-AI-Draw-Token` and `confirmedBy: "human"`.
 - Human view settings belong only in browser localStorage. They are not board state or permission.
 - Hover and active feedback must not change element geometry. Color, border, and shadow may change; transform, scale, rotation, margin, padding, and size changes are forbidden because they cause controls to overlap and shift surrounding layout.
+- The human canvas is a closed local surface: its main menu may link only to `https://github.com/2648782102/Doodle`. Native Excalidraw Socials, help-header links, the materials-library browse link, arbitrary web embeds, and AI/Mermaid generation entries are removed. Canvas object links open only when they target the project repository; other links are prevented at pointer-click and `onLinkOpen`.
 - `scan_project` returns workspace-relative paths and short evidence only; it skips dot-private paths, `.env`-like files, generated directories, large text, and common credential lines, with at most 40 evidence lines total.
 - Board mutations are serialized across processes with a filesystem lock and atomic rename; stale snapshot replacement is rejected.
 - Board library mutations use their own local lock and atomic JSON files under `OUTPUT_DIR/.doodle/boards/`; the active `board.json` remains authoritative for the current MCP session.

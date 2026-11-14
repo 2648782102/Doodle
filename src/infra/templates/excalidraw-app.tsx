@@ -1,6 +1,6 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { createRoot } from "react-dom/client";
-import { Excalidraw, convertToExcalidrawElements, exportToBlob, exportToSvg } from "@excalidraw/excalidraw";
+import { Excalidraw, MainMenu, convertToExcalidrawElements, exportToBlob, exportToSvg } from "@excalidraw/excalidraw";
 import {
   boardToExcalidrawFiles,
   boardItemsFromExcalidrawBoard,
@@ -66,10 +66,86 @@ let selectedBoardId = "";
 
 type DoodleTheme = "light" | "dark";
 const THEME_STORAGE_KEY = "doodle-theme";
+const DOODLE_PROJECT_URL = "https://github.com/2648782102/Doodle";
 const canvasColors: Record<DoodleTheme, { view: string; export: string }> = {
   light: { view: "transparent", export: "#f7f8f5" },
   dark: { view: "transparent", export: "#f7f8f5" },
 };
+
+function isDoodleProjectLink(link: unknown): boolean {
+  if (typeof link !== "string") return false;
+  try {
+    const url = new URL(link);
+    return url.protocol === "https:" &&
+      url.hostname === "github.com" &&
+      (url.pathname === "/2648782102/Doodle" || url.pathname.startsWith("/2648782102/Doodle/"));
+  } catch {
+    return false;
+  }
+}
+
+function DoodleMainMenu() {
+  return React.createElement(
+    MainMenu,
+    null,
+    React.createElement(MainMenu.DefaultItems.SearchMenu),
+    React.createElement(MainMenu.DefaultItems.Help),
+    React.createElement(MainMenu.Separator),
+    React.createElement(
+      MainMenu.ItemLink,
+      { href: DOODLE_PROJECT_URL, target: "_blank", rel: "noreferrer", "aria-label": "Doodle GitHub" },
+      "GitHub",
+    ),
+  );
+}
+
+function blockExternalCanvasLinks(event: MouseEvent): void {
+  const target = event.target instanceof Element ? event.target.closest<HTMLAnchorElement>("a[href]") : null;
+  if (!target || !target.closest(".excalidraw")) return;
+  const href = target.getAttribute("href");
+  if (!href || href.startsWith("#") || isDoodleProjectLink(href)) return;
+  event.preventDefault();
+  event.stopPropagation();
+}
+
+function hideExternalEmbedTool(): void {
+  const selector = '.dropdown-menu.App-toolbar__extra-tools-dropdown button[data-testid="toolbar-embeddable"]';
+  for (const button of document.querySelectorAll<HTMLElement>(selector)) {
+    const external = !button.textContent?.includes("Mermaid");
+    if (external) {
+      button.dataset.doodleHidden = "true";
+      button.setAttribute("aria-hidden", "true");
+    }
+  }
+  for (const node of document.querySelectorAll<HTMLElement>(
+    ".dropdown-menu.App-toolbar__extra-tools-dropdown .dropdown-menu-container > *",
+  )) {
+    const text = node.textContent?.trim() ?? "";
+    if (text === "Generate" || text.startsWith("Mermaid") || text.startsWith("生成")) {
+      node.dataset.doodleHidden = "true";
+      node.setAttribute("aria-hidden", "true");
+    }
+  }
+  for (const link of document.querySelectorAll<HTMLElement>(".excalidraw .library-menu-browse-button")) {
+    link.dataset.doodleHidden = "true";
+    link.setAttribute("aria-hidden", "true");
+  }
+}
+
+function initExternalLinkPolicy(): void {
+  document.addEventListener("click", blockExternalCanvasLinks, true);
+  const apply = () => {
+    hideExternalEmbedTool();
+  for (const group of document.querySelectorAll<HTMLElement>(".excalidraw .dropdown-menu-group")) {
+      if (group.querySelector("a[href]") && !group.querySelector('a[href="https://github.com/2648782102/Doodle"]')) {
+        group.dataset.doodleHidden = "true";
+      }
+    }
+  };
+  const observer = new MutationObserver(apply);
+  observer.observe(document.body, { childList: true, subtree: true });
+  apply();
+}
 
 function readTheme(): DoodleTheme {
   try {
@@ -578,6 +654,10 @@ function CanvasApp({ initial }: { initial: BoardSnapshot }) {
       onChange,
       langCode: "zh-CN",
       theme,
+      aiEnabled: false,
+      onLinkOpen: (element: { link?: string }, event: CustomEvent<{ nativeEvent: MouseEvent }>) => {
+        if (element.link && !isDoodleProjectLink(element.link)) event.preventDefault();
+      },
       UIOptions: {
         canvasActions: {
           loadScene: false,
@@ -588,7 +668,11 @@ function CanvasApp({ initial }: { initial: BoardSnapshot }) {
           clearCanvas: false,
           changeViewBackgroundColor: false,
         },
+        tools: {
+          image: true,
+        },
       },
+      children: React.createElement(DoodleMainMenu),
     }),
   );
 }
@@ -616,6 +700,7 @@ window.DoodleExcalidrawInit = (snapshot, mcpApp) => {
 
 if (document.querySelector("#excalidrawRoot")) {
   initThemeToggle();
+  initExternalLinkPolicy();
   initLibraryUi();
   initSnapshotExports();
   initNotifyButton();

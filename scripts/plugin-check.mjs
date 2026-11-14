@@ -115,6 +115,8 @@ check(httpSource.includes('"/api/board/library"') && excalidrawTemplate.includes
 check(appBundle.includes("updateModelContext") && appBundle.includes("callServerTool"), "bundled Excalidraw engine lacks host context refresh");
 check(appBundle.includes("doodle_board_context") && appBundle.includes("finalStateNotOperationLog"), "bundled Excalidraw engine lost final-state context projection");
 check(appBundle.includes("sendMessage") && excalidrawTemplate.includes('id="doodleNotifyAgent"'), "bundled Excalidraw engine lost the host notification button");
+check(appBundle.includes("https://github.com/2648782102/Doodle") && appBundle.includes("library-menu-browse-button") && appBundle.includes("toolbar-embeddable"), "bundled canvas does not restrict external links to the Doodle repository");
+check(excalidrawTemplate.includes(".excalidraw .HelpDialog__header { display: none; }"), "bundled help dialog still exposes upstream links");
 check(excalidrawTemplate.includes("Doodle · Excalidraw Canvas") && excalidrawTemplate.includes("/excalidraw/excalidraw-app.js"), "Excalidraw template is missing");
 check(!await exists(".doodle-plugin/doodle/server/infra/templates/board-app.js"), "legacy DOM MCP App bundle still exists");
 check(excalidrawTemplate.includes("Doodle · Excalidraw Canvas") && excalidrawTemplate.includes("/excalidraw/excalidraw-app.js"), "Excalidraw template is missing");

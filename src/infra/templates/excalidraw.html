@@ -4,6 +4,7 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>Doodle · Excalidraw Canvas</title>
+  <link rel="stylesheet" href="/excalidraw/index.css">
   <style>
     :root {
       color-scheme: light;
@@ -101,6 +102,9 @@
     .doodle-library-entry.active { border-color: var(--doodle-accent); background: var(--doodle-accent-soft); }
     .doodle-library-entry button { min-width: 0; border: 0; background: transparent; color: var(--doodle-ink); text-align: left; cursor: pointer; padding: 0; font-size: 12px; overflow: hidden; text-overflow: ellipsis; }
     .doodle-library-entry small { display: block; color: var(--doodle-muted); font-size: 10px; margin-top: 2px; white-space: nowrap; }
+    .excalidraw .HelpDialog__header { display: none; }
+    .excalidraw .dropdown-menu .dropdown-menu-group[data-doodle-hidden="true"] { display: none; }
+    .excalidraw [data-doodle-hidden="true"] { display: none !important; }
     @media (max-width: 640px) {
       .doodle-topbar { top: 58px; left: 12px; }
       .doodle-library-panel { top: 54px; width: calc(100vw - 24px); }
@@ -113,7 +117,6 @@
     }
     @media (prefers-reduced-motion: reduce) { .doodle-tool, .doodle-notify-agent, .doodle-library-panel, .doodle-library-entry, .doodle-library-actions button, .doodle-library-footer button, .doodle-library-shares button { transition: none !important; } }
   </style>
-  <link rel="stylesheet" href="/excalidraw/index.css">
 </head>
 <body>
   <div id="excalidrawRoot"></div>

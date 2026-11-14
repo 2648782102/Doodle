@@ -56,6 +56,8 @@ describe("board HTTP surface", () => {
     expect(html).toContain("body:has(.excalidraw .Modal) .doodle-topbar");
     expect(html).toContain(".doodle-library-section--boards");
     expect(html).toContain(".doodle-library-section--shares");
+    expect(html.indexOf('href="/excalidraw/index.css"')).toBeLessThan(html.indexOf("<style>"));
+    expect(html).toContain(".excalidraw .HelpDialog__header { display: none; }");
     const snapshot = await fetch(`${base}/api/board`).then((response) => response.json());
     expect(snapshot).toMatchObject({ version: 1 });
     expect(snapshot.library).toMatchObject({ version: 1 });
@@ -137,6 +139,9 @@ describe("board HTTP surface", () => {
     expect(app.status).toBe(200);
     const appText = await app.text();
     expect(appText).toContain("doodleLibraryPanel");
+    expect(appText).toContain("https://github.com/2648782102/Doodle");
+    expect(appText).toContain("library-menu-browse-button");
+    expect(appText).toContain("Doodle GitHub");
     expect(appText).toContain("editingTextElement");
     expect(appText).toContain("board_updated");
     expect(appText).not.toContain("已同步到 Doodle 画板");
