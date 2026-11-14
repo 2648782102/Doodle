@@ -290,6 +290,35 @@ describe("MCP board server", () => {
     });
   }, 30_000);
 
+  it("returns canvas fidelity only when the canvas explicitly asks for it", async () => {
+    const outputDir = path.join(tempDir, "fidelity-on-demand");
+    await withClientIn(outputDir, 3448, async (client) => {
+      await client.callTool({
+        name: "draw_board",
+        arguments: { author: "ai", items: [{ type: "note", x: 0, y: 0, w: 160, h: 90, text: "kept" }] },
+      });
+      const statePath = path.join(outputDir, ".doodle", "board.json");
+      const persisted = JSON.parse(await fs.readFile(statePath, "utf8"));
+      persisted.items = persisted.items.map((entry) => ({
+        ...entry,
+        scene: { element: { id: entry.id, version: 9, versionNonce: 777 }, boundText: { id: `${entry.id}_t`, text: entry.text } },
+      }));
+      persisted.revision += 1;
+      await fs.writeFile(statePath, JSON.stringify(persisted, null, 2));
+
+      const agentRead = await client.callTool({ name: "get_board", arguments: {} });
+      expect(JSON.stringify(agentRead.structuredContent)).not.toContain("versionNonce");
+
+      const canvasRead = await client.callTool({
+        name: "get_board",
+        arguments: { include_canvas_fidelity: true, include_guide: false },
+      });
+      expect(JSON.stringify(canvasRead.structuredContent)).toContain("777");
+      expect(canvasRead.structuredContent.items.every((entry) => Boolean(entry.scene))).toBe(true);
+      expect(canvasRead.structuredContent.safety.canvasFidelityExcluded).toBeUndefined();
+    });
+  }, 30_000);
+
   it("tells the agent what the person changed since its last read", async () => {
     await withClient(3447, async (client) => {
       await client.callTool({

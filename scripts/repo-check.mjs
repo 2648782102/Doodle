@@ -149,9 +149,10 @@ check(tools.includes('"show_board"') && tools.includes('"get_board"'), "canvas r
 check(tools.includes("CANVAS_UI_META") && tools.includes("_meta: CANVAS_UI_META"), "draw_board does not advertise the canvas for automatic post-draw rendering");
 check(tools.includes("getAppHtml()") && tools.includes("PANEL_URL"), "Excalidraw MCP App resource is not plugin-safe and the panel URL is missing");
 check(tools.includes("FIRST_USE:") && tools.includes("NEXT_STEPS:") && tools.includes("NEXT:"), "get_board does not use progressive first-use and next-step guidance");
-check(tools.includes("structuredContent: boardAgentPayload(board, libraryIndex)"), "board tools do not return an authoritative agent-view snapshot");
+check(tools.includes("structuredContent: boardJson(board, libraryIndex)"), "draw_board no longer returns the authoritative canvas snapshot");
 check(tools.includes("function boardAgentPayload") && tools.includes("canvasFidelityItems") && tools.includes("function boardJson("), "agent payload and full canvas payload are not separated");
 check(tools.includes("since_revision") && tools.includes("boardAgentDelta") && tools.includes("BoardRevisionCache"), "incremental rereads or their revision cache are missing");
+check(tools.includes("include_canvas_fidelity") && excalidrawApp.includes("include_canvas_fidelity: true"), "the canvas cannot request the fidelity that agent reads omit");
 check(tools.includes("describeHandoff") && tools.includes("handoff") && tools.includes("needsAttention"), "delta reads do not attribute human edits");
 check(buildScript.includes("excalidraw-app.tsx"), "build is missing the canvas client");
 check(tools.includes("guideSent") && tools.includes("include_guide"), "the guide is not sent once with an explicit opt-in");

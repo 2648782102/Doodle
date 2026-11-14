@@ -34,7 +34,7 @@ Shared visual context is anchored to objects, coordinates, text, and authors. Ei
 
 | Tool | Use |
 |---|---|
-| `get_board` | Read progressive guidance, `BOARD_JSON`: object IDs, coordinates, authors, `PANEL_URL`, and the drawing guide once per process. Pass `since_revision` for a delta plus `HANDOFF` (human-attributed changes only). Canvas fidelity metadata is never returned. Read-only. |
+| `get_board` | Read progressive guidance, `BOARD_JSON`: object IDs, coordinates, authors, `PANEL_URL`, and the drawing guide once per process. Pass `since_revision` for a delta plus `HANDOFF` (human-attributed changes only). Canvas fidelity metadata is returned only with `include_canvas_fidelity: true`, which the canvas uses to rebuild its scene. Read-only. |
 | `show_board` | Render the optional MCP App canvas in compatible hosts when the user asks to see or edit the board. |
 | `draw_board` | Add items, precise updates/removals, deterministic layout, visual-expression fields, local board-library actions, and `diagram` for one complete semantic diagram. Use `remove_ids` only when clearing old objects before a deliberate full redraw. |
 | `scan_project` | Optional bounded read-only project paths and `file:line` evidence. Visualize the result with `draw_board` only when useful. |

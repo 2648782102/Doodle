@@ -288,16 +288,20 @@ export function registerBoardTools(server: McpServer, ctx: BoardToolContext): vo
           .describe("Optional revision you already read. Returns only objects added, updated, or removed since it, or a compact unchanged summary."),
         include_guide: z.boolean().optional()
           .describe("Include the full capabilities, recipes, and drawing guide. Defaults to true on a first or empty read and false on later reads, where the initialization instructions already cover them."),
+        include_canvas_fidelity: z.boolean().optional()
+          .describe("Return Excalidraw scene fidelity with each item. Use only to rebuild a canvas; it is large and not useful for reading or drawing."),
       }),
       annotations: READ_ONLY_LOCAL_ANNOTATIONS,
     },
-    async ({ since_revision, include_guide }: { since_revision?: number; include_guide?: boolean }) => {
+    async ({ since_revision, include_guide, include_canvas_fidelity }: { since_revision?: number; include_guide?: boolean; include_canvas_fidelity?: boolean }) => {
       try {
         const current = await ctx.board.snapshot();
         const revisions = ctx.revisions;
         const previous = since_revision === undefined ? undefined : revisions?.get(since_revision);
         revisions?.remember(current);
-        const payload = boardAgentPayload(current, (await ctx.library.apply({ type: "list" }, current)).index);
+        const payload = include_canvas_fidelity
+          ? boardJson(current, (await ctx.library.apply({ type: "list" }, current)).index)
+          : boardAgentPayload(current, (await ctx.library.apply({ type: "list" }, current)).index);
         const firstUse = payload.itemCount === 0;
         const withGuide = include_guide ?? (firstUse || !guideSent);
         if (withGuide) guideSent = true;
@@ -462,7 +466,7 @@ export function registerBoardTools(server: McpServer, ctx: BoardToolContext): vo
                 `JSON: ${JSON.stringify({ revision: board.revision, created: generated.length })}`,
               ].join("\n"),
             }],
-            structuredContent: boardAgentPayload(board, libraryIndex),
+            structuredContent: boardJson(board, libraryIndex),
           };
         }
         if (library) {
@@ -542,7 +546,7 @@ export function registerBoardTools(server: McpServer, ctx: BoardToolContext): vo
               }),
             ].join("\n"),
           }],
-            structuredContent: boardAgentPayload(board, libraryIndex),
+            structuredContent: boardJson(board, libraryIndex),
         };
       } catch (error) {
         return errorResult("draw_board", error);

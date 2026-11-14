@@ -228,7 +228,9 @@ async function initHostApp() {
   const timer = window.setInterval(async () => {
     if (document.visibilityState === "hidden") return;
     try {
-      const result = await hostApp.callServerTool({ name: "get_board", arguments: {} });
+      // The canvas rebuilds its scene from items, so it must ask for the
+      // Excalidraw fidelity that agent-facing reads deliberately omit.
+      const result = await hostApp.callServerTool({ name: "get_board", arguments: { include_canvas_fidelity: true, include_guide: false } });
       if (result.isError) return;
       const data = result.structuredContent as BoardSnapshot | undefined;
       if (!data || !Array.isArray(data.items) || typeof data.revision !== "number") return;
