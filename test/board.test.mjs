@@ -217,7 +217,8 @@ describe("simple shared board", () => {
     const legend = items.find((item) => item.id === "diagram_legend");
     expect(edges).toHaveLength(0);
     expect(middleNodes).toHaveLength(3);
-    expect(legend?.text).toContain("a → e（far）");
+    expect(legend?.text).toContain("未绘制远连接：1 条");
+    expect(legend.text.length).toBeLessThanOrEqual(120);
   });
 
   it("records omitted semantic edges in the legend instead of drawing over the subtitle", () => {
@@ -235,7 +236,8 @@ describe("simple shared board", () => {
     const legend = items.find((item) => item.id === "diagram_legend");
     expect(items.filter((item) => item.type === "line")).toHaveLength(0);
     expect(frame.y).toBeLessThan(subtitle.y);
-    expect(legend?.text).toContain("a → d（far）");
+    expect(legend?.text).toContain("未绘制远连接：1 条");
+    expect(legend.text.length).toBeLessThanOrEqual(120);
   });
 
   it("architecture layout moves selected nodes without erasing labels", () => {

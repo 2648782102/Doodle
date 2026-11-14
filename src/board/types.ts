@@ -900,7 +900,7 @@ export function diagramToBoardItems(diagram: DiagramInput, author: BoardAuthor =
       text: node.detail.slice(0, 40), color: "#ffffff", z: 3, style: { fontSize: 12, textAlign: "center" },
     });
   }
-  const omittedEdges: string[] = [];
+  let omittedEdgeCount = 0;
   let edgeIndex = 0;
   diagram.edges.forEach((edge) => {
     const from = positions.get(edge.from)!;
@@ -909,7 +909,7 @@ export function diagramToBoardItems(diagram: DiagramInput, author: BoardAuthor =
     const deltaRow = Math.round(to.y - from.y);
     const shortEdge = layerDistance <= 1.01 && deltaRow === 0;
     if (!shortEdge) {
-      omittedEdges.push(`${edge.from} → ${edge.to}${edge.label ? `（${edge.label}）` : ""}`);
+      omittedEdgeCount += 1;
       return;
     }
     const startX = from.x + width + 8;
@@ -927,10 +927,10 @@ export function diagramToBoardItems(diagram: DiagramInput, author: BoardAuthor =
     });
   });
   const legendLabels = diagram.edges.filter((edge) => edge.label).map((edge) => edge.label).join(" · ");
-  if (legendLabels || omittedEdges.length) {
+  if (legendLabels || omittedEdgeCount) {
     const parts = [
       legendLabels ? `连接：${legendLabels}` : "",
-      omittedEdges.length ? `未绘制远连接：${omittedEdges.join(" · ")}` : "",
+      omittedEdgeCount ? `未绘制远连接：${omittedEdgeCount} 条` : "",
     ].filter(Boolean);
     const legendWidth = Math.max(MIN_SHAPE_SIZE, Math.min(MAX_SHAPE_WIDTH, bounds.right - bounds.left));
     items.push({
