@@ -39,6 +39,27 @@ function textOf(result) {
   return result.content.map((item) => item.text ?? "").join("\n");
 }
 
+async function withClientIn(outputDir, port, callback) {
+  const transport = new StdioClientTransport({
+    command: "node",
+    args: ["dist/index.js"],
+    env: {
+      ...process.env,
+      PREVIEW_PORT: String(port),
+      LOG_LEVEL: "error",
+      OUTPUT_DIR: outputDir,
+      DOODLE_WORKSPACE_ROOT: process.cwd(),
+    },
+  });
+  const client = new Client({ name: "doodle-board-tests", version: "1.0.0" });
+  try {
+    await client.connect(transport);
+    await callback(client);
+  } finally {
+    await client.close();
+  }
+}
+
 function jsonAfter(text, marker) {
   const start = text.indexOf(marker) + marker.length;
   let depth = 0;
@@ -171,10 +192,101 @@ describe("MCP board server", () => {
       const text = textOf(await client.callTool({ name: "get_board", arguments: {} }));
       expect(text).toContain("NEXT:");
       expect(text).not.toContain("FIRST_USE:");
-      expect(text).not.toContain("Drawing guide:");
       expect(text).not.toContain("BOARD_JSON is the read-only shared state");
       expect(text).toContain("BOARD_JSON:");
       expect(text).toContain('"text": "context"');
+    });
+  }, 30_000);
+
+  it("sends the guide once per process and rereads compactly", async () => {
+    await withClient(3444, async (client) => {
+      await client.callTool({
+        name: "draw_board",
+        arguments: { author: "ai", items: [{ type: "note", x: 0, y: 0, w: 160, h: 90, text: "plan" }] },
+      });
+
+      const first = textOf(await client.callTool({ name: "get_board", arguments: {} }));
+      expect(first).toContain("CAPABILITIES:");
+      expect(first).toContain("Visual recipes:");
+
+      const second = textOf(await client.callTool({ name: "get_board", arguments: {} }));
+      expect(second).not.toContain("CAPABILITIES:");
+      expect(second).not.toContain("Visual recipes:");
+      expect(second).toContain("GUIDE:");
+      expect(second.length).toBeLessThan(first.length);
+
+      const guided = textOf(await client.callTool({ name: "get_board", arguments: { include_guide: true } }));
+      expect(guided).toContain("CAPABILITIES:");
+    });
+  }, 30_000);
+
+  it("returns only changed objects for a reread since a revision", async () => {
+    await withClient(3445, async (client) => {
+      await client.callTool({
+        name: "draw_board",
+        arguments: {
+          author: "ai",
+          items: [
+            { type: "note", x: 0, y: 0, w: 160, h: 90, text: "a" },
+            { type: "note", x: 200, y: 0, w: 160, h: 90, text: "b" },
+          ],
+        },
+      });
+      const full = await client.callTool({ name: "get_board", arguments: {} });
+      const base = full.structuredContent.revision;
+      const fullText = textOf(full);
+
+      const unchanged = await client.callTool({ name: "get_board", arguments: { since_revision: base } });
+      const unchangedText = textOf(unchanged);
+      expect(unchanged.structuredContent.mode).toBe("delta");
+      expect(unchanged.structuredContent.unchanged).toBe(true);
+      expect(unchangedText).toContain("无变化");
+      expect(unchangedText).not.toContain("BOARD_JSON:");
+      expect(unchangedText.length).toBeLessThan(fullText.length / 4);
+
+      const note = full.structuredContent.items.find((entry) => entry.text === "a");
+      await client.callTool({
+        name: "draw_board",
+        arguments: { author: "human", updates: [{ id: note.id, patch: { text: "a 改过了" } }] },
+      });
+      const changed = await client.callTool({ name: "get_board", arguments: { since_revision: base } });
+      expect(changed.structuredContent.unchanged).toBe(false);
+      expect(changed.structuredContent.updated).toHaveLength(1);
+      expect(changed.structuredContent.updated[0].text).toBe("a 改过了");
+      expect(changed.structuredContent.added).toEqual([]);
+      expect(changed.structuredContent.removed).toEqual([]);
+    });
+  }, 30_000);
+
+  it("never sends canvas fidelity to the agent but keeps the canvas board intact", async () => {
+    const outputDir = path.join(tempDir, "fidelity");
+    await withClientIn(outputDir, 3446, async (client) => {
+      await client.callTool({
+        name: "draw_board",
+        arguments: { author: "ai", items: [{ type: "note", x: 0, y: 0, w: 160, h: 90, text: "kept" }] },
+      });
+
+      // Simulate what the human canvas writes back: full Excalidraw fidelity per item.
+      const statePath = path.join(outputDir, ".doodle", "board.json");
+      const persisted = JSON.parse(await fs.readFile(statePath, "utf8"));
+      persisted.items = persisted.items.map((entry) => ({
+        ...entry,
+        scene: { element: { id: entry.id, version: 9, versionNonce: 4242, seed: 7 }, boundText: { id: `${entry.id}_t`, text: entry.text } },
+      }));
+      persisted.revision += 1;
+      await fs.writeFile(statePath, JSON.stringify(persisted, null, 2));
+
+      const fresh = await client.callTool({ name: "get_board", arguments: {} });
+      const text = textOf(fresh);
+      expect(text).not.toContain("versionNonce");
+      expect(text).not.toContain('"scene"');
+      expect(text).not.toContain("boundText");
+      expect(fresh.structuredContent.canvasFidelityItems).toBe(persisted.items.length);
+      expect(fresh.structuredContent.items.every((entry) => entry.canvasFidelity === true)).toBe(true);
+      expect(fresh.structuredContent.safety.canvasFidelityExcluded).toBe(true);
+
+      const stillPersisted = JSON.parse(await fs.readFile(statePath, "utf8"));
+      expect(stillPersisted.items.every((entry) => entry.scene?.element?.versionNonce === 4242)).toBe(true);
     });
   }, 30_000);
 

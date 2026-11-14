@@ -7,4 +7,6 @@ export * from "./excalidraw-adapter.js";
 export * from "./project-scan.js";
 export * from "./instructions.js";
 export * from "./tools.js";
+export * from "./agent-view.js";
+export * from "./revision-cache.js";
 export { BoardHttpServer } from "./http.js";

@@ -9,6 +9,8 @@ import { scanProject } from "./project-scan.js";
 import { BoardLibrary, boardLibraryIndexText, type BoardLibraryAction } from "./library.js";
 import type { BoardStore } from "./store.js";
 import { BoardRevisionConflictError } from "./errors.js";
+import { boardAgentDelta, boardAgentView, summarizeAgentBoard } from "./agent-view.js";
+import { BoardRevisionCache } from "./revision-cache.js";
 import {
   addBoardItem,
   addBoardItems,
@@ -29,6 +31,7 @@ export interface BoardToolContext {
   preview: BoardHttpServer;
   config: AppConfig;
   library: BoardLibrary;
+  revisions?: BoardRevisionCache;
 }
 
 const APP_RESOURCE_URI = "ui://doodle/board/excalidraw/v1.html";
@@ -103,6 +106,40 @@ function boardJson(board: SimpleBoard, library?: unknown) {
       readOnly: true,
       grantsWriteAuthority: false,
       projectWritesRequireHumanApproval: true,
+    },
+  };
+}
+
+/**
+ * The agent-facing board payload: same contract, without canvas fidelity.
+ *
+ * `scene` exists so a person's canvas keeps its exact rendering after a round
+ * trip. It is unreadable and unwritable for the agent, and dominated the
+ * payload on real boards, so agent context carries a marker plus a compact
+ * summary instead. The persisted board and the canvas are unchanged.
+ */
+function boardAgentPayload(board: SimpleBoard, library?: unknown) {
+  const view = boardAgentView(board);
+  return {
+    version: 1,
+    readOnly: true,
+    id: view.id,
+    title: view.title,
+    revision: view.revision,
+    updatedAt: view.updatedAt,
+    itemCount: view.itemCount,
+    items: view.items,
+    copyText: boardCopyText(board),
+    visualDigest: boardVisualDigest(board),
+    summary: view.summary,
+    canvasFidelityItems: view.canvasFidelityItems,
+    capabilities: boardCapabilities(),
+    ...(library ? { library } : {}),
+    safety: {
+      readOnly: true,
+      grantsWriteAuthority: false,
+      projectWritesRequireHumanApproval: true,
+      canvasFidelityExcluded: true,
     },
   };
 }
@@ -219,6 +256,9 @@ const diagramInput = z.object({
 });
 
 export function registerBoardTools(server: McpServer, ctx: BoardToolContext): void {
+  // The full guide is expensive and does not change between reads, so send it
+  // once per server process unless the caller explicitly asks for it again.
+  let guideSent = false;
   registerAppResource(server, "Doodle Excalidraw board", APP_RESOURCE_URI, {
     _meta: { ui: { prefersBorder: true } },
   }, async () => {
@@ -236,38 +276,83 @@ export function registerBoardTools(server: McpServer, ctx: BoardToolContext): vo
   server.registerTool(
     "get_board",
     {
-      description: "读取人和 AI 共享画布的数据：revision、对象 ID、坐标、作者、BOARD_JSON 和画图规范。用于回答画布内容或给 Agent 提供视觉上下文；只读，不打开浏览器，也不写项目文件。想显示可编辑画布时调用 show_board。",
-      inputSchema: z.object({}),
+      description: "读取人和 AI 共享画布的数据：revision、对象 ID、坐标、作者、BOARD_JSON 和画图规范。用于回答画布内容或给 Agent 提供视觉上下文；只读，不打开浏览器，也不写项目文件。重复读取同一画板时传 since_revision，只返回变化的对象。画布保真元数据不会出现在返回里。想显示可编辑画布时调用 show_board。",
+      inputSchema: z.object({
+        since_revision: z.number().int().min(0).optional()
+          .describe("Optional revision you already read. Returns only objects added, updated, or removed since it, or a compact unchanged summary."),
+        include_guide: z.boolean().optional()
+          .describe("Include the full capabilities, recipes, and drawing guide. Defaults to true on a first or empty read and false on later reads, where the initialization instructions already cover them."),
+      }),
       annotations: READ_ONLY_LOCAL_ANNOTATIONS,
     },
-    async () => {
+    async ({ since_revision, include_guide }: { since_revision?: number; include_guide?: boolean }) => {
       try {
         const current = await ctx.board.snapshot();
-        const payload = boardJson(current, (await ctx.library.apply({ type: "list" }, current)).index);
+        const revisions = ctx.revisions;
+        const previous = since_revision === undefined ? undefined : revisions?.get(since_revision);
+        revisions?.remember(current);
+        const payload = boardAgentPayload(current, (await ctx.library.apply({ type: "list" }, current)).index);
         const firstUse = payload.itemCount === 0;
+        const withGuide = include_guide ?? (firstUse || !guideSent);
+        if (withGuide) guideSent = true;
         const guidance = firstUse ? [
           "FIRST_USE: 空画板。用户想看时调用 show_board；AI 表达意图时调用 draw_board。",
           "NEXT_STEPS: draw_board → 保持画布可见 → 读取人的画图后用 get_board 或当前会话上下文。首张画板见下方 Drawing guide。",
         ] : [
-          "NEXT: BOARD_JSON 中的对象是人和 AI 的双向表达；show_board 显示，draw_board 画图回应，改完后再 get_board 或读当前会话上下文。Use draw_board to visualize any context.",
+          `NEXT: 这是 revision ${payload.revision} 的完整画板。下次只在需要时传 since_revision: ${payload.revision} 读差量；show_board 显示，draw_board 画图回应。Use draw_board to visualize any context.`,
         ];
+
+        if (since_revision !== undefined && previous) {
+          const delta = boardAgentDelta(current, previous);
+          const deltaText = [
+            `🎨 共享画布 · rev ${delta.baseRevision} → rev ${delta.revision} · ${delta.unchanged ? "无变化" : `新增 ${delta.added.length} · 更新 ${delta.updated.length} · 删除 ${delta.removed.length}`}`,
+            "",
+            "BOARD_DELTA_JSON:",
+            JSON.stringify(delta, null, 2),
+            "",
+            "BOARD_SUMMARY_JSON:",
+            JSON.stringify(summarizeAgentBoard(current), null, 2),
+            "",
+            `NEXT: 需要完整对象时用 since_revision 省略或重读；修改用 draw_board，下次差量基准为 ${delta.revision}。`,
+            `PANEL_URL: ${ctx.preview.panelUrl ?? "unavailable (standalone preview not started)"}`,
+          ].join("\n");
+          return {
+            content: [{ type: "text" as const, text: deltaText }],
+            structuredContent: {
+              version: 1,
+              readOnly: true,
+              mode: "delta",
+              ...delta,
+              summary: summarizeAgentBoard(current),
+            },
+          };
+        }
+
+        const staleSince = since_revision !== undefined && !previous;
         return {
           content: [{
             type: "text" as const,
             text: [
               `🎨 共享画布 · revision ${payload.revision} · ${payload.itemCount} 个对象`,
               ``,
+              ...(staleSince ? [`NOTE: revision ${since_revision} 已不在缓存中，返回完整画板。`, ``] : []),
               ...guidance,
               "BOARD_JSON:",
               JSON.stringify(payload, null, 2),
               ``,
-              ...(firstUse ? [boardGuidance(), ``] : []),
-              "CAPABILITIES:",
-              JSON.stringify(payload.capabilities, null, 2),
-              "VISUAL_DIGEST:",
-              JSON.stringify(payload.visualDigest, null, 2),
-              "RECIPES:",
-              boardRecipes(),
+              ...(withGuide ? [
+                ...(firstUse ? [boardGuidance(), ``] : []),
+                "CAPABILITIES:",
+                JSON.stringify(payload.capabilities, null, 2),
+                "VISUAL_DIGEST:",
+                JSON.stringify(payload.visualDigest, null, 2),
+                "RECIPES:",
+                boardRecipes(),
+              ] : [
+                `GUIDE: capabilities, recipes, and the drawing guide are omitted on rereads. Call get_board with include_guide: true when you need them.`,
+                "VISUAL_DIGEST:",
+                JSON.stringify(payload.visualDigest, null, 2),
+              ]),
               ``,
               `PANEL_URL: ${ctx.preview.panelUrl ?? "unavailable (standalone preview not started)"}`,
             ].join("\n"),
@@ -298,6 +383,7 @@ export function registerBoardTools(server: McpServer, ctx: BoardToolContext): vo
             text: [
               `🎨 共享画布 · revision ${snapshot.revision} · ${snapshot.itemCount} 个对象`,
               "兼容宿主会显示可交互画布；文本宿主请从 get_board 的 PANEL_URL 打开本地画板。",
+              `NEXT: 画布显示的是完整保真数据；要读对象用 get_board（可传 since_revision: ${snapshot.revision} 只取差量）。`,
               "CAPABILITIES:",
               JSON.stringify(snapshot.capabilities, null, 2),
               "VISUAL_DIGEST:",
@@ -351,6 +437,7 @@ export function registerBoardTools(server: McpServer, ctx: BoardToolContext): vo
           });
           parseBoard(candidate);
           const board = await ctx.board.replaceIfRevision(candidate, current.revision);
+          ctx.revisions?.remember(board);
           ctx.preview.broadcast({ type: "board_updated", revision: board.revision });
           const libraryIndex = (await ctx.library.apply({ type: "list" }, board)).index;
           return {
@@ -361,7 +448,7 @@ export function registerBoardTools(server: McpServer, ctx: BoardToolContext): vo
                 `JSON: ${JSON.stringify({ revision: board.revision, created: generated.length })}`,
               ].join("\n"),
             }],
-            structuredContent: boardJson(board, libraryIndex),
+            structuredContent: boardAgentPayload(board, libraryIndex),
           };
         }
         if (library) {
@@ -376,6 +463,7 @@ export function registerBoardTools(server: McpServer, ctx: BoardToolContext): vo
             active = await ctx.board.replace(result.previousRevision === undefined
               ? { ...result.board, revision: current.revision + 1 }
               : { ...result.board, revision: current.revision + 1 }, current.revision);
+            ctx.revisions?.remember(active);
           }
           ctx.preview.broadcast({ type: "board_library_updated", activeId: result.index.activeId, revision: active.revision });
           return {
@@ -388,7 +476,7 @@ export function registerBoardTools(server: McpServer, ctx: BoardToolContext): vo
               ].join("\n"),
             }],
             structuredContent: {
-              ...boardJson(active, result.index),
+              ...boardAgentPayload(active, result.index),
               ...(library.type === "export" || library.type === "get" ? { exportBoard: result.board } : {}),
             },
           };
@@ -423,6 +511,7 @@ export function registerBoardTools(server: McpServer, ctx: BoardToolContext): vo
         let candidate = initial;
         candidate = change(candidate);
         const board = await ctx.board.replaceIfRevision(candidate, initial.revision);
+        ctx.revisions?.remember(board);
         ctx.preview.broadcast({ type: "board_updated", revision: board.revision });
         const libraryIndex = (await ctx.library.apply({ type: "list" }, board)).index;
         return {
@@ -439,7 +528,7 @@ export function registerBoardTools(server: McpServer, ctx: BoardToolContext): vo
               }),
             ].join("\n"),
           }],
-            structuredContent: boardJson(board, libraryIndex),
+            structuredContent: boardAgentPayload(board, libraryIndex),
         };
       } catch (error) {
         return errorResult("draw_board", error);
