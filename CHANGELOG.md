@@ -6,7 +6,7 @@ All notable changes are documented here. Versions follow `VERSIONING.md`.
 
 ### Changed
 
-- Doodle chrome now uses a liquid-glass material: a frosted pane with a bright inner top edge, a hairline outer ring, and a wide soft shadow, shared by the top bar, library drawer, welcome card, notification button, and Excalidraw's own toolbars. The canvas itself stays flat so drawing remains legible and panning stays cheap, and an opaque fallback keeps it usable where `backdrop-filter` is unsupported.
+- Doodle chrome uses a liquid-glass material: a frosted pane with a specular top edge, a hairline outer ring, and a wide soft shadow, shared by the top bar, library drawer, welcome card, notification button, and Excalidraw's own toolbars. The first attempt was invisible because the pane was 62% white over an equally light page (1.04:1). The material is now 30% opaque, and the canvas carries a low-amplitude warm/cool colour field so the glass has something to refract. The canvas surface itself stays flat for legibility, and an opaque fallback keeps it usable without `backdrop-filter`.
 
 ### Fixed
 

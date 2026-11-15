@@ -21,6 +21,8 @@
       --doodle-danger: #b4463d;
       --doodle-canvas-bg: #f5f6f0;
       --doodle-dot: rgba(47, 107, 92, 0.16);
+      --doodle-wash-a: rgba(246, 196, 62, 0.34);
+      --doodle-wash-b: rgba(47, 107, 92, 0.28);
       --doodle-shadow: 0 16px 40px rgba(24, 40, 34, 0.12);
       --doodle-radius: 12px;
       --doodle-radius-sm: 8px;
@@ -30,18 +32,22 @@
       --doodle-drawer-width: 336px;
       --doodle-font: "Avenir Next", "PingFang SC", "Hiragino Sans GB", "Microsoft YaHei", sans-serif;
 
-      /* Liquid glass: a frosted pane with a bright top edge and a soft core.
-         Only Doodle chrome uses it; the canvas itself stays flat so drawing
-         stays legible and scrolling stays cheap. */
-      --glass-blur: 22px;
-      --glass-saturate: 180%;
-      --glass-bg: rgba(252, 253, 250, 0.62);
-      --glass-bg-strong: rgba(252, 253, 250, 0.78);
-      --glass-edge: rgba(255, 255, 255, 0.72);
-      --glass-edge-outer: rgba(30, 42, 38, 0.1);
-      --glass-highlight: rgba(255, 255, 255, 0.85);
-      --glass-shadow: 0 1px 1px rgba(24, 40, 34, 0.04), 0 10px 32px rgba(24, 40, 34, 0.12);
-      --glass-shadow-raised: 0 1px 1px rgba(24, 40, 34, 0.05), 0 18px 48px rgba(24, 40, 34, 0.18);
+      /*
+       * Liquid glass. Two things make it read as glass rather than as a white
+       * box: enough transparency that the page shows through, and a bright
+       * specular edge. The first attempt used 62% white over an equally light
+       * page, which measured 1.04:1 - indistinguishable from the background.
+       */
+      --glass-blur: 34px;
+      --glass-saturate: 220%;
+      --glass-bg: rgba(255, 255, 252, 0.30);
+      --glass-bg-strong: rgba(255, 255, 252, 0.52);
+      --glass-edge: rgba(255, 255, 255, 0.95);
+      --glass-edge-outer: rgba(30, 42, 38, 0.12);
+      --glass-highlight: rgba(255, 255, 255, 0.55);
+      --glass-tint: rgba(255, 255, 255, 0.14);
+      --glass-shadow: 0 1px 2px rgba(24, 40, 34, 0.06), 0 8px 24px rgba(24, 40, 34, 0.1), 0 24px 48px -12px rgba(24, 40, 34, 0.18);
+      --glass-shadow-raised: 0 1px 2px rgba(24, 40, 34, 0.08), 0 14px 40px rgba(24, 40, 34, 0.14), 0 32px 64px -16px rgba(24, 40, 34, 0.22);
     }
     :root[data-doodle-theme="dark"] {
       color-scheme: dark;
@@ -58,15 +64,18 @@
       --doodle-danger: #e89288;
       --doodle-canvas-bg: #131a18;
       --doodle-dot: rgba(143, 203, 180, 0.2);
+      --doodle-wash-a: rgba(246, 196, 62, 0.18);
+      --doodle-wash-b: rgba(143, 203, 180, 0.22);
       --doodle-shadow: 0 18px 44px rgba(0, 0, 0, 0.42);
 
-      --glass-bg: rgba(32, 40, 36, 0.58);
-      --glass-bg-strong: rgba(30, 38, 34, 0.76);
-      --glass-edge: rgba(255, 255, 255, 0.14);
-      --glass-edge-outer: rgba(0, 0, 0, 0.4);
-      --glass-highlight: rgba(255, 255, 255, 0.12);
-      --glass-shadow: 0 1px 1px rgba(0, 0, 0, 0.28), 0 12px 36px rgba(0, 0, 0, 0.4);
-      --glass-shadow-raised: 0 1px 1px rgba(0, 0, 0, 0.34), 0 22px 56px rgba(0, 0, 0, 0.5);
+      --glass-bg: rgba(120, 150, 138, 0.26);
+      --glass-bg-strong: rgba(90, 116, 106, 0.44);
+      --glass-edge: rgba(255, 255, 255, 0.28);
+      --glass-edge-outer: rgba(0, 0, 0, 0.45);
+      --glass-highlight: rgba(255, 255, 255, 0.16);
+      --glass-tint: rgba(255, 255, 255, 0.04);
+      --glass-shadow: 0 1px 2px rgba(0, 0, 0, 0.3), 0 10px 28px rgba(0, 0, 0, 0.36), 0 28px 56px -12px rgba(0, 0, 0, 0.5);
+      --glass-shadow-raised: 0 1px 2px rgba(0, 0, 0, 0.36), 0 16px 44px rgba(0, 0, 0, 0.44), 0 36px 72px -16px rgba(0, 0, 0, 0.6);
     }
     .excalidraw {
       --color-primary: #2f6b5c;
@@ -161,23 +170,50 @@
       position: relative;
       background: var(--glass-bg);
       border: 1px solid var(--glass-edge-outer);
-      box-shadow: inset 0 1px 0 0 var(--glass-edge), inset 0 0 0 1px var(--glass-highlight), var(--glass-shadow);
+      box-shadow:
+        inset 0 1px 0 0 var(--glass-edge),
+        inset 0 -1px 0 0 var(--glass-highlight),
+        inset 0 0 0 1px var(--glass-tint),
+        var(--glass-shadow);
       -webkit-backdrop-filter: blur(var(--glass-blur)) saturate(var(--glass-saturate));
       backdrop-filter: blur(var(--glass-blur)) saturate(var(--glass-saturate));
     }
+    /* Specular sheen: a soft highlight at the top, a faint one at the bottom. */
     .doodle-glass::before {
       content: "";
       position: absolute;
       inset: 0;
       border-radius: inherit;
       pointer-events: none;
-      background: linear-gradient(180deg, var(--glass-highlight) 0%, transparent 42%);
-      opacity: 0.7;
+      background:
+        linear-gradient(180deg, var(--glass-edge) 0%, transparent 38%),
+        linear-gradient(0deg, var(--glass-highlight) 0%, transparent 26%);
+      opacity: 0.55;
+      mix-blend-mode: screen;
     }
     @supports not ((backdrop-filter: blur(1px)) or (-webkit-backdrop-filter: blur(1px))) {
       .doodle-glass { background: var(--glass-bg-strong); }
     }
-    .excalidraw-host { height: 100%; position: relative; background-color: var(--doodle-canvas-bg); background-image: radial-gradient(circle, var(--doodle-dot) 1px, transparent 1px); background-size: 20px 20px; background-position: 10px 10px; }
+    /*
+     * The page carries a very low-amplitude colour field under the dot grid.
+     *
+     * Glass is only visible when it has something to refract; on a flat sheet
+     * the material collapsed into a white box. These washes are ~2% saturation
+     * so drawing stays legible, but they give the chrome something to blur.
+     */
+    .excalidraw-host {
+      height: 100%;
+      position: relative;
+      background-color: var(--doodle-canvas-bg);
+      background-image:
+        radial-gradient(ellipse 46% 30% at 50% 0%, var(--doodle-wash-a) 0%, transparent 70%),
+        radial-gradient(ellipse 38% 34% at 6% 34%, var(--doodle-wash-b) 0%, transparent 72%),
+        radial-gradient(ellipse 40% 36% at 94% 62%, var(--doodle-wash-b) 0%, transparent 72%),
+        radial-gradient(ellipse 52% 34% at 72% 100%, var(--doodle-wash-a) 0%, transparent 72%),
+        radial-gradient(circle, var(--doodle-dot) 1px, transparent 1px);
+      background-size: 100% 100%, 100% 100%, 100% 100%, 100% 100%, 20px 20px;
+      background-position: 0 0, 0 0, 0 0, 0 0, 10px 10px;
+    }
     .excalidraw-host > .excalidraw { position: relative; background: transparent; }
     .excalidraw .App-menu_top { z-index: 4; }
     /*
@@ -200,7 +236,7 @@
     .excalidraw .App-menu_bottom .Island,
     .excalidraw .layer-ui__wrapper__top-right .Island,
     .excalidraw .FixedSideContainer_side_top > .Island {
-      background-color: color-mix(in srgb, var(--island-bg-color) 72%, transparent) !important;
+      background-color: color-mix(in srgb, var(--island-bg-color) 34%, transparent) !important;
       box-shadow: inset 0 1px 0 0 var(--glass-edge), inset 0 0 0 1px var(--glass-highlight), var(--glass-shadow) !important;
       -webkit-backdrop-filter: blur(var(--glass-blur)) saturate(var(--glass-saturate));
       backdrop-filter: blur(var(--glass-blur)) saturate(var(--glass-saturate));

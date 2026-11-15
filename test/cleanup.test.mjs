@@ -68,7 +68,7 @@ describe("post-cleanup repository shape", () => {
       "scripts/repo-check.mjs",
       "scripts/setup-codex.mjs",
     ]);
-    expect(tests.filter((name) => name.endsWith(".test.mjs"))).toHaveLength(16);
+    expect(tests.filter((name) => name.endsWith(".test.mjs"))).toHaveLength(17);
     const compiled = await listFiles(path.join(root, "dist"));
     expect(compiled.some((name) => /^dist\/(domain|tools)\//.test(name))).toBe(false);
     expect(compiled.some((name) => name === "dist/infra/templates/index.html")).toBe(false);
