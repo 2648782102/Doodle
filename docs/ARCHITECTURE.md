@@ -9,13 +9,42 @@ src/
 ├── index.ts                    MCP stdio and HTTP lifecycle
 ├── server.ts                   composition root; four tools
 ├── board/
-│   ├── types.ts                version 1 board state and pure object mutations
+│   ├── model/                  Board v1, no I/O and no transport
+│   │   ├── types.ts            persisted shapes and tool inputs (types only)
+│   │   ├── limits.ts           bounded limits and enum members
+│   │   ├── validate.ts         parseBoard, normalizeItem, strict predicates
+│   │   ├── board.ts            construction and item-level mutation
+│   │   ├── digest.ts           deterministic visual summary for agents
+│   │   └── clock.ts            time and identity generation
+│   ├── diagram/
+│   │   ├── layout.ts           deterministic placement for flow/timeline/compare/matrix
+│   │   └── generate.ts         materialise a diagram into Board v1 items
+│   ├── layout/arrange.ts       arrange existing objects, including architecture layers
+│   ├── canvas/                 Excalidraw projection, split by direction
+│   │   ├── types.ts            structural Excalidraw shapes
+│   │   ├── theme.ts            per-theme ink and fill decisions
+│   │   ├── primitives.ts       shared numeric/text helpers
+│   │   ├── to-excalidraw.ts    Board v1 → scene
+│   │   └── from-excalidraw.ts  scene → Board v1
+│   ├── mcp/                    tool surface
+│   │   ├── context.ts          what a tool receives from the running server
+│   │   ├── schemas.ts          input schemas for the four tools
+│   │   ├── presentation.ts     response projection and agent payloads
+│   │   ├── tools.ts            composition only
+│   │   └── tools/              one module per tool
+│   ├── http/                   local API surface
+│   │   └── templates.ts        canvas template lookup and token substitution
+│   ├── library/                named board snapshots
+│   │   ├── schema.ts           index shape and strict validation
+│   │   └── store.ts            atomic persistence under a mutex
+│   ├── types.ts                public barrel over model/diagram/layout
+│   ├── excalidraw-adapter.ts   public barrel over canvas/
+│   ├── library.ts              public barrel over library/
 │   ├── store.ts                atomic board.json persistence and revision sync
-│   ├── errors.ts               revision conflict error
+│   ├── errors.ts               revision-conflict and empty-write errors
 │   ├── mutex.ts                cross-process board write lock
 │   ├── project-scan.ts         bounded read-only workspace path/evidence scan
 │   ├── http.ts                 local board API, HTML and WebSocket updates
-│   ├── tools.ts                get / draw / scan tools and MCP App resource
 │   ├── app-context.ts          final-state delta and bounded model context projection
 │   ├── instructions.ts         MCP initialization guidance for agents
 │   └── index.ts                board module entrypoint
@@ -38,6 +67,39 @@ scripts/plugin-check.mjs        validates plugin manifests, skill, marketplace, 
 ```
 
 There is no `src/domain/` workbench model, Mermaid renderer, session store, proposal store, or legacy panel template in `0.8.0`. The plugin uses only the supported Codex compatibility layout; generated `.doodle-plugin/` output is ignored.
+
+## Layering rules
+
+Dependencies point inward. `model/` imports nothing from `diagram/`, `layout/`,
+`canvas/`, `mcp/`, or `http/`; it has no filesystem, network, or Express
+knowledge. `diagram/` and `layout/` may read `model/`. Transport layers (`mcp/`,
+`http/`) may read everything but are never imported by `model/`.
+
+Three barrels (`types.ts`, `excalidraw-adapter.ts`, `library.ts`) keep the
+historical import paths working. They are re-export lists, not implementation;
+`scripts/repo-check.mjs` fails if a barrel grows past 120 lines or if the
+deleted `tools.ts` monolith returns.
+
+No source module may exceed 450 lines. The check reports the offending file, so
+a growing module is a review signal rather than something to discover later.
+
+## Request flows
+
+Three entry points converge on the same model and store:
+
+```text
+MCP tool call      → mcp/tools/*          → model/* → BoardStore → board.json
+browser canvas     → http.ts routes       → model/* → BoardStore → board.json
+standalone preview → http.ts routes       → model/* → BoardStore → board.json
+                                ↓
+                        revision cache ──→ get_board(since_revision) delta
+                        WebSocket      ──→ canvas reload
+```
+
+`BoardStore` serialises every write behind a filesystem mutex and an optimistic
+revision check, so concurrent MCP and HTTP writers cannot interleave. Both
+surfaces record the committed revision in the shared cache, which is what makes
+the delta projection correct regardless of who made the edit.
 
 ## MCP surface
 

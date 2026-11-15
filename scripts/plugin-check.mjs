@@ -26,7 +26,21 @@ const pluginCheckScript = await read("scripts/plugin-check.mjs");
 const appBundle = await read(".doodle-plugin/doodle/server/infra/templates/excalidraw/excalidraw-app.js");
 const excalidrawTemplate = await read(".doodle-plugin/doodle/server/infra/templates/excalidraw.html");
 const httpSource = await read("src/board/http.ts");
-const toolsSource = await read("src/board/tools.ts");
+const httpTemplates = await read("src/board/http/templates.ts");
+/*
+ * Tool surface is one module per tool after the refactor. Read them together so
+ * the plugin guard keeps asserting the four-tool contract.
+ */
+const toolsSource = (await Promise.all([
+  read("src/board/mcp/tools.ts"),
+  read("src/board/mcp/context.ts"),
+  read("src/board/mcp/schemas.ts"),
+  read("src/board/mcp/presentation.ts"),
+  read("src/board/mcp/tools/registerGetBoardTool.ts"),
+  read("src/board/mcp/tools/registerShowBoardTool.ts"),
+  read("src/board/mcp/tools/registerDrawBoardTool.ts"),
+  read("src/board/mcp/tools/registerScanProjectTool.ts"),
+])).join("\n");
 const configSource = await read("src/infra/config.ts");
 const versionSource = await read("src/infra/version.ts");
 const indexSource = await read("src/index.ts");
@@ -78,7 +92,7 @@ check(buildScript.includes("bundle: true") && buildScript.includes("board.html")
 check(buildScript.includes("excalidraw.html") && buildScript.includes("excalidraw"), "plugin build does not copy Excalidraw assets");
 check(buildScript.includes("__DOODLE_PLUGIN_VERSION__"), "plugin build does not inject the package version");
 check(pluginCheckScript.includes("requires_local_executor"), "plugin guard does not verify desktop-only status");
-check(httpSource.includes("excalidrawTemplateCandidates(this.config)") && httpSource.includes('"server", "infra", "templates", "excalidraw.html"'), "bundled server cannot resolve plugin Excalidraw templates");
+check(httpTemplates.includes('"server", "infra", "templates", "excalidraw.html"') && httpTemplates.includes("excalidrawTemplateCandidates"), "bundled server cannot resolve plugin Excalidraw templates");
 check(toolsSource.includes("getAppHtml()") && toolsSource.includes('ui://doodle/board/excalidraw/v1.html'), "bundled server cannot resolve the Excalidraw MCP App resource");
 check(toolsSource.includes("CANVAS_UI_META") && toolsSource.includes("_meta: CANVAS_UI_META"), "bundled draw_board path does not advertise automatic post-draw rendering");
 check(toolsSource.includes("FIRST_USE:") && toolsSource.includes("NEXT_STEPS:") && toolsSource.includes("NEXT:"), "bundled get_board path lacks progressive first-use guidance");

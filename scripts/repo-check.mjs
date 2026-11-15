@@ -23,14 +23,53 @@ const instructions = await read("src/board/instructions.ts");
 const appContext = await read("src/board/app-context.ts");
 const excalidrawApp = await read("src/infra/templates/excalidraw-app.tsx");
 const boardIndex = await read("src/board/index.ts");
-const tools = await read("src/board/tools.ts");
-const boardTypes = await read("src/board/types.ts");
+/*
+ * Tools are registered from one module per tool. Read them together so guards
+ * can still assert the four-tool contract without knowing the file split.
+ */
+const toolModules = ["getBoard", "showBoard", "drawBoard", "scanProject"].map(
+  (name) => `src/board/mcp/tools/register${name[0].toUpperCase()}${name.slice(1)}Tool.ts`,
+);
+const tools = (await Promise.all([
+  read("src/board/mcp/tools.ts"),
+  read("src/board/mcp/schemas.ts"),
+  read("src/board/mcp/presentation.ts"),
+  read("src/board/mcp/context.ts"),
+  ...toolModules.map((file) => read(file)),
+])).join("\n");
+/*
+ * `types.ts` is a barrel after the refactor. Guards assert behaviour, so they
+ * read the modules that actually implement it plus the barrel's exports.
+ */
+const boardTypes = (await Promise.all([
+  read("src/board/types.ts"),
+  read("src/board/model/types.ts"),
+  read("src/board/model/limits.ts"),
+  read("src/board/model/validate.ts"),
+  read("src/board/model/board.ts"),
+  read("src/board/model/digest.ts"),
+  read("src/board/layout/arrange.ts"),
+  read("src/board/diagram/layout.ts"),
+  read("src/board/diagram/generate.ts"),
+])).join("\n");
+const canvasAdapter = (await Promise.all([
+  read("src/board/excalidraw-adapter.ts"),
+  read("src/board/canvas/types.ts"),
+  read("src/board/canvas/theme.ts"),
+  read("src/board/canvas/primitives.ts"),
+  read("src/board/canvas/to-excalidraw.ts"),
+  read("src/board/canvas/from-excalidraw.ts"),
+])).join("\n");
+const boardLibrary = (await Promise.all([
+  read("src/board/library.ts"),
+  read("src/board/library/schema.ts"),
+  read("src/board/library/store.ts"),
+])).join("\n");
 const excalidrawTemplate = await read("src/infra/templates/excalidraw.html");
 const liquidGlass = await read("src/infra/templates/liquid-glass.ts");
 const http = await read("src/board/http.ts");
 const scanner = await read("src/board/project-scan.ts");
 const boardStore = await read("src/board/store.ts");
-const boardLibrary = await read("src/board/library.ts");
 const mutex = await read("src/board/mutex.ts");
 const launchKit = await read("docs/LAUNCH_KIT.md");
 const readme = await read("README.md");
@@ -101,8 +140,8 @@ check(
   http.includes("EmptyWriteRefusedError"),
   "the empty-write guard only runs on the revision-checked path",
 );
-check((await read("src/board/store.ts")).includes("quarantineCorruptState"), "a corrupt board file still prevents startup");
-check((await read("src/board/types.ts")).includes("Item coordinates must be within") && !(await read("src/board/types.ts")).includes("Math.min(MAX_SHAPE_WIDTH, input.w ?? 180)"), "drawing input is silently clamped instead of rejected");
+check(boardStore.includes("quarantineCorruptState"), "a corrupt board file still prevents startup");
+check(boardTypes.includes("Item coordinates must be within") && !boardTypes.includes("Math.min(MAX_SHAPE_WIDTH, input.w ?? 180)"), "drawing input is silently clamped instead of rejected");
 check(http.includes("this.revisions?.remember(board)") && (await read("src/server.ts")).includes("new BoardHttpServer(board, config, revisions)"), "browser writes are not recorded in the shared revision cache");
 check(troubleshooting.includes("npm run preview:board") && troubleshooting.includes("current MCP server process"), "troubleshooting does not explain PANEL_URL lifetime");
 check(packageJson.scripts.check.includes("setup:codex -- --dry-run"), "npm check does not dry-run the Codex setup");
@@ -153,7 +192,30 @@ check(instructions.includes("Doodle is"), "MCP instructions do not introduce Doo
 check(instructions.includes("two-way") && instructions.includes("one kernel, two entry points, three capability layers"), "MCP instructions lost the two-way product story");
 check(instructions.includes("updateModelContext") && instructions.includes("final-state delta"), "MCP instructions do not describe host model context sync");
 check(instructions.includes("draw_board.diagram") && instructions.includes("never combines diagram"), "MCP instructions do not describe the exclusive semantic diagram path");
-check(sourceFiles.length === 17, `src/board has ${sourceFiles.length} TypeScript modules; expected the focused seventeen-module structure`);
+/*
+ * Assert the layering, not a module count.
+ *
+ * A fixed total (previously 17 and 25) fights every legitimate split and says
+ * nothing about health. These checks encode what the structure must provide:
+ * each concern has a home, no module regrows into a monolith, and the public
+ * barrels stay thin.
+ */
+for (const group of ["model", "diagram", "layout", "mcp", "canvas", "http"]) {
+  check(
+    sourceFiles.some((name) => name.startsWith(`${group}${path.sep}`) || name.startsWith(`${group}/`)),
+    `src/board is missing the ${group} module group`,
+  );
+}
+for (const barrel of ["types.ts", "tools.ts", "library.ts"]) {
+  const file = path.join(root, "src", "board", barrel);
+  const lines = await fs.readFile(file, "utf8").then((text) => text.split("\n").length, () => 0);
+  if (lines === 0) continue;
+  check(lines <= 120, `${barrel} is a barrel again, not a module (${lines} lines)`);
+}
+check(
+  !(await fs.access(path.join(root, "src", "board", "tools.ts")).then(() => true, () => false)),
+  "the monolithic tools.ts is back; tools must stay in mcp/tools/",
+);
 check(!boardIndex.includes("preview-server") && !boardIndex.includes("session-store"), "board index re-exports legacy infrastructure");
 check((tools.match(/server\.registerTool\(/g) ?? []).length === 4 && !tools.includes("server.tool("), "tools.ts does not register exactly four annotated MCP tools");
 check(tools.includes("readOnlyHint: true") && tools.includes("destructiveHint: true") && tools.includes("openWorldHint: false"), "tool annotations are incomplete");
@@ -195,8 +257,8 @@ check(!http.includes('"/api/board/scene"') && !excalidrawApp.includes("loadScene
 check(tools.includes('"scan_project"') && tools.includes("Use draw_board to visualize"), "scan_project is not a read-only board-context tool");
 check(boardTypes.includes("signedWidth") && boardTypes.includes("signedHeight"), "board types lost signed directed-arrow deltas");
 check(boardTypes.includes("boardVisualDigest") && boardTypes.includes("startItemId") && boardTypes.includes("variant"), "board types lost visual-expression fields or deterministic visual digest");
-check(excalidrawApp.includes("excalidraw") && (await read("src/board/excalidraw-adapter.ts")).includes("boardOpacityToExcalidraw"), "canvas opacity is not converted between Board v1 (0-1) and Excalidraw (0-100)");
-check((await read("src/board/excalidraw-adapter.ts")).includes("inkOn(") && (await read("src/board/excalidraw-adapter.ts")).includes("themedFill("), "canvas ink or fill is no longer adapted to the theme");
+check(excalidrawApp.includes("excalidraw") && canvasAdapter.includes("boardOpacityToExcalidraw"), "canvas opacity is not converted between Board v1 (0-1) and Excalidraw (0-100)");
+check(canvasAdapter.includes("inkOn(") && canvasAdapter.includes("themedFill("), "canvas ink or fill is no longer adapted to the theme");
 check(excalidrawApp.includes("EXCALIDRAW_THEME"), "Excalidraw may invert board colours again in dark mode");
 check(excalidrawTemplate.includes("--glass-bg") && excalidrawTemplate.includes(".doodle-glass") && excalidrawTemplate.includes("var(--glass-refraction, blur(var(--glass-blur))"), "the liquid-glass material or its refraction fallback is missing");
 check(excalidrawTemplate.includes("--glass-shade") && liquidGlass.includes("feDisplacementMap") && liquidGlass.includes("bevelAmplitude") && liquidGlass.includes("paintEdgeMap"), "the liquid-glass lens lost its bevelled displacement maps");
@@ -243,7 +305,7 @@ check(excalidrawTemplate.includes(".excalidraw .HintViewer { display: none !impo
 check(!/inset 0 0 \d+px -\d+px var\(--glass/.test(excalidrawTemplate), "a negative-spread inner glow is back, which paints an inset box inside the pane");
 check(liquidGlass.includes("const clamped = Math.min(Math.max(t, 0), 1);") && liquidGlass.includes("const fall = 1 - Math.pow(clamped, 3);"), "the bevel displacement no longer tapers to zero at the inner edge");
 check(excalidrawApp.includes("doodleSyncBanner") && excalidrawApp.includes("clearError") && !excalidrawApp.includes("api.updateScene({ elements: toElements(refreshed)"), "a rejected save still repaints the canvas from the server or fails silently");
-check((await read("src/board/excalidraw-adapter.ts")).includes("MIN_STORED_SIZE"), "canvas projection can emit items below the stored minimum size");
+check(canvasAdapter.includes("MIN_STORED_SIZE"), "canvas projection can emit items below the stored minimum size");
 check(excalidrawApp.includes("isDoodleProjectLink") && excalidrawApp.includes("onLinkOpen") && excalidrawApp.includes("blockExternalCanvasLinks"), "canvas link policy does not allow only the Doodle repository");
 check(excalidrawApp.includes("HelpDialog__header") === false && excalidrawTemplate.includes(".excalidraw .HelpDialog__header { display: none; }"), "native help dialog still exposes upstream external links");
 check(excalidrawApp.includes("library-menu-browse-button") && excalidrawApp.includes("toolbar-embeddable") && excalidrawApp.includes("dropdown-menu-container"), "external embed or library-browse entries are not removed");
@@ -257,7 +319,7 @@ check(excalidrawApp.includes("sendMessage") && excalidrawTemplate.includes('id="
 check(appContext.includes("structuredContent") && !appContext.includes("operationLog"), "board model context lost its complete structured snapshot or added an operation log");
 check(instructions.includes("conversation") && !instructions.includes("reply_on_board"), "MCP instructions duplicate the host conversation");
 check(http.includes('"/api/board"') && http.includes("X-AI-Draw-Token"), "board HTTP server lost its authenticated API");
-check(http.includes("excalidrawTemplateCandidates(this.config)") && http.includes("panelUrlValue"), "plugin bundle Excalidraw template resolution and dynamic panel URL are missing");
+check((await read("src/board/http/templates.ts")).includes("excalidrawTemplateCandidates") && http.includes("panelUrlValue"), "plugin bundle Excalidraw template resolution and dynamic panel URL are missing");
 check(http.includes("canvasSnapshot") && http.includes("notes: _legacyNotes"), "HTTP canvas API still exposes the retired message feed");
 check(http.includes('"/api/board/batch"') && http.includes('"/api/board/replace"'), "HTTP board API lost batch or replacement operations");
 check(http.includes("boardVisualDigest(board)") && http.includes("capabilities:"), "HTTP board API lost AI visual language");
@@ -315,7 +377,10 @@ check(codexExample.includes('args = ["-y", "doodle-mcp"]') && !codexExample.incl
 check(setupScript.includes('"plugin", "marketplace", "add"') && setupScript.includes('"plugin", "add", "doodle@doodle"') && setupScript.includes("--dry-run"), "setup script does not safely install the local plugin");
 check(setupScript.includes('if (dryRun) return { status: 0 }') || setupScript.includes("if (dryRun) return { status: 0; }"), "setup dry-run can still execute commands");
 check(await exists("plugins/doodle/skills/doodle/SKILL.md") && await exists("scripts/build-plugin.mjs") && await exists("scripts/plugin-check.mjs"), "plugin packaging files are incomplete");
-check(totalSourceFiles.length === 25, `src has ${totalSourceFiles.length} TypeScript modules; expected the focused plugin-ready structure`);
+check(
+  totalSourceFiles.length >= 25 && totalSourceFiles.length <= 80,
+  `src has ${totalSourceFiles.length} TypeScript modules; expected a modular but bounded tree`,
+);
 
 if (failures.length) {
   console.error("❌ Offline repository checks failed:");

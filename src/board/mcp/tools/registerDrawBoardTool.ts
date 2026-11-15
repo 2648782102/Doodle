@@ -1,0 +1,175 @@
+/**
+ * `draw_board`: the write surface.
+ *
+ * Three mutually exclusive shapes: a semantic `diagram`, a local `library`
+ * action, or a set of item mutations (add / update / remove / arrange). They
+ * are dispatched explicitly so an ambiguous call fails loudly instead of
+ * half-applying.
+ */
+
+import type { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
+import { z } from "zod";
+import { BOARD_WRITE_ANNOTATIONS, CANVAS_UI_META, type BoardToolContext } from "../context.js";
+import { boardAgentPayload, boardJson, errorResult, jsonLine } from "../presentation.js";
+import { diagramInput, itemInput, layoutInput, libraryAction, updateInput } from "../schemas.js";
+import {
+  boardLibraryIndexText,
+  type BoardLibraryAction,
+} from "../../library.js";
+import { BoardRevisionConflictError } from "../../errors.js";
+import {
+  addBoardItems,
+  boardVisualDigest,
+  diagramToBoardItems,
+  parseBoard,
+  layoutBoardItems,
+  removeBoardItems,
+  updateBoardItems,
+  replaceBoardContent,
+  touchBoard,
+  type SimpleBoard,
+} from "../../types.js";
+
+export function registerDrawBoardTool(server: McpServer, ctx: BoardToolContext): void {
+server.registerTool(
+  "draw_board",
+  {
+    description: "让 AI 直接在共享无限画布上画或改，也可通过 library 参数保存当前画板、切换本地画板图库中的图、新建/重命名/复制/删除/导入/导出可编辑版本 1 画板。普通写入会串行应用到最新状态；line 的 (x,y) 是起点，(x+w,y+h) 是终点，w/h 可为负数；其他对象是左上角与宽高。按整齐网格布局；不打开浏览器，不写项目文件。",
+    inputSchema: z.object({
+      items: z.array(itemInput).max(100).optional().describe("Objects to create; omit id"),
+      updates: z.array(updateInput).max(100).optional().describe("Precise updates to existing object IDs"),
+      remove_ids: z.array(z.string()).max(100).optional().describe("Existing object IDs to remove"),
+      layout: layoutInput.optional().describe("Optional deterministic arrangement of existing objects"),
+      replace_board: z.unknown().optional().describe("Rare full replacement with a version 1 board snapshot; revision and identity are preserved"),
+      author: z.enum(["human", "ai"]).optional().describe("Author marker; AI responses should normally use ai"),
+      expected_revision: z.number().int().nonnegative().optional().describe("Optional board revision for rejecting stale canvas edits"),
+      library: libraryAction.optional().describe("Optional local board-library action for saving, switching, renaming, duplicating, importing, or exporting editable board snapshots"),
+      diagram: diagramInput.optional().describe("Semantic diagram recipe: nodes and edges generate one bounded Board v1 diagram with deterministic layout, short labels, and connected arrows. Each node takes `label` (not `title`). By default it is added beside existing objects and reuses a numeric id suffix if a generated id is taken; replace:true clears the whole active board first. Every edge becomes a routed line, a flow longer than six columns snakes instead of becoming one wide strip, and a timeline row index is not part of the schema - send `column` to advance a timeline."),
+    }),
+    annotations: BOARD_WRITE_ANNOTATIONS,
+    _meta: CANVAS_UI_META,
+  },
+  async ({ items, updates, remove_ids, layout, replace_board, author, expected_revision, library, diagram }) => {
+    try {
+      if (diagram) {
+        if (items !== undefined || updates !== undefined || remove_ids !== undefined
+          || layout !== undefined || replace_board !== undefined || library !== undefined) {
+          throw new Error("diagram replaces the active board and cannot be combined with other draw_board actions");
+        }
+        const current = await ctx.board.snapshot();
+        if (expected_revision !== undefined && expected_revision !== current.revision) {
+          throw new BoardRevisionConflictError(expected_revision, current.revision);
+        }
+        // In append mode the existing ids are reserved so a second iteration
+        // that reuses `n1` or `diagram_frame` does not collide.
+        const generated = diagramToBoardItems(
+          diagram,
+          author ?? "ai",
+          diagram.replace ? [] : current.items.map((item) => item.id),
+        );
+        const candidate = touchBoard({
+          ...current,
+          title: diagram.title ?? current.title,
+          items: diagram.replace ? generated : [...current.items, ...generated],
+        });
+        parseBoard(candidate);
+        const board = await ctx.board.replaceIfRevision(candidate, current.revision);
+        ctx.revisions?.remember(board);
+        ctx.preview.broadcast({ type: "board_updated", revision: board.revision });
+        const libraryIndex = (await ctx.library.apply({ type: "list" }, board)).index;
+        return {
+          content: [{
+            type: "text" as const,
+            text: [
+              `✅ 图已生成 · ${diagram.nodes.length} 个节点 · ${diagram.edges.length} 条连接`,
+              `JSON: ${JSON.stringify({ revision: board.revision, created: generated.length })}`,
+            ].join("\n"),
+          }],
+          structuredContent: boardJson(board, libraryIndex),
+        };
+      }
+      if (library) {
+        const current = await ctx.board.snapshot();
+        if (expected_revision !== undefined && expected_revision !== current.revision) {
+          throw new BoardRevisionConflictError(expected_revision, current.revision);
+        }
+        const result = await ctx.library.apply(library as BoardLibraryAction, current);
+        let active = current;
+        if (result.previousRevision !== undefined || result.board.id !== current.id
+          || result.board.revision !== current.revision || result.board.title !== current.title) {
+          active = await ctx.board.replace(result.previousRevision === undefined
+            ? { ...result.board, revision: current.revision + 1 }
+            : { ...result.board, revision: current.revision + 1 }, current.revision);
+          ctx.revisions?.remember(active);
+        }
+        ctx.preview.broadcast({ type: "board_library_updated", activeId: result.index.activeId, revision: active.revision });
+        return {
+          content: [{
+            type: "text" as const,
+            text: [
+              `🗂 画板图库 · ${library.type}`,
+              boardLibraryIndexText(result.index),
+              ...(library.type === "export" || library.type === "get" ? ["BOARD_JSON:", JSON.stringify(result.board, null, 2)] : []),
+            ].join("\n"),
+          }],
+          structuredContent: {
+            ...boardAgentPayload(active, result.index),
+            ...(library.type === "export" || library.type === "get" ? { exportBoard: result.board } : {}),
+          },
+        };
+      }
+      let created = 0;
+      let updated = 0;
+      const removed = new Set(remove_ids ?? []);
+      const change = (current: SimpleBoard) => {
+        let next = current;
+        if (replace_board !== undefined) {
+          next = replaceBoardContent(next, replace_board);
+          return next;
+        }
+        if (items?.length) {
+          next = addBoardItems(next, items.map((item) => ({ ...item, author: author ?? "ai" as const })));
+          created += items.length;
+        }
+        if (updates?.length) {
+          next = updateBoardItems(next, updates ?? [], author ?? "ai");
+          updated += updates.length;
+        }
+        if (removed.size) {
+          next = removeBoardItems(next, [...removed]);
+        }
+        if (layout) next = layoutBoardItems(next, layout, author ?? "ai");
+        return next;
+      };
+      const initial = await ctx.board.snapshot();
+      if (expected_revision !== undefined && expected_revision !== initial.revision) {
+        throw new BoardRevisionConflictError(expected_revision, initial.revision);
+      }
+      let candidate = initial;
+      candidate = change(candidate);
+      const board = await ctx.board.replaceIfRevision(candidate, initial.revision);
+      ctx.revisions?.remember(board);
+      ctx.preview.broadcast({ type: "board_updated", revision: board.revision });
+      const libraryIndex = (await ctx.library.apply({ type: "list" }, board)).index;
+      return {
+        content: [{
+          type: "text" as const,
+          text: [
+            `✅ 画板已更新 · 新增 ${created} · 更新 ${updated} · 删除 ${removed.size}`,
+            `NEXT: 保持画布可见；人画 / 改完后用 get_board 或当前会话上下文读取。`,
+            jsonLine({
+              revision: board.revision,
+              created,
+              updated,
+              removed: removed.size,
+            }),
+          ].join("\n"),
+        }],
+          structuredContent: boardJson(board, libraryIndex),
+      };
+    } catch (error) {
+      return errorResult("draw_board", error);
+    }
+  },
+);
+}

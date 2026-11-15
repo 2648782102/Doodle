@@ -61,14 +61,22 @@ src/
 ├── index.ts                    MCP stdio and HTTP lifecycle
 ├── server.ts                   composition root; registers four tools
 ├── board/
-│   ├── types.ts                version 1 board state and pure mutations
+│   ├── model/                  Board v1 only: types, limits, validate, board, digest, clock
+│   ├── diagram/                deterministic diagram layout and generation
+│   ├── layout/arrange.ts       arranging existing objects, including architecture layers
+│   ├── canvas/                 Excalidraw projection split by direction
+│   ├── mcp/                    context, schemas, presentation, tools composition
+│   ├── mcp/tools/              one module per MCP tool
+│   ├── http/templates.ts       canvas template lookup and token substitution
+│   ├── library/                schema and atomic snapshot persistence
+│   ├── types.ts                public barrel over model/diagram/layout
 │   ├── store.ts                locked atomic board.json persistence and revision sync
 │   ├── project-scan.ts         bounded read-only workspace scan
 │   ├── http.ts                 local board API, HTML, and WebSocket updates
-│   ├── tools.ts                four MCP tools and optional MCP App resource
+│   ├── excalidraw-adapter.ts   public barrel over canvas/
+│   ├── library.ts              public barrel over library/
 │   ├── app-context.ts          final-state board delta and model context projection
 │   ├── instructions.ts         MCP initialization instructions
-│   ├── library.ts              local editable board snapshot index and actions
 │   └── index.ts                board module entrypoint
 ├── infra/
 │   ├── config.ts               environment configuration
@@ -91,6 +99,10 @@ docs/                           product, architecture, decisions, and maintenanc
 
 ## Architecture rules
 
+- Dependencies point inward: `model/` knows nothing about `diagram/`, `layout/`, `canvas/`, `mcp/`, `http/`, filesystem, or Express. Transport layers may read `model/`; `model/` must never import them. Add code to the layer that owns the concern rather than to whichever file is convenient.
+- `types.ts`, `excalidraw-adapter.ts`, and `library.ts` are barrels for compatibility, not implementation. Put new code in `model/`, `canvas/`, or `library/` and re-export only what other packages need. `scripts/repo-check.mjs` fails if a barrel exceeds 120 lines or if `src/board/tools.ts` returns.
+- No source module may exceed 450 lines; `test/cleanup.test.mjs` reports the offending file. Splitting by direction or responsibility is preferred over growing a file, and the split must keep the golden model snapshot unchanged unless the new behaviour is intentional.
+- `test/golden-model.test.mjs` freezes the model contract: projections, every layout mode, every diagram mode, and the long-flow property. A refactor that changes output must update the snapshot in the same commit so the diff documents it.
 - stdout is reserved for MCP JSON-RPC. All logs and diagnostics go to stderr.
 - Tool names are `snake_case`; TypeScript files are `kebab-case`; registration functions are `registerXxx`.
 - Tool descriptions are written for an LLM and explain when to use another tool instead.

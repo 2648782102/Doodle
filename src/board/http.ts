@@ -3,7 +3,6 @@ import express from "express";
 import fs from "node:fs/promises";
 import http from "node:http";
 import path from "node:path";
-import { fileURLToPath } from "node:url";
 import { WebSocketServer } from "ws";
 import type { AppConfig } from "../infra/config.js";
 import { logger } from "../infra/logger.js";
@@ -30,31 +29,7 @@ import { BoardLibrary, boardLibraryIndexText, type BoardLibraryAction } from "./
 import type { BoardRevisionCache } from "./revision-cache.js";
 import { isSuspiciousEmptyWrite, type BoardStore } from "./store.js";
 import { projectSnapshotText, scanProject, type ProjectScanOptions } from "./project-scan.js";
-
-const sourceDir = path.dirname(fileURLToPath(import.meta.url));
-function excalidrawTemplateCandidates(config: AppConfig): string[] {
-  return [
-    path.resolve(config.cwd, "server", "infra", "templates", "excalidraw.html"),
-    path.resolve(config.cwd, "infra", "templates", "excalidraw.html"),
-    path.resolve(sourceDir, "../../../infra/templates/excalidraw.html"),
-    path.resolve(sourceDir, "../../src/infra/templates/excalidraw.html"),
-    path.resolve(sourceDir, "../infra/templates/excalidraw.html"),
-    path.resolve(sourceDir, "../templates/excalidraw.html"),
-    path.resolve(sourceDir, "../../dist/infra/templates/excalidraw.html"),
-  ];
-}
-
-function assetCandidates(config: AppConfig): string[] {
-  return [
-    path.resolve(config.cwd, "server", "infra", "templates", "excalidraw"),
-    path.resolve(config.cwd, "infra", "templates", "excalidraw"),
-    path.resolve(sourceDir, "../../../infra/templates/excalidraw"),
-    path.resolve(sourceDir, "../../src/infra/templates/excalidraw"),
-    path.resolve(sourceDir, "../infra/templates/excalidraw"),
-    path.resolve(sourceDir, "../templates/excalidraw"),
-    path.resolve(sourceDir, "../../dist/infra/templates/excalidraw"),
-  ];
-}
+import { assetCandidates, fillTemplate, findExisting, readTemplate } from "./http/templates.js";
 
 function canvasSnapshot(board: SimpleBoard) {
   const { notes: _legacyNotes, ...snapshot } = board;
@@ -288,7 +263,7 @@ export class BoardHttpServer {
 
     this.app.get("/", (_req, res) => this.serveBoard(res));
     this.app.use("/excalidraw", async (req, res, next) => {
-      const assetRoot = await this.findExisting(assetCandidates(this.config));
+      const assetRoot = await findExisting(assetCandidates(this.config));
       if (!assetRoot) return res.status(404).send("Excalidraw assets not found");
       const relative = req.path === "/" ? "index.html" : req.path.replace(/^\/+/, "");
       const target = path.resolve(assetRoot, relative);
@@ -325,45 +300,24 @@ export class BoardHttpServer {
 
   private async serveBoard(res: express.Response): Promise<void> {
     res.set("Cache-Control", "no-store, max-age=0");
-    for (const candidate of excalidrawTemplateCandidates(this.config)) {
-      try {
-        const html = (await fs.readFile(candidate, "utf8"))
-          .replace('"__DOODLE_MCP_APP__"', '"0"')
-          .replace("__DOODLE_ASSET_VERSION__", this.assetVersion)
-          .replace("__DOODLE_PANEL_TOKEN__", this.panelToken)
-          .replace("__AI_DRAW_PANEL_TOKEN__", this.panelToken);
-        res.type("html").send(html);
-        return;
-      } catch {}
-    }
-    res.status(500).send("Excalidraw template not found");
-  }
-
-  private async findExisting(candidates: string[]): Promise<string | null> {
-    for (const candidate of candidates) {
-      try {
-        await fs.access(candidate);
-        return candidate;
-      } catch {}
-    }
-    return null;
+    const template = await readTemplate(this.config);
+    if (!template) return void res.status(500).send("Excalidraw template not found");
+    res.type("html").send(fillTemplate(template, {
+      assetVersion: this.assetVersion,
+      token: this.panelToken,
+      embedded: false,
+    }));
   }
 
   async getAppHtml(bundle?: string): Promise<string> {
     if (bundle !== undefined) this.appBundle = bundle;
-    let template: string | undefined;
-    for (const candidate of excalidrawTemplateCandidates(this.config)) {
-      try {
-        template = await fs.readFile(candidate, "utf8");
-        break;
-      } catch {}
-    }
+    const template = await readTemplate(this.config);
     if (!template) throw new Error("Excalidraw template not found");
-    return template
-      .replace('"__DOODLE_MCP_APP__"', '"1"')
-      .replace("__DOODLE_ASSET_VERSION__", this.assetVersion)
-      .replace("__DOODLE_PANEL_TOKEN__", "")
-      .replace("__AI_DRAW_PANEL_TOKEN__", "");
+    return fillTemplate(template, {
+      assetVersion: this.assetVersion,
+      token: this.panelToken,
+      embedded: true,
+    });
   }
 
   async start(): Promise<void> {

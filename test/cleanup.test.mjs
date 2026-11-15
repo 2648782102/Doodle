@@ -56,7 +56,35 @@ describe("post-cleanup repository shape", () => {
       expect(current.some((name) => pattern.test(name)), `unexpected legacy path matching ${pattern}`).toBe(false);
     }
     expect(extensions).toBe(false);
-    expect(source.filter((name) => name.endsWith(".ts"))).toHaveLength(25);
+    /*
+     * Assert the *shape* of the source tree, not a file count.
+     *
+     * A hard-coded total (previously 25) breaks on every legitimate split and
+     * says nothing about whether the structure is healthy. These checks encode
+     * the layering the refactor established: one concern per directory, no
+     * module that grows back into a monolith, and no duplicated implementation.
+     */
+    const tsFiles = source.filter((name) => name.endsWith(".ts"));
+    for (const directory of [
+      "src/board/model/",
+      "src/board/diagram/",
+      "src/board/layout/",
+      "src/board/mcp/",
+      "src/board/mcp/tools/",
+    ]) {
+      expect(tsFiles.some((name) => name.startsWith(directory)), `missing module group ${directory}`).toBe(true);
+    }
+    // No single board module may grow back into a 1000-line dump.
+    const oversized = [];
+    for (const name of tsFiles) {
+      const { size } = await fs.stat(path.join(root, name));
+      const lines = (await fs.readFile(path.join(root, name), "utf8")).split("\n").length;
+      if (lines > 450) oversized.push(`${name} (${lines} lines, ${size} bytes)`);
+    }
+    expect(oversized, `modules over the 450-line budget: ${oversized.join(", ")}`).toEqual([]);
+    // The old monolith must not return as a second source of truth.
+    expect(tsFiles).not.toContain("src/board/tools.ts");
+    expect(await fs.stat(path.join(root, "src/board/types.ts")).then((s) => s.size)).toBeLessThan(6_000);
     expect(scripts.filter((name) => name.endsWith(".mjs")).sort()).toEqual([
       "scripts/build-plugin.mjs",
       "scripts/build-submission.mjs",
@@ -68,7 +96,27 @@ describe("post-cleanup repository shape", () => {
       "scripts/repo-check.mjs",
       "scripts/setup-codex.mjs",
     ]);
-    expect(tests.filter((name) => name.endsWith(".test.mjs"))).toHaveLength(17);
+    /*
+     * Assert test *coverage shape*, not a file count.
+     *
+     * Every layer the refactor introduced needs its own test file, and the
+     * cross-cutting contract needs a golden snapshot so a refactor cannot drift
+     * silently. A hard-coded total only ever needed updating.
+     */
+    const testFiles = tests.filter((name) => name.endsWith(".test.mjs"));
+    for (const suite of [
+      "test/board.test.mjs",
+      "test/diagram-modes.test.mjs",
+      "test/excalidraw-adapter.test.mjs",
+      "test/http.test.mjs",
+      "test/library.test.mjs",
+      "test/mcp.test.mjs",
+      "test/empty-board-guard.test.mjs",
+      "test/golden-model.test.mjs",
+    ]) {
+      expect(testFiles, `missing test suite ${suite}`).toContain(suite);
+    }
+    expect(testFiles.length).toBeGreaterThanOrEqual(18);
     const compiled = await listFiles(path.join(root, "dist"));
     expect(compiled.some((name) => /^dist\/(domain|tools)\//.test(name))).toBe(false);
     expect(compiled.some((name) => name === "dist/infra/templates/index.html")).toBe(false);
