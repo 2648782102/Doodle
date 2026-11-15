@@ -201,6 +201,14 @@ check(excalidrawApp.includes("https://github.com/2648782102/Doodle") && excalidr
 check(excalidrawTemplate.includes('.main-menu-trigger') && excalidrawTemplate.includes(".App-menu_top__left") && !excalidrawApp.includes("MainMenu"), "the upstream wordmark menu is still mounted or is not suppressed in CSS");
 check(excalidrawTemplate.includes(".excalidraw .Island.sidebar {") && excalidrawTemplate.includes("border-radius: 18px") && excalidrawTemplate.includes("top: 72px") && excalidrawTemplate.includes("right: 12px"), "the library sidebar is not inset and rounded like the other panes");
 check(excalidrawTemplate.includes(".excalidraw .zoom-actions .zoom-button:first-child .ToolIcon__icon") && excalidrawTemplate.includes("border-radius: 12px 0 0 12px"), "bottom control islands do not share the pane corner radius");
+check(
+  excalidrawTemplate.includes(".excalidraw .undo-redo-buttons,\n    .excalidraw .help-icon,\n    .excalidraw .sidebar-trigger,") &&
+  excalidrawTemplate.includes(".excalidraw .undo-redo-buttons button,") &&
+  excalidrawTemplate.includes(".excalidraw .sidebar-trigger__label-element { background-color: transparent !important; }") &&
+  liquidGlass.includes('".excalidraw .zoom-actions",') &&
+  liquidGlass.includes('".excalidraw .undo-redo-buttons",'),
+  "bottom zoom/undo and the library trigger are not on the glass material, or their opaque button fills were not cleared",
+);
 check(excalidrawTemplate.includes(".excalidraw .mobile-misc-tools-container {") && excalidrawTemplate.includes(".excalidraw .App-bottom-bar > .Island {") && excalidrawTemplate.includes("--glass-refraction"), "mobile chrome is not on the shared glass material");
 check(excalidrawTemplate.includes("body:has(.excalidraw .dropdown-menu) .excalidraw .mobile-misc-tools-container") && excalidrawTemplate.includes(".excalidraw .dropdown-menu .dropdown-menu-container"), "mobile menus do not yield the right-hand tool strip or lack the menu surface");
 check(excalidrawTemplate.includes(".excalidraw .App-bottom-bar .App-mobile-menu {") && excalidrawTemplate.includes("background-color: var(--doodle-surface-solid)") && excalidrawTemplate.includes("backdrop-filter: none"), "the expanded property sheet is translucent, so board content ghosts through its controls");

@@ -587,21 +587,81 @@
       transition: opacity var(--doodle-duration) var(--doodle-ease), visibility 0s linear var(--doodle-duration);
     }
     /*
-     * The top-right library trigger is a 36px control in a 44px row, so its
-     * pill looked smaller than the capsule it sits beside. Match the row.
+     * The bottom-left zoom/undo cluster and the top-right library trigger are
+     * the only chrome that is not an `.Island`. They are plain buttons painted
+     * with `--button-gray-1` on a `--island-bg-color` container, so none of the
+     * island rules reached them: they stayed flat opaque pills while every other
+     * surface was glass.
+     *
+     * Give the containers the material, and make the buttons inside them
+     * transparent so the glass shows through. Hover and selected states still
+     * paint their own `--button-hover-bg` / `--color-surface-primary-container`,
+     * so feedback is unchanged.
      */
     .excalidraw .zoom-actions,
     .excalidraw .undo-redo-buttons,
     .excalidraw .help-icon,
-    .excalidraw .scroll-back-to-content { border-radius: 12px; }
     .excalidraw .sidebar-trigger,
-    .excalidraw .sidebar-trigger__label-element { height: 44px; border-radius: 14px; }
-    .excalidraw .zoom-button .ToolIcon__icon,
-    .excalidraw .undo-redo-buttons .ToolIcon__icon { border-radius: 0; }
+    .excalidraw .default-sidebar-trigger,
+    .excalidraw .scroll-back-to-content {
+      background-color: color-mix(in srgb, var(--island-bg-color) 16%, transparent);
+      box-shadow:
+        inset 0 1px 0 0 var(--glass-edge),
+        inset 0 -1px 1.5px 0 var(--glass-depth),
+        inset 0 0 0 1px var(--glass-tint),
+        var(--glass-shadow-raised);
+      -webkit-backdrop-filter: var(--glass-refraction, blur(var(--glass-blur)) saturate(var(--glass-saturate)));
+      backdrop-filter: var(--glass-refraction, blur(var(--glass-blur)) saturate(var(--glass-saturate)));
+    }
+    .excalidraw .zoom-actions,
+    .excalidraw .undo-redo-buttons,
+    .excalidraw .scroll-back-to-content { border-radius: 12px; }
+    .excalidraw .help-icon { border-radius: 12px; }
+    .excalidraw .sidebar-trigger,
+    .excalidraw .sidebar-trigger__label-element,
+    .excalidraw .default-sidebar-trigger { height: 44px; border-radius: 14px; }
+    /*
+     * Upstream paints these with a dedicated opaque `--button-gray-1` fill on
+     * the button element itself, so overriding only the container left a solid
+     * pill sitting on top of the glass. The fills are cleared here; hover and
+     * selected states still bring their own colour back.
+     */
+    .excalidraw .zoom-actions .zoom-button,
+    .excalidraw .zoom-actions .zoom-button .ToolIcon__icon,
+    .excalidraw .undo-redo-buttons .ToolIcon__icon,
+    .excalidraw .zoom-actions button,
+    /* Undo/redo buttons sit inside `*-button-container > tooltip-wrapper`, so a
+       direct-child rule misses them and the opaque fill stays. */
+    .excalidraw .undo-redo-buttons button,
+    .excalidraw .undo-redo-buttons button .ToolIcon__icon,
+    .excalidraw .sidebar-trigger,
+    .excalidraw .default-sidebar-trigger { background-color: transparent !important; box-shadow: none; }
+    .excalidraw .sidebar-trigger__label-element { background-color: transparent !important; }
+    /* `.help-icon` is itself the pill, not a container around buttons, so it
+       keeps the translucent fill it was given above. */
+    .excalidraw .help-icon { box-shadow:
+      inset 0 1px 0 0 var(--glass-edge),
+      inset 0 -1px 1.5px 0 var(--glass-depth),
+      inset 0 0 0 1px var(--glass-tint),
+      var(--glass-shadow-raised) !important; }
+    /*
+     * A bare icon on 16% glass disappears against a near-white page, which is
+     * exactly where this button sits. A slightly denser fill keeps the glass
+     * readable without making it an opaque chip.
+     */
+    .excalidraw .help-icon { background-color: color-mix(in srgb, var(--island-bg-color) 42%, transparent) !important; }
+    .excalidraw .zoom-button .ToolIcon__icon { border-radius: 0; }
     .excalidraw .zoom-actions .zoom-button:first-child .ToolIcon__icon { border-radius: 12px 0 0 12px; }
     .excalidraw .zoom-actions .zoom-button:last-child .ToolIcon__icon { border-radius: 0 12px 12px 0; }
     .excalidraw .undo-redo-buttons .ToolIcon__icon:first-child { border-radius: 12px 0 0 12px; }
     .excalidraw .undo-redo-buttons .ToolIcon__icon:last-child { border-radius: 0 12px 12px 0; }
+    @supports not ((backdrop-filter: blur(1px)) or (-webkit-backdrop-filter: blur(1px))) {
+      .excalidraw .zoom-actions,
+      .excalidraw .undo-redo-buttons,
+      .excalidraw .help-icon,
+      .excalidraw .sidebar-trigger,
+      .excalidraw .default-sidebar-trigger { background-color: var(--island-bg-color); }
+    }
     @supports not ((backdrop-filter: blur(1px)) or (-webkit-backdrop-filter: blur(1px))) {
       .excalidraw .App-toolbar,
       .excalidraw .App-menu_bottom .Island,

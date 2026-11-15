@@ -296,6 +296,13 @@ const GLASS_SELECTOR = [
   // The expanded property sheet is deliberately excluded: it is a control
   // panel, and refraction behind swatch labels made it unreadable.
   ".excalidraw .dropdown-menu .dropdown-menu-container",
+  // Bottom-left zoom/undo and the top-right library trigger are plain buttons
+  // rather than islands; CSS gives them the material, so they need maps too.
+  ".excalidraw .zoom-actions",
+  ".excalidraw .undo-redo-buttons",
+  ".excalidraw .help-icon",
+  ".excalidraw .sidebar-trigger",
+  ".excalidraw .default-sidebar-trigger",
 ].join(", ");
 
 export function initLiquidGlass(selector = GLASS_SELECTOR): LiquidGlassController | null {
