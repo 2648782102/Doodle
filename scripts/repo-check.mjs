@@ -91,6 +91,8 @@ check(packageJson.scripts.build.includes("build-plugin.mjs") && packageJson.scri
 check(packageJson.scripts["setup:codex"] === "node scripts/setup-codex.mjs", "one-command Codex setup is missing");
 check(packageJson.scripts["preview:board"] === "node scripts/preview-board.mjs", "explicit local preview command is missing");
 check(await exists("scripts/preview-board.mjs"), "local preview script is missing");
+check(await exists("scripts/open-board.mjs") && packageJson.scripts.doodle === "node scripts/open-board.mjs", "the one-action board open command is missing");
+check(excalidrawTemplate.includes('id="doodleWelcome"') && excalidrawApp.includes("WELCOME_STORAGE_KEY") && excalidrawApp.includes("initWelcome"), "the first-run board guidance is missing or not dismissible");
 check(troubleshooting.includes("npm run preview:board") && troubleshooting.includes("current MCP server process"), "troubleshooting does not explain PANEL_URL lifetime");
 check(packageJson.scripts.check.includes("setup:codex -- --dry-run"), "npm check does not dry-run the Codex setup");
 check(ci.includes("npm run repo:plugin-check"), "CI does not run the plugin guard");

@@ -2,6 +2,14 @@
 
 All notable changes are documented here. Versions follow `VERSIONING.md`.
 
+## Unreleased — Easier to reach
+
+### Added
+
+- `npm run doodle` is a one-action on-ramp: it starts the local board and opens the default browser, printing the URL and a few gestures for a machine that cannot open one. `--print` forces the terminal-only path.
+- An empty board shows a dismissible first-run card explaining note creation, drawing, panning, and zooming. The dismissal is remembered locally and the card never covers a board that already has content.
+- Running the MCP server directly now prints the board URL with one short instruction, so `npx -y doodle-mcp` is legible to a person and not only to a host.
+
 ## Unreleased — Cheaper agent reads
 
 ### Added

@@ -183,6 +183,34 @@ function initThemeToggle(): void {
   toggle?.addEventListener("click", () => applyTheme(readTheme() === "dark" ? "light" : "dark"));
 }
 
+const WELCOME_STORAGE_KEY = "doodle-welcome-dismissed";
+
+/**
+ * Teach the first empty board once.
+ *
+ * A blank canvas is the moment a person decides whether the tool is obvious.
+ * The card appears only when the board is empty and has not been dismissed
+ * before, so it never competes with real content or repeats itself.
+ */
+function initWelcome(snapshot: BoardSnapshot): void {
+  const card = document.querySelector<HTMLElement>("#doodleWelcome");
+  const dismiss = document.querySelector<HTMLButtonElement>("#doodleWelcomeDismiss");
+  if (!card || !dismiss) return;
+  let dismissed = false;
+  try {
+    dismissed = localStorage.getItem(WELCOME_STORAGE_KEY) === "1";
+  } catch {}
+  if (dismissed || snapshot.items.length > 0) return;
+  const hide = () => {
+    card.hidden = true;
+    try {
+      localStorage.setItem(WELCOME_STORAGE_KEY, "1");
+    } catch {}
+  };
+  dismiss.addEventListener("click", hide);
+  card.hidden = false;
+}
+
 function applyRemoteSnapshot(data: BoardSnapshot, refreshFiles = true) {
   if (!data || !Array.isArray(data.items) || typeof data.revision !== "number") return;
   if (activeSnapshot && data.revision <= activeSnapshot.revision && data.id === activeSnapshot.id) return;
@@ -707,6 +735,7 @@ async function start() {
   if (!root || embedded || rootInstance) return;
   const initial = await loadBoard();
   renderCanvas(initial);
+  if (!embedded) initWelcome(initial);
 }
 
 window.DoodleExcalidrawInit = (snapshot, mcpApp) => {

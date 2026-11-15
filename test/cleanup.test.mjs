@@ -62,6 +62,7 @@ describe("post-cleanup repository shape", () => {
       "scripts/build-submission.mjs",
       "scripts/build.mjs",
       "scripts/doctor.mjs",
+      "scripts/open-board.mjs",
       "scripts/plugin-check.mjs",
       "scripts/preview-board.mjs",
       "scripts/repo-check.mjs",

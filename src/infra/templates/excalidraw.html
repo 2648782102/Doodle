@@ -179,6 +179,18 @@
     .excalidraw .HelpDialog__header { display: none; }
     .excalidraw .dropdown-menu .dropdown-menu-group[data-doodle-hidden="true"] { display: none; }
     .excalidraw [data-doodle-hidden="true"] { display: none !important; }
+    .doodle-welcome { position: fixed; left: 50%; bottom: 132px; z-index: 24; width: min(520px, calc(100vw - 32px)); transform: translateX(-50%); display: grid; gap: 10px; padding: 16px 18px; border: 1px solid var(--doodle-border); border-radius: 14px; background: var(--doodle-panel); box-shadow: var(--doodle-shadow); backdrop-filter: blur(16px); animation: doodle-welcome-in var(--doodle-duration) var(--doodle-ease); }
+    .doodle-welcome[hidden] { display: none; }
+    .doodle-welcome h2 { margin: 0; font-size: 14px; font-weight: 650; letter-spacing: 0.01em; }
+    .doodle-welcome p { margin: 0; color: var(--doodle-muted); font-size: 12px; line-height: 1.6; }
+    .doodle-welcome dl { display: grid; grid-template-columns: auto 1fr; gap: 6px 12px; margin: 2px 0 0; font-size: 12px; }
+    .doodle-welcome dt { color: var(--doodle-ink); font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: 11px; }
+    .doodle-welcome dd { margin: 0; color: var(--doodle-muted); }
+    .doodle-welcome-actions { display: flex; justify-content: flex-end; margin-top: 2px; }
+    .doodle-welcome-actions button { min-height: 30px; padding: 0 14px; border: 1px solid transparent; border-radius: 9px; background: var(--doodle-accent); color: var(--doodle-accent-ink); cursor: pointer; font-size: 12px; }
+    .doodle-welcome-actions button:hover { filter: brightness(1.05); }
+    @keyframes doodle-welcome-in { from { opacity: 0; transform: translate(-50%, 8px); } to { opacity: 1; transform: translate(-50%, 0); } }
+    @media (max-height: 620px) { .doodle-welcome { bottom: 96px; padding: 12px 14px; } .doodle-welcome dl { display: none; } }
     @media (max-width: 640px) {
       .doodle-topbar { top: 58px; left: 12px; }
       .doodle-library-panel { top: 54px; width: calc(100vw - 24px); }
@@ -199,6 +211,17 @@
     <button class="doodle-tool doodle-tool-icon" id="doodleThemeToggle" aria-label="切换深色主题" title="切换明暗主题">◐</button>
   </div>
   <button class="doodle-notify-agent" id="doodleNotifyAgent" hidden>通知 Agent</button>
+  <section class="doodle-welcome" id="doodleWelcome" hidden aria-label="开始使用画板">
+    <h2>这是一张空画板</h2>
+    <p>不用配置，直接开始画。和 AI 一起用时，它会读写同一张画板。</p>
+    <dl>
+      <dt>双击空白</dt><dd>新建一张便签</dd>
+      <dt>拖拽</dt><dd>画形状、箭头或手写</dd>
+      <dt>空格 / 滚轮</dt><dd>平移画板</dd>
+      <dt>⌘ / Ctrl + 滚轮</dt><dd>缩放</dd>
+    </dl>
+    <div class="doodle-welcome-actions"><button id="doodleWelcomeDismiss" type="button">开始画</button></div>
+  </section>
   <div class="doodle-drawer-scrim" id="doodleDrawerScrim" hidden></div>
   <section class="doodle-library-panel" id="doodleLibraryPanel" hidden aria-label="画板图库">
     <div class="doodle-library-head"><strong>画板图库</strong><button id="doodleLibraryClose" aria-label="关闭图库">×</button></div>
