@@ -56,7 +56,7 @@ describe("post-cleanup repository shape", () => {
       expect(current.some((name) => pattern.test(name)), `unexpected legacy path matching ${pattern}`).toBe(false);
     }
     expect(extensions).toBe(false);
-    expect(source.filter((name) => name.endsWith(".ts"))).toHaveLength(24);
+    expect(source.filter((name) => name.endsWith(".ts"))).toHaveLength(25);
     expect(scripts.filter((name) => name.endsWith(".mjs")).sort()).toEqual([
       "scripts/build-plugin.mjs",
       "scripts/build-submission.mjs",

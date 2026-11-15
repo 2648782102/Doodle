@@ -6,7 +6,8 @@ All notable changes are documented here. Versions follow `VERSIONING.md`.
 
 ### Changed
 
-- Doodle chrome uses a liquid-glass material: a frosted pane with a specular top edge, a hairline outer ring, and a wide soft shadow, shared by the top bar, library drawer, welcome card, notification button, and Excalidraw's own toolbars. The first attempt was invisible because the pane was 62% white over an equally light page (1.04:1). The material is now 30% opaque, and the canvas carries a low-amplitude warm/cool colour field so the glass has something to refract. The canvas surface itself stays flat for legibility, and an opaque fallback keeps it usable without `backdrop-filter`.
+- Doodle chrome uses a real liquid-glass material, not a frosted panel. Each pane gets its own SVG backdrop filter built at device resolution: a bevelled displacement map bends the page near the rim, a specular map lights the rim from the upper left, its shadow side darkens the opposite bevel, and a light blur plus saturation finish the surface. The fill is only ~6% because anything more hid the lens. Maps rebuild on resize and theme change, and the filter stays on the shell only, never the canvas surface or dialogs. Engines without an SVG backdrop filter (Firefox, Safari) fall back to blur and saturation.
+- The canvas carries a low-amplitude warm/cool colour field at its edges plus a slightly stronger dot grid. A near-white page gave the bevel nothing to bend, which made the first two material attempts read as a white card; the dots now visibly magnify inside a pane and stay the same size outside it. The field fades before the middle of the canvas, so drawing stays untinted.
 
 ### Fixed
 

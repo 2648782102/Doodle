@@ -25,7 +25,10 @@ src/
 │   ├── project-workspace.ts    plugin-safe workspace resolution
 │   ├── workspace.ts            DOODLE_WORKSPACE_ROOT resolution
 │   ├── version.ts              package version read
-│   └── templates/excalidraw.html  Excalidraw-only standalone and embedded canvas
+│   └── templates/
+│       ├── excalidraw.html     Excalidraw-only standalone and embedded canvas
+│       ├── excalidraw-app.tsx  canvas client: board sync, library, exports, theme
+│       └── liquid-glass.ts     per-pane SVG refraction filters for the chrome
 plugins/doodle/                 compatibility manifest, MCP config, skill, assets
 .agents/plugins/                repository-scoped plugin marketplace
 scripts/setup-codex.mjs         one-command local Codex plugin install and first-use guide

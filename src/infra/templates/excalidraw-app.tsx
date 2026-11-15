@@ -16,6 +16,7 @@ import {
   readStoredViewport,
   writeStoredViewport,
 } from "../../board/viewport-memory.js";
+import { initLiquidGlass, type LiquidGlassController } from "./liquid-glass.js";
 
 type BoardSnapshot = {
   version: 1;
@@ -98,6 +99,7 @@ declare global {
 
 const PANEL_TOKEN = window.DOODLE_EXCALIDRAW_TOKEN ?? "";
 const headers = { "Content-Type": "application/json", "X-AI-Draw-Token": PANEL_TOKEN };
+let glassController: LiquidGlassController | null = null;
 let activeSnapshot: BoardSnapshot | null = null;
 let activeMcpApp: { drawBoard?: (args: Record<string, unknown>) => Promise<unknown> } | null = null;
 const apiRef: { current: ExcalidrawAPI | null } = { current: null };
@@ -235,6 +237,10 @@ function initThemeToggle(): void {
   const toggle = document.querySelector<HTMLButtonElement>("#doodleThemeToggle");
   applyTheme(readTheme());
   toggle?.addEventListener("click", () => applyTheme(readTheme() === "dark" ? "light" : "dark"));
+  window.addEventListener("doodle-theme-change", () => {
+    // Frames are throttled: a theme flip recomputes every pane once.
+    requestAnimationFrame(() => glassController?.refresh());
+  });
 }
 
 const WELCOME_STORAGE_KEY = "doodle-welcome-dismissed";
@@ -830,6 +836,7 @@ if (document.querySelector("#excalidrawRoot")) {
   initLibraryUi();
   initSnapshotExports();
   initNotifyButton();
+  glassController = initLiquidGlass();
   if (embedded) void initHostApp().catch(() => {});
   else connectStandaloneUpdates();
   void start().catch((error) => showError(error));

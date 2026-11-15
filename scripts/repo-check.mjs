@@ -26,6 +26,7 @@ const boardIndex = await read("src/board/index.ts");
 const tools = await read("src/board/tools.ts");
 const boardTypes = await read("src/board/types.ts");
 const excalidrawTemplate = await read("src/infra/templates/excalidraw.html");
+const liquidGlass = await read("src/infra/templates/liquid-glass.ts");
 const http = await read("src/board/http.ts");
 const scanner = await read("src/board/project-scan.ts");
 const boardStore = await read("src/board/store.ts");
@@ -172,7 +173,9 @@ check(boardTypes.includes("boardVisualDigest") && boardTypes.includes("startItem
 check(excalidrawApp.includes("excalidraw") && (await read("src/board/excalidraw-adapter.ts")).includes("boardOpacityToExcalidraw"), "canvas opacity is not converted between Board v1 (0-1) and Excalidraw (0-100)");
 check((await read("src/board/excalidraw-adapter.ts")).includes("inkOn(") && (await read("src/board/excalidraw-adapter.ts")).includes("themedFill("), "canvas ink or fill is no longer adapted to the theme");
 check(excalidrawApp.includes("EXCALIDRAW_THEME"), "Excalidraw may invert board colours again in dark mode");
-check(excalidrawTemplate.includes("--glass-bg") && excalidrawTemplate.includes(".doodle-glass") && excalidrawTemplate.includes("backdrop-filter: blur(var(--glass-blur))"), "the liquid-glass material or its tokens are missing");
+check(excalidrawTemplate.includes("--glass-bg") && excalidrawTemplate.includes(".doodle-glass") && excalidrawTemplate.includes("var(--glass-refraction, blur(var(--glass-blur))"), "the liquid-glass material or its refraction fallback is missing");
+check(excalidrawTemplate.includes("--glass-shade") && liquidGlass.includes("feDisplacementMap") && liquidGlass.includes("bevelAmplitude") && liquidGlass.includes("paintEdgeMap"), "the liquid-glass lens lost its bevelled displacement maps");
+check(excalidrawTemplate.includes("--doodle-wash-c") && liquidGlass.includes("MutationObserver") && liquidGlass.includes("ResizeObserver"), "the glass lost its refraction backdrop or its observer lifecycle");
 check(excalidrawTemplate.includes("color-mix(in srgb, var(--island-bg-color)") && !/\.excalidraw \.Island \{[^}]*background/.test(excalidrawTemplate), "native islands no longer follow Excalidraw surface tokens, so icons can vanish");
 check(excalidrawApp.includes("sceneReady") && excalidrawApp.includes("elements.length < activeSnapshot.items.length"), "canvas can write an empty mount-time scene over a loaded board");
 check(boardTypes.includes("createStarterBoard") && boardTypes.includes("createEmptyBoard"), "board types lost the compatibility starter or empty board");
@@ -266,7 +269,7 @@ check(codexExample.includes('args = ["-y", "doodle-mcp"]') && !codexExample.incl
 check(setupScript.includes('"plugin", "marketplace", "add"') && setupScript.includes('"plugin", "add", "doodle@doodle"') && setupScript.includes("--dry-run"), "setup script does not safely install the local plugin");
 check(setupScript.includes('if (dryRun) return { status: 0 }') || setupScript.includes("if (dryRun) return { status: 0; }"), "setup dry-run can still execute commands");
 check(await exists("plugins/doodle/skills/doodle/SKILL.md") && await exists("scripts/build-plugin.mjs") && await exists("scripts/plugin-check.mjs"), "plugin packaging files are incomplete");
-check(totalSourceFiles.length === 24, `src has ${totalSourceFiles.length} TypeScript modules; expected the focused plugin-ready structure`);
+check(totalSourceFiles.length === 25, `src has ${totalSourceFiles.length} TypeScript modules; expected the focused plugin-ready structure`);
 
 if (failures.length) {
   console.error("❌ Offline repository checks failed:");
