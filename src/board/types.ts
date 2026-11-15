@@ -378,23 +378,64 @@ export function resolveDiagramLayout(diagram: DiagramInput): DiagramLayout {
       }
     }
   }
-  // Anything still unplaced - an explicit mode with no columns, or a cycle -
-  // keeps a stable declaration order instead of overlapping at (0, 0).
+  /*
+   * Anything still unplaced keeps a stable declaration order instead of
+   * overlapping at (0, 0).
+   *
+   * In an explicit mode the leftover nodes join the *last explicit column* as
+   * further rows. Giving each its own column (the previous behaviour) meant a
+   * timeline that declared `column: 0, row: 0..3` and then omitted coordinates
+   * for the remaining steps placed those steps in a second column at x = 300,
+   * which is not the sequence the author described.
+   */
   let fallbackColumn = Math.max(0, ...layer.values()) + 1;
   let fallbackIndex = 0;
+  /*
+   * Follow the last *sequenced* column, not just any explicit column.
+   *
+   * A node with `column: 0` is stating an axis; a node with only `row` is
+   * stating a sequence and still needs a column. Nodes with neither keep the
+   * original behaviour of taking their own column, which is what an author
+   * writing a side-by-side comparison expects.
+   */
+  const lastSequencedColumn = [...diagram.nodes]
+    .reverse()
+    .find((node) => node.column !== undefined)?.column;
   for (const node of diagram.nodes) {
     if ((layer.get(node.id) ?? -1) >= 0) continue;
     if (mode === "flow") layer.set(node.id, fallbackColumn++);
+    else if (node.row !== undefined && lastSequencedColumn !== undefined) layer.set(node.id, lastSequencedColumn);
     else layer.set(node.id, fallbackIndex++);
   }
+  /*
+   * Snake a long flow instead of emitting one endless row.
+   *
+   * A 16-step chain used to become a single strip 3.1k units wide: technically
+   * correct, unreadable on any viewport, and the reason large diagrams were
+   * abandoned by hand. Columns past `flowWrap` are folded back as an "S": even
+   * passes run left-to-right, odd passes run right-to-left, and rows advance as
+   * the chain snakes down. Explicit `column`/`row` still win, and non-flow modes
+   * are untouched because their position is the author's statement.
+   */
+  const flowWrap = 6;
+  const explicitColumns = diagram.nodes.some((node) => node.column !== undefined);
+  const explicitRows = diagram.nodes.some((node) => node.row !== undefined);
+  const wrap = mode === "flow" && !explicitColumns && !explicitRows;
+  // `fallbackColumn` is one past the widest derived layer, so it is the chain
+  // length; clamp it to the wrap width.
+  const perRow = Math.max(1, Math.min(flowWrap, fallbackColumn));
   const positions = new Map<string, BoardPoint>();
   const rows = new Map<number, number>();
   for (const node of diagram.nodes) {
-    const column = Math.min(12, Math.max(0, layer.get(node.id) ?? 0));
-    const row = node.row ?? rows.get(column) ?? 0;
+    const rawColumn = Math.min(12, Math.max(0, layer.get(node.id) ?? 0));
+    const column = wrap ? rawColumn % perRow : rawColumn;
+    const wrappedRow = wrap ? Math.floor(rawColumn / perRow) : 0;
+    const row = node.row ?? (rows.get(column) ?? 0) + wrappedRow;
     rows.set(column, Math.max(rows.get(column) ?? 0, row + 1));
+    const reversed = wrap && wrappedRow % 2 === 1;
+    const xColumn = reversed ? perRow - 1 - column : column;
     positions.set(node.id, {
-      x: Math.round(origin.x + column * (width + columnGap)),
+      x: Math.round(origin.x + xColumn * (width + columnGap)),
       y: Math.round(origin.y + row * (height + rowGap)),
     });
   }
@@ -549,9 +590,15 @@ export function parseBoard(value: unknown): SimpleBoard {
     if (candidate.variant !== undefined && !isVariant(candidate.variant)) throw new Error("Invalid board item variant");
     if (candidate.role !== undefined && !isRole(candidate.role)) throw new Error("Invalid board item role");
     if (candidate.z !== undefined && !isFiniteNumber(candidate.z)) throw new Error("Invalid board item z-order");
-    if (candidate.startItemId !== undefined && (typeof candidate.startItemId !== "string" || !itemIds.has(candidate.startItemId)))
+    // Only the type is checked here. Existence is verified after every item has
+    // been visited, because a connector may legitimately point at a shape that
+    // appears later in the array: checking the incrementally built `itemIds`
+    // here rejected "line first, then its two endpoints", which is a normal way
+    // for a model to emit a diagram and produced `Invalid line start item` for
+    // otherwise valid boards.
+    if (candidate.startItemId !== undefined && typeof candidate.startItemId !== "string")
       throw new Error("Invalid line start item");
-    if (candidate.endItemId !== undefined && (typeof candidate.endItemId !== "string" || !itemIds.has(candidate.endItemId)))
+    if (candidate.endItemId !== undefined && typeof candidate.endItemId !== "string")
       throw new Error("Invalid line end item");
     if ((candidate.startItemId || candidate.endItemId) && candidate.type !== "line")
       throw new Error("Only line items can bind connectors");
@@ -882,7 +929,18 @@ function layoutArchitectureBoard(
   return updateBoardItems(board, updates, author);
 }
 
-export function diagramToBoardItems(diagram: DiagramInput, author: BoardAuthor = "ai"): BoardItem[] {
+/**
+ * @param reservedIds IDs already on the target board. When the diagram is added
+ *   beside existing objects, fixed generated IDs such as `diagram_frame` or a
+ *   reused node id (`n1` on a second iteration) would collide and the whole
+ *   draw call failed with `Duplicate board item ID`. Reserved IDs get a numeric
+ *   suffix, and connector bindings are rewritten to match.
+ */
+export function diagramToBoardItems(
+  diagram: DiagramInput,
+  author: BoardAuthor = "ai",
+  reservedIds: Iterable<string> = [],
+): BoardItem[] {
   const timestamp = now();
   const { origin, width, height, columnGap, rowGap, positions, rows } = resolveDiagramLayout(diagram);
   const maxRows = Math.max(...rows.values());
@@ -893,8 +951,28 @@ export function diagramToBoardItems(diagram: DiagramInput, author: BoardAuthor =
   const bottom = Math.max(maxY + height + (diagram.edges.some((edge) => edge.label) ? rowGap + 28 : 0), origin.y + (maxRows + 1) * (height + rowGap) + 28);
   const bounds = { left: leftmostX, top: origin.y - 94, right: rightmostX + width, bottom };
   const items: BoardItem[] = [];
+  const taken = new Set(reservedIds);
+  const renames = new Map<string, string>();
+  /**
+   * Keep a requested id when it is free; otherwise append the smallest numeric
+   * suffix that is. Deterministic per call, so re-issuing the same diagram on a
+   * clean board still produces the same IDs.
+   */
+  const claim = (id: string): string => {
+    if (!taken.has(id)) {
+      taken.add(id);
+      renames.set(id, id);
+      return id;
+    }
+    let attempt = 2;
+    while (taken.has(`${id}_${attempt}`)) attempt += 1;
+    const next = `${id}_${attempt}`;
+    taken.add(next);
+    renames.set(id, next);
+    return next;
+  };
   const base = (id: string): Pick<BoardItem, "id" | "author" | "createdAt" | "updatedAt"> => ({
-    id, author, createdAt: timestamp, updatedAt: timestamp,
+    id: claim(id), author, createdAt: timestamp, updatedAt: timestamp,
   });
   const frameTop = bounds.top - 12;
   const frame = {
@@ -924,47 +1002,65 @@ export function diagramToBoardItems(diagram: DiagramInput, author: BoardAuthor =
       text: node.detail.slice(0, 40), color: "#ffffff", z: 3, style: { fontSize: 12, textAlign: "center" },
     });
   }
-  let omittedEdgeCount = 0;
   let edgeIndex = 0;
   diagram.edges.forEach((edge) => {
     const from = positions.get(edge.from)!;
     const to = positions.get(edge.to)!;
-    const layerDistance = Math.abs(to.x - from.x) / (width + columnGap);
-    const deltaRow = Math.round(to.y - from.y);
-    const shortEdge = layerDistance <= 1.01 && deltaRow === 0;
-    if (!shortEdge) {
-      omittedEdgeCount += 1;
-      return;
-    }
-    const startX = from.x + width + 8;
-    const startY = from.y + height / 2;
-    const endX = to.x - 8;
-    const endY = to.y + height / 2;
+    /*
+     * Route every edge instead of dropping the ones that span more than one
+     * column. The old rule only drew a connector when the two nodes were
+     * horizontally adjacent on the same row, so a snaked flow, a skip edge
+     * (`step 1 → step 4`) or any vertical link was silently omitted: a 16-step
+     * chain lost 5 of its 15 arrows while the tool still reported success.
+     *
+     * Anchors are chosen from the dominant direction so the arrow leaves the
+     * side it is heading toward, which avoids lines crossing through the node
+     * they connect.
+     */
+    const centerFrom = { x: from.x + width / 2, y: from.y + height / 2 };
+    const centerTo = { x: to.x + width / 2, y: to.y + height / 2 };
+    const dx = centerTo.x - centerFrom.x;
+    const dy = centerTo.y - centerFrom.y;
+    const horizontal = Math.abs(dx) >= Math.abs(dy);
+    const startX = horizontal ? (dx >= 0 ? from.x + width + 8 : from.x - 8) : centerFrom.x;
+    const startY = horizontal ? centerFrom.y : (dy >= 0 ? from.y + height + 8 : from.y - 8);
+    const endX = horizontal ? (dx >= 0 ? to.x - 8 : to.x + width + 8) : centerTo.x;
+    const endY = horizontal ? centerTo.y : (dy >= 0 ? to.y - 8 : to.y + height + 8);
     const deltaX = Math.max(-MAX_LINE_DELTA_X, Math.min(MAX_LINE_DELTA_X, Math.round(endX - startX)));
     const deltaY = Math.max(-MAX_LINE_DELTA_Y, Math.min(MAX_LINE_DELTA_Y, Math.round(endY - startY)));
+    if (deltaX === 0 && deltaY === 0) return;
     edgeIndex += 1;
     items.push({
       ...base(`diagram_edge_${edgeIndex}`), type: "line",
       x: Math.round(startX), y: Math.round(startY), w: deltaX, h: deltaY,
-      text: "", color: "#64748b", shape: "straight",
-      startItemId: edge.from, endItemId: edge.to, z: 1,
+      // A short hop can carry its own label without covering anything. A long
+      // or cross-row route cannot, so its text stays in the legend instead of
+      // printing a caption over unrelated shapes.
+      text: edge.label && horizontal && Math.abs(deltaX) <= width + columnGap * 1.5
+        ? edge.label.slice(0, 40)
+        : "",
+      color: "#64748b",
+      // A snaked or skip edge is not a straight horizontal hop; an orthogonal
+      // route keeps it readable without crossing the shapes it passes.
+      shape: horizontal ? "straight" : "orthogonal",
+      // Bind to the ids actually emitted, which may be suffixed on append.
+      startItemId: renames.get(edge.from) ?? edge.from,
+      endItemId: renames.get(edge.to) ?? edge.to,
+      z: 1,
     });
   });
   const legendLabels = diagram.edges.filter((edge) => edge.label).map((edge) => edge.label).join(" · ");
-  if (legendLabels || omittedEdgeCount) {
-    const parts = [
-      legendLabels ? `连接：${legendLabels}` : "",
-      omittedEdgeCount ? `未绘制远连接：${omittedEdgeCount} 条` : "",
-    ].filter(Boolean);
+  if (legendLabels) {
     const legendWidth = Math.max(MIN_SHAPE_SIZE, Math.min(MAX_SHAPE_WIDTH, bounds.right - bounds.left));
     items.push({
       ...base("diagram_legend"), type: "text", x: origin.x, y: bottom - 28,
-      w: legendWidth, h: 28, text: parts.join(" · ").slice(0, 120), color: "#ffffff", z: 3, style: { fontSize: 12, textAlign: "left" },
+      w: legendWidth, h: 28, text: `连接：${legendLabels}`.slice(0, 120), color: "#ffffff", z: 3, style: { fontSize: 12, textAlign: "left" },
     });
   }
-  const frameItem = items.find((item) => item.id === "diagram_frame")!;
-  frameItem.w = Math.max(MIN_SHAPE_SIZE, Math.min(MAX_SHAPE_WIDTH, frameItem.w));
-  frameItem.h = Math.max(MIN_SHAPE_SIZE, Math.min(MAX_SHAPE_HEIGHT, frameItem.h));
+  // Hold the reference: on append the frame id may be suffixed, so looking it
+  // up by the original name would return undefined.
+  frame.w = Math.max(MIN_SHAPE_SIZE, Math.min(MAX_SHAPE_WIDTH, frame.w));
+  frame.h = Math.max(MIN_SHAPE_SIZE, Math.min(MAX_SHAPE_HEIGHT, frame.h));
   const candidate = { version: 1 as const, id: "diagram_validation", title: diagram.title ?? "diagram", revision: 0, updatedAt: timestamp, items, notes: [] };
   parseBoard(candidate);
   return items;

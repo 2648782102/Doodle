@@ -181,7 +181,9 @@ describe("simple shared board", () => {
     }, "ai");
     const connectors = items.filter((item) => item.type === "line");
     const legend = items.find((item) => item.id === "diagram_legend");
-    expect(connectors.every((item) => item.text === "")).toBe(true);
+    // The label lives on the connector itself; the legend keeps a de-duplicated
+    // summary so a reader can scan every relationship without hunting arrows.
+    expect(connectors.map((item) => item.text)).toEqual(["HTTP"]);
     expect(legend?.text).toContain("HTTP");
   });
 
@@ -204,7 +206,7 @@ describe("simple shared board", () => {
     expect(new Set(items.filter((item) => item.type === "rect").map((item) => item.x)).size).toBeGreaterThan(2);
   });
 
-  it("omits long semantic edges that would cross intermediate nodes", () => {
+  it("routes long semantic edges instead of omitting them", () => {
     const diagram = {
       title: "Long edge",
       nodes: ["a", "b", "c", "d", "e"].map((id, index) => ({ id, label: id, detail: `${id} detail`, column: index === 4 ? 4 : 0, row: index === 4 ? 0 : index })),
@@ -215,13 +217,16 @@ describe("simple shared board", () => {
     const edges = items.filter((item) => item.type === "line");
     const middleNodes = items.filter((item) => ["b", "c", "d"].includes(item.id));
     const legend = items.find((item) => item.id === "diagram_legend");
-    expect(edges).toHaveLength(0);
+    // A 16-step chain used to lose 5 of 15 arrows; every requested edge now
+    // produces a routed line, bound to the two nodes it connects.
+    expect(edges).toHaveLength(1);
+    expect(edges[0]).toMatchObject({ startItemId: "a", endItemId: "e" });
     expect(middleNodes).toHaveLength(3);
-    expect(legend?.text).toContain("未绘制远连接：1 条");
+    expect(legend?.text).toContain("far");
     expect(legend.text.length).toBeLessThanOrEqual(120);
   });
 
-  it("records omitted semantic edges in the legend instead of drawing over the subtitle", () => {
+  it("draws a cross-column edge without covering the subtitle", () => {
     const items = diagramToBoardItems({
       title: "Title",
       subtitle: "Long subtitle",
@@ -234,9 +239,12 @@ describe("simple shared board", () => {
     const subtitle = items.find((item) => item.id === "diagram_subtitle");
     const frame = items.find((item) => item.id === "diagram_frame");
     const legend = items.find((item) => item.id === "diagram_legend");
-    expect(items.filter((item) => item.type === "line")).toHaveLength(0);
+    const lines = items.filter((item) => item.type === "line");
+    expect(lines).toHaveLength(1);
+    expect(lines[0]).toMatchObject({ startItemId: "a", endItemId: "d" });
+    expect(lines[0].y).toBeGreaterThan(subtitle.y);
     expect(frame.y).toBeLessThan(subtitle.y);
-    expect(legend?.text).toContain("未绘制远连接：1 条");
+    expect(legend?.text).toContain("far");
     expect(legend.text.length).toBeLessThanOrEqual(120);
   });
 

@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { resolveDiagramLayout } from "../dist/board/types.js";
+import { diagramToBoardItems, parseBoard, resolveDiagramLayout } from "../dist/board/types.js";
 
 function diagram(overrides = {}) {
   return {
@@ -103,5 +103,91 @@ describe("diagram layout modes", () => {
 
     expect(layout.positions.get("a").x).toBe(layout.positions.get("a2").x);
     expect(layout.positions.get("a2").y).toBeGreaterThan(layout.positions.get("a").y);
+  });
+
+  it("snakes a long flow instead of emitting one unreadable strip", () => {
+    const nodes = Array.from({ length: 16 }, (_, index) => ({ id: `n${index}`, label: `Step ${index + 1}` }));
+    const edges = Array.from({ length: 15 }, (_, index) => ({ from: `n${index}`, to: `n${index + 1}` }));
+    const layout = resolveDiagramLayout(diagram({ mode: "flow", nodes, edges }));
+    const xs = [...layout.positions.values()].map((point) => point.x);
+    const ys = [...layout.positions.values()].map((point) => point.y);
+
+    // Six columns of 190px + 70px gap, not sixteen.
+    expect(Math.max(...xs) - Math.min(...xs)).toBeLessThanOrEqual(6 * 260);
+    expect(new Set(ys).size).toBeGreaterThan(1);
+  });
+
+  it("draws every edge, including skip and vertical links", () => {
+    const items = diagramToBoardItems({
+      mode: "flow",
+      nodes: [
+        { id: "a", label: "A" },
+        { id: "b", label: "B" },
+        { id: "c", label: "C" },
+        { id: "d", label: "D" },
+      ],
+      edges: [
+        { from: "a", to: "b" },
+        { from: "a", to: "d" },
+        { from: "b", to: "c" },
+      ],
+    });
+    const lines = items.filter((item) => item.type === "line");
+
+    expect(lines).toHaveLength(3);
+    expect(lines.map((line) => [line.startItemId, line.endItemId])).toEqual([
+      ["a", "b"],
+      ["a", "d"],
+      ["b", "c"],
+    ]);
+  });
+
+  it("continues the sequence in one column when only rows are given", () => {
+    // A timeline author states the axis once (`column: 0`) and then advances
+    // `row`; nodes that carry only a row must stay on that axis instead of
+    // being pushed into a second column at x = 300.
+    const nodes = [
+      { id: "a", label: "1", column: 0, row: 0 },
+      { id: "b", label: "2", row: 1 },
+      { id: "c", label: "3", row: 2 },
+    ];
+    const layout = resolveDiagramLayout(diagram({ mode: "timeline", nodes }));
+    const xs = new Set([...layout.positions.values()].map((point) => point.x));
+    const ys = [...layout.positions.values()].map((point) => point.y);
+
+    expect(xs.size).toBe(1);
+    expect(new Set(ys).size).toBe(3);
+  });
+
+  it("suffixes generated ids that already exist on the board", () => {
+    // A second iteration commonly reuses `n1`; that used to fail the whole call
+    // with `Duplicate board item ID`.
+    const first = diagramToBoardItems({
+      nodes: [{ id: "n1", label: "First" }],
+      edges: [],
+    });
+    const second = diagramToBoardItems(
+      { nodes: [{ id: "n1", label: "Second" }], edges: [] },
+      "ai",
+      first.map((item) => item.id),
+    );
+    const board = { version: 1, id: "b", title: "t", revision: 0, updatedAt: new Date().toISOString(), items: [...first, ...second], notes: [] };
+
+    expect(second.some((item) => item.id === "n1_2")).toBe(true);
+    expect(() => parseBoard(board)).not.toThrow();
+  });
+
+  it("accepts a connector that appears before its endpoints", () => {
+    // Models often emit the line first and the shapes after it.
+    const board = {
+      version: 1, id: "b", title: "t", revision: 0, updatedAt: new Date().toISOString(),
+      notes: [],
+      items: [
+        { id: "l", type: "line", x: 10, y: 10, w: 80, h: 0, text: "", color: "#64748b", author: "ai", createdAt: new Date().toISOString(), updatedAt: new Date().toISOString(), startItemId: "s", endItemId: "e" },
+        { id: "s", type: "rect", x: 10, y: 10, w: 80, h: 40, text: "S", color: "#ffffff", author: "ai", createdAt: new Date().toISOString(), updatedAt: new Date().toISOString() },
+        { id: "e", type: "rect", x: 200, y: 10, w: 80, h: 40, text: "E", color: "#ffffff", author: "ai", createdAt: new Date().toISOString(), updatedAt: new Date().toISOString() },
+      ],
+    };
+    expect(() => parseBoard(board)).not.toThrow();
   });
 });

@@ -19,6 +19,13 @@ All notable changes are documented here. Versions follow `VERSIONING.md`.
 - Removed the inset highlight that made every pane look like it had a second rectangle underneath. `inset 0 0 22px -14px` uses a negative spread, which shrinks the inner shadow into a smaller rounded rect instead of lighting the edge; on 44px chrome it drew a visible box ~8px inside the outline. The bevel highlight now comes only from the specular map, which follows the rim exactly, and the pane reads as one continuous surface.
 - The bevel displacement now tapers to zero at the inner edge of the band. It previously stopped at 0.68 amplitude, so the backdrop was sampled from two different places across a one-pixel line, leaving a seam across the inside of the pane.
 - Excalidraw's rotating `HintViewer` strip ("press Enter to add text…") is hidden at every width, not only on phones. It is upstream tutorial copy that mixed English and Chinese over the board and collided with the Doodle capsule.
+- Fixed four defects in `draw_board.diagram` that surfaced while drawing a 16-step process:
+  - connectors may now reference a node declared later in the array; `parseBoard` validates bindings after collecting every item, so "line first, then its endpoints" no longer fails with `Invalid line start item`;
+  - every requested edge is routed. Only same-row adjacent hops used to be drawn, so a long chain silently lost 5 of 15 arrows while the tool still reported success. Skip, cross-row, and snaked links are drawn now;
+  - a `flow` with no explicit coordinates snakes after six columns instead of becoming one unreadable strip (16 steps: 3160 → 1340 wide);
+  - appending a diagram whose generated ids already exist (`n1`, `diagram_frame`) suffixes them and rewrites the connector bindings, instead of failing the whole call with `Duplicate board item ID`.
+- `diagram.nodes[].row` now accepts 0-47 to match the 48-node limit; it was capped at 12, so a 17-step timeline was rejected. Nodes that carry only a `row` continue the last explicit column instead of being pushed into a second column.
+- Added `docs/DIAGRAM_GUIDE.md` with the field table (`label` not `title`, `author` at the top level), the verified `replace` semantics, layout limits, and when hand-placed coordinates are the better choice.
 
 ### Fixed
 

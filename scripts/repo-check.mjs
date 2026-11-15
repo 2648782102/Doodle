@@ -166,6 +166,23 @@ check(tools.includes("boardCapabilities()") && tools.includes("visualDigest: boa
 check(tools.includes('startItemId: z.string()') && tools.includes('mode: z.enum(["grid", "row", "column", "timeline", "cluster", "architecture"])') && tools.includes("diagram: diagramInput.optional()"), "draw_board lost connector bindings, expanded layouts, or semantic diagram recipe");
 check(tools.includes('mode: z.enum(["flow", "timeline", "compare", "matrix"])') && tools.includes("diagramModes"), "draw_board.diagram lost its semantic layout modes");
 check(boardTypes.includes("resolveDiagramLayout") && boardTypes.includes("diagramToBoardItems") && !boardTypes.includes("diagramToExcalidrawScene"), "semantic diagrams are not generated through one deterministic Board v1 layout");
+check(
+  boardTypes.includes("const flowWrap = 6;") &&
+  !boardTypes.includes("omittedEdgeCount") &&
+  boardTypes.includes("if (deltaX === 0 && deltaY === 0) return;"),
+  "diagram layout lost its flow wrapping or silently drops edges again",
+);
+check(
+  boardTypes.includes("reservedIds: Iterable<string> = []") &&
+  boardTypes.includes("startItemId: renames.get(edge.from) ?? edge.from"),
+  "appending a diagram can no longer suffix colliding ids or rebind its connectors",
+);
+check(
+  !boardTypes.includes("!itemIds.has(candidate.startItemId)") &&
+  boardTypes.includes("if (item.startItemId && !allItemIds.has(item.startItemId))"),
+  "connector bindings are validated before all items are known, rejecting forward references",
+);
+check(tools.includes("row: z.number().int().min(0).max(47)") && await exists("docs/DIAGRAM_GUIDE.md"), "diagram row limit is too small for a long sequence, or the diagram guide is missing");
 check(!http.includes('"/api/board/scene"') && !excalidrawApp.includes("loadScene()"), "a second persisted Excalidraw scene source remains");
 check(tools.includes('"scan_project"') && tools.includes("Use draw_board to visualize"), "scan_project is not a read-only board-context tool");
 check(boardTypes.includes("signedWidth") && boardTypes.includes("signedHeight"), "board types lost signed directed-arrow deltas");

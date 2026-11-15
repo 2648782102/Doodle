@@ -14,6 +14,7 @@ Start with [`../README.md`](../README.md) for installation and the product overv
 | [`ARCHITECTURE.md`](ARCHITECTURE.md) | Contributors, reviewers | Source layout, board state, MCP tools, HTTP API, and safety model |
 | [`DECISIONS.md`](DECISIONS.md) | Contributors, AI agents | Current decisions in force and the status of historical ADRs |
 | [`TROUBLESHOOTING.md`](TROUBLESHOOTING.md) | Users, maintainers | First-run checks and common failures |
+| [`DIAGRAM_GUIDE.md`](DIAGRAM_GUIDE.md) | AI agents, maintainers | Diagram fields, `replace` semantics, layout limits, and known pitfalls |
 | [`GOAL_MODE.md`](GOAL_MODE.md) | Maintainers, AI agents | How to set a time-boxed autonomous maintenance objective |
 | [`GOVERNANCE.md`](GOVERNANCE.md) | Maintainers | Open-source maintenance checklist and public metadata |
 | [`COMPETITIVE_RESEARCH.md`](COMPETITIVE_RESEARCH.md) | Maintainers | Product lessons from whiteboards, MCP tools, and visual agent surfaces |

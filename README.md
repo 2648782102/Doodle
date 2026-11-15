@@ -121,7 +121,7 @@ npm run preview:board
 - `author` 放在 `draw_board` 顶层参数，不放进 item。
 - `line` 可用 `shape: "straight" | "curve" | "orthogonal"`；`stroke` 的 `points` 是相对对象边界的局部坐标；`image` 使用有界的 `data:image/*;base64`。
 - 先读 `capabilities`、`visualDigest` 和 `RECIPES`：流程用 `role: "step"` + `startItemId` / `endItemId`，对比用 `role: "column"` 或 `variant: "frame"`，聚类用 `groupId` + `layout.mode: "cluster"`，重点用 `emphasis: "focus"`。
-- 复杂图优先用 `draw_board.diagram`：只提供短标题、语义节点和边，AI 不必手算坐标；`mode` 可选 `flow`（默认，按边分层）、`timeline`、`compare`、`matrix`，后三者按你给的 `column` / `row` 排布，不会被打乱顺序。它默认保留已有对象并追加新图；仅显式 `replace: true` 才整张重画。普通整理可用 `layout.mode: "architecture"`；`layout.mode` 支持 `grid / row / column / timeline / cluster / architecture`。可选 `variant / role / z / style / startItemId / endItemId` 都是版本 1 兼容字段。
+- 复杂图优先用 `draw_board.diagram`：只提供短标题、语义节点和边，AI 不必手算坐标；节点标题字段是 `label`。`mode` 可选 `flow`（默认，按边分层，超过 6 列自动折成蛇形，不会变成一条超宽横条）、`timeline`、`compare`、`matrix`，后三者按你给的 `column` / `row` 排布（`row` 上限 47），不会被打乱顺序。每条 `edges` 都会生成可见连线，包括跨列、跨行和折行连接。它默认保留已有对象并追加新图，重名 ID 会自动加数字后缀；仅显式 `replace: true` 才清空整张画板重画。普通整理可用 `layout.mode: "architecture"`；`layout.mode` 支持 `grid / row / column / timeline / cluster / architecture`。可选 `variant / role / z / style / startItemId / endItemId` 都是版本 1 兼容字段。字段细节与常见坑见[画图指南](docs/DIAGRAM_GUIDE.md)。
 - `draw_board.library` 支持 `list / get / create / save / switch / rename / duplicate / delete / import / export`；切换后会改变当前活动画板，`get_board` 随后读到的就是新图。
 - 图库文件保存在本地 `OUTPUT_DIR/.doodle/boards/`，每个图都是完整的版本 1 `board.json` 结构，不生成静态图片。
 - 结构化图用严格网格、短标签、一致尺寸。
@@ -165,6 +165,7 @@ npm run doctor
 | [当前决策](docs/DECISIONS.md) | 0.8.0 Excalidraw 画布与历史 ADR 状态 |
 | [文档地图](docs/README.md) | 全部文档入口 |
 | [故障排查](docs/TROUBLESHOOTING.md) | 首用自检与常见问题 |
+| [画图指南](docs/DIAGRAM_GUIDE.md) | `diagram` 的字段、`replace` 语义、布局上限与已知坑 |
 | [贡献指南](CONTRIBUTING.md) | 本地验证与 PR 规范 |
 | [安全政策](SECURITY.md) | 威胁模型与漏洞报告 |
 | [隐私政策](PRIVACY.md) | 本地数据、用途、接收方、保存期限与用户控制 |

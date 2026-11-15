@@ -239,15 +239,17 @@ const diagramInput = z.object({
   replace: z.boolean().optional().describe("Replace all existing board objects; defaults to false and adds the generated diagram beside existing objects"),
   subtitle: z.string().max(200).optional(),
   mode: z.enum(["flow", "timeline", "compare", "matrix"]).optional()
-    .describe("Semantic arrangement. flow derives columns from edges; timeline/compare/matrix use your explicit column/row. Defaults to flow."),
+    .describe("Semantic arrangement, default flow. flow derives columns from edges and snakes after six columns so a 16-step chain is not one 3k-wide strip. timeline/compare/matrix place nodes only where you give `column`/`row` - nodes without them are appended in declaration order below the explicit grid, so set both for a timed sequence."),
   nodes: z.array(z.object({
     id: z.string().max(80),
-    label: z.string().max(80),
+    label: z.string().max(80).describe("Node caption; this is the field to fill, not `title`"),
     detail: z.string().max(120).optional(),
     type: z.enum(["rect", "ellipse"]).optional(),
     color: z.string().regex(/^#[0-9a-fA-F]{6}$/).optional(),
-    column: z.number().int().min(0).max(12).optional(),
-    row: z.number().int().min(0).max(12).optional(),
+    column: z.number().int().min(0).max(12).optional()
+      .describe("Explicit column, 0-12. In timeline/compare/matrix this is the axis step: 17 steps in one row means column 0-16 is NOT available, so use row for the sequence instead."),
+    row: z.number().int().min(0).max(47).optional()
+      .describe("Explicit row, 0-47. In timeline the sequence usually advances down the page, so increment `row` per step and keep `column` fixed."),
   })).min(1).max(48),
   edges: z.array(z.object({
     from: z.string(),
@@ -436,7 +438,7 @@ export function registerBoardTools(server: McpServer, ctx: BoardToolContext): vo
         author: z.enum(["human", "ai"]).optional().describe("Author marker; AI responses should normally use ai"),
         expected_revision: z.number().int().nonnegative().optional().describe("Optional board revision for rejecting stale canvas edits"),
         library: libraryAction.optional().describe("Optional local board-library action for saving, switching, renaming, duplicating, importing, or exporting editable board snapshots"),
-        diagram: diagramInput.optional().describe("Semantic diagram recipe: nodes and edges generate one bounded Board v1 diagram with deterministic layout, short labels, and connected arrows; by default it is added beside existing objects, and replace:true clears the active board first"),
+        diagram: diagramInput.optional().describe("Semantic diagram recipe: nodes and edges generate one bounded Board v1 diagram with deterministic layout, short labels, and connected arrows. Each node takes `label` (not `title`). By default it is added beside existing objects and reuses a numeric id suffix if a generated id is taken; replace:true clears the whole active board first. Every edge becomes a routed line, a flow longer than six columns snakes instead of becoming one wide strip, and a timeline row index is not part of the schema - send `column` to advance a timeline."),
       }),
       annotations: BOARD_WRITE_ANNOTATIONS,
       _meta: CANVAS_UI_META,
@@ -452,7 +454,13 @@ export function registerBoardTools(server: McpServer, ctx: BoardToolContext): vo
           if (expected_revision !== undefined && expected_revision !== current.revision) {
             throw new BoardRevisionConflictError(expected_revision, current.revision);
           }
-          const generated = diagramToBoardItems(diagram, author ?? "ai");
+          // In append mode the existing ids are reserved so a second iteration
+          // that reuses `n1` or `diagram_frame` does not collide.
+          const generated = diagramToBoardItems(
+            diagram,
+            author ?? "ai",
+            diagram.replace ? [] : current.items.map((item) => item.id),
+          );
           const candidate = touchBoard({
             ...current,
             title: diagram.title ?? current.title,
