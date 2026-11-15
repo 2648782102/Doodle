@@ -4,6 +4,15 @@ All notable changes are documented here. Versions follow `VERSIONING.md`.
 
 ## Unreleased — Easier to reach
 
+### Changed
+
+- Doodle chrome now uses a liquid-glass material: a frosted pane with a bright inner top edge, a hairline outer ring, and a wide soft shadow, shared by the top bar, library drawer, welcome card, notification button, and Excalidraw's own toolbars. The canvas itself stays flat so drawing remains legible and panning stays cheap, and an opaque fallback keeps it usable where `backdrop-filter` is unsupported.
+
+### Fixed
+
+- Native Excalidraw islands follow Excalidraw's own surface tokens rather than the page theme. Doodle keeps Excalidraw on its light theme so board colours stay literal, so a dark page-tinted glass made the dark toolbar icons disappear.
+
+
 ### Fixed
 
 - Dark mode rendered board content almost invisibly. Three separate causes: ink was a hardcoded dark grey on a dark page, a frame's white fill became a glaring block, and Excalidraw's own dark theme inverted the colours a person had chosen. Ink and paper fills are now chosen per theme, text ink is chosen against the surface it actually sits on (dark ink inside a light card), and Excalidraw stays on its light theme so stored colours render literally while Doodle paints the dark page.

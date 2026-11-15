@@ -29,6 +29,19 @@
       --doodle-duration: 220ms;
       --doodle-drawer-width: 336px;
       --doodle-font: "Avenir Next", "PingFang SC", "Hiragino Sans GB", "Microsoft YaHei", sans-serif;
+
+      /* Liquid glass: a frosted pane with a bright top edge and a soft core.
+         Only Doodle chrome uses it; the canvas itself stays flat so drawing
+         stays legible and scrolling stays cheap. */
+      --glass-blur: 22px;
+      --glass-saturate: 180%;
+      --glass-bg: rgba(252, 253, 250, 0.62);
+      --glass-bg-strong: rgba(252, 253, 250, 0.78);
+      --glass-edge: rgba(255, 255, 255, 0.72);
+      --glass-edge-outer: rgba(30, 42, 38, 0.1);
+      --glass-highlight: rgba(255, 255, 255, 0.85);
+      --glass-shadow: 0 1px 1px rgba(24, 40, 34, 0.04), 0 10px 32px rgba(24, 40, 34, 0.12);
+      --glass-shadow-raised: 0 1px 1px rgba(24, 40, 34, 0.05), 0 18px 48px rgba(24, 40, 34, 0.18);
     }
     :root[data-doodle-theme="dark"] {
       color-scheme: dark;
@@ -46,6 +59,14 @@
       --doodle-canvas-bg: #131a18;
       --doodle-dot: rgba(143, 203, 180, 0.2);
       --doodle-shadow: 0 18px 44px rgba(0, 0, 0, 0.42);
+
+      --glass-bg: rgba(32, 40, 36, 0.58);
+      --glass-bg-strong: rgba(30, 38, 34, 0.76);
+      --glass-edge: rgba(255, 255, 255, 0.14);
+      --glass-edge-outer: rgba(0, 0, 0, 0.4);
+      --glass-highlight: rgba(255, 255, 255, 0.12);
+      --glass-shadow: 0 1px 1px rgba(0, 0, 0, 0.28), 0 12px 36px rgba(0, 0, 0, 0.4);
+      --glass-shadow-raised: 0 1px 1px rgba(0, 0, 0, 0.34), 0 22px 56px rgba(0, 0, 0, 0.5);
     }
     .excalidraw {
       --color-primary: #2f6b5c;
@@ -126,11 +147,71 @@
     body { overflow: hidden; background: var(--doodle-surface-solid); color: var(--doodle-ink); font-family: var(--doodle-font); }
     button, input { font: inherit; }
     button:focus-visible, input:focus-visible { outline: 2px solid var(--doodle-accent); outline-offset: 2px; }
+
+    /*
+     * One glass recipe, used by every Doodle surface.
+     *
+     * A backdrop blur alone looks like fog. The Apple material reads as glass
+     * because of three separate edges: a bright inner top edge (light catching
+     * the bevel), a hairline outer ring (the pane's thickness), and a wide soft
+     * shadow that lifts it off the page. `::before` paints the top highlight as
+     * a gradient rather than a border, so it fades instead of drawing a line.
+     */
+    .doodle-glass {
+      position: relative;
+      background: var(--glass-bg);
+      border: 1px solid var(--glass-edge-outer);
+      box-shadow: inset 0 1px 0 0 var(--glass-edge), inset 0 0 0 1px var(--glass-highlight), var(--glass-shadow);
+      -webkit-backdrop-filter: blur(var(--glass-blur)) saturate(var(--glass-saturate));
+      backdrop-filter: blur(var(--glass-blur)) saturate(var(--glass-saturate));
+    }
+    .doodle-glass::before {
+      content: "";
+      position: absolute;
+      inset: 0;
+      border-radius: inherit;
+      pointer-events: none;
+      background: linear-gradient(180deg, var(--glass-highlight) 0%, transparent 42%);
+      opacity: 0.7;
+    }
+    @supports not ((backdrop-filter: blur(1px)) or (-webkit-backdrop-filter: blur(1px))) {
+      .doodle-glass { background: var(--glass-bg-strong); }
+    }
     .excalidraw-host { height: 100%; position: relative; background-color: var(--doodle-canvas-bg); background-image: radial-gradient(circle, var(--doodle-dot) 1px, transparent 1px); background-size: 20px 20px; background-position: 10px 10px; }
     .excalidraw-host > .excalidraw { position: relative; background: transparent; }
     .excalidraw .App-menu_top { z-index: 4; }
-    .excalidraw .App-toolbar, .excalidraw .App-menu_bottom .Island, .excalidraw .layer-ui__wrapper__top-right .Island { border-radius: 12px; }
-    .doodle-topbar { position: fixed; top: 64px; left: 16px; z-index: 23; display: flex; gap: 2px; align-items: center; padding: 2px; border: 1px solid var(--doodle-border); border-radius: 10px; background: var(--doodle-surface); box-shadow: var(--doodle-shadow); backdrop-filter: blur(12px); transition: box-shadow var(--doodle-duration) var(--doodle-ease), border-color var(--doodle-duration) var(--doodle-ease), opacity var(--doodle-duration) var(--doodle-ease), visibility 0s linear; }
+    /*
+     * Native Excalidraw islands get the same material so the shell reads as one
+     * surface. Their background variables are remapped rather than filtered, so
+     * icons keep their contrast.
+     */
+    /*
+     * Only the chrome islands become glass. `.Island` is also used for tool
+     * popovers and dialogs, where a translucent background would put controls
+     * over their own content; those keep the opaque surface colour.
+     */
+    /*
+     * Native islands follow Excalidraw's own theme, not the user's page theme.
+     * Doodle keeps Excalidraw on `light` so board colours stay literal, which
+     * means its icons are dark ink. Tinting these islands with the dark page
+     * glass made icons vanish, so they reuse Excalidraw's surface tokens.
+     */
+    .excalidraw .App-toolbar,
+    .excalidraw .App-menu_bottom .Island,
+    .excalidraw .layer-ui__wrapper__top-right .Island,
+    .excalidraw .FixedSideContainer_side_top > .Island {
+      background-color: color-mix(in srgb, var(--island-bg-color) 72%, transparent) !important;
+      box-shadow: inset 0 1px 0 0 var(--glass-edge), inset 0 0 0 1px var(--glass-highlight), var(--glass-shadow) !important;
+      -webkit-backdrop-filter: blur(var(--glass-blur)) saturate(var(--glass-saturate));
+      backdrop-filter: blur(var(--glass-blur)) saturate(var(--glass-saturate));
+    }
+    .excalidraw .App-toolbar, .excalidraw .App-menu_bottom .Island, .excalidraw .layer-ui__wrapper__top-right .Island { border-radius: 14px; }
+    @supports not ((backdrop-filter: blur(1px)) or (-webkit-backdrop-filter: blur(1px))) {
+      .excalidraw .App-toolbar,
+      .excalidraw .App-menu_bottom .Island,
+      .excalidraw .layer-ui__wrapper__top-right .Island { background-color: var(--island-bg-color) !important; }
+    }
+    .doodle-topbar { position: fixed; top: 64px; left: 16px; z-index: 23; display: flex; gap: 2px; align-items: center; padding: 3px; border-radius: 14px; transition: box-shadow var(--doodle-duration) var(--doodle-ease), opacity var(--doodle-duration) var(--doodle-ease), visibility 0s linear; }
     .doodle-topbar:has(#doodleLibraryToggle[aria-expanded="true"]) { border-color: var(--doodle-border-strong); }
     body.doodle-drawer-open .doodle-topbar { opacity: 0; visibility: hidden; pointer-events: none; transition: opacity var(--doodle-duration) var(--doodle-ease), visibility 0s linear var(--doodle-duration); }
     body:has(.excalidraw .dropdown-menu) .doodle-topbar,
@@ -143,10 +224,10 @@
     .doodle-tool-primary:hover { color: var(--doodle-accent-ink); filter: brightness(1.05); }
     .doodle-tool-icon { width: 30px; padding: 0; font-size: 14px; }
     #doodleThemeToggle:hover { color: var(--doodle-accent); background: var(--doodle-accent-soft); }
-    .doodle-notify-agent { position: fixed; right: 14px; bottom: 14px; z-index: 20; height: 36px; padding: 0 14px; border: 1px solid transparent; border-radius: 18px; background: var(--doodle-accent); color: var(--doodle-accent-ink); cursor: pointer; font-size: 12px; box-shadow: var(--doodle-shadow); }
+    .doodle-notify-agent { position: fixed; right: 14px; bottom: 14px; z-index: 20; height: 36px; padding: 0 16px; border-radius: 18px; color: var(--doodle-accent-ink); background: var(--doodle-accent); cursor: pointer; font-size: 12px; }
     .doodle-notify-agent:hover { filter: brightness(1.05); }
     .doodle-notify-agent[hidden] { display: none; }
-    .doodle-library-panel { position: fixed; top: 64px; left: 0; bottom: 0; z-index: 22; display: flex; flex-direction: column; gap: 10px; width: min(var(--doodle-drawer-width), calc(100vw - 16px)); overflow: hidden; padding: 16px; border-right: 1px solid var(--doodle-border); background: var(--doodle-panel); box-shadow: var(--doodle-shadow); backdrop-filter: blur(16px); transform-origin: left center; opacity: 0; transform: translateX(-100%); visibility: hidden; pointer-events: none; transition: opacity var(--doodle-duration) var(--doodle-ease), transform var(--doodle-duration) var(--doodle-ease), visibility 0s linear var(--doodle-duration); }
+    .doodle-library-panel { position: fixed; top: 64px; left: 0; bottom: 0; z-index: 22; display: flex; flex-direction: column; gap: 10px; width: min(var(--doodle-drawer-width), calc(100vw - 16px)); overflow: hidden; padding: 16px; border-right: 1px solid var(--glass-edge-outer); background: var(--glass-bg-strong); box-shadow: inset 0 1px 0 0 var(--glass-edge), var(--glass-shadow-raised); -webkit-backdrop-filter: blur(28px) saturate(var(--glass-saturate)); backdrop-filter: blur(28px) saturate(var(--glass-saturate)); transform-origin: left center; opacity: 0; transform: translateX(-100%); visibility: hidden; pointer-events: none; transition: opacity var(--doodle-duration) var(--doodle-ease), transform var(--doodle-duration) var(--doodle-ease), visibility 0s linear var(--doodle-duration); }
     .doodle-library-panel.is-open { opacity: 1; transform: translateX(0); visibility: visible; pointer-events: auto; transition: opacity var(--doodle-duration) var(--doodle-ease), transform var(--doodle-duration) var(--doodle-ease), visibility 0s linear 0s; }
     .doodle-drawer-scrim { position: fixed; inset: 0; z-index: 21; background: rgba(12, 18, 26, 0.24); opacity: 0; visibility: hidden; pointer-events: none; transition: opacity var(--doodle-duration) var(--doodle-ease), visibility 0s linear var(--doodle-duration); }
     body.doodle-drawer-open .doodle-drawer-scrim { opacity: 1; visibility: visible; pointer-events: auto; transition: opacity var(--doodle-duration) var(--doodle-ease), visibility 0s linear 0s; }
@@ -179,7 +260,7 @@
     .excalidraw .HelpDialog__header { display: none; }
     .excalidraw .dropdown-menu .dropdown-menu-group[data-doodle-hidden="true"] { display: none; }
     .excalidraw [data-doodle-hidden="true"] { display: none !important; }
-    .doodle-welcome { position: fixed; left: 50%; bottom: 132px; z-index: 24; width: min(520px, calc(100vw - 32px)); transform: translateX(-50%); display: grid; gap: 10px; padding: 16px 18px; border: 1px solid var(--doodle-border); border-radius: 14px; background: var(--doodle-panel); box-shadow: var(--doodle-shadow); backdrop-filter: blur(16px); animation: doodle-welcome-in var(--doodle-duration) var(--doodle-ease); }
+    .doodle-welcome { position: fixed; left: 50%; bottom: 132px; z-index: 24; width: min(520px, calc(100vw - 32px)); transform: translateX(-50%); display: grid; gap: 10px; padding: 18px 20px; border-radius: 20px; animation: doodle-welcome-in var(--doodle-duration) var(--doodle-ease); }
     .doodle-welcome[hidden] { display: none; }
     .doodle-welcome h2 { margin: 0; font-size: 14px; font-weight: 650; letter-spacing: 0.01em; }
     .doodle-welcome p { margin: 0; color: var(--doodle-muted); font-size: 12px; line-height: 1.6; }
@@ -206,12 +287,12 @@
 </head>
 <body>
   <div id="excalidrawRoot"></div>
-  <div class="doodle-topbar" role="toolbar" aria-label="Doodle 画板控制">
+  <div class="doodle-topbar doodle-glass" role="toolbar" aria-label="Doodle 画板控制">
     <button class="doodle-tool" id="doodleLibraryToggle" aria-expanded="false" aria-controls="doodleLibraryPanel">图库</button>
     <button class="doodle-tool doodle-tool-icon" id="doodleThemeToggle" aria-label="切换深色主题" title="切换明暗主题">◐</button>
   </div>
-  <button class="doodle-notify-agent" id="doodleNotifyAgent" hidden>通知 Agent</button>
-  <section class="doodle-welcome" id="doodleWelcome" hidden aria-label="开始使用画板">
+  <button class="doodle-notify-agent doodle-glass" id="doodleNotifyAgent" hidden>通知 Agent</button>
+  <section class="doodle-welcome doodle-glass" id="doodleWelcome" hidden aria-label="开始使用画板">
     <h2>这是一张空画板</h2>
     <p>不用配置，直接开始画。和 AI 一起用时，它会读写同一张画板。</p>
     <dl>
