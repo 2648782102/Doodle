@@ -62,6 +62,13 @@ const currentFiles: { current: Record<string, ExcalidrawFileData> } = { current:
 const currentAppState: { current: ExcalidrawAppState } = { current: {} };
 const pendingRemote: { current: BoardSnapshot | null } = { current: null };
 const pendingTimer: { current: number | null } = { current: null };
+/**
+ * Excalidraw fires `onChange` while it is still mounting, before the scene we
+ * passed in has been applied. Writing that empty scene back would erase a board
+ * that loaded fine a moment earlier, so the first real scene has to arrive
+ * before any change is treated as a human edit.
+ */
+const sceneReady = { current: false };
 let selectedBoardId = "";
 
 type DoodleTheme = "light" | "dark";
@@ -189,6 +196,7 @@ function applyRemoteSnapshot(data: BoardSnapshot, refreshFiles = true) {
   }
   activeSnapshot = data;
   applyingRemote.current = true;
+  sceneReady.current = true;
   const files = refreshFiles ? toFiles(data) : [];
   if (refreshFiles) {
     currentFiles.current = Object.fromEntries(files.map((file) => [file.id, file]));
@@ -610,6 +618,12 @@ function CanvasApp({ initial }: { initial: BoardSnapshot }) {
     currentAppState.current = appState;
     Object.assign(currentFiles.current, files);
     if (!api || applyingRemote.current || !activeSnapshot) return;
+    // Ignore the mount-time callback: the canvas has not applied the initial
+    // scene yet, so an empty element list here is not a human edit.
+    if (!sceneReady.current) {
+      if (elements.length === 0 || elements.length < activeSnapshot.items.length) return;
+      sceneReady.current = true;
+    }
     if (isEditing(appState)) return;
     if (pendingRemote.current) {
       applyRemoteSnapshot(pendingRemote.current);
