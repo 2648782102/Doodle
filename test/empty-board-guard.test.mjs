@@ -1,5 +1,9 @@
 import { describe, expect, it } from "vitest";
+import { mkdtemp, readdir, readFile, writeFile } from "node:fs/promises";
+import { tmpdir } from "node:os";
+import path from "node:path";
 import { isSuspiciousEmptyWrite } from "../dist/board/store.js";
+import { BoardStore } from "../dist/board/store.js";
 
 function board(items) {
   return {
@@ -44,5 +48,28 @@ describe("empty board write guard", () => {
 
   it("does not treat a first write as suspicious", () => {
     expect(isSuspiciousEmptyWrite(undefined, board([]))).toBe(false);
+  });
+});
+
+describe("corrupt board state recovery", () => {
+  it("starts from an empty board and preserves the damaged file", async () => {
+    // A crash mid-write or a manual edit can leave invalid JSON. Throwing here
+    // failed init(), so the plugin registered no tools at all.
+    const dir = await mkdtemp(path.join(tmpdir(), "doodle-corrupt-test-"));
+    const first = new BoardStore(dir);
+    await first.init();
+    const statePath = path.join(dir, ".doodle", "board.json");
+    await writeFile(statePath, "{ not json", "utf8");
+
+    const second = new BoardStore(dir);
+    await expect(second.init()).resolves.toBeUndefined();
+    expect(second.get().items).toHaveLength(0);
+
+    const files = await readdir(path.join(dir, ".doodle"));
+    const backup = files.find((name) => name.includes("board.json.corrupt-"));
+    expect(backup).toBeDefined();
+    expect(await readFile(path.join(dir, ".doodle", backup), "utf8")).toBe("{ not json");
+    // The live file is a valid empty board again.
+    expect(JSON.parse(await readFile(statePath, "utf8")).items).toEqual([]);
   });
 });

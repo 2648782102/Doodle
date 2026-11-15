@@ -96,6 +96,14 @@ check(await exists("scripts/open-board.mjs") && packageJson.scripts.doodle === "
 check(excalidrawTemplate.includes('id="doodleWelcome"') && excalidrawApp.includes("WELCOME_STORAGE_KEY") && excalidrawApp.includes("initWelcome"), "the first-run board guidance is missing or not dismissible");
 check((await read("src/board/viewport-memory.ts")).includes("isViewportNearContent") && excalidrawApp.includes("readStoredViewport"), "the canvas no longer remembers a sane viewport per board");
 check(tools.includes("isSuspiciousEmptyWrite") || http.includes("isSuspiciousEmptyWrite"), "writes are not guarded against accidentally clearing a full board");
+check(
+  (http.match(/isSuspiciousEmptyWrite\(/g) ?? []).length >= 2 &&
+  http.includes("EmptyWriteRefusedError"),
+  "the empty-write guard only runs on the revision-checked path",
+);
+check((await read("src/board/store.ts")).includes("quarantineCorruptState"), "a corrupt board file still prevents startup");
+check((await read("src/board/types.ts")).includes("Item coordinates must be within") && !(await read("src/board/types.ts")).includes("Math.min(MAX_SHAPE_WIDTH, input.w ?? 180)"), "drawing input is silently clamped instead of rejected");
+check(http.includes("this.revisions?.remember(board)") && (await read("src/server.ts")).includes("new BoardHttpServer(board, config, revisions)"), "browser writes are not recorded in the shared revision cache");
 check(troubleshooting.includes("npm run preview:board") && troubleshooting.includes("current MCP server process"), "troubleshooting does not explain PANEL_URL lifetime");
 check(packageJson.scripts.check.includes("setup:codex -- --dry-run"), "npm check does not dry-run the Codex setup");
 check(ci.includes("npm run repo:plugin-check"), "CI does not run the plugin guard");

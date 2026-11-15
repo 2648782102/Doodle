@@ -5,6 +5,7 @@ import path from "node:path";
 import WebSocket from "ws";
 import { afterAll, describe, expect, it } from "vitest";
 import { BoardHttpServer } from "../dist/board/http.js";
+import { BoardRevisionCache } from "../dist/board/revision-cache.js";
 import { BoardStore } from "../dist/board/store.js";
 import { addBoardItem } from "../dist/board/types.js";
 
@@ -24,13 +25,14 @@ const port = await freePort();
 const base = `http://127.0.0.1:${port}`;
 const board = new BoardStore(path.join(tempDir, "output"));
 await board.init();
+const revisions = new BoardRevisionCache();
 const preview = new BoardHttpServer(board, {
   previewHost: "127.0.0.1",
   previewPort: port,
   outputDir: path.join(tempDir, "output"),
   workspaceRoot: tempDir,
   cwd: tempDir,
-});
+}, revisions);
 await preview.start();
 
 afterAll(async () => {
@@ -242,6 +244,24 @@ describe("board HTTP surface", () => {
     });
     expect(cleared.status).toBe(409);
     expect(await cleared.text()).toContain("Refusing to clear");
+
+    // The guard must not depend on an optional header. A client that does not
+    // track revisions (a stale canvas after reload) used to bypass it entirely
+    // and erase the board.
+    const clearedWithoutHeader = await fetch(`${base}/api/board/replace`, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        "X-AI-Draw-Token": token,
+      },
+      body: JSON.stringify({
+        confirmedBy: "human",
+        board: { ...seeded, revision: revision + 2, items: [] },
+      }),
+    });
+    expect(clearedWithoutHeader.status).toBe(409);
+    expect(await clearedWithoutHeader.text()).toContain("Refusing to clear");
+
     const intact = await fetch(`${base}/api/board`).then((response) => response.json());
     expect(intact.items.some((entry) => entry.text === "keep me")).toBe(true);
 
@@ -272,6 +292,31 @@ describe("board HTTP surface", () => {
     preview.broadcast({ type: "board_updated", revision: next.revision });
     expect(await update).toMatchObject({ type: "board_updated", revision: next.revision });
     socket.close();
+  });
+
+  it("records browser writes in the shared revision cache", async () => {
+    // A person drawing in the canvas writes over HTTP. `get_board` then asks
+    // for `since_revision`, and without this the cache had never seen the
+    // revision, so the delta path silently degraded to a full board on exactly
+    // the edits it should describe.
+    const html = await fetch(base).then((response) => response.text());
+    const token = html.match(/const PANEL_TOKEN = "([^"]+)"/)?.[1];
+    const current = await board.snapshot();
+    const created = await fetch(`${base}/api/board/items`, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        "X-AI-Draw-Token": token,
+        "If-Match-Revision": String(current.revision),
+      },
+      body: JSON.stringify({
+        confirmedBy: "human",
+        item: { type: "text", x: 10, y: 10, w: 120, h: 24, text: "from browser" },
+      }),
+    }).then((response) => response.json());
+
+    expect(revisions.get(created.board.revision)).toBeDefined();
+    expect(revisions.get(created.board.revision).items.some((item) => item.text === "from browser")).toBe(true);
   });
 
   it("exposes read-only project context without project writes", async () => {

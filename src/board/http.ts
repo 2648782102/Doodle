@@ -25,8 +25,9 @@ import {
   type DiagramInput,
   type SimpleBoard,
 } from "./types.js";
-import { BoardRevisionConflictError } from "./errors.js";
+import { BoardRevisionConflictError, EmptyWriteRefusedError } from "./errors.js";
 import { BoardLibrary, boardLibraryIndexText, type BoardLibraryAction } from "./library.js";
+import type { BoardRevisionCache } from "./revision-cache.js";
 import { isSuspiciousEmptyWrite, type BoardStore } from "./store.js";
 import { projectSnapshotText, scanProject, type ProjectScanOptions } from "./project-scan.js";
 
@@ -86,6 +87,13 @@ export class BoardHttpServer {
   constructor(
     private board: BoardStore,
     private config: AppConfig,
+    /**
+     * Shared with the MCP tools so a browser edit is visible to the next
+     * `get_board(since_revision)`. Without it every HTTP write produced a
+     * revision the cache had never seen, so the delta path fell back to a full
+     * board on exactly the edits a person just made.
+     */
+    private revisions?: BoardRevisionCache,
   ) {
     this.app.use(express.json({ limit: "2mb" }));
     this.library = new BoardLibrary(config.outputDir);
@@ -125,6 +133,7 @@ export class BoardHttpServer {
           : { ...result.board, revision: current.revision + 1 }, current.revision);
         result.board = next;
       }
+      this.revisions?.remember(result.board);
       this.broadcast({ type: "board_library_updated", activeId: result.index.activeId, revision: result.board.revision });
       res.json({
         ok: true,
@@ -141,8 +150,23 @@ export class BoardHttpServer {
       let board: Awaited<ReturnType<BoardStore["snapshot"]>>;
       try {
         const revisionHeader = res.req.header("If-Match-Revision");
+        /*
+         * The empty-write guard must not depend on an optional header.
+         *
+         * The guarded path only ran when `If-Match-Revision` was present, so a
+         * client that omitted the header (every caller that does not track
+         * revisions, including a stale canvas after a reload) could replace a
+         * full board with zero items and erase it. Both paths now compute the
+         * candidate first, refuse a suspicious clear, then persist.
+         */
         if (revisionHeader === undefined) {
-          board = await this.board.mutate(change);
+          board = await this.board.mutate((current) => {
+            const candidate = change(current);
+            if (isSuspiciousEmptyWrite(current, candidate)) {
+              throw new EmptyWriteRefusedError();
+            }
+            return candidate;
+          });
         } else {
           const expectedRevision = Number(revisionHeader);
           if (!Number.isInteger(expectedRevision) || expectedRevision < 0) {
@@ -155,12 +179,15 @@ export class BoardHttpServer {
           const candidate = change(current);
           // A client bug must not look like a deliberate clear.
           if (isSuspiciousEmptyWrite(current, candidate)) {
-            return res.status(409).json({ error: "Refusing to clear every object from the board; send an explicit delete instead" });
+            throw new EmptyWriteRefusedError();
           }
           board = await this.board.replaceIfRevision(candidate, expectedRevision);
         }
       } catch (error) {
         const message = error instanceof Error ? error.message : String(error);
+        if (error instanceof EmptyWriteRefusedError) {
+          return res.status(409).json({ error: "Refusing to clear every object from the board; send an explicit delete instead" });
+        }
         if (error instanceof BoardRevisionConflictError) return res.status(409).json({ error: message });
         if (message.toLowerCase().includes("timed out waiting")) return res.status(503).json({ error: message });
         if ((error as NodeJS.ErrnoException).code) {
@@ -170,6 +197,7 @@ export class BoardHttpServer {
         return res.status(400).json({ error: message });
       }
       this.broadcast({ type: "board_updated", revision: board.revision });
+      this.revisions?.remember(board);
       return res.json({ ok: true, board: canvasSnapshot(board) });
     };
 

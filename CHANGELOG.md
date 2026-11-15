@@ -26,6 +26,10 @@ All notable changes are documented here. Versions follow `VERSIONING.md`.
   - appending a diagram whose generated ids already exist (`n1`, `diagram_frame`) suffixes them and rewrites the connector bindings, instead of failing the whole call with `Duplicate board item ID`.
 - `diagram.nodes[].row` now accepts 0-47 to match the 48-node limit; it was capped at 12, so a 17-step timeline was rejected. Nodes that carry only a `row` continue the last explicit column instead of being pushed into a second column.
 - Added `docs/DIAGRAM_GUIDE.md` with the field table (`label` not `title`, `author` at the top level), the verified `replace` semantics, layout limits, and when hand-placed coordinates are the better choice.
+- The empty-board guard no longer depends on an optional header. It previously ran only when `If-Match-Revision` was present, so a client that does not track revisions — a stale canvas after reload — could replace a full board with zero items and erase it. Both commit paths now build the candidate first and refuse a suspicious clear with 409.
+- A corrupt `board.json` no longer prevents the MCP server from starting. Invalid JSON threw out of `init()`, the plugin registered zero tools, and the board could not be recovered from the app. The damaged file is now moved to `board.json.corrupt-<timestamp>`, an empty board is created, and the reason is logged on stderr.
+- Out-of-range drawing input is rejected instead of clamped. Coordinates, sizes, line deltas, text length, colour, and author were previously coerced to a default or a bound and then reported as success, so a caller asking for `x: 999999` silently got `x: 100000` and a 99999-wide box came back 2000 wide. Missing values still get defaults; invalid explicit values now raise a descriptive error.
+- Browser edits are recorded in the shared revision cache. `BoardHttpServer` never wrote to it, so a canvas edit produced a revision `get_board(since_revision)` had never seen and the delta path degraded to a full board on exactly the changes a person had just made.
 
 ### Fixed
 

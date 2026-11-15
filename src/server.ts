@@ -21,7 +21,7 @@ export async function createServer() {
   await board.init();
   const library = new BoardLibrary(config.outputDir);
   const revisions = new BoardRevisionCache();
-  const preview = new BoardHttpServer(board, config);
+  const preview = new BoardHttpServer(board, config, revisions);
   const mcp = new McpServer(
     { name: "doodle-mcp", version: SERVER_VERSION },
     { instructions: MCP_INSTRUCTIONS },

@@ -97,6 +97,10 @@ docs/                           product, architecture, decisions, and maintenanc
 - Every MCP tool registers explicit `readOnlyHint`, `destructiveHint`, and `openWorldHint` annotations. `draw_board` is destructive because it can remove or overwrite objects.
 - `SimpleBoard` is version 1. Extended optional object fields are backward-compatible version 1 additions; any required or incompatible state change still requires compatibility tests and synchronized docs/guards.
 - The server version comes from `package.json`; do not hard-code it in `src/server.ts`.
+- The empty-write guard belongs in both commit paths. `BoardHttpServer.commit` must build the candidate before persisting whether or not `If-Match-Revision` is present; guarding only the revision-checked branch let a stale canvas erase a full board.
+- A corrupt board file must not fail startup. `BoardStore.init` quarantines it as `board.json.corrupt-<timestamp>` and starts empty with a stderr message, because throwing there leaves the plugin with zero registered tools.
+- Invalid drawing input is rejected, not clamped. `normalizeItem` fills defaults for omitted fields but raises a descriptive error for explicit out-of-range coordinates, oversize shapes, oversized line deltas, overlong text, invalid colour, and invalid author. Silent coercion made the persisted board disagree with what the caller asked for.
+- `BoardRevisionCache` is shared between the MCP tools and `BoardHttpServer`. Every successful write on either surface must call `revisions.remember(board)`, otherwise `get_board(since_revision)` degrades to a full read for browser edits.
 - The preview server binds to `127.0.0.1` by default. `PREVIEW_PORT` selects a fixed port; when unset or `0`, the server binds to a free loopback port and `get_board` reports it as `PANEL_URL`.
 - Normal startup connects MCP stdio before starting the local HTTP preview. Preview startup failure is logged on stderr and does not disable the MCP tools.
 - Non-GET `/api/board/*` requests require the random HTML-injected `X-AI-Draw-Token` and `confirmedBy: "human"`.

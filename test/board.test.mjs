@@ -386,6 +386,41 @@ describe("simple shared board", () => {
       await fs.rm(outputDir, { recursive: true, force: true });
     }
   });
+
+  it("rejects out-of-range input instead of silently clamping it", () => {
+    // Clamping moved x=999999 to x=100000 and shrank a 99999-wide box to 2000,
+    // then reported success, so the caller's coordinates never matched what
+    // landed on the board.
+    const base = createEmptyBoard();
+
+    expect(() => addBoardItems(base, [
+      { type: "rect", x: 999999, y: 0, w: 200, h: 100, text: "far" },
+    ])).toThrow(/coordinates must be within/);
+
+    expect(() => addBoardItems(base, [
+      { type: "rect", x: 10, y: 10, w: 99999, h: 100, text: "wide" },
+    ])).toThrow(/size must not exceed/);
+
+    expect(() => addBoardItems(base, [
+      { type: "text", x: 10, y: 10, w: 100, h: 24, text: "x".repeat(2000) },
+    ])).toThrow(/text must not exceed/);
+
+    expect(() => addBoardItems(base, [
+      { type: "rect", x: 10, y: 10, w: 100, h: 100, text: "a", color: "red" },
+    ])).toThrow(/color must be a six-digit hex/);
+
+    expect(() => addBoardItems(base, [
+      { type: "rect", x: 10, y: 10, w: 100, h: 100, text: "a", author: "me" },
+    ])).toThrow(/author must be human or ai/);
+  });
+
+  it("still fills defaults for omitted fields", () => {
+    // Only missing values get defaults; explicit nonsense must fail.
+    const board = addBoardItems(createEmptyBoard(), [
+      { type: "rect", x: 10, y: 10, text: "defaults" },
+    ]);
+    expect(board.items[0]).toMatchObject({ w: 180, h: 120, author: "human" });
+  });
 });
 
 describe("read-only project scan", () => {

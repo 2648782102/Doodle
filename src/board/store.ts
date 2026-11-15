@@ -2,6 +2,7 @@ import fs from "node:fs/promises";
 import path from "node:path";
 import { BoardRevisionConflictError } from "./errors.js";
 import { AsyncMutex } from "./mutex.js";
+import { logger } from "../infra/logger.js";
 import { createEmptyBoard, parseBoard, touchBoard, type SimpleBoard } from "./types.js";
 
 /**
@@ -44,7 +45,21 @@ export class BoardStore {
         this.assign(current);
       } catch (error) {
         if (!isMissingFile(error)) {
-          throw new Error(`Failed to read simple board: ${error instanceof Error ? error.message : String(error)}`);
+          /*
+           * A corrupt board file must not brick the MCP server.
+           *
+           * Board state is local and single-writer, but a crash mid-write, a
+           * manual edit, or a disk problem can leave invalid JSON. Throwing here
+           * failed `init()` and the plugin never registered any tools, so the
+           * user saw "no tools" instead of a recoverable board. Preserve the
+           * damaged file for inspection, start from an empty board, and say so
+           * on stderr. `parseBoard` still guards every write after this.
+           */
+          const backup = await this.quarantineCorruptState();
+          logger.error(
+            `Board state was unreadable (${error instanceof Error ? error.message : String(error)}); `
+            + `started from an empty board. Damaged file preserved at ${backup}.`,
+          );
         }
         this.board = createEmptyBoard();
         this.revision = 0;
@@ -52,6 +67,20 @@ export class BoardStore {
       }
       await this.migrateLegacyState();
     });
+  }
+
+  /** Move an unreadable state file aside so it is never silently overwritten. */
+  private async quarantineCorruptState(): Promise<string> {
+    const stamp = new Date().toISOString().replace(/[:.]/g, "-");
+    const source = await fs.access(this.file).then(() => this.file, () => this.legacyFile);
+    const backup = `${source}.corrupt-${stamp}`;
+    try {
+      await fs.rename(source, backup);
+      return backup;
+    } catch (error) {
+      if (isMissingFile(error)) return `${backup} (source already missing)`;
+      throw error;
+    }
   }
 
   get(): SimpleBoard {

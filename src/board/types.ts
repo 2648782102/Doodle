@@ -669,6 +669,20 @@ function normalizeItem(input: BoardItemInput): Omit<BoardItem, "createdAt" | "up
   if (!input || typeof input !== "object") throw new Error("Invalid item input");
   if (!ITEM_TYPES.includes(input.type)) throw new Error("Unknown item type");
   if (![input.x, input.y].every(isFiniteNumber)) throw new Error("Item coordinates must be finite");
+  /*
+   * Reject out-of-range input instead of clamping it.
+   *
+   * Clamping silently moved a shape from x=999999 to x=100000 and shrank a
+   * 99999-wide box to 2000, then reported success. A caller that asked for a
+   * specific position has no way to notice its drawing landed somewhere else,
+   * and the next `get_board` looks like the tool ignored the request. Explicit
+   * bounds keep the caller's coordinates and its expectations in sync; only
+   * *defaults* (an omitted w/h) are filled in.
+   */
+  if (input.x < -MAX_COORDINATE || input.x > MAX_COORDINATE
+    || input.y < -MAX_COORDINATE || input.y > MAX_COORDINATE) {
+    throw new Error(`Item coordinates must be within ±${MAX_COORDINATE}`);
+  }
   if (input.w !== undefined && !isFiniteNumber(input.w)) throw new Error("Item width must be finite");
   if (input.h !== undefined && !isFiniteNumber(input.h)) throw new Error("Item height must be finite");
   if (input.type === "line") {
@@ -679,21 +693,34 @@ function normalizeItem(input: BoardItemInput): Omit<BoardItem, "createdAt" | "up
     if (input.h !== undefined && !isFiniteNumber(input.h)) throw new Error("Line height must be finite");
   }
   const width = input.type === "line" ? 1
-    : input.type === "stroke" ? Math.max(MIN_STROKE_SPAN, Math.min(MAX_SHAPE_WIDTH, input.w ?? 1))
-      : Math.max(MIN_SHAPE_SIZE, Math.min(MAX_SHAPE_WIDTH, input.w ?? 180));
+    : input.type === "stroke" ? Math.max(MIN_STROKE_SPAN, input.w ?? 1)
+      : Math.max(MIN_SHAPE_SIZE, input.w ?? 180);
   const height = input.type === "line" ? 1
-    : input.type === "stroke" ? Math.max(MIN_STROKE_SPAN, Math.min(MAX_SHAPE_HEIGHT, input.h ?? 1))
-      : Math.max(MIN_SHAPE_SIZE, Math.min(MAX_SHAPE_HEIGHT, input.h ?? 120));
+    : input.type === "stroke" ? Math.max(MIN_STROKE_SPAN, input.h ?? 1)
+      : Math.max(MIN_SHAPE_SIZE, input.h ?? 120);
+  if (input.type !== "line" && (width > MAX_SHAPE_WIDTH || height > MAX_SHAPE_HEIGHT)) {
+    throw new Error(`Item size must not exceed ${MAX_SHAPE_WIDTH}×${MAX_SHAPE_HEIGHT}`);
+  }
   const signedWidth = input.w !== undefined
-    ? (input.type === "line" ? Math.max(-MAX_LINE_DELTA_X, Math.min(MAX_LINE_DELTA_X, input.w)) : width)
+    ? (input.type === "line" ? input.w : width)
     : (input.type === "line" ? 0 : width);
   const signedHeight = input.h !== undefined
-    ? (input.type === "line" ? Math.max(-MAX_LINE_DELTA_Y, Math.min(MAX_LINE_DELTA_Y, input.h)) : height)
+    ? (input.type === "line" ? input.h : height)
     : (input.type === "line" ? 0 : height);
+  if (input.type === "line"
+    && (Math.abs(signedWidth) > MAX_LINE_DELTA_X || Math.abs(signedHeight) > MAX_LINE_DELTA_Y)) {
+    throw new Error(`Line endpoint delta must not exceed ${MAX_LINE_DELTA_X}×${MAX_LINE_DELTA_Y}`);
+  }
   const text = (input.text ?? "").slice(0, MAX_TEXT);
-  if (text.length > MAX_TEXT) throw new Error("Item text is too long");
-  const color = input.color && /^#[0-9a-fA-F]{6}$/.test(input.color) ? input.color : COLORS[0];
-  const author = isAuthor(input.author) ? input.author : "human";
+  if ((input.text ?? "").length > MAX_TEXT) throw new Error(`Item text must not exceed ${MAX_TEXT} characters`);
+  if (input.color !== undefined && !/^#[0-9a-fA-F]{6}$/.test(input.color)) {
+    throw new Error("Item color must be a six-digit hex value like #f6d365");
+  }
+  const color = input.color ?? COLORS[0];
+  if (input.author !== undefined && !isAuthor(input.author)) {
+    throw new Error("Item author must be human or ai");
+  }
+  const author = input.author ?? "human";
   if (input.type === "line" && signedWidth === 0 && signedHeight === 0) throw new Error("Line needs a direction");
   if (input.type === "image" && !isImageSource(input.src)) throw new Error("Image source is required");
   if (input.type === "line" && input.shape !== undefined && !isLineShape(input.shape)) throw new Error("Invalid line shape");
