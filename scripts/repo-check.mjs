@@ -111,7 +111,7 @@ check(releasing.includes("publish workflow") && !releasing.includes("does not cr
 check(releasing.includes("npm stage approve") && releasing.includes("npm view doodle-mcp@<version> version"), "releasing guide does not describe the npm 2FA and version verification gates");
 check(experienceAudit.includes("| E12 | P1 | fixed |") && experienceAudit.includes("doodle-mcp@0.6.3"), "experience audit does not record the closed npm publication");
 check(experienceAudit.includes("| E13 | P0 | fixed |") && experienceAudit.includes("final-state delta"), "experience audit does not record host model context sync");
-check(experienceAudit.includes("| E15 | P1 | external |") && experienceAudit.includes("npm `latest`"), "experience audit does not record the npm publication gate");
+check(experienceAudit.includes("| E15 | P1 | fixed |") && experienceAudit.includes("npm `latest`") && experienceAudit.includes("dist-tags.latest"), "experience audit does not record the closed npm publication gate");
 check(experienceAudit.includes("| E19 | P1 | fixed |") && experienceAudit.includes("terminal-owned preview command"), "experience audit does not record PANEL_URL lifecycle clarification");
 check(!readme.includes("尚未更新") && !readmeEn.includes("until `npm view doodle-mcp version`"), "READMEs still warn about a resolved npm version gap");
 check(gitignore.includes(".doodle-plugin/") && gitignore.includes(".doodle-data/") && gitignore.includes("doodle-plugin-submission/"), "generated plugin output, data, or submission ZIP is not ignored");
@@ -122,6 +122,10 @@ check(
   (await read("test/mcp.test.mjs")).includes("function freePort()")
     && !/withClient(In)?\(\s*(outputDir\s*,\s*)?\d{4,5}\b/.test(await read("test/mcp.test.mjs")),
   "MCP tests pin a preview port instead of asking the OS for a free one, so parallel checkouts collide",
+);
+check(
+  !/PREVIEW_PORT:\s*"[1-9]\d*"/.test(await read("examples/board-client.mjs")),
+  "the board client example pins a preview port instead of asking the OS for a free one",
 );
 check(version.includes("__DOODLE_PLUGIN_VERSION__"), "bundled server cannot report the injected version");
 check(projectWorkspace.includes("CODEX_PROJECT_ROOT"), "plugin-safe workspace resolution is missing");

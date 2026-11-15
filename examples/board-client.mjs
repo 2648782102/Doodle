@@ -4,7 +4,9 @@ import { StdioClientTransport } from "@modelcontextprotocol/sdk/client/stdio.js"
 const transport = new StdioClientTransport({
   command: "node",
   args: ["dist/index.js"],
-  env: { ...process.env, PREVIEW_PORT: "3433", LOG_LEVEL: "error" },
+  // Let the OS pick the preview port, so running this example twice at once
+  // (or beside a test run) cannot collide on a fixed loopback port.
+  env: { ...process.env, PREVIEW_PORT: "0", LOG_LEVEL: "error" },
 });
 const client = new Client({ name: "doodle-board-example", version: "1.0.0" });
 
