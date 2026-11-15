@@ -158,6 +158,7 @@ check(tools.includes("function boardAgentPayload") && tools.includes("canvasFide
 check(tools.includes("since_revision") && tools.includes("boardAgentDelta") && tools.includes("BoardRevisionCache"), "incremental rereads or their revision cache are missing");
 check(tools.includes("include_canvas_fidelity") && excalidrawApp.includes("include_canvas_fidelity: true"), "the canvas cannot request the fidelity that agent reads omit");
 check(tools.includes("describeHandoff") && tools.includes("handoff") && tools.includes("needsAttention"), "delta reads do not attribute human edits");
+check((await read("src/board/handoff.ts")).includes("HANDOFF_READINGS") === false && (await read("src/board/handoff.ts")).includes("readings") && tools.includes("HANDOFF_READINGS"), "handoff no longer explains what the human change means");
 check(buildScript.includes("excalidraw-app.tsx"), "build is missing the canvas client");
 check(tools.includes("guideSent") && tools.includes("include_guide"), "the guide is not sent once with an explicit opt-in");
 check(tools.includes("boardCapabilities()") && tools.includes("visualDigest: boardVisualDigest(board)") && tools.includes("boardRecipes()"), "board tools lost AI visual language");

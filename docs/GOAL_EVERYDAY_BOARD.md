@@ -134,3 +134,17 @@ proves the objects survive.
 **Gesture audit.** Checked the four high-frequency paths in the real canvas:
 note creation, shape drag, arrow drag, and freehand ink. The one defect found was
 the restored camera stranding the view; it is fixed above.
+
+
+### 2026-11-15 — the agent reads intent, not diffs
+
+Field-level deltas answer "what changed" but not "what did the person mean",
+so the agent still has to guess before responding. `HANDOFF` now carries
+`HANDOFF_READINGS`: one line per human change, classified as a relabel, a move,
+a resize, a restyle, an addition, or a removal, each with a bounded suggestion.
+`NEXT` leads with the highest-salience reading, so the first sentence the agent
+sees is about meaning.
+
+Verified end to end: renaming a note from 「开始」 to 「从需求评审开始」 produces
+`把「开始」改成了「从需求评审开始」，这是含义上的修正` plus a suggestion to keep
+surrounding labels consistent.

@@ -320,6 +320,11 @@ export function registerBoardTools(server: McpServer, ctx: BoardToolContext): vo
             "",
             `HANDOFF: ${handoff.summary}`,
             ...(handoff.needsAttention ? [
+              ...(handoff.readings.length ? [
+                "HANDOFF_READINGS:",
+                ...handoff.readings.map((reading) => `- ${reading.reading}${reading.suggestion ? ` → ${reading.suggestion}` : ""}`),
+                "",
+              ] : []),
               "HANDOFF_JSON:",
               JSON.stringify(handoff, null, 2),
               "",
