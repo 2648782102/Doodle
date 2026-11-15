@@ -285,6 +285,16 @@ const GLASS_SELECTOR = [
   ".excalidraw .App-menu_bottom .Island",
   ".excalidraw .layer-ui__wrapper__top-right .Island",
   ".excalidraw .FixedSideContainer_side_top > .Island",
+  // Below Excalidraw's mobile breakpoint the chrome is a different tree: the
+  // toolbar moves to the top, the library trigger becomes a vertical strip on
+  // the right edge, and the bottom bar becomes one full-width sheet.
+  ".excalidraw .App-toolbar--mobile",
+  ".excalidraw .mobile-misc-tools-container",
+  ".excalidraw .App-bottom-bar > .Island",
+  ".excalidraw .Island.App-menu__left",
+  // Menus and the mobile extra-tools sheet float over board content; they get
+  // the same material as the shell rather than a flat white card.
+  ".excalidraw .dropdown-menu .dropdown-menu-container",
 ].join(", ");
 
 export function initLiquidGlass(selector = GLASS_SELECTOR): LiquidGlassController | null {

@@ -81,4 +81,29 @@ describe("Doodle to Excalidraw adapter", () => {
     expect(projected.items[0]).toMatchObject({ src: png, mime: "image/png" });
     expect(projected.items[0].scene).toMatchObject({ fileId: "file_1", fileMime: "image/png", fileCreated: 123 });
   });
+
+  it("keeps a short text element inside the stored size floor", () => {
+    // A single line of Excalidraw text measures ~15px tall. Writing that
+    // verbatim failed the whole board write (the server requires 16px), so one
+    // new label erased everything the person had just drawn.
+    const board = createEmptyBoard();
+    const projected = boardItemsFromExcalidrawBoard(board, [
+      { id: "tiny", type: "text", x: 10, y: 10, width: 48, height: 15, text: "小" },
+    ]);
+    expect(projected.items[0].h).toBeGreaterThanOrEqual(16);
+    expect(() => parseBoard(JSON.parse(JSON.stringify(projected)))).not.toThrow();
+  });
+
+  it("produces a board the server accepts after a human edit", () => {
+    // End-to-end guard for the "drawing disappears" regression: project a real
+    // scene and parse it the way `/api/board/replace` does.
+    const board = createEmptyBoard();
+    const projected = boardItemsFromExcalidrawBoard(board, [
+      { id: "r1", type: "rectangle", x: 40, y: 40, width: 190, height: 90 },
+      { id: "t1", type: "text", x: 60, y: 150, width: 48, height: 15, text: "需求冻结" },
+      { id: "l1", type: "arrow", x: 20, y: 20, width: 0, height: 0, points: [[0, 0], [80, 40]] },
+    ]);
+    expect(projected.items.map((item) => item.type)).toEqual(["rect", "text", "line"]);
+    expect(() => parseBoard(JSON.parse(JSON.stringify(projected)))).not.toThrow();
+  });
 });

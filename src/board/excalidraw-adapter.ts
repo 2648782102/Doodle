@@ -1,5 +1,17 @@
 import type { BoardItem, BoardItemType, SimpleBoard } from "./types.js";
 
+/**
+ * Smallest width/height a stored object may have.
+ *
+ * `parseBoard` rejects anything below this, and the canvas writes back whatever
+ * Excalidraw reports. A single short text line is about 15–16px tall, so
+ * letting a 15px value through failed the *entire* board write rather than one
+ * item: the server answered 400, the client reloaded the previous revision, and
+ * the human's new drawing vanished. Clamping here keeps the round trip lossless
+ * for real content instead of rejecting it downstream.
+ */
+const MIN_STORED_SIZE = 16;
+
 export interface ExcalidrawFileData {
   id: string;
   mimeType: string;
@@ -412,8 +424,10 @@ export function excalidrawElementsToBoardItems(
     const bound = textByContainer.get(element.id);
     const labels = itemText(bound ?? element);
     const previous = bySceneId.get(element.id) ?? byId.get(element.id);
-    const width = Math.max(1, finite(element.width, 1));
-    const height = Math.max(1, finite(element.height, 1));
+    // Text and thin lines can legitimately be shorter than the stored minimum;
+    // clamp rather than emit a board the server will reject wholesale.
+    const width = Math.max(MIN_STORED_SIZE, finite(element.width, 1));
+    const height = Math.max(MIN_STORED_SIZE, finite(element.height, 1));
     const points = elementPoints(element);
     const file = element.fileId ? files[element.fileId] : undefined;
     const item: BoardItem = {
@@ -421,8 +435,10 @@ export function excalidrawElementsToBoardItems(
       type,
       x: round(finite(element.x)),
       y: round(finite(element.y)),
-      w: type === "line" ? round(points.at(-1)?.x ?? width) : round(width),
-      h: type === "line" ? round(points.at(-1)?.y ?? height) : round(height),
+    // `round` can land back under the minimum (15.98 → 16 is fine, 15.9 → 15.9
+    // is not), so clamp the rounded value instead of the raw one.
+    w: type === "line" ? round(points.at(-1)?.x ?? width) : Math.max(MIN_STORED_SIZE, round(width)),
+    h: type === "line" ? round(points.at(-1)?.y ?? height) : Math.max(MIN_STORED_SIZE, round(height)),
       text: labels.text,
       color: elementColor(element),
       author: previous?.author ?? (custom?.author === "ai" ? "ai" : "human"),

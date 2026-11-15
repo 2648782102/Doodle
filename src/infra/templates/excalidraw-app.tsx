@@ -543,8 +543,43 @@ async function replaceBoard(items: unknown[], expectedRevision: number): Promise
   return result.board as BoardSnapshot;
 }
 
+let errorTimer: number | null = null;
+
+/**
+ * Tell the person when a save was rejected.
+ *
+ * A rejected write used to be a `console.warn`, and the canvas then snapped
+ * back to the server's previous revision: the drawing vanished with no
+ * explanation, which reads as a broken board rather than a failed save. The
+ * banner is transient and lives in the page, not in board state.
+ */
 function showError(error: unknown) {
   console.warn("Doodle board sync skipped", error);
+  const message = error instanceof Error ? error.message : String(error);
+  let banner = document.querySelector<HTMLElement>("#doodleSyncBanner");
+  if (!banner) {
+    banner = document.createElement("div");
+    banner.id = "doodleSyncBanner";
+    banner.className = "doodle-sync-banner doodle-glass";
+    banner.setAttribute("role", "status");
+    banner.setAttribute("aria-live", "polite");
+    document.body.append(banner);
+  }
+  banner.textContent = `这次改动没有保存：${message}`;
+  banner.dataset.visible = "true";
+  if (errorTimer !== null) window.clearTimeout(errorTimer);
+  errorTimer = window.setTimeout(() => {
+    errorTimer = null;
+    banner?.removeAttribute("data-visible");
+  }, 8000);
+}
+
+function clearError() {
+  if (errorTimer !== null) {
+    window.clearTimeout(errorTimer);
+    errorTimer = null;
+  }
+  document.querySelector<HTMLElement>("#doodleSyncBanner")?.removeAttribute("data-visible");
 }
 function downloadBlob(blob: Blob, filename: string) {
   const url = URL.createObjectURL(blob);
@@ -746,19 +781,20 @@ function CanvasApp({ initial }: { initial: BoardSnapshot }) {
       if (!base || activeSnapshot !== base) return;
       try {
         const updated = await replaceBoard(projected.items as unknown[], base.revision);
+        clearError();
         setSnapshot(updated);
       } catch (error) {
-        const refreshed = await loadBoard().catch(() => null);
-        if (refreshed) {
-          applyingRemote.current = true;
-          activeSnapshot = refreshed;
-          setSnapshot(refreshed);
-          const files = toFiles(refreshed);
-          currentFiles.current = Object.fromEntries(files.map((file) => [file.id, file]));
-          api.addFiles(files);
-          api.updateScene({ elements: toElements(refreshed), captureUpdate: "NEVER" });
-          window.setTimeout(() => { applyingRemote.current = false; }, 0);
-        }
+        /*
+         * Never repaint the canvas from the server here.
+         *
+         * Reloading on failure meant one rejected item silently erased the
+         * person's whole drawing: the canvas jumped back to the previous
+         * revision with no message. Keep what they drew, refresh only the
+         * revision so a retry can succeed after a conflict, and say what
+         * happened.
+         */
+        const latest = await loadBoard().catch(() => null);
+        if (latest) activeSnapshot = { ...activeSnapshot, revision: latest.revision };
         showError(error);
       }
     }, 450);

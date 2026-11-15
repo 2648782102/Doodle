@@ -291,6 +291,54 @@
     .excalidraw-host > .excalidraw { position: relative; background: transparent; }
     .excalidraw .App-menu_top { z-index: 4; }
     /*
+     * Below Excalidraw's mobile breakpoint the chrome is a different tree: the
+     * toolbar moves to the top, the library trigger becomes a fixed vertical
+     * strip hanging off the right edge, and the bottom bar becomes a single
+     * full-width sheet. None of those inherit the desktop island rules, so they
+     * were left as opaque white chrome with square corners and an 8px radius.
+     * Every one of them gets the same pane geometry as the desktop surfaces.
+     */
+    .excalidraw .mobile-misc-tools-container {
+      top: 68px;
+      right: 12px;
+      border: 1px solid var(--glass-edge-outer);
+      border-radius: 14px;
+      background-color: color-mix(in srgb, var(--island-bg-color) 16%, transparent);
+      box-shadow:
+        inset 0 1px 0 0 var(--glass-edge),
+        inset 0 -1px 1.5px 0 var(--glass-depth),
+        inset 0 0 0 1px var(--glass-tint),
+        var(--glass-shadow);
+      -webkit-backdrop-filter: var(--glass-refraction, blur(var(--glass-blur)) saturate(var(--glass-saturate)));
+      backdrop-filter: var(--glass-refraction, blur(var(--glass-blur)) saturate(var(--glass-saturate)));
+    }
+    .excalidraw .mobile-misc-tools-container .sidebar-trigger,
+    .excalidraw .mobile-misc-tools-container .ToolIcon__icon { border-radius: 10px; }
+    /*
+     * The mobile bottom bar is the tool palette plus, once something is
+     * selected, the action row. It spans the viewport as a bare 8px sheet with
+     * a 1px border, which read as a system bar rather than as part of the board.
+     */
+    .excalidraw .App-bottom-bar { padding: 0 12px 12px; }
+    .excalidraw .App-bottom-bar > .Island {
+      border: 1px solid var(--glass-edge-outer);
+      border-radius: 18px;
+      background-color: color-mix(in srgb, var(--island-bg-color) 16%, transparent);
+      box-shadow:
+        inset 0 1px 0 0 var(--glass-edge),
+        inset 0 -1px 1.5px 0 var(--glass-depth),
+        inset 0 0 0 1px var(--glass-tint),
+        var(--glass-shadow);
+      -webkit-backdrop-filter: var(--glass-refraction, blur(var(--glass-blur)) saturate(var(--glass-saturate)));
+      backdrop-filter: var(--glass-refraction, blur(var(--glass-blur)) saturate(var(--glass-saturate)));
+    }
+    .excalidraw .App-bottom-bar .Island .panelColumn { padding: 8px 10px; }
+    .excalidraw .App-bottom-bar .dropdown-menu-button--mobile { border-radius: 10px; }
+    @supports not ((backdrop-filter: blur(1px)) or (-webkit-backdrop-filter: blur(1px))) {
+      .excalidraw .App-bottom-bar > .Island,
+      .excalidraw .mobile-misc-tools-container { background-color: var(--island-bg-color); }
+    }
+    /*
      * Native Excalidraw islands get the same material so the shell reads as one
      * surface. Their background variables are remapped rather than filtered, so
      * icons keep their contrast.
@@ -367,10 +415,41 @@
      * zoom/undo groups so a segmented pill reads as one control.
      */
     /*
-     * The extra-tools dropdown hangs off the toolbar, so it must not inherit
-     * the Doodle capsule's glass: it holds a list of its own.
+     * Menus and the mobile extra-tools sheet.
+     *
+     * The container was an 8px white sheet, which read as a different product
+     * next to the 14–18px panes. It now uses the same material as every other
+     * floating surface: rounded, refracting, with the shared rim and shadow.
+     * Rows keep their own opaque hover surface so labels stay readable over the
+     * board behind them.
      */
-    .excalidraw .dropdown-menu { border-radius: 14px; }
+    .excalidraw .dropdown-menu,
+    .excalidraw .dropdown-menu--mobile .dropdown-menu-container { border-radius: 14px; }
+    .excalidraw .dropdown-menu .dropdown-menu-container,
+    .excalidraw .dropdown-menu--mobile .dropdown-menu-container {
+      border: 1px solid var(--glass-edge-outer);
+      border-radius: 14px;
+      background-color: color-mix(in srgb, var(--island-bg-color) 34%, transparent);
+      box-shadow:
+        inset 0 1px 0 0 var(--glass-edge),
+        inset 0 -1px 1.5px 0 var(--glass-depth),
+        inset 0 0 0 1px var(--glass-tint),
+        var(--glass-shadow-raised);
+      -webkit-backdrop-filter: var(--glass-refraction, blur(var(--glass-blur)) saturate(var(--glass-saturate)));
+      backdrop-filter: var(--glass-refraction, blur(var(--glass-blur)) saturate(var(--glass-saturate)));
+    }
+    .excalidraw .dropdown-menu-item { border-radius: 9px; }
+    /*
+     * A menu opened from the mobile toolbar is a full-width sheet, so the
+     * vertical library strip on the right edge would draw over it. Yield the
+     * strip while a menu is open, the same way the Doodle capsule yields.
+     */
+    body:has(.excalidraw .dropdown-menu) .excalidraw .mobile-misc-tools-container {
+      opacity: 0;
+      visibility: hidden;
+      pointer-events: none;
+      transition: opacity var(--doodle-duration) var(--doodle-ease), visibility 0s linear var(--doodle-duration);
+    }
     /*
      * The top-right library trigger is a 36px control in a 44px row, so its
      * pill looked smaller than the capsule it sits beside. Match the row.
@@ -433,6 +512,34 @@
     .doodle-notify-agent:hover { filter: brightness(1.05); }
     .doodle-notify-agent[hidden] { display: none; }
     /*
+     * Save failures have to be visible. A rejected write used to be a console
+     * message while the canvas silently reverted, so content appeared to
+     * disappear for no reason.
+     */
+    .doodle-sync-banner {
+      position: fixed;
+      left: 50%;
+      bottom: 72px;
+      z-index: 40;
+      max-width: min(460px, calc(100vw - 32px));
+      padding: 10px 16px;
+      border-radius: 14px;
+      color: var(--doodle-danger);
+      font-size: 12px;
+      line-height: 1.5;
+      opacity: 0;
+      visibility: hidden;
+      pointer-events: none;
+      transform: translate(-50%, 6px);
+      transition: opacity var(--doodle-duration) var(--doodle-ease), transform var(--doodle-duration) var(--doodle-ease), visibility 0s linear var(--doodle-duration);
+    }
+    .doodle-sync-banner[data-visible="true"] {
+      opacity: 1;
+      visibility: visible;
+      transform: translate(-50%, 0);
+      transition: opacity var(--doodle-duration) var(--doodle-ease), transform var(--doodle-duration) var(--doodle-ease), visibility 0s linear 0s;
+    }
+    /*
      * The library is a floating pane, not a docked sheet.
      *
      * It used to be flush to the left and bottom edges with square corners,
@@ -486,8 +593,27 @@
     @keyframes doodle-welcome-in { from { opacity: 0; transform: translate(-50%, 8px); } to { opacity: 1; transform: translate(-50%, 0); } }
     @media (max-height: 620px) { .doodle-welcome { bottom: 96px; padding: 12px 14px; } .doodle-welcome dl { display: none; } }
     @media (max-width: 640px) {
-      .doodle-topbar { top: 58px; left: 12px; }
-      .doodle-library-panel { top: 54px; width: calc(100vw - 24px); }
+      /*
+       * Narrow screens keep the capsule under the toolbar, but Excalidraw's
+       * first-use hint sits on the same line and used to show through it. The
+       * hint is decorative: the Doodle welcome card carries the same guidance
+       * in the board's own voice.
+       */
+      .doodle-topbar { top: 64px; left: 12px; }
+      /*
+       * Excalidraw paints a rotating hint strip under the toolbar (`.HintViewer`:
+       * "press Enter to add text…"). On a phone that line runs straight through
+       * the Doodle capsule, and it is upstream tutorial copy that mixes English
+       * and Chinese, not this board's voice. The Doodle welcome card carries the
+       * same guidance, so the strip is hidden rather than restyled.
+       */
+      .excalidraw .HintViewer { display: none !important; }
+      /*
+       * On a phone the drawer is the whole surface, so it must not start under
+       * the toolbar: the capsule sits at 64px, and 12px insets leave a rounded
+       * card that still shows the canvas edge behind it.
+       */
+      .doodle-library-panel { top: 12px; left: 8px; right: 8px; bottom: 8px; width: auto; border-radius: 16px; }
       .doodle-notify-agent { right: 8px; bottom: 8px; }
     }
     @media (max-height: 620px) {
