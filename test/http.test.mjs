@@ -56,6 +56,26 @@ describe("board HTTP surface", () => {
     expect(html).toContain("body:has(.excalidraw .Modal) .doodle-topbar");
     expect(html).toContain(".doodle-library-section--boards");
     expect(html).toContain(".doodle-library-section--shares");
+    /*
+     * Library drawer information architecture.
+     *
+     * The panel used to carry six equal buttons plus two more below the list,
+     * all on one grid: "另存为" and "复制所选" were the same operation under two
+     * labels, and "重命名" read from the name field but sat rows away from it.
+     * These assertions pin the grouping that replaced it, so a future edit
+     * cannot quietly reintroduce the flat button wall.
+     */
+    expect(html).toContain('class="doodle-library-rename"');
+    expect(html).toContain('id="doodleLibraryRename"');
+    expect(html).toContain('class="doodle-library-sectionhead"');
+    expect(html).toContain('data-library-action="duplicate">另存一份');
+    expect(html).not.toContain('data-library-action="duplicate-selected"');
+    // Opening a board is a single click on its row; the separate switch button
+    // and the three-way select/double-click/switch dance are gone.
+    expect(html).not.toContain('id="doodleLibrarySwitch"');
+    // Per-row actions are built in the client, so assert the rule that styles
+    // them rather than markup that only exists after render.
+    expect(html).toContain(".doodle-library-entry-actions");
     expect(html.indexOf('href="/excalidraw/index.css"')).toBeLessThan(html.indexOf("<style>"));
     expect(html).toContain(".excalidraw .HelpDialog__header { display: none; }");
     expect(html).toContain("--color-primary: #2f6b5c");

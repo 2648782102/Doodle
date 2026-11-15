@@ -192,8 +192,13 @@ check(boardStore.includes("createEmptyBoard") && !boardStore.includes("createSta
 check(excalidrawTemplate.includes("Doodle · Excalidraw Canvas") && excalidrawTemplate.includes('id="excalidrawRoot"'), "Excalidraw-only board template is missing");
 check(excalidrawTemplate.includes("/excalidraw/excalidraw-app.js") && excalidrawTemplate.includes("const PANEL_TOKEN"), "Excalidraw template lost its local entry or panel token");
 check(excalidrawTemplate.includes('id="doodleLibraryPanel"') && !excalidrawTemplate.includes('id="toast"'), "Excalidraw template lost the library overlay or kept an obsolete toast");
-check(excalidrawTemplate.includes('data-library-action="duplicate">另存为') && excalidrawTemplate.includes('id="doodleLibraryStatus"'), "Excalidraw template lost save-as feedback or turned it into a rename");
-check(excalidrawApp.includes('if (action.type === "duplicate")') && excalidrawApp.includes("selectedBoardId"), "canvas library Save As does not duplicate the active or selected snapshot");
+check(excalidrawTemplate.includes('data-library-action="duplicate">另存一份') && excalidrawTemplate.includes('id="doodleLibraryStatus"'), "Excalidraw template lost save-as feedback or turned it into a rename");
+/*
+ * "另存一份" must copy the board the person is looking at. Clicking a row
+ * switches to it, so the active snapshot *is* the source; the guard now binds
+ * to that contract instead of to the removed `selectedBoardId` variable.
+ */
+check(excalidrawApp.includes('if (action.type === "duplicate")') && excalidrawApp.includes('id: activeSnapshot?.id'), "canvas library Save As does not duplicate the active snapshot");
 check(excalidrawApp.includes("exportToBlob") && excalidrawApp.includes("exportToSvg") && excalidrawTemplate.includes('data-snapshot-export="png"') && excalidrawTemplate.includes('data-snapshot-export="jpg"') && excalidrawTemplate.includes('data-snapshot-export="svg"'), "static PNG/JPG/SVG snapshot exports are missing");
 check(excalidrawTemplate.includes("--doodle-accent") && excalidrawTemplate.includes('data-doodle-theme="dark"') && excalidrawTemplate.includes("radial-gradient(circle, var(--doodle-dot)") && excalidrawApp.includes('view: "transparent"'), "unified theme tokens or native Excalidraw dot grid are missing");
 check(excalidrawTemplate.includes(".excalidraw {\n      --color-primary: #2f6b5c") && excalidrawTemplate.includes('.excalidraw.theme--dark,\n    :root[data-doodle-theme="dark"] .excalidraw {\n      --color-primary: #8fcbb4'), "Excalidraw controls are not mapped to the Doodle pine-green palette in both themes");

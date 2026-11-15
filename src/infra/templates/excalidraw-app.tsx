@@ -115,7 +115,6 @@ const pendingTimer: { current: number | null } = { current: null };
  * before any change is treated as a human edit.
  */
 const sceneReady = { current: false };
-let selectedBoardId = "";
 
 type DoodleTheme = "light" | "dark";
 const THEME_STORAGE_KEY = "doodle-theme";
@@ -405,38 +404,97 @@ async function refreshLibraryUi() {
   current.textContent = `当前：${boards.find((entry) => entry.id === index?.activeId)?.name ?? "—"} · ${board.items.length} 个对象`;
   if (name && document.activeElement !== name) name.value = boards.find((entry) => entry.id === index?.activeId)?.name ?? "";
   list.replaceChildren();
-  selectedBoardId = index?.activeId ?? "";
   for (const entry of boards) {
     const row = document.createElement("div");
     row.className = "doodle-library-entry";
     row.classList.toggle("active", entry.id === index?.activeId);
     const button = document.createElement("button");
+    button.className = "doodle-library-entry-main";
     button.textContent = entry.name;
     const meta = document.createElement("small");
     meta.textContent = `${entry.itemCount} 个对象 · rev ${entry.revision}`;
     button.append(meta);
-    button.addEventListener("click", () => {
-        selectedBoardId = entry.id;
-      for (const child of list.children) child.classList.toggle("active", child === row);
-    });
-    button.addEventListener("dblclick", () => void runLibraryAction({ type: "switch", id: entry.id }));
+    /*
+     * One click opens the board.
+     *
+     * The list used to have three ways to do the same thing — click to select,
+     * double-click to open, and a footer button to open the selection — which
+     * is why the panel needed a "切换到选中" row that read like a leftover. A
+     * board list is a navigation control: clicking a board opens it.
+     */
+    button.addEventListener("click", () => void runLibraryAction({ type: "switch", id: entry.id }));
+    /*
+     * Per-row actions are a row of small text buttons, not a second grid.
+     *
+     * Each entry used to carry one "导出" button competing for width with the
+     * name, and delete only ever applied to the *active* board even though the
+     * list lets you select any board. Putting both actions on the row that owns
+     * the board makes "which board does this affect" unambiguous.
+     */
+    const actions = document.createElement("div");
+    actions.className = "doodle-library-entry-actions";
     const exportButton = document.createElement("button");
     exportButton.textContent = "导出";
-    exportButton.addEventListener("click", () => void runLibraryAction({ type: "export", id: entry.id }));
-    row.append(button, exportButton);
+    exportButton.title = "导出这个画板的 JSON";
+    exportButton.addEventListener("click", (event) => {
+      event.stopPropagation();
+      void runLibraryAction({ type: "export", id: entry.id });
+    });
+    const deleteButton = document.createElement("button");
+    deleteButton.textContent = "删除";
+    deleteButton.className = "doodle-library-entry-delete";
+    deleteButton.title = "删除这个画板";
+    deleteButton.addEventListener("click", (event) => {
+      event.stopPropagation();
+      if (!window.confirm(`删除画板「${entry.name}」？此操作不可撤销。`)) return;
+      void runLibraryAction({ type: "delete", id: entry.id });
+    });
+    actions.append(exportButton, deleteButton);
+    row.append(button, actions);
     list.append(row);
   }
-  const switchButton = document.querySelector<HTMLButtonElement>("#doodleLibrarySwitch");
-  if (switchButton) switchButton.onclick = () => void runLibraryAction({ type: "switch", id: selectedBoardId });
+  /*
+   * The name field's action lives beside it.
+   *
+   * "重命名" used to sit in the six-button grid, reading from the same field
+   * but looking like a sibling of "新建". Pairing them makes the relationship
+   * obvious, and Enter in the field does the same thing so a person does not
+   * have to reach for the button.
+   */
+  const renameButton = document.querySelector<HTMLButtonElement>("#doodleLibraryRename");
+  const renameTarget = document.querySelector<HTMLInputElement>("#doodleLibraryName");
+  /*
+   * `rename` needs an explicit board id. The visible board is the active one,
+   * so the id comes from the snapshot rather than from a tracked selection.
+   */
+  const renameActive = () => {
+    if (!activeSnapshot) return;
+    void runLibraryAction({ type: "rename", id: activeSnapshot.id });
+  };
+  if (renameButton) renameButton.onclick = renameActive;
+  if (renameTarget) {
+    renameTarget.onkeydown = (event) => {
+      if (event.key === "Enter") {
+        event.preventDefault();
+        renameActive();
+      }
+    };
+  }
 }
 
 async function runLibraryAction(action: Record<string, unknown>) {
   const name = document.querySelector<HTMLInputElement>("#doodleLibraryName")?.value.trim();
   let request: Record<string, unknown> = action;
   if (action.type === "duplicate") {
-    request = { type: "duplicate", id: selectedBoardId, name: name || undefined };
-  } else if (action.type === "duplicate-selected") {
-    request = { type: "duplicate", id: selectedBoardId, name: name || `${selectedBoardId} 副本` };
+    /*
+     * "另存一份" copies the board that is currently open. Clicking a row now
+     * switches to it, so the active board is always the one the person is
+     * looking at; there is no separate selection to track. The library action
+     * still requires an explicit id, so it is read from the live index rather
+     * than remembered in a module variable.
+     */
+    // The snapshot *is* the active board, so its own id is the source to copy.
+    request = { type: "duplicate", id: activeSnapshot?.id, name: name || undefined };
   } else {
     request = { ...action, ...(name && ["save", "create", "rename", "duplicate"].includes(String(action.type)) ? { name } : {}) };
   }

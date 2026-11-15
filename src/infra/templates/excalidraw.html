@@ -997,26 +997,50 @@
     .doodle-library-head button { margin-left: auto; width: 26px; height: 26px; border: 0; border-radius: 7px; background: transparent; color: var(--doodle-muted); cursor: pointer; }
     .doodle-library-head button:hover { background: var(--doodle-accent-soft); color: var(--doodle-ink); }
     .doodle-library-kicker { flex: none; color: var(--doodle-muted); font-size: 11px; line-height: 1.5; }
-    .doodle-library-name { flex: none; width: 100%; height: 34px; padding: 0 10px; border: 1px solid var(--doodle-border); border-radius: var(--doodle-radius-sm); background: var(--doodle-surface-solid); color: var(--doodle-ink); transition: border-color var(--doodle-duration) var(--doodle-ease), box-shadow var(--doodle-duration) var(--doodle-ease); }
+    /*
+     * Name field and its action share one row.
+     *
+     * The field used to be full-width on its own line, with "重命名" orphaned in
+     * the six-button grid below — the two were visually unrelated even though
+     * the button only ever read that field.
+     */
+    .doodle-library-rename { display: flex; flex: none; align-items: center; gap: 6px; }
+    .doodle-library-name { flex: 1 1 auto; min-width: 0; height: 34px; padding: 0 10px; border: 1px solid var(--doodle-border); border-radius: var(--doodle-radius-sm); background: var(--doodle-surface-solid); color: var(--doodle-ink); transition: border-color var(--doodle-duration) var(--doodle-ease), box-shadow var(--doodle-duration) var(--doodle-ease); }
     .doodle-library-name:hover { border-color: var(--doodle-border-strong); }
     .doodle-library-name:focus { border-color: var(--doodle-accent); }
+    .doodle-library-rename button { flex: none; height: 34px; padding: 0 12px; border: 1px solid var(--doodle-border); border-radius: var(--doodle-radius-sm); background: var(--doodle-surface-solid); color: var(--doodle-ink); font-size: 11px; cursor: pointer; white-space: nowrap; transition: background-color var(--doodle-duration) var(--doodle-ease), border-color var(--doodle-duration) var(--doodle-ease); }
+    .doodle-library-rename button:hover { border-color: var(--doodle-accent); background: var(--doodle-accent-soft); }
     .doodle-library-section { flex: none; padding-top: 12px; border-top: 1px solid var(--doodle-border); }
     .doodle-library-section--boards { display: flex; flex: 1 1 auto; min-height: 0; flex-direction: column; }
     .doodle-library-section--shares { flex: none; }
     .doodle-library-section > strong { display: block; margin-bottom: 8px; color: var(--doodle-muted); font-size: 11px; font-weight: 600; }
-    .doodle-library-actions, .doodle-library-footer, .doodle-library-shares { display: grid; grid-template-columns: repeat(auto-fit, minmax(84px, 1fr)); gap: 6px; }
-    .doodle-library-actions, .doodle-library-footer { flex: none; }
+    /*
+     * Section heading and its two create actions on one line.
+     *
+     * "新建" and "另存一份" act on the library, not on a selected board, so they
+     * belong next to the list's title rather than in a grid shared with row
+     * actions where they looked like they applied to the highlighted board.
+     */
+    .doodle-library-sectionhead { display: flex; align-items: center; gap: 8px; margin-bottom: 8px; }
+    .doodle-library-sectionhead > strong { margin-bottom: 0; }
+    .doodle-library-sectionhead-actions { display: flex; gap: 6px; margin-left: auto; }
+    .doodle-library-footer, .doodle-library-shares { display: grid; grid-template-columns: repeat(auto-fit, minmax(84px, 1fr)); gap: 6px; }
+    .doodle-library-footer { flex: none; }
     .doodle-library-footer { grid-template-columns: repeat(2, minmax(0, 1fr)); margin-top: 8px; }
-    .doodle-library-actions button, .doodle-library-footer button, .doodle-library-shares button { min-width: 0; min-height: 32px; padding: 0 7px; overflow: hidden; border: 1px solid var(--doodle-border); border-radius: var(--doodle-radius-sm); background: var(--doodle-surface-solid); color: var(--doodle-ink); cursor: pointer; font-size: 11px; text-overflow: ellipsis; white-space: nowrap; transition: background-color var(--doodle-duration) var(--doodle-ease), border-color var(--doodle-duration) var(--doodle-ease), box-shadow var(--doodle-duration) var(--doodle-ease); }
-    .doodle-library-actions button:active, .doodle-library-footer button:active, .doodle-library-shares button:active { background: var(--doodle-accent-soft); box-shadow: inset 0 1px 2px rgba(0, 0, 0, 0.08); }
-    .doodle-library-actions button:hover, .doodle-library-footer button:hover, .doodle-library-shares button:hover { border-color: var(--doodle-accent); background: var(--doodle-accent-soft); }
-    .doodle-library-actions button[data-library-action="delete"] { color: var(--doodle-danger); }
+    .doodle-library-sectionhead-actions button, .doodle-library-footer button, .doodle-library-shares button { min-width: 0; min-height: 28px; padding: 0 9px; overflow: hidden; border: 1px solid var(--doodle-border); border-radius: var(--doodle-radius-sm); background: var(--doodle-surface-solid); color: var(--doodle-ink); cursor: pointer; font-size: 11px; text-overflow: ellipsis; white-space: nowrap; transition: background-color var(--doodle-duration) var(--doodle-ease), border-color var(--doodle-duration) var(--doodle-ease), box-shadow var(--doodle-duration) var(--doodle-ease); }
+    .doodle-library-footer button, .doodle-library-shares button { min-height: 32px; }
+    .doodle-library-sectionhead-actions button:active, .doodle-library-footer button:active, .doodle-library-shares button:active { background: var(--doodle-accent-soft); box-shadow: inset 0 1px 2px rgba(0, 0, 0, 0.08); }
+        .doodle-library-sectionhead-actions button:hover { border-color: var(--doodle-accent); background: var(--doodle-accent-soft); }
     .doodle-library-list { display: grid; flex: 1 1 auto; align-content: start; gap: 6px; min-height: 88px; overflow: auto; overscroll-behavior: contain; }
     .doodle-library-entry { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 6px; align-items: center; padding: 8px; border: 1px solid var(--doodle-border); border-radius: 9px; background: var(--doodle-surface-solid); transition: border-color var(--doodle-duration) var(--doodle-ease), background-color var(--doodle-duration) var(--doodle-ease); }
     .doodle-library-entry:hover { border-color: var(--doodle-border-strong); background: var(--doodle-accent-soft); }
     .doodle-library-entry.active { border-color: var(--doodle-accent); background: var(--doodle-accent-soft); }
-    .doodle-library-entry button { min-width: 0; border: 0; background: transparent; color: var(--doodle-ink); text-align: left; cursor: pointer; padding: 0; font-size: 12px; overflow: hidden; text-overflow: ellipsis; }
+    .doodle-library-entry-main { min-width: 0; border: 0; background: transparent; color: var(--doodle-ink); text-align: left; cursor: pointer; padding: 0; font-size: 12px; overflow: hidden; text-overflow: ellipsis; }
     .doodle-library-entry small { display: block; color: var(--doodle-muted); font-size: 10px; margin-top: 2px; white-space: nowrap; }
+    .doodle-library-entry-actions { display: flex; flex: none; gap: 2px; }
+    .doodle-library-entry-actions button { min-width: 0; padding: 4px 6px; border: 0; border-radius: 6px; background: transparent; color: var(--doodle-muted); cursor: pointer; font-size: 11px; white-space: nowrap; transition: background-color var(--doodle-duration) var(--doodle-ease), color var(--doodle-duration) var(--doodle-ease); }
+    .doodle-library-entry-actions button:hover { background: var(--doodle-surface-solid); color: var(--doodle-ink); }
+    .doodle-library-entry-actions .doodle-library-entry-delete:hover { color: var(--doodle-danger); }
     .excalidraw .HelpDialog__header { display: none; }
     .excalidraw .dropdown-menu .dropdown-menu-group[data-doodle-hidden="true"] { display: none; }
     .excalidraw [data-doodle-hidden="true"] { display: none !important; }
@@ -1053,7 +1077,7 @@
       .doodle-library-section { padding-top: 8px; }
       .doodle-library-list { min-height: 64px; }
     }
-    @media (prefers-reduced-motion: reduce) { .doodle-tool, .doodle-notify-agent, .doodle-library-panel, .doodle-library-entry, .doodle-library-actions button, .doodle-library-footer button, .doodle-library-shares button { transition: none !important; } }
+    @media (prefers-reduced-motion: reduce) { .doodle-tool, .doodle-notify-agent, .doodle-library-panel, .doodle-library-entry, .doodle-library-sectionhead-actions button, .doodle-library-footer button, .doodle-library-shares button { transition: none !important; } }
   </style>
 </head>
 <body>
@@ -1079,18 +1103,29 @@
     <div class="doodle-library-head"><strong>画板图库</strong><button id="doodleLibraryClose" aria-label="关闭图库">×</button></div>
     <div id="doodleLibraryCurrent" class="doodle-library-kicker">当前：—</div>
     <div id="doodleLibraryStatus" class="doodle-library-kicker" role="status" aria-live="polite"></div>
-    <input class="doodle-library-name" id="doodleLibraryName" maxlength="80" placeholder="画板名称">
-    <div class="doodle-library-section doodle-library-section--boards"><strong>画板</strong><div class="doodle-library-actions">
-      <button data-library-action="duplicate">另存为</button>
-      <button data-library-action="create">新建</button>
-      <button data-library-action="rename">重命名</button>
-      <button data-library-action="duplicate-selected">复制所选</button>
-      <button data-library-action="export">导出 JSON</button>
-      <button data-library-action="delete">删除</button>
-    </div><div class="doodle-library-list" id="doodleLibraryList"></div><div class="doodle-library-footer">
-      <button id="doodleLibraryImport">导入 JSON</button>
-      <button id="doodleLibrarySwitch">切换到选中</button>
-    </div></div>
+    <!--
+      One name field, and the actions that consume it sit on the same row.
+
+      The panel used to carry six equal buttons plus two more below the list,
+      all on the same grid: "另存为" and "复制所选" were the same operation under
+      two labels, and "重命名" read from the field above while looking like a
+      sibling of "新建". Grouping by what a person is trying to do — name this
+      board, pick a board, share it — removes the guessing.
+    -->
+    <div class="doodle-library-rename">
+      <input class="doodle-library-name" id="doodleLibraryName" maxlength="80" placeholder="画板名称">
+      <button id="doodleLibraryRename" title="保存为新名称">重命名</button>
+    </div>
+    <div class="doodle-library-section doodle-library-section--boards">
+      <div class="doodle-library-sectionhead"><strong>全部画板</strong>
+        <div class="doodle-library-sectionhead-actions">
+          <button id="doodleLibraryImport">导入</button>
+          <button data-library-action="create">新建</button>
+          <button data-library-action="duplicate">另存一份</button>
+        </div>
+      </div>
+      <div class="doodle-library-list" id="doodleLibraryList"></div>
+    </div>
     <div class="doodle-library-section doodle-library-section--shares"><strong>分享快照</strong><div class="doodle-library-shares" aria-label="分享快照格式">
       <button data-snapshot-export="png">导出 PNG</button>
       <button data-snapshot-export="jpg">导出 JPG</button>
