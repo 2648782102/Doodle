@@ -1,4 +1,5 @@
 import fs from "node:fs/promises";
+import net from "node:net";
 import os from "node:os";
 import path from "node:path";
 import { afterAll, describe, expect, it } from "vitest";
@@ -14,7 +15,28 @@ afterAll(async () => {
   await fs.rm(tempDir, { recursive: true, force: true });
 });
 
-async function withClient(port, callback) {
+/**
+ * Ask the OS for a loopback port that is free right now.
+ *
+ * Pinning a port made two checkouts of this repository collide: the second
+ * `npm test` either failed to bind or, worse, silently attached its assertions
+ * to the first run's preview server. Parallel worktrees only work if every
+ * spawned server picks its own port, so tests bind port 0 and read back the
+ * port the server actually received.
+ */
+function freePort() {
+  return new Promise((resolve, reject) => {
+    const server = net.createServer();
+    server.once("error", reject);
+    server.listen(0, "127.0.0.1", () => {
+      const { port } = server.address();
+      server.close(() => resolve(port));
+    });
+  });
+}
+
+async function withClient(callback) {
+  const port = await freePort();
   const transport = new StdioClientTransport({
     command: "node",
     args: ["dist/index.js"],
@@ -39,7 +61,8 @@ function textOf(result) {
   return result.content.map((item) => item.text ?? "").join("\n");
 }
 
-async function withClientIn(outputDir, port, callback) {
+async function withClientIn(outputDir, callback) {
+  const port = await freePort();
   const transport = new StdioClientTransport({
     command: "node",
     args: ["dist/index.js"],
@@ -111,7 +134,7 @@ describe("MCP board server", () => {
   });
 
   it("registers four agent-first tools and an embedded board app", async () => {
-    await withClient(3421, async (client) => {
+    await withClient(async (client) => {
       const { tools } = await client.listTools();
       expect(tools.map((tool) => tool.name).sort()).toEqual([...EXPECTED_TOOLS].sort());
       expect(tools.find((tool) => tool.name === "get_board")._meta).toBeUndefined();
@@ -130,7 +153,7 @@ describe("MCP board server", () => {
   }, 30_000);
 
   it("serves the embedded board app and advertises it after drawing", async () => {
-    await withClient(3442, async (client) => {
+    await withClient(async (client) => {
       const appResource = await client.readResource({ uri: "ui://doodle/board/excalidraw/v1.html" });
       expect(appResource.contents[0].mimeType).toBe("text/html;profile=mcp-app");
       expect(appResource.contents[0].text).toContain("Doodle · Excalidraw Canvas");
@@ -153,7 +176,7 @@ describe("MCP board server", () => {
       args: ["dist/index.js"],
       env: {
         ...process.env,
-        PREVIEW_PORT: "3441",
+        PREVIEW_PORT: "0",
         LOG_LEVEL: "error",
         OUTPUT_DIR: path.join(tempDir, "first-use"),
         DOODLE_WORKSPACE_ROOT: process.cwd(),
@@ -184,7 +207,7 @@ describe("MCP board server", () => {
   }, 30_000);
 
   it("uses concise guidance after a board has visual context", async () => {
-    await withClient(3443, async (client) => {
+    await withClient(async (client) => {
       await client.callTool({
         name: "draw_board",
         arguments: { author: "ai", items: [{ type: "note", x: 0, y: 0, w: 160, h: 90, text: "context" }] },
@@ -199,7 +222,7 @@ describe("MCP board server", () => {
   }, 30_000);
 
   it("sends the guide once per process and rereads compactly", async () => {
-    await withClient(3444, async (client) => {
+    await withClient(async (client) => {
       await client.callTool({
         name: "draw_board",
         arguments: { author: "ai", items: [{ type: "note", x: 0, y: 0, w: 160, h: 90, text: "plan" }] },
@@ -221,7 +244,7 @@ describe("MCP board server", () => {
   }, 30_000);
 
   it("returns only changed objects for a reread since a revision", async () => {
-    await withClient(3445, async (client) => {
+    await withClient(async (client) => {
       await client.callTool({
         name: "draw_board",
         arguments: {
@@ -260,7 +283,7 @@ describe("MCP board server", () => {
 
   it("never sends canvas fidelity to the agent but keeps the canvas board intact", async () => {
     const outputDir = path.join(tempDir, "fidelity");
-    await withClientIn(outputDir, 3446, async (client) => {
+    await withClientIn(outputDir, async (client) => {
       await client.callTool({
         name: "draw_board",
         arguments: { author: "ai", items: [{ type: "note", x: 0, y: 0, w: 160, h: 90, text: "kept" }] },
@@ -292,7 +315,7 @@ describe("MCP board server", () => {
 
   it("returns canvas fidelity only when the canvas explicitly asks for it", async () => {
     const outputDir = path.join(tempDir, "fidelity-on-demand");
-    await withClientIn(outputDir, 3448, async (client) => {
+    await withClientIn(outputDir, async (client) => {
       await client.callTool({
         name: "draw_board",
         arguments: { author: "ai", items: [{ type: "note", x: 0, y: 0, w: 160, h: 90, text: "kept" }] },
@@ -320,7 +343,7 @@ describe("MCP board server", () => {
   }, 30_000);
 
   it("tells the agent what the person changed since its last read", async () => {
-    await withClient(3447, async (client) => {
+    await withClient(async (client) => {
       await client.callTool({
         name: "draw_board",
         arguments: { author: "ai", items: [{ type: "note", x: 0, y: 0, w: 160, h: 90, text: "开始" }] },
@@ -406,7 +429,7 @@ describe("MCP board server", () => {
   }, 30_000);
 
   it("draws a directed board arrow and returns an authoritative canvas snapshot", async () => {
-    await withClient(3422, async (client) => {
+    await withClient(async (client) => {
       const before = jsonAfter(textOf(await client.callTool({ name: "get_board", arguments: {} })), "BOARD_JSON:");
       const drawnResult = await client.callTool({
         name: "draw_board",
@@ -456,7 +479,7 @@ describe("MCP board server", () => {
   }, 30_000);
 
   it("saves and switches editable board snapshots through draw_board library actions", async () => {
-    await withClient(3424, async (client) => {
+    await withClient(async (client) => {
       const initial = await client.callTool({
         name: "draw_board",
         arguments: { author: "ai", items: [{ type: "note", x: 0, y: 0, text: "library original" }] },
@@ -480,7 +503,7 @@ describe("MCP board server", () => {
   }, 30_000);
 
   it("generates a complex diagram from semantic nodes and edges", async () => {
-    await withClient(3427, async (client) => {
+    await withClient(async (client) => {
       const existing = await client.callTool({
         name: "draw_board",
         arguments: { author: "human", items: [{ type: "note", x: 20, y: 20, w: 180, h: 100, text: "person note" }] },
@@ -531,7 +554,7 @@ describe("MCP board server", () => {
   }, 30_000);
 
   it("scans the project read-only as optional board context", async () => {
-    await withClient(3423, async (client) => {
+    await withClient(async (client) => {
       const text = textOf(await client.callTool({
         name: "scan_project",
         arguments: { max_depth: 1, max_files: 12, include_evidence: false },

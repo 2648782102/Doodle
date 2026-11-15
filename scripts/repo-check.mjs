@@ -118,6 +118,11 @@ check(gitignore.includes(".doodle-plugin/") && gitignore.includes(".doodle-data/
 check(index.indexOf("await mcp.connect(transport);") < index.indexOf("await preview.start();"), "MCP stdio is not connected before optional preview startup");
 check(index.includes("Preview unavailable"), "preview failure does not keep the MCP server alive");
 check(config.includes("previewPort: rawPort ? parsePort(rawPort) : null") && config.includes("PLUGIN_DATA"), "runtime config is not plugin-safe");
+check(
+  (await read("test/mcp.test.mjs")).includes("function freePort()")
+    && !/withClient(In)?\(\s*(outputDir\s*,\s*)?\d{4,5}\b/.test(await read("test/mcp.test.mjs")),
+  "MCP tests pin a preview port instead of asking the OS for a free one, so parallel checkouts collide",
+);
 check(version.includes("__DOODLE_PLUGIN_VERSION__"), "bundled server cannot report the injected version");
 check(projectWorkspace.includes("CODEX_PROJECT_ROOT"), "plugin-safe workspace resolution is missing");
 check(packageJson.name === "doodle-mcp", "npm package name is not doodle-mcp");
