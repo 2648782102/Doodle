@@ -65,6 +65,20 @@ describe("liquid glass material", () => {
     expect(glassSource).toMatch(/Math\.round\(clamp\(bezel \* token\("--glass-lens-blur", 0\.05\), 0\.5, 1\.2\)/);
   });
 
+  it("tapers the displacement to zero at the inner bevel edge", () => {
+    // A bevel band that stops with displacement still applied leaves a one-pixel
+    // jump between two sampled places, which reads as a second rectangle under
+    // the glass. Both ends of the band must reach zero.
+    expect(glassSource).toContain("const fall = 1 - Math.pow(clamped, 3);");
+    expect(glassSource).toMatch(/return rise \* fall;/);
+  });
+
+  it("avoids negative-spread inner glows that paint an inset box", () => {
+    // `inset 0 0 22px -14px` shrinks the shadow into a smaller rounded rect
+    // inside the pane instead of lighting its edge.
+    expect(template).not.toMatch(/inset 0 0 \d+px -\d+px var\(--glass/);
+  });
+
   it("separates the pane from a near-white page with a lit rim and a shaded one", () => {
     // Pure-white fill on a white page measures as no surface at all; the rim
     // highlight and its shadow side are what make the curvature visible.

@@ -36,12 +36,23 @@ function bevelHeight(t: number): number {
 
 /**
  * Displacement amplitude from the rim (t=0) to the inner bevel edge (t=1).
- * Zero exactly at the rim keeps the pane's outline from tearing, peaks just
- * inside it, and fades out before the flat centre.
+ *
+ * Both ends must reach zero. The bevel is a closed band: if the amplitude is
+ * still high where the band stops, the map jumps from "displace by N pixels" to
+ * "don't displace" on one pixel row, and the backdrop is sampled from two
+ * different places on either side of that line. Visually that is a hard seam
+ * running across the inside of the pane, which reads as a second rectangle
+ * layered under the glass.
+ *
+ * The curve rises quickly from the rim (that is where the lens bends hardest),
+ * peaks around a third of the way in, then eases back to zero at the inner
+ * edge so the transition into the flat centre is continuous.
  */
 function bevelAmplitude(t: number): number {
-  const rise = Math.pow(Math.sin(Math.min(t, 1) * Math.PI * 0.5), 1.4);
-  return rise * (1 - 0.32 * t);
+  const clamped = Math.min(Math.max(t, 0), 1);
+  const rise = Math.pow(Math.sin(clamped * Math.PI * 0.5), 1.4);
+  const fall = 1 - Math.pow(clamped, 3);
+  return rise * fall;
 }
 
 function clamp(value: number, min: number, max: number): number {

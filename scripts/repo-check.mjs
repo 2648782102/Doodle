@@ -215,6 +215,8 @@ check(excalidrawTemplate.includes(".excalidraw .App-bottom-bar .App-mobile-menu 
 check(excalidrawTemplate.includes("grid-template-columns: repeat(2, minmax(0, 1fr))") && excalidrawTemplate.includes("grid-column: 1 / -1"), "the mobile property sheet is a single narrow column instead of a two-column grid");
 check(excalidrawTemplate.includes(".excalidraw .mobile-misc-tools-container { display: flex; flex-direction: column; gap: 6px; }") && excalidrawTemplate.includes("width: 40px; height: 40px; border-radius: 10px"), "the mobile right-hand tool strip lost its even rows or padding");
 check(excalidrawTemplate.includes(".excalidraw .HintViewer { display: none !important; }"), "upstream hint strip still overlaps the Doodle capsule on narrow screens");
+check(!/inset 0 0 \d+px -\d+px var\(--glass/.test(excalidrawTemplate), "a negative-spread inner glow is back, which paints an inset box inside the pane");
+check(liquidGlass.includes("const clamped = Math.min(Math.max(t, 0), 1);") && liquidGlass.includes("const fall = 1 - Math.pow(clamped, 3);"), "the bevel displacement no longer tapers to zero at the inner edge");
 check(excalidrawApp.includes("doodleSyncBanner") && excalidrawApp.includes("clearError") && !excalidrawApp.includes("api.updateScene({ elements: toElements(refreshed)"), "a rejected save still repaints the canvas from the server or fails silently");
 check((await read("src/board/excalidraw-adapter.ts")).includes("MIN_STORED_SIZE"), "canvas projection can emit items below the stored minimum size");
 check(excalidrawApp.includes("isDoodleProjectLink") && excalidrawApp.includes("onLinkOpen") && excalidrawApp.includes("blockExternalCanvasLinks"), "canvas link policy does not allow only the Doodle repository");
