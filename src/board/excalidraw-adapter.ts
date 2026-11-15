@@ -123,6 +123,18 @@ function skeletonType(item: BoardItem): string {
   return "rectangle";
 }
 
+/**
+ * Board v1 stores opacity as a 0-1 fraction; Excalidraw stores it as 0-100.
+ *
+ * Treating the fraction as a percentage is not a rounding error: `1` becomes
+ * 1% opacity, which renders nearly invisible, and that is how an entire board
+ * can look empty while the data is correct.
+ */
+function boardOpacityToExcalidraw(opacity: number | undefined): number {
+  if (typeof opacity !== "number" || !Number.isFinite(opacity)) return 100;
+  return Math.round(Math.max(0.01, Math.min(1, opacity)) * 100);
+}
+
 function styleFor(item: BoardItem): Partial<ExcalidrawSkeleton> {
   const style = item.style || {};
   return {
@@ -132,7 +144,7 @@ function styleFor(item: BoardItem): Partial<ExcalidrawSkeleton> {
     strokeStyle: item.variant === "frame" ? "dashed" : "solid",
     roughness: item.variant === "frame" || item.role === "step" ? 0 : 1,
     roundness: item.variant === "pill" ? { type: 3 } : item.variant === "card" ? { type: 3 } : null,
-    opacity: style.opacity ?? 100,
+    opacity: boardOpacityToExcalidraw(style.opacity),
     fontSize: style.fontSize ?? (item.variant === "heading" ? 28 : item.type === "text" ? 20 : 16),
     fontFamily: 3,
     textAlign: style.textAlign ?? (item.type === "text" ? "left" : "center"),
@@ -182,7 +194,7 @@ function boundTextSkeleton(item: BoardItem, parent: ExcalidrawSkeleton): Excalid
     containerId: item.id,
     autoResize: false,
     lineHeight: 1.25,
-    opacity: item.style?.opacity ?? 100,
+    opacity: boardOpacityToExcalidraw(item.style?.opacity),
     groupIds: item.groupId ? [item.groupId] : [],
     customData: { doodle: { id: `${item.id}_text`, author: item.author, role: "label", z: item.z, color: item.color } },
   };

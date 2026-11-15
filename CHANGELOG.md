@@ -11,6 +11,10 @@ All notable changes are documented here. Versions follow `VERSIONING.md`.
 - `scan_project` also returns `DIAGRAM_DRAFT_JSON`, a ready-to-draw `draw_board.diagram` draft of the top-level structure, so visualizing a scan no longer needs a separate authoring step.
 - `draw_board.diagram.mode` adds `timeline`, `compare`, and `matrix` beside the default `flow`. Non-flow modes honour explicit `column` / `row`, so an ordered explanation is never reordered by edge analysis.
 
+### Fixed
+
+- Board v1 opacity (a 0-1 fraction) was passed to Excalidraw as if it were a 0-100 percentage, so any item with `opacity: 1` rendered at 1% and looked missing. Opacity is now converted in both directions, and a test covers the round trip.
+
 ### Changed
 
 - Canvas fidelity metadata (`scene`) no longer appears in agent-facing payloads. It stays persisted, and `canvasFidelityItems` reports how many items carry it. The canvas is a separate consumer: it asks for fidelity with `include_canvas_fidelity: true`, and `draw_board` still returns the authoritative snapshot the canvas rebuilds from.
