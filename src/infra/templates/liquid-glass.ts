@@ -85,9 +85,19 @@ function edgeField(
   return { distance: radius - distance, nx: cx / distance, ny: cy / distance };
 }
 
-/** Map resolution multiplier: a 1x map shows hard stair-steps at the rim on Retina. */
+/**
+ * Map resolution multiplier.
+ *
+ * A 1x map shows hard stair-steps at the rim on Retina, so this follows the
+ * device pixel ratio — but the map is regenerated as a PNG and re-rasterised
+ * by the compositor on every rebuild, so the top of that range is expensive
+ * for very little visible gain on small chrome. Doodle's panes are 36–550px
+ * wide; at DPR 3 a 550x44 toolbar produced a 1650x132 map per primitive and
+ * there are four primitives. Capping at 2 keeps the bevel smooth (the band is
+ * only ~13px) while halving the raster cost on 3x displays.
+ */
 function mapScale(): number {
-  return Math.min(Math.max(window.devicePixelRatio || 1, 1), 3);
+  return Math.min(Math.max(window.devicePixelRatio || 1, 1), 2);
 }
 
 function canvasUrl(width: number, height: number, paint: (data: Uint8ClampedArray, scale: number) => void): string {
@@ -119,14 +129,45 @@ function paintEdgeMap(
     clear(data);
     const columns = Math.round(width * scale);
     const rows = Math.round(height * scale);
-    for (let row = 0; row < rows; row += 1) {
-      for (let column = 0; column < columns; column += 1) {
-        const field = edgeField((column + 0.5) / scale, (row + 0.5) / scale, width, height, radius);
-        if (!field || field.distance <= 0 || field.distance >= bezel) continue;
-        if (field.nx === 0 && field.ny === 0) continue;
-        paint(data, (row * columns + column) * 4, field.nx, field.ny, field.distance / bezel);
+    /*
+     * Only the frames can hold bevel pixels.
+     *
+     * The band is `bezel` wide along each edge, so a pane that is 550x44 with
+     * an 8px bezel has ~5% of its area in play; looping every pixel of the flat
+     * middle ran `edgeField` tens of thousands of times per map for results
+     * that were discarded. Two horizontal strips plus two vertical strips cover
+     * the whole band, including the rounded corners, with no per-pixel cost in
+     * the centre.
+     */
+    /*
+     * The band is measured from the rim inward, and `edgeField` reports the
+     * distance of a pixel *centre*. A pixel whose centre sits exactly at
+     * `bezel` is excluded, so the scan window has to reach one pixel further
+     * than `bezel * scale` or the outermost corner pixel of each band is
+     * dropped — a four-pixel hole in the map that shows as a nick in the rim.
+     */
+    const band = Math.ceil(bezel * scale) + 1;
+    const top = 0;
+    const bottomLimit = Math.min(rows, band);
+    const innerTop = Math.max(top, rows - band);
+    const scan = (rowStart: number, rowEnd: number, columnStart: number, columnEnd: number) => {
+      for (let row = rowStart; row < rowEnd; row += 1) {
+        for (let column = columnStart; column < columnEnd; column += 1) {
+          const field = edgeField((column + 0.5) / scale, (row + 0.5) / scale, width, height, radius);
+          if (!field || field.distance <= 0 || field.distance >= bezel) continue;
+          if (field.nx === 0 && field.ny === 0) continue;
+          paint(data, (row * columns + column) * 4, field.nx, field.ny, field.distance / bezel);
+        }
       }
-    }
+    };
+    // Top and bottom bands span the full width (corners included).
+    scan(top, bottomLimit, 0, columns);
+    scan(innerTop, rows, 0, columns);
+    // Left and right bands cover the middle rows the corners do not reach.
+    const leftLimit = Math.min(columns, band);
+    const innerLeft = Math.max(0, columns - band);
+    scan(bottomLimit, innerTop, 0, leftLimit);
+    scan(bottomLimit, innerTop, innerLeft, columns);
   });
 }
 
@@ -563,7 +604,18 @@ export function initLiquidGlass(selector = GLASS_SELECTOR): LiquidGlassControlle
       scan();
     }, 120);
   });
-  tree.observe(document.body, { childList: true, subtree: true, attributes: true, attributeFilter: ["hidden", "class"] });
+  /*
+   * Watch structure and `hidden`, not `class`.
+   *
+   * Excalidraw rewrites `class` constantly — hover, selection, every pointer
+   * move over the toolbar — so observing it woke the observer dozens of times
+   * a second and re-ran `scan()` over the whole document. `scan()` itself is
+   * cheap (it only touches elements matching the selector), but the callback
+   * and the query were pure overhead on a board that is supposed to feel like
+   * paper. Panes appear through element insertion and `hidden` flips, which is
+   * all this needs; a pane that merely changes class keeps its maps.
+   */
+  tree.observe(document.body, { childList: true, subtree: true, attributes: true, attributeFilter: ["hidden"] });
 
   return {
     refresh() {

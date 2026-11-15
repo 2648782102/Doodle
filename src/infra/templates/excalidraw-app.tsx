@@ -311,6 +311,17 @@ async function initHostApp() {
   await hostApp.connect();
   const timer = window.setInterval(async () => {
     if (document.visibilityState === "hidden") return;
+    /*
+     * Never poll while a write is in flight or the pointer is mid-gesture.
+     *
+     * The poll asks for `include_canvas_fidelity`, which is the expensive
+     * shape: every item carries its full Excalidraw `scene`. Firing that during
+     * a drag means the response lands mid-gesture, `applyRemoteSnapshot` sees an
+     * older revision and throws the payload away — all cost, no benefit. The
+     * board also broadcasts its own change through the host tool result, so a
+     * skipped tick is caught by the next one.
+     */
+    if (applyingRemote.current || isEditing(currentAppState.current)) return;
     try {
       // The canvas rebuilds its scene from items, so it must ask for the
       // Excalidraw fidelity that agent-facing reads deliberately omit.

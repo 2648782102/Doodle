@@ -1,7 +1,3 @@
-# Changelog
-
-All notable changes are documented here. Versions follow `VERSIONING.md`.
-
 ## Unreleased — Easier to reach
 
 ### Changed
@@ -23,27 +19,14 @@ All notable changes are documented here. Versions follow `VERSIONING.md`.
 ### Fixed
 
 - Native Excalidraw islands follow Excalidraw's own surface tokens rather than the page theme. Doodle keeps Excalidraw on its light theme so board colours stay literal, so a dark page-tinted glass made the dark toolbar icons disappear.
-
-
-### Fixed
-
 - Dark mode rendered board content almost invisibly. Three separate causes: ink was a hardcoded dark grey on a dark page, a frame's white fill became a glaring block, and Excalidraw's own dark theme inverted the colours a person had chosen. Ink and paper fills are now chosen per theme, text ink is chosen against the surface it actually sits on (dark ink inside a light card), and Excalidraw stays on its light theme so stored colours render literally while Doodle paints the dark page.
 - Equal-z backdrops (frames, columns) could be drawn above their contents after a redraw; ordering now keeps them behind.
-
 
 ### Added
 
 - Delta reads now explain *what the human change means*, not just which fields moved. `HANDOFF_READINGS` names the intent — a rename is read as a correction of meaning, a move as a layout preference, a resize as emphasis, a new note as something to respond to — with one bounded suggestion each. `NEXT` leads with the most meaningful change.
-
-
-### Added
-
 - Each board remembers its own camera (scroll and zoom) in browser storage, so reopening lands where you left off instead of at the origin. An empty board never restores a camera, and a remembered view panned away from the content is discarded so a full board cannot look blank.
 - Writes that would clear every object from a non-empty board are refused with a 409. A deliberate per-object delete is unaffected, as is the first write to a new board.
-
-
-### Added
-
 - `npm run doodle` is a one-action on-ramp: it starts the local board and opens the default browser, printing the URL and a few gestures for a machine that cannot open one. `--print` forces the terminal-only path.
 - An empty board shows a dismissible first-run card explaining note creation, drawing, panning, and zooming. The dismissal is remembered locally and the card never covers a board that already has content.
 - Running the MCP server directly now prints the board URL with one short instruction, so `npx -y doodle-mcp` is legible to a person and not only to a host.
@@ -73,13 +56,10 @@ All notable changes are documented here. Versions follow `VERSIONING.md`.
 - The material no longer leaks into descendants. `--glass-refraction` is a custom property, so every icon, 13px radio input, and 1×1 visually-hidden anchor inside a pane inherited the filter and sampled the backdrop through a bevel sized for the parent's box. The mobile library trigger — a 40px row whose 12px radius spent 60% of its height on the band — painted the "tray inside the strip" that survived the earlier light-direction fix. Rows in the mobile strip now inherit the strip's material instead of becoming panes themselves.
 - The mobile bottom bar is anchored to its content instead of the viewport. Upstream stretches it with `inset: 0`; opening the property sheet resized that flex container and re-laid-out the palette, which is the jitter on every open and close. The bar also drops upstream's `margin: 0 14px 14px`, which stacked with our 12px padding into a 26px inset and made the palette float lower than every other surface.
 - `--glass-surface-*` is declared next to `--island-bg-color` rather than on `:root`. Declared at the root, the `color-mix()` referenced a variable that only existed on `.excalidraw`, so the whole family resolved to nothing and panes using it painted no fill at all.
-
-### Added
-
 - The glass is frosted in the centre and sharp at the rim. A single gaussian cannot serve both: enough blur to read as frosted glass erased the 1px dot grid, while keeping the grid left the middle looking like clear acetate. A second, wider blur now runs on a fresh copy of the backdrop and is masked to the flat middle, so the bevel keeps its refraction while the centre gets a diffuse haze. The frost blend is deliberately partial so the dot grid survives through it.
-
-### Changed
-
+- An unfilled shape no longer turns into a solid block. `elementColor` fell back to `strokeColor` whenever `backgroundColor` was `transparent`, so an outline-only rectangle stored its ink colour as its fill; the next render then painted a black box. Fill and stroke are separate fields — `transparent` is now preserved as a real fill value, in both the adapter and `addBoardItems`.
+- The glass no longer rasterises pixels it cannot use. The bevel band is a few pixels along each edge, but `paintEdgeMap` looped every pixel of the flat middle and threw the results away — about 320k `edgeField` calls across six panes at DPR 2. The scan is now limited to the four edge bands (verified pixel-identical against the exhaustive version on six geometries), which took a forced rebuild from ~32ms to a few milliseconds.
+- The pane observer no longer watches `class`. Excalidraw rewrites classes on every hover and selection change, so the document scan woke dozens of times a second for no benefit; only `hidden` and subtree insertion matter.
 - Canvas fidelity metadata (`scene`) no longer appears in agent-facing payloads. It stays persisted, and `canvasFidelityItems` reports how many items carry it. The canvas is a separate consumer: it asks for fidelity with `include_canvas_fidelity: true`, and `draw_board` still returns the authoritative snapshot the canvas rebuilds from.
 - Delta reads end with a state-derived `NEXT` line: no-change reads discourage a redraw, and human-edit reads name what changed and ask for a response first.
 - The capabilities, recipes, and drawing guide are sent once per server process; later reads carry a one-line pointer, and `include_guide: true` asks for them again.
@@ -96,7 +76,6 @@ All notable changes are documented here. Versions follow `VERSIONING.md`.
 - Added layout regression coverage for the human canvas: the `图库` drawer must overlay rather than resize Excalidraw, keep one independently scrollable board list with fixed action rows, and hide its launcher while open; hover/active rules may change only color, border, and shadow.
 - The human canvas now uses a Doodle-owned main menu: local search, local help, and one GitHub link to the current Doodle repository. Upstream social links, help-header external links, the materials-library browse destination, arbitrary web embedding, and Excalidraw AI/Mermaid generation entries are removed.
 - Unified Doodle and Excalidraw under one palette: warm paper with pine green in light mode and green-tinted charcoal with pale mint in dark mode. Native Excalidraw primary, surface, island, input, border, button, and shadow variables now follow those tokens instead of the upstream violet defaults.
-
 - Extended version 1 board objects with freehand `stroke`, bounded local `image`, `title`, `shape`, `groupId`, and `emphasis: focus`; older boards remain valid without migration.
 - `draw_board` now supports precise `updates`, batch `items`, `remove_ids`, and deterministic `layout` while keeping exactly four MCP tools.
 - Human canvas adds marquee multi-select, batch move/delete/group/layout, undo/redo, double-click-to-create notes, arrow-key nudging, alignment snapping, and bounded `Ctrl/⌘+V` image paste.
@@ -229,8 +208,6 @@ All notable changes are documented here. Versions follow `VERSIONING.md`.
 
 ### Public plugin directory
 
-The attached `doodle-0.6.0.zip` is a review-ready local-MCP plugin package. Public directory submission still requires an approved submitting organization, verified developer identity, portal review, policy attestations, and clean desktop testing.
-
 ## 0.5.0 — Canvas embedded in the agent
 
 ### Added
@@ -280,5 +257,3 @@ The attached `doodle-0.6.0.zip` is a review-ready local-MCP plugin package. Publ
 - Removed 0.3.x tool schemas, REST endpoints, and approval workflows are intentionally not restored. Code changes remain ordinary, separately reviewed coding-agent work.
 
 ## 0.3.x and earlier
-
-Earlier releases explored a broader project-workbench and proposal-based collaboration surface. They are preserved in Git history and the archived ADRs; their tool schemas and state contracts are not part of 0.4.0.

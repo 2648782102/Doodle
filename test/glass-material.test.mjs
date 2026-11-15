@@ -229,4 +229,25 @@ describe("liquid glass material", () => {
     expect(glassSource).toMatch(/token\("--glass-frost", 0\.12\)/);
     expect(glassSource).toMatch(/<feFuncA type="linear" slope="0\.42"/);
   });
+
+  it("only rasterises the bevel band, not the whole pane", () => {
+    // The band is a few pixels along each edge; the flat middle has no bevel
+    // pixels at all. Looping every pixel ran `edgeField` tens of thousands of
+    // times per map for results that were immediately discarded.
+    expect(glassSource).toContain("const band = Math.ceil(bezel * scale) + 1;");
+    expect(glassSource).toMatch(/scan\(top, bottomLimit, 0, columns\)/);
+    expect(glassSource).toMatch(/scan\(bottomLimit, innerTop, 0, leftLimit\)/);
+  });
+
+  it("caps map resolution so 3x displays do not pay for invisible detail", () => {
+    // Four primitives per pane, each a PNG re-rasterised on every rebuild.
+    expect(glassSource).toMatch(/Math\.min\(Math\.max\(window\.devicePixelRatio \|\| 1, 1\), 2\)/);
+  });
+
+  it("does not wake on class churn", () => {
+    // Excalidraw rewrites `class` on every hover and selection change; watching
+    // it re-ran the document scan dozens of times a second for nothing.
+    expect(glassSource).toMatch(/attributeFilter: \["hidden"\]/);
+    expect(glassSource).not.toMatch(/attributeFilter: \["hidden", "class"\]/);
+  });
 });

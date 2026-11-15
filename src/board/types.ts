@@ -227,6 +227,17 @@ function isColor(value: unknown): value is string {
   return typeof value === "string" && /^#[0-9a-fA-F]{6}$/.test(value);
 }
 
+/**
+ * Fill colour, where `transparent` is a real choice.
+ *
+ * A shape the person left unfilled must round-trip as unfilled. Treating
+ * `transparent` as invalid made the adapter fall back to the stroke colour,
+ * which painted an outline-only rectangle as a solid block on the next load.
+ */
+function isFillColor(value: unknown): value is string {
+  return value === "transparent" || isColor(value);
+}
+
 function normalizeStyle(value: unknown): BoardItemStyle | undefined {
   if (value === undefined) return undefined;
   if (!value || typeof value !== "object") throw new Error("Invalid board item style");
@@ -645,7 +656,7 @@ function normalizeItem(input: BoardItemInput): Omit<BoardItem, "createdAt" | "up
     : (input.type === "line" ? 0 : height);
   const text = (input.text ?? "").slice(0, MAX_TEXT);
   if (text.length > MAX_TEXT) throw new Error("Item text is too long");
-  const color = input.color && /^#[0-9a-fA-F]{6}$/.test(input.color) ? input.color : COLORS[0];
+  const color = input.color && isFillColor(input.color) ? input.color : COLORS[0];
   const author = isAuthor(input.author) ? input.author : "human";
   if (input.type === "line" && signedWidth === 0 && signedHeight === 0) throw new Error("Line needs a direction");
   if (input.type === "image" && !isImageSource(input.src)) throw new Error("Image source is required");
