@@ -292,8 +292,9 @@ const GLASS_SELECTOR = [
   ".excalidraw .mobile-misc-tools-container",
   ".excalidraw .App-bottom-bar > .Island",
   ".excalidraw .Island.App-menu__left",
-  // Menus and the mobile extra-tools sheet float over board content; they get
-  // the same material as the shell rather than a flat white card.
+  // Menus float over board content and get the same material as the shell.
+  // The expanded property sheet is deliberately excluded: it is a control
+  // panel, and refraction behind swatch labels made it unreadable.
   ".excalidraw .dropdown-menu .dropdown-menu-container",
 ].join(", ");
 

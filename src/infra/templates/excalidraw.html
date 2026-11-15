@@ -301,6 +301,7 @@
     .excalidraw .mobile-misc-tools-container {
       top: 68px;
       right: 12px;
+      padding: 4px;
       border: 1px solid var(--glass-edge-outer);
       border-radius: 14px;
       background-color: color-mix(in srgb, var(--island-bg-color) 16%, transparent);
@@ -312,8 +313,34 @@
       -webkit-backdrop-filter: var(--glass-refraction, blur(var(--glass-blur)) saturate(var(--glass-saturate)));
       backdrop-filter: var(--glass-refraction, blur(var(--glass-blur)) saturate(var(--glass-saturate)));
     }
+    /*
+     * One 40px row per icon.
+     *
+     * Upstream let this strip size each child by its own content, so the
+     * library trigger rendered 44px tall while the lock and hand buttons were
+     * 32px, and the 4px shell padding left them touching the rim. Normalising
+     * the rows gives the group a real inset and an even rhythm.
+     */
+    .excalidraw .mobile-misc-tools-container > * { border-radius: 10px; }
+    .excalidraw .mobile-misc-tools-container .sidebar-trigger__label-element,
     .excalidraw .mobile-misc-tools-container .sidebar-trigger,
-    .excalidraw .mobile-misc-tools-container .ToolIcon__icon { border-radius: 10px; }
+    .excalidraw .mobile-misc-tools-container .default-sidebar-trigger,
+    .excalidraw .mobile-misc-tools-container .ToolIcon,
+    .excalidraw .mobile-misc-tools-container .ToolIcon__icon { width: 40px; height: 40px; border-radius: 10px; }
+    .excalidraw .mobile-misc-tools-container .ToolIcon + .ToolIcon,
+    .excalidraw .mobile-misc-tools-container .sidebar-trigger__label-element + .ToolIcon { margin-top: 2px; }
+    /*
+     * The strip is a column of equal rows. Upstream leaves it as a plain flex
+     * column whose children size themselves, which is why the library icon sat
+     * flush against the top rim and the bottom icon against the bottom rim.
+     */
+    .excalidraw .mobile-misc-tools-container { display: flex; flex-direction: column; gap: 6px; }
+    /*
+     * The library trigger is a distinct action from the two view tools. A gap
+     * separates them; a hairline was rejected because the rows are rounded, so
+     * a border-top drew an arc instead of a rule.
+     */
+    .excalidraw .mobile-misc-tools-container .sidebar-trigger__label-element + .ToolIcon { margin-top: 4px; }
     /*
      * The mobile bottom bar is the tool palette plus, once something is
      * selected, the action row. It spans the viewport as a bare 8px sheet with
@@ -334,6 +361,115 @@
     }
     .excalidraw .App-bottom-bar .Island .panelColumn { padding: 8px 10px; }
     .excalidraw .App-bottom-bar .dropdown-menu-button--mobile { border-radius: 10px; }
+    /*
+     * The expanded properties sheet.
+     *
+     * Selecting an object on mobile opens Excalidraw's property panel, which is
+     * rendered *inside* the bottom bar island. With the island as glass the
+     * sheet inherited that 16% fill and grew to the full viewport height, so the
+     * board showed straight through the controls and the content overflowed the
+     * card (913px of fields inside a 794px island).
+     *
+     * Instead the island becomes a transparent layout container while the sheet
+     * is open: the properties get their own bounded card that scrolls
+     * internally, and the palette below keeps its own pill.
+     *
+     * The sheet is the one surface in the product that is not translucent. It is
+     * a control panel, not a frame: the board showed through behind the swatch
+     * labels and the colour chips, so it uses the solid panel colour. The rim,
+     * the hairline, and the raised shadow stay, so it still reads as part of the
+     * glass shell without ghosting the board. Readability of controls wins over
+     * translucency here.
+     */
+    .excalidraw .App-bottom-bar .App-mobile-menu {
+      max-height: min(62vh, 520px);
+      margin: 0 0 8px;
+      padding: 14px 16px 16px;
+      overflow: hidden auto;
+      overscroll-behavior: contain;
+      border: 1px solid var(--glass-edge-outer);
+      border-radius: 18px;
+      /*
+       * `--doodle-panel` is itself 97% alpha, which still let the yellow card
+       * and its dashed frame tint through the swatches. This sheet uses the
+       * solid surface colour: it is a control panel, and it must be readable
+       * over any board content. The rim and shadow keep it in the glass family.
+       */
+      background-color: var(--doodle-surface-solid);
+      box-shadow:
+        inset 0 1px 0 0 var(--glass-edge),
+        inset 0 -1px 1.5px 0 var(--glass-depth),
+        inset 0 0 0 1px var(--glass-tint),
+        var(--glass-shadow-raised);
+      -webkit-backdrop-filter: none;
+      backdrop-filter: none;
+    }
+    /*
+     * Two columns, not one.
+     *
+     * Upstream renders this panel as a single narrow column of sections, which
+     * at phone width left the right half of the card empty while the content
+     * ran past the bottom. The sections are independent control groups, so a
+     * two-column grid halves the height, fills the card, and keeps each group
+     * readable. Wide sections (the colour pickers and the opacity slider) span
+     * both columns; they need the full width to stay one row.
+     */
+    @media (max-width: 640px) {
+      .excalidraw .App-bottom-bar .App-mobile-menu .panelColumn {
+        display: grid;
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+        gap: 16px 14px;
+        align-items: start;
+      }
+      .excalidraw .App-bottom-bar .App-mobile-menu .panelColumn > * { min-width: 0; }
+      /* The two colour pickers and the opacity slider need the full card width
+         to keep their swatches and track on one row. */
+      .excalidraw .App-bottom-bar .App-mobile-menu .panelColumn > div:has(.color-picker-container),
+      .excalidraw .App-bottom-bar .App-mobile-menu .panelColumn > label.control-label { grid-column: 1 / -1; }
+      /* Breathing room under the last row so it does not touch the card's rim
+         when the list is scrolled to the end. */
+      .excalidraw .App-bottom-bar .App-mobile-menu .panelColumn { padding-bottom: 6px; }
+    }
+    /*
+     * Property sheet rhythm. Upstream stacks every section with the same tight
+     * 0.75rem gap and leaves the swatch rows at 22px, which reads as cramped at
+     * phone width. Sections get a little more air, and the colour swatches are
+     * enlarged to a comfortable tap target without touching the layout box.
+     */
+    .excalidraw .App-bottom-bar .App-mobile-menu .panelColumn { padding: 0; row-gap: 1.15rem; }
+    .excalidraw .App-bottom-bar .App-mobile-menu .panelColumn h3,
+    .excalidraw .App-bottom-bar .App-mobile-menu .panelColumn legend,
+    .excalidraw .App-bottom-bar .App-mobile-menu .panelColumn .control-label { margin-bottom: 0.5rem; font-size: 0.8125rem; }
+    .excalidraw .App-bottom-bar .App-mobile-menu .color-picker__button,
+    .excalidraw .App-bottom-bar .App-mobile-menu .color-picker__button--large { width: 28px; height: 28px; border-radius: 8px; flex: 0 0 auto; }
+    /*
+     * Five swatches plus the current-colour chip must fit one row. Upstream used
+     * `space-between` inside a fixed-width grid column, so enlarging the swatches
+     * pushed the chip onto its own line and left an orphan below every palette.
+     */
+    .excalidraw .App-bottom-bar .App-mobile-menu .color-picker__top-picks { display: flex; flex-wrap: nowrap; align-items: center; gap: 4px; }
+    .excalidraw .App-bottom-bar .App-mobile-menu .color-picker-container {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      padding: 2px 0;
+    }
+    .excalidraw .App-bottom-bar .App-mobile-menu .color-picker__button-outline { display: none; }
+    .excalidraw .App-bottom-bar .App-mobile-menu .color-picker__button.active { outline: 2px solid var(--color-primary); outline-offset: 2px; }
+    .excalidraw .App-bottom-bar .App-mobile-menu .buttonList { flex-wrap: wrap; gap: 6px; }
+    body:has(.excalidraw .App-mobile-menu) .excalidraw .App-bottom-bar > .Island {
+      border: 0;
+      background-color: transparent;
+      box-shadow: none;
+      -webkit-backdrop-filter: none;
+      backdrop-filter: none;
+    }
+    body:has(.excalidraw .App-mobile-menu) .excalidraw .mobile-misc-tools-container {
+      opacity: 0;
+      visibility: hidden;
+      pointer-events: none;
+      transition: opacity var(--doodle-duration) var(--doodle-ease), visibility 0s linear var(--doodle-duration);
+    }
     @supports not ((backdrop-filter: blur(1px)) or (-webkit-backdrop-filter: blur(1px))) {
       .excalidraw .App-bottom-bar > .Island,
       .excalidraw .mobile-misc-tools-container { background-color: var(--island-bg-color); }
