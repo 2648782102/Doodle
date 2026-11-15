@@ -4,6 +4,12 @@ All notable changes are documented here. Versions follow `VERSIONING.md`.
 
 ## Unreleased — Easier to reach
 
+### Fixed
+
+- Dark mode rendered board content almost invisibly. Three separate causes: ink was a hardcoded dark grey on a dark page, a frame's white fill became a glaring block, and Excalidraw's own dark theme inverted the colours a person had chosen. Ink and paper fills are now chosen per theme, text ink is chosen against the surface it actually sits on (dark ink inside a light card), and Excalidraw stays on its light theme so stored colours render literally while Doodle paints the dark page.
+- Equal-z backdrops (frames, columns) could be drawn above their contents after a redraw; ordering now keeps them behind.
+
+
 ### Added
 
 - Delta reads now explain *what the human change means*, not just which fields moved. `HANDOFF_READINGS` names the intent — a rename is read as a correction of meaning, a move as a layout preference, a resize as emphasis, a new note as something to respond to — with one bounded suggestion each. `NEXT` leads with the most meaningful change.

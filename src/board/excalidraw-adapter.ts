@@ -135,11 +135,99 @@ function boardOpacityToExcalidraw(opacity: number | undefined): number {
   return Math.round(Math.max(0.01, Math.min(1, opacity)) * 100);
 }
 
-function styleFor(item: BoardItem): Partial<ExcalidrawSkeleton> {
+/**
+ * Canvas ink for each theme.
+ *
+ * Board v1 stores an object's own colour, but not the page it sits on. The
+ * adapter always emitted one dark ink, which is invisible on the dark canvas -
+ * the text was there, just unreadable. Ink is therefore chosen by theme, and an
+ * explicit `style.textColor` / `style.borderColor` still wins.
+ */
+const CANVAS_INK: Record<CanvasTheme, string> = {
+  light: "#1f2937",
+  dark: "#e8eeea",
+};
+
+export type CanvasTheme = "light" | "dark";
+
+const CANVAS_BACKGROUND: Record<CanvasTheme, string> = {
+  light: "#f5f6f0",
+  dark: "#131a18",
+};
+
+/** A frame is a page-like backdrop; pure white is wrong in dark mode. */
+const CANVAS_PANEL: Record<CanvasTheme, string> = {
+  light: "#ffffff",
+  dark: "#1d2521",
+};
+
+/**
+ * Board v1 records literal colours, but a colour that means "paper" has to
+ * follow the theme. Pure white/near-white fills are mapped so a frame or card
+ * does not turn into a glaring block - or hide its contents - in dark mode.
+ */
+function themedFill(color: string | undefined, theme: CanvasTheme): string | undefined {
+  if (!color) return color;
+  // Judge by luminance, not by a hex prefix: `#f6d365` is a yellow card, while
+  // `#fbfbfc` is paper. A prefix rule silently erased saturated fills.
+  if (theme === "dark" && /^#[0-9a-fA-F]{6}$/.test(color) && isNearWhite(color)) return CANVAS_PANEL.dark;
+  return color;
+}
+
+/** True for colours that read as paper rather than as a deliberate fill. */
+function isNearWhite(hex: string): boolean {
+  const value = hex.replace("#", "");
+  const [r, g, b] = [0, 2, 4].map((index) => Number.parseInt(value.slice(index, index + 2), 16));
+  const spread = Math.max(r, g, b) - Math.min(r, g, b);
+  return Math.min(r, g, b) >= 230 && spread <= 12;
+}
+
+function relativeLuminance(hex: string): number {
+  const value = hex.replace("#", "");
+  if (value.length !== 6) return 0;
+  const channels = [0, 2, 4].map((index) => Number.parseInt(value.slice(index, index + 2), 16) / 255);
+  const [r, g, b] = channels.map((c) => (c <= 0.03928 ? c / 12.92 : ((c + 0.055) / 1.055) ** 2.4));
+  return 0.2126 * r + 0.7152 * g + 0.0722 * b;
+}
+
+function contrast(a: string, b: string): number {
+  const left = relativeLuminance(a);
+  const right = relativeLuminance(b);
+  return (Math.max(left, right) + 0.05) / (Math.min(left, right) + 0.05);
+}
+
+/**
+ * Keep an object's own colour when it reads against the page, otherwise fall
+ * back to the theme's ink. A line with `color: #ffffff` on a white canvas is the
+ * same bug as dark ink on a dark canvas.
+ */
+function readableStroke(color: string | undefined, theme: CanvasTheme): string {
+  if (color && /^#[0-9a-fA-F]{6}$/.test(color) && contrast(color, CANVAS_BACKGROUND[theme]) >= 3) return color;
+  return CANVAS_INK[theme];
+}
+
+/**
+ * Ink that reads against the surface it actually sits on.
+ *
+ * Text inside a yellow card must be dark even when the page is dark; choosing
+ * ink by page background painted light text on a light card. When an object has
+ * its own fill, that fill decides.
+ */
+function inkOn(fill: string | undefined, theme: CanvasTheme): string {
+  const surface = fill && /^#[0-9a-fA-F]{6}$/.test(fill) && !isNearWhite(fill) ? fill : CANVAS_BACKGROUND[theme];
+  return contrast(CANVAS_INK[theme], surface) >= 4.5 ? CANVAS_INK[theme] : CANVAS_INK.light;
+}
+
+function styleFor(item: BoardItem, theme: CanvasTheme): Partial<ExcalidrawSkeleton> {
   const style = item.style || {};
+  // A standalone text object paints with its stroke, so `textColor` must reach
+  // strokeColor; shapes keep their border colour for the outline.
+  const textInk = item.type === "text" ? style.textColor : undefined;
   return {
-    strokeColor: style.borderColor ?? (item.type === "line" ? item.color : "#1f2937"),
-    backgroundColor: item.type === "line" || item.type === "stroke" || item.type === "image" ? "transparent" : item.color,
+    strokeColor: textInk
+      ?? style.borderColor
+      ?? (item.type === "line" ? readableStroke(item.color, theme) : CANVAS_INK[theme]),
+    backgroundColor: item.type === "line" || item.type === "stroke" || item.type === "image" ? "transparent" : (themedFill(item.color, theme) ?? "transparent"),
     strokeWidth: style.strokeWidth ?? (item.type === "stroke" ? 3 : 2),
     strokeStyle: item.variant === "frame" ? "dashed" : "solid",
     roughness: item.variant === "frame" || item.role === "step" ? 0 : 1,
@@ -153,7 +241,7 @@ function styleFor(item: BoardItem): Partial<ExcalidrawSkeleton> {
   };
 }
 
-function baseSkeleton(item: BoardItem): ExcalidrawSkeleton {
+function baseSkeleton(item: BoardItem, theme: CanvasTheme): ExcalidrawSkeleton {
   return {
     id: item.id,
     type: skeletonType(item),
@@ -162,11 +250,11 @@ function baseSkeleton(item: BoardItem): ExcalidrawSkeleton {
     width: item.type === "line" ? Math.abs(item.w) : item.w,
     height: item.type === "line" ? Math.abs(item.h) : item.h,
     verticalAlign: item.type === "text" ? "top" : "middle",
-    ...styleFor(item),
+    ...styleFor(item, theme),
   };
 }
 
-function boundTextSkeleton(item: BoardItem, parent: ExcalidrawSkeleton): ExcalidrawSkeleton {
+function boundTextSkeleton(item: BoardItem, parent: ExcalidrawSkeleton, theme: CanvasTheme): ExcalidrawSkeleton {
   const raw = labelOf(item);
   const fontSize = item.style?.fontSize ?? 16;
   const align = item.style?.textAlign ?? "center";
@@ -189,7 +277,7 @@ function boundTextSkeleton(item: BoardItem, parent: ExcalidrawSkeleton): Excalid
     fontFamily: 3,
     textAlign: item.style?.textAlign ?? "center",
     verticalAlign: "middle",
-    strokeColor: item.style?.textColor ?? "#1f2937",
+    strokeColor: item.style?.textColor ?? inkOn(item.color, theme),
     backgroundColor: "transparent",
     containerId: item.id,
     autoResize: false,
@@ -200,9 +288,9 @@ function boundTextSkeleton(item: BoardItem, parent: ExcalidrawSkeleton): Excalid
   };
 }
 
-export function boardItemsToExcalidrawSkeleton(items: BoardItem[]): ExcalidrawSkeleton[] {
+export function boardItemsToExcalidrawSkeleton(items: BoardItem[], theme: CanvasTheme = "light"): ExcalidrawSkeleton[] {
   return items.flatMap((item) => {
-    const base = baseSkeleton(item);
+    const base = baseSkeleton(item, theme);
     if (item.type === "line") {
       const endX = item.w;
       const endY = item.h;
@@ -233,7 +321,7 @@ export function boardItemsToExcalidrawSkeleton(items: BoardItem[]): ExcalidrawSk
       base.fileId = item.scene?.fileId ?? item.id;
     } else if (isTextContainer(item) && textOf(item)) {
       base.boundElements = [{ type: "text", id: `${item.id}_text` }];
-      return [base, boundTextSkeleton(item, base)];
+      return [base, boundTextSkeleton(item, base, theme)];
     }
     return [base];
   });
@@ -376,9 +464,9 @@ export function excalidrawElementsToBoardItems(
   return items;
 }
 
-export function boardToExcalidrawInitialData(board: SimpleBoard): Record<string, unknown> {
+export function boardToExcalidrawInitialData(board: SimpleBoard, theme: CanvasTheme = "light"): Record<string, unknown> {
   return {
-    elements: boardItemsToExcalidrawSkeleton(board.items),
+    elements: boardItemsToExcalidrawSkeleton(board.items, theme),
     files: boardToExcalidrawFiles(board),
     appState: {
       viewBackgroundColor: "#fbfbfc",

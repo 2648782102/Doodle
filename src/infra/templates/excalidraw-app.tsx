@@ -206,6 +206,16 @@ function readTheme(): DoodleTheme {
   }
 }
 
+/**
+ * Excalidraw inverts element colours when its own theme is dark. That is right
+ * for a whiteboard owner who wants a dark UI, but wrong here: a board stores the
+ * colours a person chose, and inverting them made a yellow card render as dark
+ * brown with light text, or disappear. Doodle therefore keeps Excalidraw on the
+ * light theme so element colours are literal, and paints the dark page itself
+ * with `--doodle-canvas-bg`.
+ */
+const EXCALIDRAW_THEME = "light" as const;
+
 function applyTheme(theme: DoodleTheme): void {
   document.documentElement.dataset.doodleTheme = theme;
   window.DOODLE_THEME = theme;
@@ -334,13 +344,18 @@ function connectStandaloneUpdates() {
   socket.addEventListener("close", () => window.setTimeout(connectStandaloneUpdates, 750));
 }
 
-function toElements(snapshot: BoardSnapshot) {
-  const skeletons = boardItemsToExcalidrawSkeleton(snapshot.items as never[]);
+function toElements(snapshot: BoardSnapshot, theme: DoodleTheme = readTheme()) {
+  const skeletons = boardItemsToExcalidrawSkeleton(snapshot.items as never[], theme);
   return convertToExcalidrawElements(skeletons as never[], { regenerateIds: false })
     .sort((left: ExcalidrawLikeElement, right: ExcalidrawLikeElement) => {
-      const leftZ = (left.customData?.doodle as { z?: number } | undefined)?.z ?? 0;
-      const rightZ = (right.customData?.doodle as { z?: number } | undefined)?.z ?? 0;
-      return leftZ - rightZ;
+      const leftMeta = (left.customData?.doodle as { z?: number; role?: string; variant?: string } | undefined) ?? {};
+      const rightMeta = (right.customData?.doodle as { z?: number; role?: string; variant?: string } | undefined) ?? {};
+      const z = (leftMeta.z ?? 0) - (rightMeta.z ?? 0);
+      if (z !== 0) return z;
+      // A frame or column is a backdrop; drawing it last would cover its
+      // contents, so equal z orders it behind everything else.
+      const isBackdrop = (role?: string, variant?: string) => role === "frame" || role === "column" || variant === "frame";
+      return Number(isBackdrop(leftMeta.role, leftMeta.variant)) - Number(isBackdrop(rightMeta.role, rightMeta.variant));
     });
 }
 
@@ -653,7 +668,7 @@ function CanvasApp({ initial }: { initial: BoardSnapshot }) {
       ? stored
       : undefined;
     return {
-      elements: toElements(initial),
+      elements: toElements(initial, theme),
       files: currentFiles.current,
       appState: {
         viewBackgroundColor: canvasColors[theme].view,
@@ -684,6 +699,13 @@ function CanvasApp({ initial }: { initial: BoardSnapshot }) {
       },
       captureUpdate: "NEVER",
     });
+    // Ink is chosen per theme, so switching themes has to recolor the scene as
+    // well as the page. Without this, dark mode shows light-mode ink.
+    if (activeSnapshot) {
+      applyingRemote.current = true;
+      api.updateScene({ elements: toElements(activeSnapshot, theme), captureUpdate: "NEVER" });
+      window.setTimeout(() => { applyingRemote.current = false; }, 0);
+    }
   }, [api, theme]);
 
   useEffect(() => {
@@ -756,7 +778,7 @@ function CanvasApp({ initial }: { initial: BoardSnapshot }) {
       initialData,
       onChange,
       langCode: "zh-CN",
-      theme,
+      theme: EXCALIDRAW_THEME,
       aiEnabled: false,
       onLinkOpen: (element: { link?: string }, event: CustomEvent<{ nativeEvent: MouseEvent }>) => {
         if (element.link && !isDoodleProjectLink(element.link)) event.preventDefault();

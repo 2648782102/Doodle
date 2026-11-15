@@ -170,6 +170,8 @@ check(tools.includes('"scan_project"') && tools.includes("Use draw_board to visu
 check(boardTypes.includes("signedWidth") && boardTypes.includes("signedHeight"), "board types lost signed directed-arrow deltas");
 check(boardTypes.includes("boardVisualDigest") && boardTypes.includes("startItemId") && boardTypes.includes("variant"), "board types lost visual-expression fields or deterministic visual digest");
 check(excalidrawApp.includes("excalidraw") && (await read("src/board/excalidraw-adapter.ts")).includes("boardOpacityToExcalidraw"), "canvas opacity is not converted between Board v1 (0-1) and Excalidraw (0-100)");
+check((await read("src/board/excalidraw-adapter.ts")).includes("inkOn(") && (await read("src/board/excalidraw-adapter.ts")).includes("themedFill("), "canvas ink or fill is no longer adapted to the theme");
+check(excalidrawApp.includes("EXCALIDRAW_THEME"), "Excalidraw may invert board colours again in dark mode");
 check(excalidrawApp.includes("sceneReady") && excalidrawApp.includes("elements.length < activeSnapshot.items.length"), "canvas can write an empty mount-time scene over a loaded board");
 check(boardTypes.includes("createStarterBoard") && boardTypes.includes("createEmptyBoard"), "board types lost the compatibility starter or empty board");
 check(boardStore.includes("createEmptyBoard") && !boardStore.includes("createStarterBoard()"), "new board state is not empty-first");
