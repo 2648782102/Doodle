@@ -4,6 +4,24 @@ import { BoardRevisionConflictError } from "./errors.js";
 import { AsyncMutex } from "./mutex.js";
 import { createEmptyBoard, parseBoard, touchBoard, type SimpleBoard } from "./types.js";
 
+/**
+ * True when a write would erase every object from a board that had some.
+ *
+ * In a two-way board, "the board went blank" is almost always a client state
+ * bug rather than intent: a canvas that has not yet mounted, a stale scene, a
+ * race between a reload and a write. Clearing on purpose stays explicit through
+ * `allowEmpty`, so deleting the last object is still possible.
+ */
+export function isSuspiciousEmptyWrite(
+  current: SimpleBoard | undefined,
+  next: SimpleBoard,
+  options: { allowEmpty?: boolean } = {},
+): boolean {
+  if (options.allowEmpty) return false;
+  if (!current) return false;
+  return current.items.length > 0 && next.items.length === 0;
+}
+
 export class BoardStore {
   private board: SimpleBoard;
   private revision: number;

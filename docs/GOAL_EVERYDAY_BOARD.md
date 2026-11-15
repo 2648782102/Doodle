@@ -115,3 +115,22 @@ before and after.
   remembered in localStorage, and the card never appears on a board with content.
 
 Both were verified in the live canvas, not only in tests.
+
+### 2026-11-15 — resume, state safety, and gesture audit
+
+**Resume.** Each board now remembers its own camera (scroll and zoom) in browser
+storage, capped at eight boards. Two rules keep it from being a trap: an empty
+board never restores a camera, and a remembered camera panned far from the
+content is discarded so a full board cannot look blank. Verified by panning,
+reloading, and confirming the view held.
+
+**State safety.** Writes that would clear every object from a non-empty board
+are now refused with a 409 instead of being applied, because "the board went
+blank" is almost always a client bug — today it was a canvas writing its
+pre-mount empty scene. A deliberate delete by id still works, and a first write
+to a new board is unaffected. Covered by a unit test plus an HTTP test that
+proves the objects survive.
+
+**Gesture audit.** Checked the four high-frequency paths in the real canvas:
+note creation, shape drag, arrow drag, and freehand ink. The one defect found was
+the restored camera stranding the view; it is fixed above.

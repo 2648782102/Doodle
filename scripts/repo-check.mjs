@@ -93,6 +93,8 @@ check(packageJson.scripts["preview:board"] === "node scripts/preview-board.mjs",
 check(await exists("scripts/preview-board.mjs"), "local preview script is missing");
 check(await exists("scripts/open-board.mjs") && packageJson.scripts.doodle === "node scripts/open-board.mjs", "the one-action board open command is missing");
 check(excalidrawTemplate.includes('id="doodleWelcome"') && excalidrawApp.includes("WELCOME_STORAGE_KEY") && excalidrawApp.includes("initWelcome"), "the first-run board guidance is missing or not dismissible");
+check((await read("src/board/viewport-memory.ts")).includes("isViewportNearContent") && excalidrawApp.includes("readStoredViewport"), "the canvas no longer remembers a sane viewport per board");
+check(tools.includes("isSuspiciousEmptyWrite") || http.includes("isSuspiciousEmptyWrite"), "writes are not guarded against accidentally clearing a full board");
 check(troubleshooting.includes("npm run preview:board") && troubleshooting.includes("current MCP server process"), "troubleshooting does not explain PANEL_URL lifetime");
 check(packageJson.scripts.check.includes("setup:codex -- --dry-run"), "npm check does not dry-run the Codex setup");
 check(ci.includes("npm run repo:plugin-check"), "CI does not run the plugin guard");
@@ -142,7 +144,7 @@ check(instructions.includes("Doodle is"), "MCP instructions do not introduce Doo
 check(instructions.includes("two-way") && instructions.includes("one kernel, two entry points, three capability layers"), "MCP instructions lost the two-way product story");
 check(instructions.includes("updateModelContext") && instructions.includes("final-state delta"), "MCP instructions do not describe host model context sync");
 check(instructions.includes("draw_board.diagram") && instructions.includes("never combines diagram"), "MCP instructions do not describe the exclusive semantic diagram path");
-check(sourceFiles.length === 16, `src/board has ${sourceFiles.length} TypeScript modules; expected the focused fourteen-module structure`);
+check(sourceFiles.length === 17, `src/board has ${sourceFiles.length} TypeScript modules; expected the focused seventeen-module structure`);
 check(!boardIndex.includes("preview-server") && !boardIndex.includes("session-store"), "board index re-exports legacy infrastructure");
 check((tools.match(/server\.registerTool\(/g) ?? []).length === 4 && !tools.includes("server.tool("), "tools.ts does not register exactly four annotated MCP tools");
 check(tools.includes("readOnlyHint: true") && tools.includes("destructiveHint: true") && tools.includes("openWorldHint: false"), "tool annotations are incomplete");
@@ -259,7 +261,7 @@ check(codexExample.includes('args = ["-y", "doodle-mcp"]') && !codexExample.incl
 check(setupScript.includes('"plugin", "marketplace", "add"') && setupScript.includes('"plugin", "add", "doodle@doodle"') && setupScript.includes("--dry-run"), "setup script does not safely install the local plugin");
 check(setupScript.includes('if (dryRun) return { status: 0 }') || setupScript.includes("if (dryRun) return { status: 0; }"), "setup dry-run can still execute commands");
 check(await exists("plugins/doodle/skills/doodle/SKILL.md") && await exists("scripts/build-plugin.mjs") && await exists("scripts/plugin-check.mjs"), "plugin packaging files are incomplete");
-check(totalSourceFiles.length === 23, `src has ${totalSourceFiles.length} TypeScript modules; expected the focused plugin-ready structure`);
+check(totalSourceFiles.length === 24, `src has ${totalSourceFiles.length} TypeScript modules; expected the focused plugin-ready structure`);
 
 if (failures.length) {
   console.error("❌ Offline repository checks failed:");

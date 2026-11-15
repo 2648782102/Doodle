@@ -56,7 +56,7 @@ describe("post-cleanup repository shape", () => {
       expect(current.some((name) => pattern.test(name)), `unexpected legacy path matching ${pattern}`).toBe(false);
     }
     expect(extensions).toBe(false);
-    expect(source.filter((name) => name.endsWith(".ts"))).toHaveLength(23);
+    expect(source.filter((name) => name.endsWith(".ts"))).toHaveLength(24);
     expect(scripts.filter((name) => name.endsWith(".mjs")).sort()).toEqual([
       "scripts/build-plugin.mjs",
       "scripts/build-submission.mjs",
@@ -68,7 +68,7 @@ describe("post-cleanup repository shape", () => {
       "scripts/repo-check.mjs",
       "scripts/setup-codex.mjs",
     ]);
-    expect(tests.filter((name) => name.endsWith(".test.mjs"))).toHaveLength(12);
+    expect(tests.filter((name) => name.endsWith(".test.mjs"))).toHaveLength(14);
     const compiled = await listFiles(path.join(root, "dist"));
     expect(compiled.some((name) => /^dist\/(domain|tools)\//.test(name))).toBe(false);
     expect(compiled.some((name) => name === "dist/infra/templates/index.html")).toBe(false);

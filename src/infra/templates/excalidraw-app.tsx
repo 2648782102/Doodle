@@ -10,6 +10,12 @@ import {
 } from "../../board/excalidraw-adapter.js";
 import { App } from "@modelcontextprotocol/ext-apps";
 import { buildBoardModelContext } from "../../board/app-context.js";
+import {
+  browserViewportStorage,
+  isViewportNearContent,
+  readStoredViewport,
+  writeStoredViewport,
+} from "../../board/viewport-memory.js";
 
 type BoardSnapshot = {
   version: 1;
@@ -37,7 +43,45 @@ type ExcalidrawAppState = {
   editingTextElement?: unknown;
   editingLinearElement?: unknown;
   editingGroupId?: unknown;
+  scrollX?: number;
+  scrollY?: number;
+  zoom?: { value?: number } | number;
 };
+
+let viewportSaveTimer: number | null = null;
+
+/** Bounding box of the board's objects, used to judge a remembered camera. */
+function boardBounds(items: unknown[]): { minX: number; minY: number; maxX: number; maxY: number } | undefined {
+  let minX = Infinity;
+  let minY = Infinity;
+  let maxX = -Infinity;
+  let maxY = -Infinity;
+  for (const raw of items) {
+    const item = raw as { x?: number; y?: number; w?: number; h?: number };
+    if (typeof item.x !== "number" || typeof item.y !== "number") continue;
+    const width = typeof item.w === "number" ? item.w : 0;
+    const height = typeof item.h === "number" ? item.h : 0;
+    minX = Math.min(minX, item.x, item.x + width);
+    minY = Math.min(minY, item.y, item.y + height);
+    maxX = Math.max(maxX, item.x, item.x + width);
+    maxY = Math.max(maxY, item.y, item.y + height);
+  }
+  return Number.isFinite(minX) ? { minX, minY, maxX, maxY } : undefined;
+}
+
+/** Save the camera at most a few times a second; it changes on every pan frame. */
+function rememberViewport(boardId: string | undefined, appState: ExcalidrawAppState): void {
+  if (!boardId) return;
+  const zoom = typeof appState.zoom === "number" ? appState.zoom : appState.zoom?.value;
+  if (typeof appState.scrollX !== "number" || typeof appState.scrollY !== "number" || typeof zoom !== "number") return;
+  const storage = browserViewportStorage();
+  if (!storage) return;
+  if (viewportSaveTimer !== null) return;
+  viewportSaveTimer = window.setTimeout(() => {
+    viewportSaveTimer = null;
+    writeStoredViewport(storage, boardId, { scrollX: appState.scrollX!, scrollY: appState.scrollY!, zoom });
+  }, 600);
+}
 
 function isEditing(appState: ExcalidrawAppState | undefined): boolean {
   return Boolean(appState?.editingTextElement || appState?.editingLinearElement || appState?.editingGroupId);
@@ -595,6 +639,19 @@ function CanvasApp({ initial }: { initial: BoardSnapshot }) {
   const initialData = useMemo(() => {
     const files = toFiles(initial);
     currentFiles.current = Object.fromEntries(files.map((file) => [file.id, file]));
+    // A board you have to re-find is not the board beside you: restore the
+    // camera this person left on this board, and only fall back to fitting the
+    // content when there is nothing remembered.
+    // An empty board has nothing to return to, and restoring a camera that was
+    // wandering off-content would look like the canvas is broken.
+    const stored = initial.items.length > 0 && browserViewportStorage()
+      ? readStoredViewport(browserViewportStorage()!, initial.id)
+      : undefined;
+    // Only restore a camera that can actually show this board. A remembered
+    // view panned into empty space makes a full board look blank.
+    const remembered = stored && isViewportNearContent(stored, boardBounds(initial.items))
+      ? stored
+      : undefined;
     return {
       elements: toElements(initial),
       files: currentFiles.current,
@@ -602,8 +659,9 @@ function CanvasApp({ initial }: { initial: BoardSnapshot }) {
         viewBackgroundColor: canvasColors[theme].view,
         exportBackground: true,
         exportWithDarkMode: false,
+        ...(remembered ? { scrollX: remembered.scrollX, scrollY: remembered.scrollY, zoom: { value: remembered.zoom as never } } : {}),
       },
-      scrollToContent: true,
+      scrollToContent: !remembered,
     };
   }, [initial, theme]);
 
@@ -645,6 +703,7 @@ function CanvasApp({ initial }: { initial: BoardSnapshot }) {
   const onChange = useCallback((elements: ExcalidrawLikeElement[], appState: ExcalidrawAppState, files: Record<string, ExcalidrawFileData>) => {
     currentAppState.current = appState;
     Object.assign(currentFiles.current, files);
+    rememberViewport(activeSnapshot?.id, appState);
     if (!api || applyingRemote.current || !activeSnapshot) return;
     // Ignore the mount-time callback: the canvas has not applied the initial
     // scene yet, so an empty element list here is not a human edit.

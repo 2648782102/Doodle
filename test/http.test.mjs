@@ -217,6 +217,43 @@ describe("board HTTP surface", () => {
     expect(result.board.items.find((item) => item.id === id)).toMatchObject({ text: "人改过", author: "human" });
   });
 
+  it("refuses to let a client bug erase the board, but still allows a deliberate delete", async () => {
+    const html = await fetch(base).then((response) => response.text());
+    const token = html.match(/const PANEL_TOKEN = "([^"]+)"/)?.[1];
+    const before = await fetch(`${base}/api/board`).then((response) => response.json());
+    const seeded = await board.mutate((current) => addBoardItem(current, {
+      type: "note", x: 0, y: 0, w: 160, h: 90, text: "keep me", author: "human",
+    }));
+    const revision = seeded.revision;
+
+    const cleared = await fetch(`${base}/api/board/replace`, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        "X-AI-Draw-Token": token,
+        "If-Match-Revision": String(revision),
+      },
+      body: JSON.stringify({
+        confirmedBy: "human",
+        board: { ...seeded, revision: revision + 1, items: [] },
+      }),
+    });
+    expect(cleared.status).toBe(409);
+    expect(await cleared.text()).toContain("Refusing to clear");
+    const intact = await fetch(`${base}/api/board`).then((response) => response.json());
+    expect(intact.items.some((entry) => entry.text === "keep me")).toBe(true);
+
+    // A deliberate removal by id is still allowed.
+    const target = intact.items.find((entry) => entry.text === "keep me");
+    const removed = await fetch(`${base}/api/board/items/${target.id}`, {
+      method: "DELETE",
+      headers: { "Content-Type": "application/json", "X-AI-Draw-Token": token },
+      body: JSON.stringify({ confirmedBy: "human" }),
+    });
+    expect(removed.status).toBe(200);
+    expect(before.version).toBe(1);
+  });
+
   it("broadcasts board updates to the standalone canvas", async () => {
     const socket = new WebSocket(`ws://127.0.0.1:${port}/ws`);
     const update = new Promise((resolve, reject) => {

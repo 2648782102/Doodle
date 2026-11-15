@@ -27,7 +27,7 @@ import {
 } from "./types.js";
 import { BoardRevisionConflictError } from "./errors.js";
 import { BoardLibrary, boardLibraryIndexText, type BoardLibraryAction } from "./library.js";
-import type { BoardStore } from "./store.js";
+import { isSuspiciousEmptyWrite, type BoardStore } from "./store.js";
 import { projectSnapshotText, scanProject, type ProjectScanOptions } from "./project-scan.js";
 
 const sourceDir = path.dirname(fileURLToPath(import.meta.url));
@@ -152,7 +152,12 @@ export class BoardHttpServer {
           if (current.revision !== expectedRevision) {
             throw new BoardRevisionConflictError(expectedRevision, current.revision);
           }
-          board = await this.board.replaceIfRevision(change(current), expectedRevision);
+          const candidate = change(current);
+          // A client bug must not look like a deliberate clear.
+          if (isSuspiciousEmptyWrite(current, candidate)) {
+            return res.status(409).json({ error: "Refusing to clear every object from the board; send an explicit delete instead" });
+          }
+          board = await this.board.replaceIfRevision(candidate, expectedRevision);
         }
       } catch (error) {
         const message = error instanceof Error ? error.message : String(error);
