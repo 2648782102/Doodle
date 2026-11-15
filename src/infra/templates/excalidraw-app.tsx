@@ -1,6 +1,6 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { createRoot } from "react-dom/client";
-import { Excalidraw, MainMenu, convertToExcalidrawElements, exportToBlob, exportToSvg } from "@excalidraw/excalidraw";
+import { Excalidraw, convertToExcalidrawElements, exportToBlob, exportToSvg } from "@excalidraw/excalidraw";
 import {
   boardToExcalidrawFiles,
   boardItemsFromExcalidrawBoard,
@@ -129,27 +129,13 @@ function isDoodleProjectLink(link: unknown): boolean {
   if (typeof link !== "string") return false;
   try {
     const url = new URL(link);
-    return url.protocol === "https:" &&
-      url.hostname === "github.com" &&
-      (url.pathname === "/2648782102/Doodle" || url.pathname.startsWith("/2648782102/Doodle/"));
+    const project = new URL(DOODLE_PROJECT_URL);
+    return url.protocol === project.protocol &&
+      url.hostname === project.hostname &&
+      (url.pathname === project.pathname || url.pathname.startsWith(`${project.pathname}/`));
   } catch {
     return false;
   }
-}
-
-function DoodleMainMenu() {
-  return React.createElement(
-    MainMenu,
-    null,
-    React.createElement(MainMenu.DefaultItems.SearchMenu),
-    React.createElement(MainMenu.DefaultItems.Help),
-    React.createElement(MainMenu.Separator),
-    React.createElement(
-      MainMenu.ItemLink,
-      { href: DOODLE_PROJECT_URL, target: "_blank", rel: "noreferrer", "aria-label": "Doodle GitHub" },
-      "GitHub",
-    ),
-  );
 }
 
 function blockExternalCanvasLinks(event: MouseEvent): void {
@@ -189,8 +175,10 @@ function initExternalLinkPolicy(): void {
   document.addEventListener("click", blockExternalCanvasLinks, true);
   const apply = () => {
     hideExternalEmbedTool();
-  for (const group of document.querySelectorAll<HTMLElement>(".excalidraw .dropdown-menu-group")) {
-      if (group.querySelector("a[href]") && !group.querySelector('a[href="https://github.com/2648782102/Doodle"]')) {
+    // Any link group that is not the project itself is upstream chrome
+    // (Socials, blog, docs). The board ships no outbound links of its own.
+    for (const group of document.querySelectorAll<HTMLElement>(".excalidraw .dropdown-menu-group")) {
+      if (group.querySelector("a[href]")) {
         group.dataset.doodleHidden = "true";
       }
     }
@@ -803,7 +791,6 @@ function CanvasApp({ initial }: { initial: BoardSnapshot }) {
           image: true,
         },
       },
-      children: React.createElement(DoodleMainMenu),
     }),
   );
 }

@@ -144,7 +144,9 @@ describe("board HTTP surface", () => {
     expect(appText).toContain("doodleLibraryPanel");
     expect(appText).toContain("https://github.com/2648782102/Doodle");
     expect(appText).toContain("library-menu-browse-button");
-    expect(appText).toContain("Doodle GitHub");
+    expect(appText).not.toContain("MainMenu.DefaultItems");
+    expect(html).toContain(".excalidraw .main-menu-trigger");
+    expect(html).toContain(".excalidraw .Island.sidebar {");
     expect(appText).toContain("editingTextElement");
     expect(appText).toContain("board_updated");
     expect(appText).not.toContain("已同步到 Doodle 画板");

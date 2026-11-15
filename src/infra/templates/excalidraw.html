@@ -149,7 +149,16 @@
       --popup-secondary-bg-color: #f2f4ef;
       --shadow-island: 0 1px 2px rgba(24, 40, 34, 0.08), 0 8px 24px rgba(24, 40, 34, 0.08);
     }
-    .excalidraw.theme--dark {
+    /*
+     * Doodle keeps Excalidraw on its light *theme* so board colours stay
+     * literal, but the page has its own dark mode. Without this the chrome
+     * tokens stay light while the page goes dark, so the zoom group, the help
+     * button, and the library trigger rendered as white panes floating on a
+     * black canvas. The selector matches both cases: upstream's own dark theme,
+     * and Doodle's dark page with a light canvas theme.
+     */
+    .excalidraw.theme--dark,
+    :root[data-doodle-theme="dark"] .excalidraw {
       --color-primary: #8fcbb4;
       --color-primary-darker: #a3d6c2;
       --color-primary-darkest: #bde4d3;
@@ -312,12 +321,102 @@
       backdrop-filter: var(--glass-refraction, blur(var(--glass-blur)) saturate(var(--glass-saturate)));
     }
     .excalidraw .App-toolbar, .excalidraw .App-menu_bottom .Island, .excalidraw .layer-ui__wrapper__top-right .Island { border-radius: 14px; }
+    /*
+     * The library sidebar is the one Excalidraw panel that reaches the window
+     * edge, with square corners and a hard divider. Inset it and round it like
+     * every other pane, so the glass bevel has a rim on all four sides. Its own
+     * surface colour is kept: it holds a list, and a translucent background
+     * would let board objects run behind the rows.
+     */
+    .excalidraw .Island.sidebar {
+      top: 72px;
+      right: 12px;
+      bottom: 12px;
+      height: auto;
+      border: 1px solid var(--glass-edge-outer);
+      border-radius: 18px;
+      overflow: hidden;
+    }
+    .excalidraw .Island.sidebar .sidebar__header { padding-inline: 12px; }
+    /*
+     * The style panel appears under the top-left cell when an object is
+     * selected. Upstream renders it flush to the corner at 8px radius with a
+     * 3.1rem max-height budget that assumed the wordmark menu above it; with
+     * the menu gone it needs to start below the capsule and stop above the
+     * zoom controls, or it overlaps both.
+     */
+    .excalidraw .Island.App-menu__left {
+      top: 72px;
+      left: 12px;
+      max-height: calc(100vh - 148px);
+      border: 1px solid var(--glass-edge-outer);
+      border-radius: 18px;
+      background-color: color-mix(in srgb, var(--island-bg-color) 16%, transparent);
+      box-shadow:
+        inset 0 1px 0 0 var(--glass-edge),
+        inset 0 -1px 1.5px 0 var(--glass-depth),
+        inset 0 0 0 1px var(--glass-tint),
+        var(--glass-shadow);
+      -webkit-backdrop-filter: var(--glass-refraction, blur(var(--glass-blur)) saturate(var(--glass-saturate)));
+      backdrop-filter: var(--glass-refraction, blur(var(--glass-blur)) saturate(var(--glass-saturate)));
+    }
+    /*
+     * Bottom controls are separate islands in Excalidraw, each with its own
+     * shadow ring and an 8px radius; next to the 14px top toolbar they looked
+     * like a different product. Give them the same radius, and join the split
+     * zoom/undo groups so a segmented pill reads as one control.
+     */
+    /*
+     * The extra-tools dropdown hangs off the toolbar, so it must not inherit
+     * the Doodle capsule's glass: it holds a list of its own.
+     */
+    .excalidraw .dropdown-menu { border-radius: 14px; }
+    /*
+     * The top-right library trigger is a 36px control in a 44px row, so its
+     * pill looked smaller than the capsule it sits beside. Match the row.
+     */
+    .excalidraw .zoom-actions,
+    .excalidraw .undo-redo-buttons,
+    .excalidraw .help-icon,
+    .excalidraw .scroll-back-to-content { border-radius: 12px; }
+    .excalidraw .sidebar-trigger,
+    .excalidraw .sidebar-trigger__label-element { height: 44px; border-radius: 14px; }
+    .excalidraw .zoom-button .ToolIcon__icon,
+    .excalidraw .undo-redo-buttons .ToolIcon__icon { border-radius: 0; }
+    .excalidraw .zoom-actions .zoom-button:first-child .ToolIcon__icon { border-radius: 12px 0 0 12px; }
+    .excalidraw .zoom-actions .zoom-button:last-child .ToolIcon__icon { border-radius: 0 12px 12px 0; }
+    .excalidraw .undo-redo-buttons .ToolIcon__icon:first-child { border-radius: 12px 0 0 12px; }
+    .excalidraw .undo-redo-buttons .ToolIcon__icon:last-child { border-radius: 0 12px 12px 0; }
     @supports not ((backdrop-filter: blur(1px)) or (-webkit-backdrop-filter: blur(1px))) {
       .excalidraw .App-toolbar,
       .excalidraw .App-menu_bottom .Island,
       .excalidraw .layer-ui__wrapper__top-right .Island { background-color: var(--island-bg-color) !important; }
     }
-    .doodle-topbar { position: fixed; top: 64px; left: 16px; z-index: 23; display: flex; gap: 2px; align-items: center; padding: 3px; border-radius: 14px; transition: box-shadow var(--doodle-duration) var(--doodle-ease), opacity var(--doodle-duration) var(--doodle-ease), visibility 0s linear; }
+    /*
+     * Excalidraw's wordmark menu is gone.
+     *
+     * It carried Search, Help, and the GitHub link. All three were either
+     * already reachable elsewhere (search is in the palette's toolbar, help is
+     * the `?` button in the bottom right, this is a single-board surface) or
+     * off-topic for a board that ships no external links. Removing the trigger
+     * also removes the top-left stack entirely, so the Doodle capsule can take
+     * that slot and the shape toolbar can sit on the same 16px margin.
+     */
+    .excalidraw .main-menu-trigger,
+    .excalidraw [data-testid="main-menu-trigger"],
+    .excalidraw .App-menu_top__left > div:has(.main-menu-trigger) { display: none !important; }
+    /*
+     * The top row keeps Excalidraw's `1fr 2fr 1fr` grid. With the menu gone the
+     * left column is empty, so the shape column still centres on the viewport
+     * and the toolbar stays optically centred; the Doodle capsule occupies the
+     * empty left cell without pushing anything sideways.
+     */
+    /*
+     * The Doodle capsule lives where the wordmark menu used to, and matches the
+     * toolbar's height, radius, and 16px inset so the top row reads as three
+     * panes on one line rather than three different sizes.
+     */
+    .doodle-topbar { position: fixed; top: 16px; left: 16px; z-index: 23; height: 44px; display: flex; gap: 2px; align-items: center; padding: 4px; border-radius: 14px; transition: box-shadow var(--doodle-duration) var(--doodle-ease), opacity var(--doodle-duration) var(--doodle-ease), visibility 0s linear; }
     .doodle-topbar:has(#doodleLibraryToggle[aria-expanded="true"]) { border-color: var(--doodle-border-strong); }
     body.doodle-drawer-open .doodle-topbar { opacity: 0; visibility: hidden; pointer-events: none; transition: opacity var(--doodle-duration) var(--doodle-ease), visibility 0s linear var(--doodle-duration); }
     body:has(.excalidraw .dropdown-menu) .doodle-topbar,
@@ -333,7 +432,15 @@
     .doodle-notify-agent { position: fixed; right: 14px; bottom: 14px; z-index: 20; height: 36px; padding: 0 16px; border-radius: 18px; color: var(--doodle-accent-ink); background: var(--doodle-accent); cursor: pointer; font-size: 12px; }
     .doodle-notify-agent:hover { filter: brightness(1.05); }
     .doodle-notify-agent[hidden] { display: none; }
-    .doodle-library-panel { position: fixed; top: 64px; left: 0; bottom: 0; z-index: 22; display: flex; flex-direction: column; gap: 10px; width: min(var(--doodle-drawer-width), calc(100vw - 16px)); overflow: hidden; padding: 16px; border-right: 1px solid var(--glass-edge-outer); background: var(--glass-bg-strong); box-shadow: inset 0 1px 0 0 var(--glass-edge), inset 0 0 0 1px var(--glass-tint), var(--glass-shadow-raised); -webkit-backdrop-filter: var(--glass-refraction, blur(var(--glass-blur)) saturate(var(--glass-saturate))); backdrop-filter: var(--glass-refraction, blur(var(--glass-blur)) saturate(var(--glass-saturate))); transform-origin: left center; opacity: 0; transform: translateX(-100%); visibility: hidden; pointer-events: none; transition: opacity var(--doodle-duration) var(--doodle-ease), transform var(--doodle-duration) var(--doodle-ease), visibility 0s linear var(--doodle-duration); }
+    /*
+     * The library is a floating pane, not a docked sheet.
+     *
+     * It used to be flush to the left and bottom edges with square corners,
+     * which read as a browser sidebar and broke the glass: the material needs a
+     * rounded rim on every side to show its bevel. A 12px inset plus an 18px
+     * radius puts it on the same geometry as every other pane.
+     */
+    .doodle-library-panel { position: fixed; top: 72px; left: 12px; bottom: 12px; z-index: 22; display: flex; flex-direction: column; gap: 10px; width: min(var(--doodle-drawer-width), calc(100vw - 24px)); overflow: hidden; padding: 16px; border: 1px solid var(--glass-edge-outer); border-radius: 18px; background: var(--glass-bg-strong); box-shadow: inset 0 1px 0 0 var(--glass-edge), inset 0 0 0 1px var(--glass-tint), var(--glass-shadow-raised); -webkit-backdrop-filter: var(--glass-refraction, blur(var(--glass-blur)) saturate(var(--glass-saturate))); backdrop-filter: var(--glass-refraction, blur(var(--glass-blur)) saturate(var(--glass-saturate))); transform-origin: left center; opacity: 0; transform: translateX(-100%); visibility: hidden; pointer-events: none; transition: opacity var(--doodle-duration) var(--doodle-ease), transform var(--doodle-duration) var(--doodle-ease), visibility 0s linear var(--doodle-duration); }
     .doodle-library-panel.is-open { opacity: 1; transform: translateX(0); visibility: visible; pointer-events: auto; transition: opacity var(--doodle-duration) var(--doodle-ease), transform var(--doodle-duration) var(--doodle-ease), visibility 0s linear 0s; }
     .doodle-drawer-scrim { position: fixed; inset: 0; z-index: 21; background: rgba(12, 18, 26, 0.24); opacity: 0; visibility: hidden; pointer-events: none; transition: opacity var(--doodle-duration) var(--doodle-ease), visibility 0s linear var(--doodle-duration); }
     body.doodle-drawer-open .doodle-drawer-scrim { opacity: 1; visibility: visible; pointer-events: auto; transition: opacity var(--doodle-duration) var(--doodle-ease), visibility 0s linear 0s; }
