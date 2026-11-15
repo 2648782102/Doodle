@@ -72,11 +72,40 @@
       --glass-highlight: rgba(255, 255, 255, 0.8);
       --glass-depth: rgba(16, 30, 24, 0.18);
       --glass-shade: rgba(16, 30, 24, 0.42);
-      --glass-lens-scale: 2.1;
+      --glass-lens-scale: 0.9;
       --glass-lens-blur: 0.05;
       --glass-tint: rgba(255, 255, 255, 0.14);
       --glass-shadow: 0 1px 2px rgba(24, 40, 34, 0.08), 0 12px 30px -8px rgba(24, 40, 34, 0.22);
       --glass-shadow-raised: 0 1px 2px rgba(24, 40, 34, 0.1), 0 20px 48px -10px rgba(24, 40, 34, 0.28);
+      /*
+       * Interaction inside the glass, not on top of it.
+       *
+       * A tool button must not paint an opaque chip over the pane: that reads
+       * as a sticker and kills the lens. Hover instead *thickens* the glass —
+       * a low-alpha wash plus an inner rim that follows the button's own
+       * radius — so the control looks like a raised lens in the same material.
+       * Values stay low enough that the dot grid behind still shows through.
+       */
+      --glass-hover-fill: rgba(255, 255, 255, 0.2);
+      --glass-hover-rim: rgba(255, 255, 255, 0.92);
+      --glass-hover-shade: rgba(16, 30, 24, 0.07);
+      --glass-active-fill: rgba(255, 255, 255, 0.3);
+      --glass-selected-fill: rgba(47, 107, 92, 0.12);
+      --glass-selected-hover-fill: rgba(47, 107, 92, 0.18);
+      --glass-selected-rim: rgba(47, 107, 92, 0.36);
+      --glass-input-fill: rgba(255, 255, 255, 0.58);
+      /*
+       * How much of the Excalidraw surface colour each kind of pane carries.
+       * These replace the 16/34/42% literals that used to be inline: a pane
+       * that floats over the board must stay near-transparent so the lens is
+       * visible, while a pane that holds controls needs enough body to keep
+       * its labels legible. Doodle's own `.doodle-glass` fill is ~5.5%, and
+       * these are expressed as mixes of the *same* surface colour so the two
+       * families read as one material instead of glass next to white cards.
+       */
+      --glass-surface-float: color-mix(in srgb, var(--island-bg-color) 7%, transparent);
+      --glass-surface-panel: color-mix(in srgb, var(--island-bg-color) 22%, transparent);
+      --glass-surface-solid: color-mix(in srgb, var(--island-bg-color) 46%, transparent);
     }
     :root[data-doodle-theme="dark"] {
       color-scheme: dark;
@@ -105,11 +134,22 @@
       --glass-highlight: rgba(255, 255, 255, 0.4);
       --glass-depth: rgba(0, 0, 0, 0.34);
       --glass-shade: rgba(0, 0, 0, 0.55);
-      --glass-lens-scale: 2.1;
+      --glass-lens-scale: 0.9;
       --glass-lens-blur: 0.05;
       --glass-tint: rgba(255, 255, 255, 0.05);
       --glass-shadow: 0 1px 2px rgba(0, 0, 0, 0.36), 0 14px 34px -8px rgba(0, 0, 0, 0.5);
       --glass-shadow-raised: 0 1px 2px rgba(0, 0, 0, 0.4), 0 22px 52px -10px rgba(0, 0, 0, 0.6);
+      --glass-hover-fill: rgba(255, 255, 255, 0.1);
+      --glass-hover-rim: rgba(255, 255, 255, 0.22);
+      --glass-hover-shade: rgba(0, 0, 0, 0.18);
+      --glass-active-fill: rgba(255, 255, 255, 0.16);
+      --glass-selected-fill: rgba(143, 203, 180, 0.16);
+      --glass-selected-hover-fill: rgba(143, 203, 180, 0.24);
+      --glass-selected-rim: rgba(143, 203, 180, 0.42);
+      --glass-input-fill: rgba(255, 255, 255, 0.06);
+      --glass-surface-float: color-mix(in srgb, var(--island-bg-color) 10%, transparent);
+      --glass-surface-panel: color-mix(in srgb, var(--island-bg-color) 26%, transparent);
+      --glass-surface-solid: color-mix(in srgb, var(--island-bg-color) 52%, transparent);
     }
     .excalidraw {
       --color-primary: #2f6b5c;
@@ -245,15 +285,20 @@
       backdrop-filter: var(--glass-refraction, blur(var(--glass-blur)) saturate(var(--glass-saturate)));
     }
     /*
-     * Specular sheen. Three light sources, the way a real bevelled edge picks
-     * up light: a bright corner highlight at the top left, a softer one at the
-     * bottom right, and a diagonal sweep across the pane. Drawn as gradients
-     * over the pane rather than as a border so it fades out, and blurred
-     * content behind it still shows through.
+     * Specular sheen, in two passes with different jobs.
      *
-     * Kept tight on purpose. A broad highlight over a 40px-tall pill covers
-     * most of its area and turns the pane back into a white card, which is
-     * what hid the lensing in the first pass.
+     * `::before` is the *specular* layer: a tight highlight where a light
+     * source above-left would strike the bevel, plus a fainter bounce from
+     * below. Both are small and sit at the corners, so they read as curvature
+     * rather than as a coat of paint over the pane. An earlier version spread
+     * them across most of a 44px pill, which turned the glass back into a
+     * white card and hid the refraction.
+     *
+     * `::after` is the *convexity* layer: a hairline of light just inside the
+     * top rim and a soft dark band just inside the bottom rim. That pair is
+     * what makes a surface look like it bulges toward the viewer instead of
+     * being a flat acetate sheet with rounded corners. It is deliberately
+     * neutral in hue — only luminance — so it cannot tint the board behind.
      */
     .doodle-glass::before {
       content: "";
@@ -262,11 +307,28 @@
       border-radius: inherit;
       pointer-events: none;
       background:
-        radial-gradient(64% 78% at 6% -14%, var(--glass-edge) 0%, transparent 34%),
-        radial-gradient(58% 70% at 94% 116%, var(--glass-highlight) 0%, transparent 34%),
-        linear-gradient(104deg, transparent 41%, var(--glass-highlight) 47%, transparent 55%);
-      opacity: 0.34;
+        radial-gradient(28% 46% at 4% -8%, var(--glass-edge) 0%, transparent 62%),
+        radial-gradient(26% 40% at 96% 108%, var(--glass-highlight) 0%, transparent 64%),
+        radial-gradient(42% 34% at 50% -18%, var(--glass-highlight) 0%, transparent 70%);
+      opacity: 0.42;
       mix-blend-mode: screen;
+    }
+    .doodle-glass::after {
+      content: "";
+      position: absolute;
+      inset: 0;
+      border-radius: inherit;
+      pointer-events: none;
+      background:
+        linear-gradient(
+          to bottom,
+          rgba(255, 255, 255, 0.5) 0 1px,
+          rgba(255, 255, 255, 0.1) 1px 3px,
+          transparent 3px 70%,
+          var(--glass-hover-shade) 88%,
+          rgba(255, 255, 255, 0.16) 100%
+        );
+      opacity: 0.7;
     }
     @supports not ((backdrop-filter: blur(1px)) or (-webkit-backdrop-filter: blur(1px))) {
       .doodle-glass { background: var(--glass-bg-strong); }
@@ -320,7 +382,7 @@
       padding: 4px;
       border: 1px solid var(--glass-edge-outer);
       border-radius: 14px;
-      background-color: color-mix(in srgb, var(--island-bg-color) 16%, transparent);
+      background-color: var(--glass-surface-float);
       box-shadow:
         inset 0 1px 0 0 var(--glass-edge),
         inset 0 -1px 1.5px 0 var(--glass-depth),
@@ -366,7 +428,7 @@
     .excalidraw .App-bottom-bar > .Island {
       border: 1px solid var(--glass-edge-outer);
       border-radius: 18px;
-      background-color: color-mix(in srgb, var(--island-bg-color) 16%, transparent);
+      background-color: var(--glass-surface-float);
       box-shadow:
         inset 0 1px 0 0 var(--glass-edge),
         inset 0 -1px 1.5px 0 var(--glass-depth),
@@ -510,7 +572,7 @@
     .excalidraw .App-menu_bottom .Island,
     .excalidraw .layer-ui__wrapper__top-right .Island,
     .excalidraw .FixedSideContainer_side_top > .Island {
-      background-color: color-mix(in srgb, var(--island-bg-color) 16%, transparent) !important;
+      background-color: var(--glass-surface-float) !important;
       /* No negative-spread inner glow: it renders as an inset box rather than
          edge light. The specular map supplies the rim highlight instead. */
       box-shadow:
@@ -522,6 +584,66 @@
       backdrop-filter: var(--glass-refraction, blur(var(--glass-blur)) saturate(var(--glass-saturate)));
     }
     .excalidraw .App-toolbar, .excalidraw .App-menu_bottom .Island, .excalidraw .layer-ui__wrapper__top-right .Island { border-radius: 14px; }
+    /*
+     * Tool buttons inside the glass toolbar.
+     *
+     * Upstream paints `--button-hover-bg` (an opaque near-white) directly on
+     * the icon box. On an opaque toolbar that is invisible as a seam, but on a
+     * lens it is a solid sticker floating over the refraction: the material
+     * disappears under the cursor exactly where the eye is looking. Hover now
+     * thickens the lens instead — a translucent wash, a rim that follows the
+     * button's own radius, and a soft inner shade at the bottom so the control
+     * reads as raised rather than filled.
+     *
+     * Geometry never changes: no padding, no border-width, no transform. The
+     * rim is a box-shadow ring, which paints inside the existing box.
+     */
+    .excalidraw .App-toolbar .ToolIcon__icon {
+      border-radius: 10px;
+      transition:
+        background-color var(--doodle-duration) var(--doodle-ease),
+        box-shadow var(--doodle-duration) var(--doodle-ease);
+    }
+    .excalidraw .App-toolbar .ToolIcon:hover .ToolIcon__icon:not([aria-disabled="true"]),
+    .excalidraw .App-toolbar .ToolIcon__icon:hover:not([aria-disabled="true"]) {
+      background: var(--glass-hover-fill) !important;
+      box-shadow:
+        inset 0 1px 0 0 var(--glass-hover-rim),
+        inset 0 -1px 0 0 var(--glass-hover-shade);
+    }
+    .excalidraw .App-toolbar .ToolIcon__icon:active:not([aria-disabled="true"]) {
+      background: var(--glass-active-fill) !important;
+      box-shadow:
+        inset 0 1px 0 0 var(--glass-hover-shade),
+        inset 0 -1px 0 0 var(--glass-hover-rim);
+    }
+    /*
+     * The selected tool is a lens with a tint in it, not a filled chip.
+     *
+     * Three layers sell it as glass rather than paint: a low tint so the dot
+     * grid still shows through, a full inner ring in the accent at low alpha
+     * (the lit edge of the lens), and a bright top inner line offset by one
+     * pixel from that ring so the surface reads as curved rather than flat.
+     * The tint is deliberately weaker than the hover wash: hover means "you
+     * are pointing at this", selection means "this is engaged", and selection
+     * must win without shouting.
+     */
+    .excalidraw .App-toolbar .ToolIcon .ToolIcon_type_radio:checked + .ToolIcon__icon,
+    .excalidraw .App-toolbar .ToolIcon .ToolIcon_type_checkbox:checked + .ToolIcon__icon,
+    .excalidraw .App-toolbar .ToolIcon--selected .ToolIcon__icon {
+      background: var(--glass-selected-fill) !important;
+      box-shadow:
+        inset 0 1px 0 0 var(--glass-hover-rim),
+        inset 0 0 0 1px var(--glass-selected-rim),
+        inset 0 -2px 3px -2px var(--glass-hover-shade);
+    }
+    /* Hovering an already-selected tool still gives feedback, without losing
+       the accent that says it is the active one. */
+    .excalidraw .App-toolbar .ToolIcon:hover .ToolIcon_type_radio:checked + .ToolIcon__icon,
+    .excalidraw .App-toolbar .ToolIcon:hover .ToolIcon_type_checkbox:checked + .ToolIcon__icon,
+    .excalidraw .App-toolbar .ToolIcon--selected:hover .ToolIcon__icon {
+      background: var(--glass-selected-hover-fill) !important;
+    }
     /*
      * The library sidebar is the one Excalidraw panel that reaches the window
      * edge, with square corners and a hard divider. Inset it and round it like
@@ -552,7 +674,7 @@
       max-height: calc(100vh - 148px);
       border: 1px solid var(--glass-edge-outer);
       border-radius: 18px;
-      background-color: color-mix(in srgb, var(--island-bg-color) 16%, transparent);
+      background-color: var(--glass-surface-float);
       box-shadow:
         inset 0 1px 0 0 var(--glass-edge),
         inset 0 -1px 1.5px 0 var(--glass-depth),
@@ -582,7 +704,7 @@
     .excalidraw .dropdown-menu--mobile .dropdown-menu-container {
       border: 1px solid var(--glass-edge-outer);
       border-radius: 14px;
-      background-color: color-mix(in srgb, var(--island-bg-color) 34%, transparent);
+      background-color: var(--glass-surface-panel);
       box-shadow:
         inset 0 1px 0 0 var(--glass-edge),
         inset 0 -1px 1.5px 0 var(--glass-depth),
@@ -621,7 +743,7 @@
     .excalidraw .sidebar-trigger,
     .excalidraw .default-sidebar-trigger,
     .excalidraw .scroll-back-to-content {
-      background-color: color-mix(in srgb, var(--island-bg-color) 16%, transparent);
+      background-color: var(--glass-surface-float);
       box-shadow:
         inset 0 1px 0 0 var(--glass-edge),
         inset 0 -1px 1.5px 0 var(--glass-depth),
@@ -666,12 +788,58 @@
      * exactly where this button sits. A slightly denser fill keeps the glass
      * readable without making it an opaque chip.
      */
-    .excalidraw .help-icon { background-color: color-mix(in srgb, var(--island-bg-color) 42%, transparent) !important; }
+    .excalidraw .help-icon { background-color: var(--glass-surface-solid) !important; }
     .excalidraw .zoom-button .ToolIcon__icon { border-radius: 0; }
     .excalidraw .zoom-actions .zoom-button:first-child .ToolIcon__icon { border-radius: 12px 0 0 12px; }
     .excalidraw .zoom-actions .zoom-button:last-child .ToolIcon__icon { border-radius: 0 12px 12px 0; }
     .excalidraw .undo-redo-buttons .ToolIcon__icon:first-child { border-radius: 12px 0 0 12px; }
     .excalidraw .undo-redo-buttons .ToolIcon__icon:last-child { border-radius: 0 12px 12px 0; }
+    /*
+     * The zoom and undo groups had no feedback at all.
+     *
+     * Their fills were cleared to `transparent !important` above so the glass
+     * could show through, which also erased the `--button-hover-bg` those
+     * buttons rely on. They now light up with the same inner-rim treatment as
+     * the toolbar, scoped to the button that is actually under the pointer
+     * rather than the whole segmented group.
+     */
+    .excalidraw .zoom-actions .zoom-button:hover .ToolIcon__icon,
+    .excalidraw .undo-redo-buttons button:hover .ToolIcon__icon {
+      background-color: var(--glass-hover-fill) !important;
+      box-shadow:
+        inset 0 1px 0 0 var(--glass-hover-rim),
+        inset 0 -1px 0 0 var(--glass-hover-shade);
+    }
+    .excalidraw .zoom-actions .zoom-button:active .ToolIcon__icon,
+    .excalidraw .undo-redo-buttons button:active .ToolIcon__icon {
+      background-color: var(--glass-active-fill) !important;
+      box-shadow:
+        inset 0 1px 0 0 var(--glass-hover-shade),
+        inset 0 -1px 0 0 var(--glass-hover-rim);
+    }
+    /*
+     * A disabled undo/redo must stay visibly inert, not light up on hover.
+     *
+     * Dimming the whole icon box to 0.38 also dimmed the *enabled* neighbour
+     * unevenly and left the disabled half looking like an empty capsule, since
+     * upstream already paints its glyph with `--color-disabled`. Fade the glyph
+     * only, and keep enough contrast that the control still reads as a control
+     * rather than as a gap in the glass.
+     */
+    .excalidraw .undo-redo-buttons button:disabled .ToolIcon__icon {
+      background-color: transparent !important;
+      box-shadow: none !important;
+    }
+    .excalidraw .undo-redo-buttons button:disabled svg {
+      opacity: 0.55;
+    }
+    /*
+     * The help pill and the library trigger are solid-fill controls by design
+     * (a bare icon on near-clear glass disappears), so their hover darkens the
+     * existing fill instead of adding another layer.
+     */
+    .excalidraw .help-icon:hover { background-color: color-mix(in srgb, var(--island-bg-color) 62%, transparent) !important; }
+    .excalidraw .help-icon:active { background-color: color-mix(in srgb, var(--island-bg-color) 78%, transparent) !important; }
     @supports not ((backdrop-filter: blur(1px)) or (-webkit-backdrop-filter: blur(1px))) {
       .excalidraw .zoom-actions,
       .excalidraw .undo-redo-buttons,

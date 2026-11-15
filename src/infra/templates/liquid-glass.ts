@@ -149,12 +149,24 @@ function displacementMap(width: number, height: number, radius: number, bezel: n
   });
 }
 
-/** Rim highlight lit from the upper left, fading inward across the bevel. */
+/**
+ * Rim highlight lit from the upper left, fading inward across the bevel.
+ *
+ * `edgeField` reports **outward** normals, so the top edge has a negative
+ * `ny`. The light vector points from the surface toward the light, which sits
+ * above the pane, so it also has a negative `y`. The lit side is therefore the
+ * one whose normal agrees with the light vector: a plain dot product.
+ *
+ * Negating `ny` here (as an earlier revision did) flips the material upside
+ * down: the bright band lands on the bottom edge and the dark one on the top.
+ * At 44px tall that reads as a slab shifted toward the lower left instead of a
+ * lit rim, which is the "rectangle inside the glass" people report.
+ */
 function specularMap(width: number, height: number, radius: number, bezel: number): string {
   const lightX = 0.42;
   const lightY = -0.91;
   return paintEdgeMap(width, height, radius, bezel, (data, offset, nx, ny, t) => {
-    const facing = Math.max(0, nx * lightX + -ny * lightY);
+    const facing = Math.max(0, nx * lightX + ny * lightY);
     const value = Math.pow(facing, 2.2) * Math.pow(1 - t, 1.4);
     if (value <= 0.004) return;
     const channel = Math.round(clamp(value * 255 * 1.5, 0, 255));
@@ -178,9 +190,15 @@ function rimShadeMap(width: number, height: number, radius: number, bezel: numbe
   const lightX = 0.42;
   const lightY = -0.91;
   return paintEdgeMap(width, height, radius, bezel, (data, offset, nx, ny, t) => {
-    const facing = Math.max(0, -(nx * lightX + -ny * lightY));
+    // The shaded side is the rim facing away from the light: the negation of
+    // the same dot product `specularMap` uses, so the two always complement
+    // each other instead of stacking on the same edge.
+    const facing = Math.max(0, -(nx * lightX + ny * lightY));
     const value = Math.pow(facing, 1.5) * Math.pow(1 - t, 0.9);
     if (value <= 0.006) return;
+    // The shade is a dark veil composited with `operator="in"` against this
+    // map, so all four channels have to stay near-black; only alpha carries
+    // the shape. Leaving RGB at its cleared value of 0 already does that.
     data[offset + 3] = Math.round(clamp(value * 130, 0, 130));
   });
 }
@@ -218,6 +236,22 @@ function filterMarkup(
   if (!displacement || !specular) return "";
 
   /*
+   * Every map is declared in **user space CSS pixels**, not `100%`.
+   *
+   * `width="100%"` on an `feImage` resolves against the filter region, while
+   * `feDisplacementMap` reads its offsets in user space. On a pane whose box
+   * is not an integer number of device pixels those two grids drift apart and
+   * the edge band gets smeared into a hard-edged slab offset up and to the
+   * left — the "rectangle inside the glass" report. Pinning the primitives to
+   * the element's own CSS size keeps the displacement map and the sample grid
+   * in the same coordinate system at any DPR.
+   */
+  const w = width;
+  const h = height;
+  const map = (href: string, result: string) =>
+    `<feImage href="${href}" x="0" y="0" width="${w}" height="${h}" preserveAspectRatio="none" result="${result}" />`;
+
+  /*
    * Chromatic dispersion. Glass has a different refractive index per
    * wavelength, so a bevelled edge fringes with colour: the rim separates
    * slightly into cyan and amber. This is the single most recognisable cue of
@@ -228,9 +262,9 @@ function filterMarkup(
    */
   const fringe = Math.max(2, Math.round(tuning.scale * 0.22));
   return [
-    `<filter id="${id}" x="0" y="0" width="100%" height="100%" color-interpolation-filters="sRGB">`,
+    `<filter id="${id}" x="0" y="0" width="${w}" height="${h}" filterUnits="userSpaceOnUse" color-interpolation-filters="sRGB">`,
     `<feGaussianBlur in="SourceGraphic" stdDeviation="${tuning.blur}" result="soft" />`,
-    `<feImage href="${displacement}" x="0" y="0" width="100%" height="100%" preserveAspectRatio="none" result="lens" />`,
+    map(displacement, "lens"),
     `<feDisplacementMap in="soft" in2="lens" scale="${tuning.scale}" xChannelSelector="R" yChannelSelector="G" result="refracted" />`,
     `<feColorMatrix in="refracted" type="saturate" values="1.55" result="tinted" />`,
     `<feDisplacementMap in="soft" in2="lens" scale="${fringe}" xChannelSelector="R" yChannelSelector="G" result="fringeBase" />`,
@@ -238,15 +272,15 @@ function filterMarkup(
     `<feDisplacementMap in="soft" in2="lens" scale="-${fringe}" xChannelSelector="R" yChannelSelector="G" result="fringeBase2" />`,
     `<feColorMatrix in="fringeBase2" type="matrix" values="0 0 0 0 0  0 0 0 0 0  0 0 1 0 0  0 0 0 1 0" result="fringeBlue" />`,
     `<feBlend in="fringeRed" in2="fringeBlue" mode="screen" result="fringes" />`,
-    `<feImage href="${rimShade}" x="0" y="0" width="100%" height="100%" preserveAspectRatio="none" result="fringeMask" />`,
+    map(rimShade, "fringeMask"),
     `<feComposite in="fringes" in2="fringeMask" operator="in" result="fringesMasked" />`,
     `<feComponentTransfer in="fringesMasked" result="fringesFaded"><feFuncA type="linear" slope="0.32" /></feComponentTransfer>`,
     `<feBlend in="fringesFaded" in2="tinted" mode="screen" result="dispersed" />`,
-    `<feImage href="${rimShade}" x="0" y="0" width="100%" height="100%" preserveAspectRatio="none" result="shade" />`,
+    map(rimShade, "shade"),
     `<feFlood flood-color="${tuning.shade}" result="shadeColor" />`,
     `<feComposite in="shadeColor" in2="shade" operator="in" result="shadeMasked" />`,
     `<feBlend in="shadeMasked" in2="dispersed" mode="normal" result="shaded" />`,
-    `<feImage href="${specular}" x="0" y="0" width="100%" height="100%" preserveAspectRatio="none" result="gloss" />`,
+    map(specular, "gloss"),
     `<feComponentTransfer in="gloss" result="glossFaded"><feFuncA type="linear" slope="0.72" /></feComponentTransfer>`,
     `<feBlend in="glossFaded" in2="shaded" mode="screen" />`,
     `</filter>`,
@@ -352,7 +386,20 @@ export function initLiquidGlass(selector = GLASS_SELECTOR): LiquidGlassControlle
     const token = (name: string, fallback: number) => Number.parseFloat(style.getPropertyValue(name)) || fallback;
     const tuning: LensTuning = {
       blur: Math.round(clamp(bezel * token("--glass-lens-blur", 0.05), 0.5, 1.2) * 10) / 10,
-      scale: Math.round(clamp(bezel * token("--glass-lens-scale", 2.1), 12, 34)),
+      /*
+       * Displacement is measured in CSS pixels and must stay *below* the
+       * bevel band's own width. When it exceeded the band, the map pushed the
+       * backdrop by more than the distance it had to fade out over, so the
+       * edge band sampled pixels from far outside itself and smeared into the
+       * plastic-looking strips. Roughly half the bezel reads as a lens; twice
+       * the bezel reads as a smear.
+       *
+       * The profile is a smooth bump, so the *mean* push across the band is
+       * only about half the peak. At a 0.9 peak-to-bezel ratio the average
+       * bend is therefore ~0.45 bezel, which is the range where a rim visibly
+       * magnifies what is behind it without tearing.
+       */
+      scale: Math.round(clamp(bezel * token("--glass-lens-scale", 0.9), 4, 16)),
       shade:
         style.getPropertyValue("--glass-shade").trim() ||
         (document.documentElement.dataset.doodleTheme === "dark" ? "rgba(0,0,0,0.55)" : "rgba(16,30,24,0.5)"),

@@ -62,6 +62,14 @@ All notable changes are documented here. Versions follow `VERSIONING.md`.
 - Loading the canvas could erase a board: Excalidraw emits an `onChange` while mounting, before the initial scene is applied, and that empty scene was written back as a human edit. Mutations now wait until the mounted scene actually contains the board's items.
 - Board v1 opacity (a 0-1 fraction) was passed to Excalidraw as if it were a 0-100 percentage, so any item with `opacity: 1` rendered at 1% and looked missing. Opacity is now converted in both directions, and a test covers the round trip.
 - The MCP integration tests no longer pin ports 3421–3448. Each spawned server asks the OS for a free loopback port, so two worktrees can run `npm test` at the same time without one run binding the other's preview server and silently asserting against the wrong board. `scripts/repo-check.mjs` fails if a pinned port returns.
+- The glass no longer paints a rectangle inside the pane. Three separate causes, all fixed: the specular map negated the light vector's `y` term even though `edgeField` already returns outward normals, so the bright band landed on the bottom edge and read as a slab shifted toward the lower left; `feImage` was sized `100%` while `feDisplacementMap` reads offsets in user space, so on a pane whose width is not an integer device pixel (the 90.25px capsule) the two grids drifted apart and smeared the bevel into a hard-edged box; and displacement peaked at twice the bevel width, dragging the band's own surroundings into the pane as a plastic strip.
+
+### Changed
+
+- Controls inside the glass are lit by the material, not painted on top of it. The toolbar had been switching to upstream's opaque `--button-hover-bg` on hover — invisible on an opaque bar, but a solid sticker over a lens. Hover now thickens the glass with a translucent wash and an inner rim that follows the button's own radius; selected tools get a low accent tint plus a lit edge, staying weak enough that the dot grid still shows through.
+- The zoom and undo groups have hover and active feedback again. Clearing their fills to `transparent !important` so the glass could show through had also erased the hover state those buttons relied on, so they looked dead. Disabled undo/redo now fades the glyph instead of the whole box, which had left an empty-looking capsule.
+- Pane fill comes from one token family (`--glass-surface-float` / `-panel` / `-solid`) instead of three drifting inline `color-mix` percentages, which had made some panes read as glass and others as white cards.
+- The glass carries two sheen layers with different jobs: `::before` is a tight specular highlight, `::after` is the hairline under the top rim plus a soft shade along the bottom. That pair is what makes the surface look like it bulges toward the viewer rather than lying flat.
 
 ### Changed
 
