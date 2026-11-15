@@ -70,6 +70,13 @@ All notable changes are documented here. Versions follow `VERSIONING.md`.
 - The zoom and undo groups have hover and active feedback again. Clearing their fills to `transparent !important` so the glass could show through had also erased the hover state those buttons relied on, so they looked dead. Disabled undo/redo now fades the glyph instead of the whole box, which had left an empty-looking capsule.
 - Pane fill comes from one token family (`--glass-surface-float` / `-panel` / `-solid`) instead of three drifting inline `color-mix` percentages, which had made some panes read as glass and others as white cards.
 - The glass carries two sheen layers with different jobs: `::before` is a tight specular highlight, `::after` is the hairline under the top rim plus a soft shade along the bottom. That pair is what makes the surface look like it bulges toward the viewer rather than lying flat.
+- The material no longer leaks into descendants. `--glass-refraction` is a custom property, so every icon, 13px radio input, and 1×1 visually-hidden anchor inside a pane inherited the filter and sampled the backdrop through a bevel sized for the parent's box. The mobile library trigger — a 40px row whose 12px radius spent 60% of its height on the band — painted the "tray inside the strip" that survived the earlier light-direction fix. Rows in the mobile strip now inherit the strip's material instead of becoming panes themselves.
+- The mobile bottom bar is anchored to its content instead of the viewport. Upstream stretches it with `inset: 0`; opening the property sheet resized that flex container and re-laid-out the palette, which is the jitter on every open and close. The bar also drops upstream's `margin: 0 14px 14px`, which stacked with our 12px padding into a 26px inset and made the palette float lower than every other surface.
+- `--glass-surface-*` is declared next to `--island-bg-color` rather than on `:root`. Declared at the root, the `color-mix()` referenced a variable that only existed on `.excalidraw`, so the whole family resolved to nothing and panes using it painted no fill at all.
+
+### Added
+
+- The glass is frosted in the centre and sharp at the rim. A single gaussian cannot serve both: enough blur to read as frosted glass erased the 1px dot grid, while keeping the grid left the middle looking like clear acetate. A second, wider blur now runs on a fresh copy of the backdrop and is masked to the flat middle, so the bevel keeps its refraction while the centre gets a diffuse haze. The frost blend is deliberately partial so the dot grid survives through it.
 
 ### Changed
 

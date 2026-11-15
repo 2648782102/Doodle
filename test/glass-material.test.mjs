@@ -61,8 +61,10 @@ describe("liquid glass material", () => {
   });
 
   it("keeps the bevel blur small enough for the dot grid to survive", () => {
-    // 1px dots vanish under a 3px gaussian; the pane then reads as fog.
-    expect(glassSource).toMatch(/Math\.round\(clamp\(bezel \* token\("--glass-lens-blur", 0\.05\), 0\.5, 1\.2\)/);
+    // The rim blur must stay tight or the bevel stops reading as a lens. The
+    // softer centre is a separate pass (`frost`) that is masked away from the
+    // band, so this cap only governs the edge.
+    expect(glassSource).toMatch(/Math\.round\(clamp\(bezel \* token\("--glass-lens-blur", 0\.05\), 0\.5, 1\.4\)/);
   });
 
   it("tapers the displacement to zero at the inner bevel edge", () => {
@@ -178,5 +180,53 @@ describe("liquid glass material", () => {
     expect(template).toMatch(/\.doodle-glass::before\s*\{[^}]*mix-blend-mode:\s*screen/);
     expect(template).toMatch(/\.doodle-glass::after\s*\{/);
     expect(template).toMatch(/\.doodle-glass::after\s*\{[^}]*linear-gradient\(/);
+  });
+
+  it("does not let the refraction filter leak into descendants", () => {
+    // Custom properties inherit. Without a reset every icon, 13px radio input,
+    // and 1×1 visually-hidden anchor inside a pane inherits the parent's filter
+    // and samples the backdrop through a bevel sized for the parent's box.
+    expect(glassSource).toContain('element.dataset.glass = ""');
+    expect(template).toMatch(/\[data-glass\]\s+\*\s*\{\s*--glass-refraction:\s*none;/);
+  });
+
+  it("does not give the mobile strip's rows their own bevel", () => {
+    // A 12px radius on a 40px row spends 60% of the height on the band, so the
+    // "rim" becomes a bowl. Rows inherit the strip's material instead.
+    expect(glassSource).toContain('element.closest(".excalidraw .mobile-misc-tools-container")');
+    expect(glassSource).toMatch(/if \(strip && strip !== element\) return;/);
+  });
+
+  it("anchors the mobile bottom bar to the content instead of the viewport", () => {
+    // Upstream stretches this bar with `inset: 0`; opening the property sheet
+    // then resizes the flex container and re-lays-out the palette, which is the
+    // jitter on every open/close.
+    expect(template).toMatch(/\.excalidraw \.App-bottom-bar \{[^}]*top:\s*auto;/);
+    expect(template).toMatch(/\.excalidraw \.App-bottom-bar \{[^}]*bottom:\s*0;/);
+    // Upstream's own `margin: 0 14px 14px` stacks with our 12px padding.
+    expect(template).toMatch(/\.excalidraw \.App-bottom-bar \{[^}]*margin:\s*0 !important;/);
+  });
+
+  it("defines the surface tokens next to the colour they mix", () => {
+    // `--glass-surface-*` mixes `--island-bg-color`, which only exists on
+    // `.excalidraw`. Declaring them on `:root` left the whole family resolving
+    // to an empty value, so every pane that used it painted nothing.
+    for (const token of ["--glass-surface-float", "--glass-surface-panel", "--glass-surface-solid"]) {
+      expect(template, `${token} is missing`).toContain(`${token}: color-mix(`);
+    }
+    const islandDecl = template.indexOf("--island-bg-color: #fdfefb;");
+    const floatDecl = template.indexOf("--glass-surface-float: color-mix(");
+    expect(floatDecl).toBeGreaterThan(islandDecl);
+    // And must not appear before the island colour is declared.
+    expect(template.indexOf("--glass-surface-float: color-mix(")).toBeGreaterThan(0);
+  });
+
+  it("frosts the centre without erasing the dot grid", () => {
+    // The rim keeps its sharp refraction; only the flat middle is blurred, and
+    // even there the frost is a partial blend so the 1px dots stay legible.
+    expect(glassSource).toContain("coreMap");
+    expect(glassSource).toMatch(/stdDeviation="\$\{tuning\.frost\}"/);
+    expect(glassSource).toMatch(/token\("--glass-frost", 0\.12\)/);
+    expect(glassSource).toMatch(/<feFuncA type="linear" slope="0\.42"/);
   });
 });

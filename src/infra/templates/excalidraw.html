@@ -6,6 +6,25 @@
   <title>Doodle · Excalidraw Canvas</title>
   <link rel="stylesheet" href="/excalidraw/index.css">
   <style>
+    /*
+     * Glass must not leak into children.
+     *
+     * `liquid-glass.ts` sets `--glass-refraction` inline on each pane and marks
+     * it `data-glass`. Custom properties inherit by default, so without this
+     * reset every icon, 13px radio input, and 1×1 visually-hidden anchor inside
+     * a pane inherits the *parent's* filter and runs a backdrop sample shaped
+     * for the parent's bevel. A 40px button inside a 44px pill painted a
+     * rounded tray belonging to neither element.
+     *
+     * `@property ... inherits: false` would be cleaner, but it only accepts
+     * typed syntaxes and a `<url>` filter list has no type that also permits
+     * the `blur(...)` fallback. Resetting inside each pane is equivalent here:
+     * a nested element that is itself a pane carries its own `data-glass` and
+     * its inline value wins by specificity.
+     */
+    [data-glass] * {
+      --glass-refraction: none;
+    }
     :root {
       color-scheme: light;
       --doodle-surface: rgba(253, 254, 250, 0.92);
@@ -74,6 +93,8 @@
       --glass-shade: rgba(16, 30, 24, 0.42);
       --glass-lens-scale: 0.9;
       --glass-lens-blur: 0.05;
+      /* Centre frost radius: how soft the flat middle of the pane is. */
+      --glass-frost: 0.42;
       --glass-tint: rgba(255, 255, 255, 0.14);
       --glass-shadow: 0 1px 2px rgba(24, 40, 34, 0.08), 0 12px 30px -8px rgba(24, 40, 34, 0.22);
       --glass-shadow-raised: 0 1px 2px rgba(24, 40, 34, 0.1), 0 20px 48px -10px rgba(24, 40, 34, 0.28);
@@ -103,9 +124,6 @@
        * these are expressed as mixes of the *same* surface colour so the two
        * families read as one material instead of glass next to white cards.
        */
-      --glass-surface-float: color-mix(in srgb, var(--island-bg-color) 7%, transparent);
-      --glass-surface-panel: color-mix(in srgb, var(--island-bg-color) 22%, transparent);
-      --glass-surface-solid: color-mix(in srgb, var(--island-bg-color) 46%, transparent);
     }
     :root[data-doodle-theme="dark"] {
       color-scheme: dark;
@@ -136,6 +154,8 @@
       --glass-shade: rgba(0, 0, 0, 0.55);
       --glass-lens-scale: 0.9;
       --glass-lens-blur: 0.05;
+      /* Centre frost radius: how soft the flat middle of the pane is. */
+      --glass-frost: 0.42;
       --glass-tint: rgba(255, 255, 255, 0.05);
       --glass-shadow: 0 1px 2px rgba(0, 0, 0, 0.36), 0 14px 34px -8px rgba(0, 0, 0, 0.5);
       --glass-shadow-raised: 0 1px 2px rgba(0, 0, 0, 0.4), 0 22px 52px -10px rgba(0, 0, 0, 0.6);
@@ -147,9 +167,6 @@
       --glass-selected-hover-fill: rgba(143, 203, 180, 0.24);
       --glass-selected-rim: rgba(143, 203, 180, 0.42);
       --glass-input-fill: rgba(255, 255, 255, 0.06);
-      --glass-surface-float: color-mix(in srgb, var(--island-bg-color) 10%, transparent);
-      --glass-surface-panel: color-mix(in srgb, var(--island-bg-color) 26%, transparent);
-      --glass-surface-solid: color-mix(in srgb, var(--island-bg-color) 52%, transparent);
     }
     .excalidraw {
       --color-primary: #2f6b5c;
@@ -171,6 +188,9 @@
       --color-border-outline: #6b7a72;
       --color-border-outline-variant: #c9d2cb;
       --island-bg-color: #fdfefb;
+      --glass-surface-float: color-mix(in srgb, var(--island-bg-color) 7%, transparent);
+      --glass-surface-panel: color-mix(in srgb, var(--island-bg-color) 22%, transparent);
+      --glass-surface-solid: color-mix(in srgb, var(--island-bg-color) 46%, transparent);
       --button-gray-1: #eef2ea;
       --button-gray-2: #e2e8e0;
       --button-gray-3: #cfd7d1;
@@ -216,6 +236,9 @@
       --color-border-outline: #8a9a91;
       --color-border-outline-variant: #3a4743;
       --island-bg-color: #1c2421;
+      --glass-surface-float: color-mix(in srgb, var(--island-bg-color) 10%, transparent);
+      --glass-surface-panel: color-mix(in srgb, var(--island-bg-color) 26%, transparent);
+      --glass-surface-solid: color-mix(in srgb, var(--island-bg-color) 52%, transparent);
       --button-gray-1: #2a342f;
       --button-gray-2: #333f39;
       --button-gray-3: #3c4a43;
@@ -424,7 +447,43 @@
      * selected, the action row. It spans the viewport as a bare 8px sheet with
      * a 1px border, which read as a system bar rather than as part of the board.
      */
-    .excalidraw .App-bottom-bar { padding: 0 12px 12px; }
+    /*
+     * Anchor the bar to the bottom instead of stretching it.
+     *
+     * Upstream makes `.App-bottom-bar` a full-viewport absolutely-positioned
+     * flex box (`inset: 0`) and lets the island ride at its end. That works
+     * while the island never changes height, but the mobile property sheet is
+     * rendered *inside* the island: opening or closing it resized the flex
+     * container and re-laid-out everything around it, which is the jitter the
+     * palette shows on every open/close. Pinning the box to the bottom edge and
+     * letting its height follow the content keeps the palette's baseline fixed.
+     *
+     * `pointer-events` stays enabled only on the island so the bar itself never
+     * swallows clicks aimed at the canvas above it.
+     */
+    .excalidraw .App-bottom-bar {
+      top: auto;
+      right: 0;
+      bottom: 0;
+      left: 0;
+      align-items: flex-end;
+      /* 12px of breathing room from the window edge, matching the other panes.
+         `box-sizing` is border-box so the padded height is the bar's height;
+         the island sits flush inside it. */
+      box-sizing: border-box;
+      /*
+       * Upstream gives this bar `margin: 0 14px 14px`. With our 12px padding
+       * the insets stacked into 26px from the window edge — the same magic
+       * number the other panes use for a *total* inset, so the palette floated
+       * lower than every other surface. The horizontal padding below is the
+       * inset, so the margin goes entirely; `!important` is required because
+       * upstream's rule is more specific than a plain class selector.
+       */
+      margin: 0 !important;
+      padding: 0 12px 12px;
+      pointer-events: none;
+    }
+    .excalidraw .App-bottom-bar > .Island { pointer-events: auto; }
     .excalidraw .App-bottom-bar > .Island {
       border: 1px solid var(--glass-edge-outer);
       border-radius: 18px;

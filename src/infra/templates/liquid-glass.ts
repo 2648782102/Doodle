@@ -203,6 +203,40 @@ function rimShadeMap(width: number, height: number, radius: number, bezel: numbe
   });
 }
 
+/**
+ * The flat middle of a pane, as an opaque mask.
+ *
+ * This is the complement of the bevel band: fully opaque once a pixel is
+ * further from the rim than `bezel`, fully transparent inside the band. It
+ * exists so the frost pass can be confined to the centre while the rim keeps
+ * its sharp refraction — one blur cannot serve both, so the filter splits the
+ * pane along this edge.
+ */
+function coreMap(width: number, height: number, radius: number, bezel: number): string {
+  return canvasUrl(width, height, (data, scale) => {
+    const columns = Math.round(width * scale);
+    const rows = Math.round(height * scale);
+    for (let row = 0; row < rows; row += 1) {
+      for (let column = 0; column < columns; column += 1) {
+        const field = edgeField((column + 0.5) / scale, (row + 0.5) / scale, width, height, radius);
+        /*
+         * `edgeField` returns null outside the rounded rect, so those pixels
+         * must stay transparent — the clamp to the border-radius is what makes
+         * the frost follow the pane's shape rather than its bounding box.
+         * Inside the shape, only the bevel band is excluded.
+         */
+        if (field === null) continue;
+        if (field.distance > 0 && field.distance < bezel) continue;
+        const offset = (row * columns + column) * 4;
+        data[offset] = 255;
+        data[offset + 1] = 255;
+        data[offset + 2] = 255;
+        data[offset + 3] = 255;
+      }
+    }
+  });
+}
+
 function defsElement(): SVGDefsElement | null {
   let defs = document.getElementById(DEFS_ID) as SVGDefsElement | null;
   if (defs) return defs;
@@ -220,7 +254,7 @@ function defsElement(): SVGDefsElement | null {
   return defs;
 }
 
-type LensTuning = { blur: number; scale: number; shade: string };
+type LensTuning = { blur: number; scale: number; shade: string; frost: number };
 
 function filterMarkup(
   id: string,
@@ -233,7 +267,8 @@ function filterMarkup(
   const displacement = displacementMap(width, height, radius, bezel);
   const specular = specularMap(width, height, radius, bezel);
   const rimShade = rimShadeMap(width, height, radius, bezel);
-  if (!displacement || !specular) return "";
+  const coreMask = coreMap(width, height, radius, bezel);
+  if (!displacement || !specular || !coreMask) return "";
 
   /*
    * Every map is declared in **user space CSS pixels**, not `100%`.
@@ -282,7 +317,26 @@ function filterMarkup(
     `<feBlend in="shadeMasked" in2="dispersed" mode="normal" result="shaded" />`,
     map(specular, "gloss"),
     `<feComponentTransfer in="gloss" result="glossFaded"><feFuncA type="linear" slope="0.72" /></feComponentTransfer>`,
-    `<feBlend in="glossFaded" in2="shaded" mode="screen" />`,
+    `<feBlend in="glossFaded" in2="shaded" mode="screen" result="lit" />`,
+    /*
+     * Frost layer.
+     *
+     * The rim has to stay sharp or the bevel stops reading as a lens, and the
+     * centre has to be soft or the pane reads as clear acetate instead of
+     * glass. One gaussian cannot do both, so this second, much wider blur runs
+     * on a fresh copy of the backdrop and is masked to the *flat middle* —
+     * exactly the complement of the bevel band. `feComposite operator="out"`
+     * against the same rim-shade silhouette punches the rim out of the frost,
+     * so the two treatments split at the bevel's inner edge instead of
+     * cross-fading through the middle of the band.
+     */
+    `<feGaussianBlur in="SourceGraphic" stdDeviation="${tuning.frost}" result="frost" />`,
+    `<feColorMatrix in="SourceGraphic" type="saturate" values="1.25" result="frostTinted" />`,
+    `<feComposite in="frostTinted" in2="frost" operator="arithmetic" k1="0.55" k2="0.45" k3="0" k4="0" result="frostMix" />`,
+    map(coreMask, "core"),
+    `<feComposite in="frostMix" in2="core" operator="in" result="frostCore" />`,
+    `<feComponentTransfer in="frostCore" result="frostSoft"><feFuncA type="linear" slope="0.42" /></feComponentTransfer>
+    <feBlend in="frostSoft" in2="lit" mode="normal" />`,
     `</filter>`,
   ].join("");
 }
@@ -346,6 +400,14 @@ const GLASS_SELECTOR = [
   ".excalidraw .zoom-actions",
   ".excalidraw .undo-redo-buttons",
   ".excalidraw .help-icon",
+  /*
+   * The library trigger is only a pane when it stands alone. Inside the mobile
+   * strip it is a 40px row of a pane that already has the material, and a
+   * 12px bevel on a 40px box is 60% of its height: it stops reading as a rim
+   * and turns into a bowl. `:not(.mobile-misc-tools-container *)` keeps the
+   * standalone desktop trigger refracting while letting the mobile strip own
+   * the material for its rows.
+   */
   ".excalidraw .sidebar-trigger",
   ".excalidraw .default-sidebar-trigger",
 ].join(", ");
@@ -385,7 +447,23 @@ export function initLiquidGlass(selector = GLASS_SELECTOR): LiquidGlassControlle
     const style = getComputedStyle(element);
     const token = (name: string, fallback: number) => Number.parseFloat(style.getPropertyValue(name)) || fallback;
     const tuning: LensTuning = {
-      blur: Math.round(clamp(bezel * token("--glass-lens-blur", 0.05), 0.5, 1.2) * 10) / 10,
+      /*
+       * Frost without losing the lens.
+       *
+       * A single blur has to serve two jobs that want opposite values: the rim
+       * must stay sharp enough to show the bevel bending the backdrop, while
+       * the centre should be soft enough to read as frosted rather than as
+       * clear acetate. Multiplying the same gaussian across the pane can only
+       * satisfy one of them, which is why the earlier cap was 1.2px: anything
+       * more erased the 1px dot grid and the pane turned to fog.
+       *
+       * `blur` here drives the outer band only (the filter chains it *before*
+       * displacement). A second, much softer pass is composited over the flat
+       * centre by `frostVeil` below, so the rim keeps its refraction and the
+       * middle gets the diffuse haze.
+       */
+      blur: Math.round(clamp(bezel * token("--glass-lens-blur", 0.05), 0.5, 1.4) * 10) / 10,
+      frost: Math.round(clamp(bezel * token("--glass-frost", 0.12), 1.2, 3.5)),
       /*
        * Displacement is measured in CSS pixels and must stay *below* the
        * bevel band's own width. When it exceeded the band, the map pushed the
@@ -417,6 +495,15 @@ export function initLiquidGlass(selector = GLASS_SELECTOR): LiquidGlassControlle
     if (!previous) container.append(node);
     targets.set(element, { element, id, width, height, radius });
     element.style.setProperty("--glass-refraction", `url(#${id})`);
+    /*
+     * Mark the element so CSS can scope the reset. See the `:where([data-glass])`
+     * rule in `excalidraw.html`: every descendant of a pane clears the custom
+     * property, and only elements carrying this attribute keep their own
+     * filter. Custom properties inherit, so without that reset every icon and
+     * hidden anchor inside a pane samples the backdrop through a bevel sized
+     * for the parent's box.
+     */
+    element.dataset.glass = "";
   }
 
   function schedule(element: HTMLElement): void {
@@ -433,6 +520,19 @@ export function initLiquidGlass(selector = GLASS_SELECTOR): LiquidGlassControlle
 
   function watch(element: HTMLElement): void {
     if (targets.has(element)) return;
+    /*
+     * A bevel needs room to be a bevel.
+     *
+     * The mobile library trigger is a 40px row inside the mobile tool strip.
+     * Its radius is 12px, and the band is allowed to grow to
+     * `min(width, height) * 0.3`, so the rim ends up covering 60% of the box
+     * and there is no flat centre left: it reads as a bowl rather than a lens,
+     * which is the "tray inside the strip" that survived the light fix. Rows
+     * inside the strip inherit the strip's material instead of getting their
+     * own filter.
+     */
+    const strip = element.closest(".excalidraw .mobile-misc-tools-container");
+    if (strip && strip !== element) return;
     targets.set(element, { element, id: "", width: 0, height: 0, radius: -1 });
     observer.observe(element);
     recompute(element);
