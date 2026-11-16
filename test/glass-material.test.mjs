@@ -64,7 +64,7 @@ describe("liquid glass material", () => {
     // The rim blur must stay tight or the bevel stops reading as a lens. The
     // softer centre is a separate pass (`frost`) that is masked away from the
     // band, so this cap only governs the edge.
-    expect(glassSource).toMatch(/Math\.round\(clamp\(bezel \* token\("--glass-lens-blur", 0\.05\), 0\.5, 1\.4\)/);
+    expect(glassSource).toMatch(/clamp\(bezel \* requested, 0\.5, 1\.4\)/);
   });
 
   it("tapers the displacement to zero at the inner bevel edge", () => {
@@ -129,7 +129,7 @@ describe("liquid glass material", () => {
   it("keeps displacement below the bevel width", () => {
     // Displacement larger than the band it fades out over drags the edge's own
     // surroundings into the pane, which reads as a plastic strip.
-    expect(glassSource).toMatch(/scale: Math\.round\(clamp\(bezel \* token\("--glass-lens-scale", 0\.9\), 4, 16\)\)/);
+    expect(glassSource).toMatch(/clamp\(bezel \* requested, 4, 16\)/);
     const declared = Number(/--glass-lens-scale:\s*([\d.]+)/.exec(template)?.[1]);
     // The profile is a smooth bump whose mean is about half its peak, so a 0.9
     // peak already averages ~0.45 bezel of displacement.
@@ -249,5 +249,27 @@ describe("liquid glass material", () => {
     // it re-ran the document scan dozens of times a second for nothing.
     expect(glassSource).toMatch(/attributeFilter: \["hidden"\]/);
     expect(glassSource).not.toMatch(/attributeFilter: \["hidden", "class"\]/);
+  });
+
+  it("lets a theme turn the lens off completely", () => {
+    // The paper theme sets scale, blur, and frost to zero. Building a filter
+    // anyway costs a GPU pass per pane per composite for an identity map, so
+    // the engine must skip it — and it must not clamp a deliberate zero back up
+    // to the minimum, which is what a `|| fallback` numeric read used to do.
+    expect(glassSource).toContain("if (tuning.scale === 0 && tuning.blur === 0 && tuning.frost === 0)");
+    expect(glassSource).toMatch(/const raw = style\.getPropertyValue\(name\)\.trim\(\);/);
+    expect(glassSource).not.toMatch(/Number\.parseFloat\(style\.getPropertyValue\(name\)\) \|\| fallback/);
+  });
+
+  it("declares the paper material for the sketch appearance", () => {
+    // A material switch, not another palette: the sheet is opaque and the
+    // refraction is gone, which is what "paper" has to mean visually.
+    expect(template).toContain(':root[data-doodle-material="paper"]');
+    const sketchBlock = template.slice(template.indexOf(':root[data-doodle-theme="sketch"] {'));
+    expect(sketchBlock.slice(0, 4000)).toContain("--glass-lens-scale: 0;");
+    expect(sketchBlock.slice(0, 4000)).toContain("--paper-sheet:");
+    // Paper panes must not keep a backdrop filter — you cannot read through card.
+    const paperBlock = template.slice(template.indexOf(':root[data-doodle-material="paper"] .doodle-glass'));
+    expect(paperBlock.slice(0, 600)).toContain("backdrop-filter: none");
   });
 });

@@ -486,7 +486,21 @@ export function initLiquidGlass(selector = GLASS_SELECTOR): LiquidGlassControlle
     // blur stays under ~1.2px: the displacement does the work and the grid
     // stays legible through the pane.
     const style = getComputedStyle(element);
-    const token = (name: string, fallback: number) => Number.parseFloat(style.getPropertyValue(name)) || fallback;
+    /*
+     * Read a numeric token, treating an explicit `0` as a value.
+     *
+     * `Number.parseFloat(...) || fallback` looks harmless and is wrong: `0` is
+     * falsy, so a theme that sets `--glass-lens-blur: 0` to turn blur off got
+     * the default instead. The paper theme uses zero for scale, blur, and frost
+     * together, and all three were silently replaced — which is why it still
+     * built a full refraction filter after being told to build none.
+     */
+    const token = (name: string, fallback: number) => {
+      const raw = style.getPropertyValue(name).trim();
+      if (!raw) return fallback;
+      const parsed = Number.parseFloat(raw);
+      return Number.isFinite(parsed) ? parsed : fallback;
+    };
     const tuning: LensTuning = {
       /*
        * Frost without losing the lens.
@@ -503,8 +517,18 @@ export function initLiquidGlass(selector = GLASS_SELECTOR): LiquidGlassControlle
        * centre by `frostVeil` below, so the rim keeps its refraction and the
        * middle gets the diffuse haze.
        */
-      blur: Math.round(clamp(bezel * token("--glass-lens-blur", 0.05), 0.5, 1.4) * 10) / 10,
-      frost: Math.round(clamp(bezel * token("--glass-frost", 0.12), 1.2, 3.5)),
+      /*
+       * Same rule as `scale` below: an explicit zero means "this theme wants no
+       * blur here", and the paper theme relies on that for the frost pass.
+       */
+      blur: (() => {
+        const requested = token("--glass-lens-blur", 0.05);
+        return requested <= 0 ? 0 : Math.round(clamp(bezel * requested, 0.5, 1.4) * 10) / 10;
+      })(),
+      frost: (() => {
+        const requested = token("--glass-frost", 0.12);
+        return requested <= 0 ? 0 : Math.round(clamp(bezel * requested, 1.2, 3.5));
+      })(),
       /*
        * Displacement is measured in CSS pixels and must stay *below* the
        * bevel band's own width. When it exceeded the band, the map pushed the
@@ -518,11 +542,44 @@ export function initLiquidGlass(selector = GLASS_SELECTOR): LiquidGlassControlle
        * bend is therefore ~0.45 bezel, which is the range where a rim visibly
        * magnifies what is behind it without tearing.
        */
-      scale: Math.round(clamp(bezel * token("--glass-lens-scale", 0.9), 4, 16)),
+      /*
+       * `0` is meaningful and must survive the clamp.
+       *
+       * The paper theme sets `--glass-lens-scale: 0` because an opaque sheet
+       * has no refraction to speak of. Clamping a zero up to the 4px floor
+       * would leave a small but visible bend in every card, which reads as a
+       * warped sticker rather than paper.
+       */
+      scale: (() => {
+        const requested = token("--glass-lens-scale", 0.9);
+        if (requested <= 0) return 0;
+        return Math.round(clamp(bezel * requested, 4, 16));
+      })(),
       shade:
         style.getPropertyValue("--glass-shade").trim() ||
         (document.documentElement.dataset.doodleTheme === "dark" ? "rgba(0,0,0,0.55)" : "rgba(16,30,24,0.5)"),
     };
+    /*
+     * A theme may ask for no lens at all.
+     *
+     * The paper appearance sets scale, blur, and frost to zero: an opaque sheet
+     * has nothing to refract and nothing to frost, and its material comes from
+     * borders and shadows instead. Building a filter that would be the identity
+     * map wastes a GPU pass per pane per composite, so skip it and leave
+     * `--glass-refraction` unset — the CSS fallback then resolves to plain
+     * `blur(0) saturate(100%)`, which is also the identity.
+     */
+    if (tuning.scale === 0 && tuning.blur === 0 && tuning.frost === 0) {
+      targets.set(element, { element, id: "", width, height, radius });
+      element.style.removeProperty("--glass-refraction");
+      element.dataset.glass = "";
+      // Drop every filter this pane owned. A theme switch rebuilds each pane in
+      // turn, so the earlier ones leave orphans in `<defs>` unless they are
+      // removed here; on a board with six panes that is six dead filters whose
+      // maps are still referenced by nothing but still cost memory.
+      previous?.remove();
+      return;
+    }
     const markup = filterMarkup(id, width, height, radius, bezel, tuning);
     if (!markup) return;
     // The markup must be parsed in the SVG namespace: a `<filter>` created by
@@ -622,6 +679,21 @@ export function initLiquidGlass(selector = GLASS_SELECTOR): LiquidGlassControlle
       // The rim shade colour is theme-dependent, so a theme switch has to
       // rebuild the filter rather than only re-measure the box.
       for (const element of targets.keys()) recompute(element, true);
+      /*
+       * Sweep filters no pane points at any more.
+       *
+       * A material switch (glass → paper) makes every pane take the no-lens
+       * path, which removes its own filter but leaves the `<filter>` nodes a
+       * *previous* theme created. Those nodes hold three rasterised maps each
+       * and nothing references them, so they are pure leakage. Anything still
+       * unreferenced here is dead.
+       */
+      const live = new Set(
+        [...targets.values()].map((target) => target.id).filter(Boolean),
+      );
+      for (const node of [...container.querySelectorAll("filter")]) {
+        if (!live.has(node.id)) node.remove();
+      }
     },
     dispose() {
       tree.disconnect();

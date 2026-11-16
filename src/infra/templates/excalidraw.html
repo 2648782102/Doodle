@@ -7,6 +7,26 @@
   <link rel="stylesheet" href="/excalidraw/index.css">
   <style>
     /*
+     * Handwriting faces for the sketch theme.
+     *
+     * Both files already ship inside the Excalidraw bundle — no asset is added
+     * and nothing is fetched from a CDN. Declaring them here, rather than
+     * relying on Excalidraw's lazy registration, is what makes the faces
+     * available to *chrome* text: Excalidraw only injects a `@font-face` once a
+     * canvas element asks for that family, so without this the theme's headings
+     * would paint in the fallback.
+     *
+     * `Virgil` covers Latin; `Xiaolai` covers Chinese and is shipped as many
+     * unicode-range shards. Declaring a single `@font-face` with `local()` and a
+     * `src` list lets the browser pick the shard it needs.
+     */
+    @font-face {
+      font-family: "Doodle Sketch";
+      src: url("/excalidraw/fonts/Virgil/Virgil-Regular.woff2") format("woff2");
+      font-display: swap;
+      font-weight: 400;
+    }
+    /*
      * Glass must not leak into children.
      *
      * `liquid-glass.ts` sets `--glass-refraction` inline on each pane and marks
@@ -124,6 +144,126 @@
        * these are expressed as mixes of the *same* surface colour so the two
        * families read as one material instead of glass next to white cards.
        */
+    }
+    /*
+     * Hand-drawn sketch theme.
+     *
+     * This is a different material, not the light theme in warmer colours.
+     * Light and dark are the same design at two luminances — calm glass on warm
+     * paper. Sketch is a page from a field notebook: uncoated paper stock, a
+     * graphite line rather than black ink, and a single muted blue-grey accent
+     * that reads like a pencil annotation rather than a brand colour.
+     *
+     * Three rules keep it from becoming a costume:
+     *
+     *   - no texture images: the "paper" is a near-neutral ground plus the
+     *     existing dot grid, so it stays crisp at any DPR and costs nothing;
+     *   - no torn edges or rotations: chrome keeps its rounded geometry, only
+     *     the type and the ink change;
+     *   - the handwriting face is scoped to headings, never to dense UI.
+     */
+    :root[data-doodle-theme="sketch"] {
+      color-scheme: light;
+      --doodle-surface: rgba(252, 250, 244, 0.94);
+      --doodle-surface-solid: #faf7f0;
+      --doodle-panel: rgba(250, 247, 240, 0.98);
+      /* Graphite, not black: pure #000 on paper reads as a printed screen. */
+      --doodle-ink: #3a3733;
+      --doodle-muted: #6f6961;
+      --doodle-border: rgba(58, 55, 51, 0.16);
+      --doodle-border-strong: rgba(58, 55, 51, 0.3);
+      /* Pencil annotation blue, muted enough to sit next to graphite. */
+      --doodle-accent: #4a6785;
+      --doodle-accent-soft: rgba(74, 103, 133, 0.12);
+      --doodle-accent-ink: #fdfbf6;
+      --doodle-danger: #a4483c;
+      /* Uncoated stock: warm cream, a touch deeper than the light theme so
+         graphite ink has something to sit on without the page looking dusty. */
+      --doodle-canvas-bg: #f8f4ea;
+      --doodle-dot: rgba(58, 55, 51, 0.2);
+      /*
+       * Softer washes than the glass themes. Paper does not carry a colour
+       * field; these stay warm and very low so the page reads as stock rather
+       * than as a gradient.
+       */
+      --doodle-wash-a: rgba(206, 176, 120, 0.16);
+      --doodle-wash-b: rgba(150, 160, 140, 0.13);
+      --doodle-wash-c: rgba(152, 168, 186, 0.12);
+      --doodle-shadow: 0 14px 34px rgba(58, 55, 51, 0.13);
+
+      /*
+       * Paper and ink instead of glass.
+       *
+       * This theme is not the light theme with warmer numbers: the *material*
+       * changes. A lens bends what is behind it, which is the whole point of
+       * the other two appearances and exactly wrong for paper — you cannot read
+       * through a card. So the pane becomes an opaque sheet with a physical
+       * edge: a warm top bevel catching light, a darker bottom lip for
+       * thickness, and a tight shadow that reads as contact with the page
+       * rather than a wide glass float.
+       *
+       * `--glass-lens-scale: 0` is the switch that turns refraction off.
+       * `liquid-glass.ts` still writes a filter, but a zero-amplitude
+       * displacement map is the identity map, so panes keep the blur/saturate
+       * fallback only where the theme wants it. That keeps one code path
+       * instead of a second rendering engine for one theme.
+       */
+      --paper-sheet: #fdfbf5;
+      --paper-sheet-edge: #f2ebdb;
+      --paper-lip: #e4d9c1;
+      --paper-crease: rgba(120, 104, 76, 0.14);
+      --paper-bevel-light: rgba(255, 255, 255, 0.9);
+      --glass-blur: 0px;
+      --glass-saturate: 100%;
+      --glass-bg: var(--paper-sheet);
+      --glass-bg-strong: var(--paper-sheet);
+      --glass-edge: var(--paper-bevel-light);
+      --glass-edge-outer: var(--paper-crease);
+      --glass-highlight: rgba(255, 255, 255, 0.55);
+      --glass-depth: rgba(120, 104, 76, 0.22);
+      --glass-shade: rgba(120, 104, 76, 0.34);
+      --glass-lens-scale: 0;
+      --glass-lens-blur: 0;
+      --glass-frost: 0;
+      --glass-tint: rgba(255, 255, 255, 0.4);
+      /* Contact shadow: short falloff, higher opacity — a card on a desk. */
+      --glass-shadow:
+        0 1px 0 0 var(--paper-lip),
+        0 2px 3px rgba(120, 104, 76, 0.16),
+        0 8px 16px -6px rgba(120, 104, 76, 0.28);
+      --glass-shadow-raised:
+        0 1px 0 0 var(--paper-lip),
+        0 3px 5px rgba(120, 104, 76, 0.18),
+        0 12px 24px -8px rgba(120, 104, 76, 0.3);
+      /*
+       * Pressed-in states, not lit-up states.
+       *
+       * On glass a hover adds light; on paper a control presses into the
+       * sheet, so hover darkens slightly and the inner shadow moves to the top
+       * lip. The fills stay opaque because the sheet is.
+       */
+      --glass-hover-fill: #f6f1e4;
+      --glass-hover-rim: rgba(255, 255, 255, 0.75);
+      --glass-hover-shade: rgba(120, 104, 76, 0.18);
+      --glass-active-fill: #ece4d1;
+      --glass-selected-fill: #e6edf3;
+      --glass-selected-hover-fill: #dbe6ef;
+      --glass-selected-rim: rgba(74, 103, 133, 0.5);
+      --glass-input-fill: #fdfbf5;
+      --glass-surface-float: var(--paper-sheet);
+      --glass-surface-panel: var(--paper-sheet);
+      --glass-surface-solid: var(--paper-sheet);
+
+      /*
+       * Handwriting, scoped.
+       *
+       * `Xiaolai` covers Chinese and `Virgil` the Latin glyphs — both already
+       * ship inside the Excalidraw bundle, so this adds no download. Only
+       * headings and the appearance switcher use it; board names, revision
+       * numbers, and menu items stay in the UI font because a handwritten
+       * 11px label is a legibility bug, not a style.
+       */
+      --doodle-font-sketch: "Doodle Sketch", "Segoe Print", "Bradley Hand", var(--doodle-font);
     }
     :root[data-doodle-theme="dark"] {
       color-scheme: dark;
@@ -257,6 +397,56 @@
       --scrollbar-thumb-hover: #4a5a52;
       --shadow-island: 0 1px 2px rgba(0, 0, 0, 0.32), 0 10px 28px rgba(0, 0, 0, 0.28);
     }
+    /*
+     * Excalidraw's own chrome under the sketch theme.
+     *
+     * Doodle pins Excalidraw to its light theme so board colours stay literal,
+     * which means these variables — not Excalidraw's dark set — decide how the
+     * shape toolbar, zoom group, and dropdown menus look. Without this block
+     * the toolbar would keep the pine-green palette while every Doodle pane
+     * around it turned to paper, and the shell would read as two products.
+     */
+    :root[data-doodle-theme="sketch"] .excalidraw {
+      --color-primary: #4a6785;
+      --color-primary-darker: #3d5670;
+      --color-primary-darkest: #33475d;
+      --color-primary-light: #e2e8ee;
+      --color-primary-light-darker: #d4dce6;
+      --color-primary-hover: #42607d;
+      --color-selection: #4a6785;
+      --color-brand-hover: #3d5670;
+      --color-brand-active: #33475d;
+      --color-on-primary-container: #33475d;
+      --color-surface-primary-container: #e2e8ee;
+      --color-surface-high: #f0ebe1;
+      --color-surface-mid: #f4f0e7;
+      --color-surface-low: #eae4d8;
+      --color-surface-lowest: #fbf8f2;
+      --color-on-surface: #3a3733;
+      --color-border-outline: #7d766c;
+      --color-border-outline-variant: #d6cfc1;
+      --island-bg-color: #faf7f0;
+      --glass-surface-float: color-mix(in srgb, var(--island-bg-color) 42%, transparent);
+      --glass-surface-panel: color-mix(in srgb, var(--island-bg-color) 62%, transparent);
+      --glass-surface-solid: color-mix(in srgb, var(--island-bg-color) 82%, transparent);
+      --button-gray-1: #f0ebe1;
+      --button-gray-2: #e7e1d5;
+      --button-gray-3: #d9d2c4;
+      --button-hover-bg: #f0ebe1;
+      --button-active-bg: #e2e8ee;
+      --button-active-border: #4a6785;
+      --focus-highlight-color: #4a6785;
+      --link-color: #4a6785;
+      --default-border-color: #e0d9cc;
+      --input-bg-color: #fbf8f2;
+      --input-border-color: #d6cfc1;
+      --input-hover-bg-color: #f0ebe1;
+      --input-label-color: #5f594f;
+      --popup-secondary-bg-color: #f4f0e7;
+      --scrollbar-thumb: #d6cfc1;
+      --scrollbar-thumb-hover: #c2b9a8;
+      --shadow-island: 0 1px 2px rgba(58, 55, 51, 0.08), 0 8px 22px rgba(58, 55, 51, 0.1);
+    }
     * { box-sizing: border-box; }
     html, body, #excalidrawRoot { height: 100%; margin: 0; }
     body { overflow: hidden; background: var(--doodle-surface-solid); color: var(--doodle-ink); font-family: var(--doodle-font); }
@@ -381,6 +571,35 @@
       background-position: 0 0, 0 0, 0 0, 0 0, 0 0, 0 0, 10px 10px;
     }
     .excalidraw-host > .excalidraw { position: relative; background: transparent; }
+    /*
+     * Paper ground.
+     *
+     * The glass themes need a colour field so the bevel has something to bend.
+     * Paper needs the opposite: a surface with no gradient at all, plus a
+     * texture fine enough that it reads as stock rather than as noise. The
+     * grain is two repeating-linear-gradients at 0.02–0.03 alpha on a 3px and
+     * 7px pitch, which tiles without a visible seam and costs one paint.
+     *
+     * The dot grid stays but becomes graphite and slightly irregular in weight,
+     * because a printed grid on paper is what this theme is imitating.
+     */
+    :root[data-doodle-material="paper"] .excalidraw-host {
+      background-color: var(--doodle-canvas-bg);
+      background-image:
+        repeating-linear-gradient(
+          0deg,
+          rgba(120, 104, 76, 0.008) 0 1px,
+          transparent 1px 6px
+        ),
+        repeating-linear-gradient(
+          90deg,
+          rgba(120, 104, 76, 0.007) 0 1px,
+          transparent 1px 11px
+        ),
+        radial-gradient(circle, var(--doodle-dot) 1px, transparent 1px);
+      background-size: 100% 100%, 100% 100%, 22px 22px;
+      background-position: 0 0, 0 0, 11px 11px;
+    }
     .excalidraw .App-menu_top { z-index: 4; }
     /*
      * Excalidraw paints a rotating hint strip under the toolbar (`.HintViewer`:
@@ -948,6 +1167,38 @@
     .doodle-tool-primary:hover { color: var(--doodle-accent-ink); filter: brightness(1.05); }
     .doodle-tool-icon { width: 30px; padding: 0; font-size: 14px; }
     #doodleThemeToggle:hover { color: var(--doodle-accent); background: var(--doodle-accent-soft); }
+    /*
+     * Three-segment appearance switcher.
+     *
+     * It sits inside the capsule, so it must read as part of that pane rather
+     * than as a nested control: no border of its own, segments separated by a
+     * hairline, and the active segment carrying the accent at low alpha. The
+     * whole group is 30px tall to match the sibling tool button.
+     */
+    .doodle-themes { display: inline-flex; align-items: stretch; gap: 2px; height: 30px; padding: 1px; border-radius: 9px; }
+    .doodle-theme-option {
+      min-width: 26px;
+      padding: 0 7px;
+      border: 1px solid transparent;
+      border-radius: 8px;
+      background: transparent;
+      color: var(--doodle-muted);
+      cursor: pointer;
+      font-size: 11px;
+      font-family: var(--doodle-font);
+      letter-spacing: 0.02em;
+      transition:
+        color var(--doodle-duration) var(--doodle-ease),
+        background-color var(--doodle-duration) var(--doodle-ease),
+        border-color var(--doodle-duration) var(--doodle-ease);
+    }
+    .doodle-theme-option:hover { color: var(--doodle-ink); border-color: var(--doodle-border); }
+    .doodle-theme-option[aria-pressed="true"] {
+      color: var(--doodle-accent);
+      background: var(--doodle-accent-soft);
+      border-color: var(--doodle-border-strong);
+      font-weight: 600;
+    }
     .doodle-notify-agent { position: fixed; right: 14px; bottom: 14px; z-index: 20; height: 36px; padding: 0 16px; border-radius: 18px; color: var(--doodle-accent-ink); background: var(--doodle-accent); cursor: pointer; font-size: 12px; }
     .doodle-notify-agent:hover { filter: brightness(1.05); }
     .doodle-notify-agent[hidden] { display: none; }
@@ -1047,6 +1298,162 @@
     .doodle-welcome { position: fixed; left: 50%; bottom: 132px; z-index: 24; width: min(520px, calc(100vw - 32px)); transform: translateX(-50%); display: grid; gap: 10px; padding: 18px 20px; border-radius: 20px; animation: doodle-welcome-in var(--doodle-duration) var(--doodle-ease); }
     .doodle-welcome[hidden] { display: none; }
     .doodle-welcome h2 { margin: 0; font-size: 14px; font-weight: 650; letter-spacing: 0.01em; }
+    /*
+     * Sketch typography, applied narrowly.
+     *
+     * Only strings a person reads once and does not scan: the page title, the
+     * welcome heading, section titles, and the three appearance labels. Board
+     * names, revision counts, menu items, and buttons keep the UI font — at
+     * 11-12px a handwriting face loses the difference between 一 and ー, and a
+     * library drawer full of illegible rows is not charming.
+     *
+     * `letter-spacing` is relaxed a touch because the sketch faces sit tighter
+     * than the UI sans they replace.
+     */
+    :root[data-doodle-theme="sketch"] .doodle-library-head strong,
+    :root[data-doodle-theme="sketch"] .doodle-welcome h2,
+    :root[data-doodle-theme="sketch"] .doodle-library-section > strong,
+    :root[data-doodle-theme="sketch"] .doodle-theme-option {
+      font-family: var(--doodle-font-sketch);
+      letter-spacing: 0.03em;
+    }
+    :root[data-doodle-theme="sketch"] .doodle-library-head strong,
+    :root[data-doodle-theme="sketch"] .doodle-welcome h2 {
+      font-size: 15px;
+      font-weight: 600;
+    }
+    /*
+     * Paper is thinner than glass, so the panes float less. The rim stays legible
+     * because the surface token above is denser than in the glass themes.
+     */
+    :root[data-doodle-theme="sketch"] .doodle-glass::after { opacity: 0.5; }
+    :root[data-doodle-theme="sketch"] .doodle-glass::before { opacity: 0.22; }
+    /*
+     * Physical paper material.
+     *
+     * `data-doodle-material="paper"` is set by the app when the appearance is
+     * sketch, so these rules key off a material switch rather than repeating
+     * the theme selector everywhere. The three parts:
+     *
+     *   thickness  a darker lip under the bottom edge, from `box-shadow`, so the
+     *              card has a visible side like a piece of card stock;
+     *   bevel      a bright 1px top edge where the paper catches light, plus a
+     *              hairline ring so the sheet boundary is crisp on a warm ground;
+     *   contact    a short, fairly dark shadow. Glass floats; paper rests.
+     *
+     * The `::before` sheen is repurposed as a paper grain wash rather than a
+     * specular highlight, and `::after` supplies the top bevel.
+     */
+    :root[data-doodle-material="paper"] .doodle-glass {
+      background: var(--paper-sheet);
+      border: 1px solid var(--paper-crease);
+      box-shadow:
+        inset 0 1px 0 0 var(--paper-bevel-light),
+        inset 0 -2px 0 0 var(--paper-sheet-edge),
+        inset 0 -3px 0 0 var(--paper-lip),
+        var(--glass-shadow);
+      -webkit-backdrop-filter: none;
+      backdrop-filter: none;
+    }
+    /* A faint grain: two very low-alpha washes at different offsets. Nothing
+       bright enough to read as a highlight, just enough that the sheet is not a
+       perfectly flat fill. */
+    :root[data-doodle-material="paper"] .doodle-glass::before {
+      background:
+        radial-gradient(80% 60% at 20% 0%, rgba(255, 255, 255, 0.5) 0%, transparent 60%),
+        radial-gradient(70% 50% at 85% 110%, rgba(120, 104, 76, 0.05) 0%, transparent 65%);
+      opacity: 0.55;
+      mix-blend-mode: normal;
+    }
+    :root[data-doodle-material="paper"] .doodle-glass::after {
+      background:
+        linear-gradient(
+          to bottom,
+          rgba(255, 255, 255, 0.7) 0 1px,
+          transparent 1px 88%,
+          rgba(120, 104, 76, 0.07) 100%
+        );
+      opacity: 0.9;
+    }
+    /*
+     * Native Excalidraw islands become paper cards too. They are separate from
+     * `.doodle-glass`, so the material has to be stated again; the inner button
+     * fills are re-declared below because the paper sheet is opaque and needs a
+     * visible pressed state instead of a translucent wash.
+     */
+    :root[data-doodle-material="paper"] .excalidraw .App-toolbar,
+    :root[data-doodle-material="paper"] .excalidraw .App-menu_bottom .Island,
+    :root[data-doodle-material="paper"] .excalidraw .layer-ui__wrapper__top-right .Island,
+    :root[data-doodle-material="paper"] .excalidraw .zoom-actions,
+    :root[data-doodle-material="paper"] .excalidraw .undo-redo-buttons,
+    :root[data-doodle-material="paper"] .excalidraw .help-icon,
+    :root[data-doodle-material="paper"] .excalidraw .sidebar-trigger,
+    :root[data-doodle-material="paper"] .excalidraw .default-sidebar-trigger,
+    :root[data-doodle-material="paper"] .excalidraw .mobile-misc-tools-container,
+    :root[data-doodle-material="paper"] .excalidraw .App-bottom-bar > .Island {
+      background-color: var(--paper-sheet) !important;
+      border: 1px solid var(--paper-crease);
+      box-shadow:
+        inset 0 1px 0 0 var(--paper-bevel-light),
+        inset 0 -2px 0 0 var(--paper-lip),
+        var(--glass-shadow) !important;
+      -webkit-backdrop-filter: none;
+      backdrop-filter: none;
+    }
+    /* Menus are lifted sheets, so they get the deeper contact shadow. */
+    :root[data-doodle-material="paper"] .excalidraw .dropdown-menu .dropdown-menu-container,
+    :root[data-doodle-material="paper"] .excalidraw .dropdown-menu--mobile .dropdown-menu-container {
+      background-color: var(--paper-sheet) !important;
+      border: 1px solid var(--paper-crease);
+      box-shadow:
+        inset 0 1px 0 0 var(--paper-bevel-light),
+        inset 0 -2px 0 0 var(--paper-lip),
+        var(--glass-shadow-raised) !important;
+      -webkit-backdrop-filter: none;
+      backdrop-filter: none;
+    }
+    /*
+     * Tool buttons press into the sheet.
+     *
+     * On glass, hover adds a translucent wash. On opaque paper a wash has
+     * nothing to show through, so the control changes colour like a printed
+     * key and gains an inner top shadow — the recessed look of a physical
+     * button. Geometry never changes.
+     */
+    :root[data-doodle-material="paper"] .excalidraw .App-toolbar .ToolIcon__icon:hover:not([aria-disabled="true"]),
+    :root[data-doodle-material="paper"] .excalidraw .App-toolbar .ToolIcon:hover .ToolIcon__icon:not([aria-disabled="true"]),
+    :root[data-doodle-material="paper"] .excalidraw .zoom-actions .zoom-button:hover .ToolIcon__icon,
+    :root[data-doodle-material="paper"] .excalidraw .undo-redo-buttons button:hover .ToolIcon__icon {
+      background: var(--glass-hover-fill) !important;
+      box-shadow:
+        inset 0 1px 2px 0 var(--glass-hover-shade),
+        inset 0 -1px 0 0 var(--glass-hover-rim);
+    }
+    :root[data-doodle-material="paper"] .excalidraw .App-toolbar .ToolIcon__icon:active:not([aria-disabled="true"]),
+    :root[data-doodle-material="paper"] .excalidraw .zoom-actions .zoom-button:active .ToolIcon__icon,
+    :root[data-doodle-material="paper"] .excalidraw .undo-redo-buttons button:active .ToolIcon__icon {
+      background: var(--glass-active-fill) !important;
+      box-shadow:
+        inset 0 2px 3px 0 var(--glass-hover-shade),
+        inset 0 -1px 0 0 var(--glass-hover-rim);
+    }
+    :root[data-doodle-material="paper"] .excalidraw .App-toolbar .ToolIcon .ToolIcon_type_radio:checked + .ToolIcon__icon,
+    :root[data-doodle-material="paper"] .excalidraw .App-toolbar .ToolIcon--selected .ToolIcon__icon {
+      background: var(--glass-selected-fill) !important;
+      box-shadow:
+        inset 0 1px 0 0 var(--glass-hover-rim),
+        inset 0 0 0 1px var(--glass-selected-rim),
+        inset 0 -1px 0 0 var(--glass-hover-shade);
+    }
+    /* Doodle's own capsule buttons keep their pressed states on paper too. */
+    :root[data-doodle-material="paper"] .doodle-tool:hover {
+      background: var(--glass-hover-fill);
+      border-color: var(--paper-crease);
+    }
+    :root[data-doodle-material="paper"] .doodle-theme-option[aria-pressed="true"] {
+      background: var(--glass-selected-fill);
+      box-shadow: inset 0 1px 2px 0 var(--glass-hover-shade);
+    }
     .doodle-welcome p { margin: 0; color: var(--doodle-muted); font-size: 12px; line-height: 1.6; }
     .doodle-welcome dl { display: grid; grid-template-columns: auto 1fr; gap: 6px 12px; margin: 2px 0 0; font-size: 12px; }
     .doodle-welcome dt { color: var(--doodle-ink); font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: 11px; }
@@ -1084,7 +1491,19 @@
   <div id="excalidrawRoot"></div>
   <div class="doodle-topbar doodle-glass" role="toolbar" aria-label="Doodle 画板控制">
     <button class="doodle-tool" id="doodleLibraryToggle" aria-expanded="false" aria-controls="doodleLibraryPanel">图库</button>
-    <button class="doodle-tool doodle-tool-icon" id="doodleThemeToggle" aria-label="切换深色主题" title="切换明暗主题">◐</button>
+    <!--
+      Appearance switcher.
+
+      A three-way choice cannot live behind a single toggle: with more than two
+      appearances the icon no longer tells you which one you will land on, and
+      cycling forces a person through themes they did not want. Three explicit
+      options show what is available and which one is active.
+    -->
+    <div class="doodle-themes" id="doodleThemeToggle" role="group" aria-label="外观">
+      <button class="doodle-theme-option" data-theme-option="light" aria-pressed="true" title="浅色 · 暖纸与松绿">浅</button>
+      <button class="doodle-theme-option" data-theme-option="dark" aria-pressed="false" title="深色 · 墨绿与夜色">深</button>
+      <button class="doodle-theme-option" data-theme-option="sketch" aria-pressed="false" title="手绘 · 纸面与铅笔">绘</button>
+    </div>
   </div>
   <button class="doodle-notify-agent doodle-glass" id="doodleNotifyAgent" hidden>通知 Agent</button>
   <section class="doodle-welcome doodle-glass" id="doodleWelcome" hidden aria-label="开始使用画板">

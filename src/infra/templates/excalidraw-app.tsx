@@ -91,7 +91,7 @@ function isEditing(appState: ExcalidrawAppState | undefined): boolean {
 declare global {
   interface Window {
     DOODLE_EXCALIDRAW_TOKEN?: string;
-    DOODLE_THEME?: "light" | "dark";
+    DOODLE_THEME?: DoodleTheme;
     DoodleExcalidrawInit?: (snapshot: BoardSnapshot, mcpApp?: unknown) => void;
     DoodleExcalidrawUpdate?: (snapshot: BoardSnapshot) => void;
   }
@@ -116,12 +116,45 @@ const pendingTimer: { current: number | null } = { current: null };
  */
 const sceneReady = { current: false };
 
-type DoodleTheme = "light" | "dark";
+/**
+ * Every appearance Doodle ships, in switcher order.
+ *
+ * This array is the single source of truth: the type is derived from it, the
+ * switcher renders it, and `readTheme` validates against it. Adding a fourth
+ * appearance is a one-line change here plus a token block in the template —
+ * no `if (theme === …)` chain to thread through.
+ */
+const THEMES = [
+  { id: "light", label: "浅色", hint: "暖纸与松绿" },
+  { id: "dark", label: "深色", hint: "墨绿与夜色" },
+  { id: "sketch", label: "手绘", hint: "纸面与铅笔" },
+] as const;
+
+type DoodleTheme = (typeof THEMES)[number]["id"];
+
+const THEME_IDS = THEMES.map((theme) => theme.id) as readonly DoodleTheme[];
+
+function isDoodleTheme(value: unknown): value is DoodleTheme {
+  return typeof value === "string" && (THEME_IDS as readonly string[]).includes(value);
+}
 const THEME_STORAGE_KEY = "doodle-theme";
 const DOODLE_PROJECT_URL = "https://github.com/2648782102/Doodle";
+/**
+ * The canvas ground for each appearance.
+ *
+ * `view` is always transparent: the page behind the canvas is painted by
+ * `--doodle-canvas-bg`, so one transparent canvas works for every theme and a
+ * theme switch never has to reinitialise Excalidraw. `export` is opaque
+ * because a PNG with a transparent background is unreadable in most viewers.
+ *
+ * The sketch theme sits on light paper, so its export ground matches the light
+ * theme rather than inventing a third one — a sketch board exported to PNG
+ * should look like the same drawing, not a different colour grade.
+ */
 const canvasColors: Record<DoodleTheme, { view: string; export: string }> = {
   light: { view: "transparent", export: "#f7f8f5" },
   dark: { view: "transparent", export: "#f7f8f5" },
+  sketch: { view: "transparent", export: "#faf7f0" },
 };
 
 function isDoodleProjectLink(link: unknown): boolean {
@@ -189,7 +222,10 @@ function initExternalLinkPolicy(): void {
 
 function readTheme(): DoodleTheme {
   try {
-    return localStorage.getItem(THEME_STORAGE_KEY) === "dark" ? "dark" : "light";
+    const stored = localStorage.getItem(THEME_STORAGE_KEY);
+    // An unknown value — a future theme removed, or a hand-edited key — must
+    // fall back rather than leave the page with no token block at all.
+    return isDoodleTheme(stored) ? stored : "light";
   } catch {
     return "light";
   }
@@ -207,23 +243,52 @@ const EXCALIDRAW_THEME = "light" as const;
 
 function applyTheme(theme: DoodleTheme): void {
   document.documentElement.dataset.doodleTheme = theme;
+  /*
+   * The material is a separate axis from the palette.
+   *
+   * Light and dark are one material (a glass lens) at two luminances. Sketch is
+   * a different material entirely — opaque paper with cut edges — and the
+   * stylesheet keys its rules off this attribute rather than re-listing the
+   * theme selector at every call site. It also lets `liquid-glass.ts` tell the
+   * difference without importing the theme list.
+   */
+  document.documentElement.dataset.doodleMaterial = theme === "sketch" ? "paper" : "glass";
   window.DOODLE_THEME = theme;
-  const toggle = document.querySelector<HTMLButtonElement>("#doodleThemeToggle");
-  if (toggle) {
-    toggle.textContent = theme === "dark" ? "☀" : "☾";
-    toggle.setAttribute("aria-label", theme === "dark" ? "切换浅色主题" : "切换深色主题");
-    toggle.title = theme === "dark" ? "切换浅色主题" : "切换深色主题";
-  }
+  syncThemeSwitcher(theme);
   try {
     localStorage.setItem(THEME_STORAGE_KEY, theme);
   } catch {}
   window.dispatchEvent(new CustomEvent("doodle-theme-change", { detail: theme }));
 }
 
+/**
+ * Reflect the active theme on the switcher.
+ *
+ * The control is a group of three buttons rather than one toggle: with three
+ * appearances a single button no longer tells you what you will get, and the
+ * old two-state icon had no room for a third state. `aria-pressed` carries the
+ * selection so a screen reader announces the current theme.
+ */
+function syncThemeSwitcher(theme: DoodleTheme): void {
+  const active = THEMES.find((entry) => entry.id === theme) ?? THEMES[0];
+  const group = document.querySelector<HTMLElement>("#doodleThemeToggle");
+  if (group) {
+    group.setAttribute("aria-label", `外观：${active.label}`);
+    group.title = `外观：${active.label}（${active.hint}）`;
+    for (const button of group.querySelectorAll<HTMLButtonElement>("[data-theme-option]")) {
+      const selected = button.dataset.themeOption === theme;
+      button.setAttribute("aria-pressed", selected ? "true" : "false");
+    }
+  }
+}
+
 function initThemeToggle(): void {
-  const toggle = document.querySelector<HTMLButtonElement>("#doodleThemeToggle");
   applyTheme(readTheme());
-  toggle?.addEventListener("click", () => applyTheme(readTheme() === "dark" ? "light" : "dark"));
+  const group = document.querySelector<HTMLElement>("#doodleThemeToggle");
+  group?.addEventListener("click", (event) => {
+    const button = (event.target as HTMLElement | null)?.closest<HTMLButtonElement>("[data-theme-option]");
+    if (button && isDoodleTheme(button.dataset.themeOption)) applyTheme(button.dataset.themeOption);
+  });
   window.addEventListener("doodle-theme-change", () => {
     // Frames are throttled: a theme flip recomputes every pane once.
     requestAnimationFrame(() => glassController?.refresh());
@@ -348,8 +413,20 @@ function connectStandaloneUpdates() {
   socket.addEventListener("close", () => window.setTimeout(connectStandaloneUpdates, 750));
 }
 
+/**
+ * Which *canvas* semantics an appearance needs.
+ *
+ * The adapter decides ink and paper from whether the ground is light or dark;
+ * it has no concept of a third appearance and should not grow one, because
+ * board rendering must stay identical no matter which chrome the person
+ * picked. Sketch sits on light paper, so it maps to the light canvas.
+ */
+function canvasThemeFor(theme: DoodleTheme): "light" | "dark" {
+  return theme === "dark" ? "dark" : "light";
+}
+
 function toElements(snapshot: BoardSnapshot, theme: DoodleTheme = readTheme()) {
-  const skeletons = boardItemsToExcalidrawSkeleton(snapshot.items as never[], theme);
+  const skeletons = boardItemsToExcalidrawSkeleton(snapshot.items as never[], canvasThemeFor(theme));
   return convertToExcalidrawElements(skeletons as never[], { regenerateIds: false })
     .sort((left: ExcalidrawLikeElement, right: ExcalidrawLikeElement) => {
       const leftMeta = (left.customData?.doodle as { z?: number; role?: string; variant?: string } | undefined) ?? {};
