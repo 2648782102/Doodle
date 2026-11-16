@@ -214,11 +214,18 @@ describe("liquid glass material", () => {
     for (const token of ["--glass-surface-float", "--glass-surface-panel", "--glass-surface-solid"]) {
       expect(template, `${token} is missing`).toContain(`${token}: color-mix(`);
     }
-    const islandDecl = template.indexOf("--island-bg-color: #fdfefb;");
-    const floatDecl = template.indexOf("--glass-surface-float: color-mix(");
-    expect(floatDecl).toBeGreaterThan(islandDecl);
-    // And must not appear before the island colour is declared.
-    expect(template.indexOf("--glass-surface-float: color-mix(")).toBeGreaterThan(0);
+    // Every block that mixes glass surfaces must declare its island colour
+    // first. The blocks moved when paper became the default theme, so pinning
+    // one literal island colour and one global index only tested the old order.
+    const blocks = [...template.matchAll(/\{\s*--color-primary[\s\S]*?\n\s*\}/g)].map((match) => match[0]);
+    expect(blocks.length).toBeGreaterThanOrEqual(3);
+    for (const block of blocks) {
+      if (!block.includes("--glass-surface-float: color-mix(")) continue;
+      const islandDecl = block.indexOf("--island-bg-color:");
+      const floatDecl = block.indexOf("--glass-surface-float: color-mix(");
+      expect(islandDecl, "a glass surface block is missing its island colour").toBeGreaterThanOrEqual(0);
+      expect(floatDecl).toBeGreaterThan(islandDecl);
+    }
   });
 
   it("frosts the centre without erasing the dot grid", () => {
@@ -261,15 +268,20 @@ describe("liquid glass material", () => {
     expect(glassSource).not.toMatch(/Number\.parseFloat\(style\.getPropertyValue\(name\)\) \|\| fallback/);
   });
 
-  it("declares the paper material for the sketch appearance", () => {
+  it("declares the paper material for the paper appearances", () => {
     // A material switch, not another palette: the sheet is opaque and the
     // refraction is gone, which is what "paper" has to mean visually.
     expect(template).toContain(':root[data-doodle-material="paper"]');
-    const sketchBlock = template.slice(template.indexOf(':root[data-doodle-theme="sketch"] {'));
-    expect(sketchBlock.slice(0, 6000)).toContain("--glass-lens-scale: 0;");
-    expect(sketchBlock.slice(0, 6000)).toContain("--paper-sheet:");
+    const lightPaper = template.slice(template.indexOf(":root {"));
+    expect(lightPaper.slice(0, 6000)).toContain("--glass-lens-scale: 0;");
+    expect(lightPaper.slice(0, 6000)).toContain("--paper-sheet:");
+    // Dark is now a dark sheet, not the old tinted lens. It shares the paper
+    // material and must zero the lens exactly like the light appearance.
+    const darkPaper = template.slice(template.indexOf(':root[data-doodle-theme="dark"] {'));
+    expect(darkPaper.slice(0, 6000)).toContain("--glass-lens-scale: 0;");
+    expect(darkPaper.slice(0, 6000)).toContain("--paper-sheet:");
     // Paper panes must not keep a backdrop filter — you cannot read through card.
-    const paperBlock = template.slice(template.indexOf(':root[data-doodle-material="paper"] .doodle-glass'));
+    const paperBlock = template.slice(template.indexOf(':root[data-doodle-material="paper"] .doodle-glass {'));
     expect(paperBlock.slice(0, 600)).toContain("backdrop-filter: none");
   });
 
@@ -291,7 +303,7 @@ describe("liquid glass material", () => {
   });
 
   it("keeps paper layers at distinct heights", () => {
-    // Sketch is a physical desk: the toolbar rests, the drawer is held above it.
+    // Paper is a physical desk: the toolbar rests, the drawer is held above it.
     // One shared shadow would flatten that relationship.
     expect(template).toContain("--paper-shadow-card:");
     expect(template).toContain("--paper-shadow-lifted:");
@@ -350,5 +362,44 @@ describe("liquid glass material", () => {
         `:root[data-doodle-material="paper"] .excalidraw .Island.sidebar ${target}`,
       );
     }
+  });
+
+  it("keeps the native library empty state clear of its open menu", () => {
+    /*
+     * Excalidraw positions the library's "..." menu with fixed negative
+     * offsets. Its empty state used to sit in the middle of the sidebar, so
+     * the "打开" menu painted across the explanatory copy and off the panel.
+     * The copy now sits higher, the bare button is labelled "打开本地素材",
+     * the menu is clamped inside the sidebar, and the copy fades while the
+     * menu is open so the row never overlaps text.
+     */
+    expect(template).toMatch(/\.excalidraw \.library-menu-items-container__items\s*\{[^}]*justify-content:\s*flex-start\s*!important/);
+    expect(template).toMatch(/\.excalidraw \.library-menu-control-buttons\s*\{[^}]*padding:\s*14px 16px 78px\s*!important/);
+    expect(template).toContain('content: "打开本地素材"');
+    expect(template).toMatch(/\.excalidraw \.library-menu\s*\{[^}]*left:\s*-100px\s*!important/);
+    expect(template).toMatch(/\.excalidraw \.library-menu\s*\{[^}]*width:\s*min\(220px, calc\(100vw - 68px\)\)\s*!important/);
+    expect(template).toContain("body:has(.excalidraw .library-menu) .excalidraw .library-menu-items__no-items");
+  });
+
+  it("keeps the canvas full width when the sidebar switches to search", () => {
+    /*
+     * Excalidraw docks the sidebar in Search mode by writing `right: 302px`
+     * on `.layer-ui__wrapper`, shrinking the canvas and sliding the centred
+     * toolbar ~150px left. Doodle's sidebar is always an inset overlay, so
+     * the wrapper must stay full width with no animated width change.
+     */
+    expect(template).toMatch(/\.excalidraw \.layer-ui__wrapper\s*\{[^}]*width:\s*100%\s*!important[^}]*right:\s*0\s*!important/);
+    expect(template).toMatch(/\.excalidraw \.layer-ui__wrapper\.animate\s*\{[^}]*transition:\s*none\s*!important/);
+  });
+
+  it("themes the search field from the palette, not upstream's hardcoded white", () => {
+    /*
+     * Upstream pins `.ExcTextField__input` to #f5f5f9 / #31303b by its own
+     * theme class. Doodle pins Excalidraw to light, so the box was always
+     * white even on the dark page. It must follow the theme's input token.
+     */
+    expect(template).toMatch(/\.excalidraw \.layer-ui__search-header \.ExcTextField__input\s*\{[^}]*background-color:\s*var\(--input-bg-color\)\s*!important/);
+    expect(template).toMatch(/\.excalidraw \.layer-ui__search-header \.ExcTextField__input input\s*\{[^}]*color:\s*var\(--doodle-ink\)/);
+    expect(template).toMatch(/\.excalidraw \.layer-ui__search-header \.ExcTextField__input input::placeholder\s*\{[^}]*color:\s*var\(--doodle-muted\)/);
   });
 });

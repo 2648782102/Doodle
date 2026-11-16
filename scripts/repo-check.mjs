@@ -201,10 +201,16 @@ check(excalidrawTemplate.includes('data-library-action="duplicate">另存一份'
 check(excalidrawApp.includes('if (action.type === "duplicate")') && excalidrawApp.includes('id: activeSnapshot?.id'), "canvas library Save As does not duplicate the active snapshot");
 check(excalidrawApp.includes("exportToBlob") && excalidrawApp.includes("exportToSvg") && excalidrawTemplate.includes('data-snapshot-export="png"') && excalidrawTemplate.includes('data-snapshot-export="jpg"') && excalidrawTemplate.includes('data-snapshot-export="svg"'), "static PNG/JPG/SVG snapshot exports are missing");
 check(excalidrawTemplate.includes("--doodle-accent") && excalidrawTemplate.includes('data-doodle-theme="dark"') && excalidrawTemplate.includes("radial-gradient(circle, var(--doodle-dot)") && excalidrawApp.includes('view: "transparent"'), "unified theme tokens or native Excalidraw dot grid are missing");
-check(excalidrawTemplate.includes(".excalidraw {\n      --color-primary: #2f6b5c") && excalidrawTemplate.includes('.excalidraw.theme--dark,\n    :root[data-doodle-theme="dark"] .excalidraw {\n      --color-primary: #8fcbb4'), "Excalidraw controls are not mapped to the Doodle pine-green palette in both themes");
+check(excalidrawTemplate.includes(".excalidraw {\n      --color-primary: #4a6785") && excalidrawTemplate.includes(':root[data-doodle-theme="glass"] .excalidraw {\n      --color-primary: #2f6b5c') && excalidrawTemplate.includes('.excalidraw.theme--dark,\n    :root[data-doodle-theme="dark"] .excalidraw {\n      --color-primary: #8fcbb4'), "Excalidraw controls are not mapped across the paper, glass, and dark palettes");
 check(excalidrawTemplate.includes(':root[data-doodle-theme="dark"] .excalidraw {') && excalidrawTemplate.includes("--button-gray-1: #2a342f"), "the dark page does not retheme Excalidraw's chrome, so controls stay white");
 check(!/--color-primary:\s*#6965db/.test(excalidrawTemplate) && excalidrawTemplate.includes("--color-surface-primary-container: #dcebe4"), "Excalidraw purple defaults remain visible in the canvas theme");
-check(excalidrawTemplate.includes('id="doodleThemeToggle"') && excalidrawApp.includes("initThemeToggle") && excalidrawApp.includes("THEME_STORAGE_KEY"), "light/dark theme toggle is missing");
+check(excalidrawTemplate.includes('id="doodleThemeToggle"') && excalidrawApp.includes("initThemeToggle") && excalidrawApp.includes("THEME_STORAGE_KEY"), "appearance theme switcher is missing");
+check(
+  ['{ id: "light"', '{ id: "dark"', '{ id: "glass"'].every((entry) => excalidrawApp.includes(entry)) &&
+    ['data-theme-option="light"', 'data-theme-option="dark"', 'data-theme-option="glass"'].every((option) => excalidrawTemplate.includes(option)) &&
+    excalidrawApp.includes('theme === "glass" ? "glass" : "paper"'),
+  "the three appearances or the paper/glass material split are incomplete",
+);
 check(excalidrawTemplate.includes("--doodle-drawer-width") && excalidrawTemplate.includes("doodle-drawer-scrim") && excalidrawApp.includes("doodle-drawer-open"), "library drawer lost its bounded width or accessible scrim");
 check(excalidrawTemplate.includes("body.doodle-drawer-open .doodle-topbar") && !excalidrawTemplate.includes("body.doodle-drawer-open .excalidraw-host > .excalidraw"), "library drawer squeezes or collides with the canvas toolbar");
 check(excalidrawTemplate.includes("body:has(.excalidraw .dropdown-menu) .doodle-topbar") && excalidrawTemplate.includes("body:has(.excalidraw .Modal) .doodle-topbar"), "Doodle toolbar does not yield to Excalidraw menus and modal overlays");

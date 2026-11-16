@@ -125,9 +125,9 @@ const sceneReady = { current: false };
  * no `if (theme === …)` chain to thread through.
  */
 const THEMES = [
-  { id: "light", label: "浅色", hint: "暖纸与松绿" },
-  { id: "dark", label: "深色", hint: "墨绿与夜色" },
-  { id: "sketch", label: "手绘", hint: "纸面与铅笔" },
+  { id: "light", label: "浅色", hint: "纸面与铅笔" },
+  { id: "dark", label: "深色", hint: "夜纸与浅墨" },
+  { id: "glass", label: "液态玻璃", hint: "暖纸与松绿" },
 ] as const;
 
 type DoodleTheme = (typeof THEMES)[number]["id"];
@@ -147,14 +147,19 @@ const DOODLE_PROJECT_URL = "https://github.com/2648782102/Doodle";
  * theme switch never has to reinitialise Excalidraw. `export` is opaque
  * because a PNG with a transparent background is unreadable in most viewers.
  *
- * The sketch theme sits on light paper, so its export ground matches the light
- * theme rather than inventing a third one — a sketch board exported to PNG
- * should look like the same drawing, not a different colour grade.
+ * The paper themes keep their sheet colour as the export ground, while the
+ * glass theme exports on the old warm white — a board exported to PNG should
+ * look like the same drawing, not a different colour grade.
  */
 const canvasColors: Record<DoodleTheme, { view: string; export: string }> = {
-  light: { view: "transparent", export: "#f7f8f5" },
-  dark: { view: "transparent", export: "#f7f8f5" },
-  sketch: { view: "transparent", export: "#faf7f0" },
+  /*
+   * Export ground follows the sheet, not the chrome. A paper light board
+   * exported onto the old glass white would come back a different colour than
+   * the one the person drew on.
+   */
+  light: { view: "transparent", export: "#faf7f0" },
+  dark: { view: "transparent", export: "#faf7f0" },
+  glass: { view: "transparent", export: "#f7f8f5" },
 };
 
 function isDoodleProjectLink(link: unknown): boolean {
@@ -244,15 +249,13 @@ const EXCALIDRAW_THEME = "light" as const;
 function applyTheme(theme: DoodleTheme): void {
   document.documentElement.dataset.doodleTheme = theme;
   /*
-   * The material is a separate axis from the palette.
+   * Light and dark are the paper desk; only the glass appearance refracts.
    *
-   * Light and dark are one material (a glass lens) at two luminances. Sketch is
-   * a different material entirely — opaque paper with cut edges — and the
-   * stylesheet keys its rules off this attribute rather than re-listing the
-   * theme selector at every call site. It also lets `liquid-glass.ts` tell the
-   * difference without importing the theme list.
+   * The two paper appearances differ in luminance, not in material, so the
+   * material switch keys off the single glass id rather than enumerating the
+   * paper ones — adding another paper tone does not have to touch this.
    */
-  document.documentElement.dataset.doodleMaterial = theme === "sketch" ? "paper" : "glass";
+  document.documentElement.dataset.doodleMaterial = theme === "glass" ? "glass" : "paper";
   window.DOODLE_THEME = theme;
   syncThemeSwitcher(theme);
   try {
@@ -419,7 +422,8 @@ function connectStandaloneUpdates() {
  * The adapter decides ink and paper from whether the ground is light or dark;
  * it has no concept of a third appearance and should not grow one, because
  * board rendering must stay identical no matter which chrome the person
- * picked. Sketch sits on light paper, so it maps to the light canvas.
+ * picked. The paper light and glass appearances sit on light ground; only
+ * the dark paper appearance maps to the dark canvas.
  */
 function canvasThemeFor(theme: DoodleTheme): "light" | "dark" {
   return theme === "dark" ? "dark" : "light";
@@ -886,7 +890,7 @@ function CanvasApp({ initial }: { initial: BoardSnapshot }) {
   useEffect(() => {
     const onThemeChange = (event: Event) => {
       const detail = (event as CustomEvent<DoodleTheme>).detail;
-      if (detail === "light" || detail === "dark") setTheme(detail);
+      if (isDoodleTheme(detail)) setTheme(detail);
     };
     window.addEventListener("doodle-theme-change", onThemeChange);
     return () => window.removeEventListener("doodle-theme-change", onThemeChange);
