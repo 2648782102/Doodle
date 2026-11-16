@@ -59,6 +59,22 @@ does not earn a third slot in the switcher.
    The page itself becomes stock too — a warm cream ground with a very low-alpha
    grain and a graphite dot grid — because a paper-themed chrome on a
    gradient-lit background reads as a skin over a renderer.
+
+   **Material detail (second iteration).** The sheet is built from four parts,
+   and each was chosen after looking at the rendered result at 6×:
+
+   | Part | Value | Why |
+   |---|---|---|
+   | fibre | `feTurbulence baseFrequency='0.62' octaves='3'`, alpha 0.11 | isotropic; an anisotropic pair read as wood grain |
+   | tooth | `feTurbulence baseFrequency='0.92' octaves='3'`, alpha 0.05 | second scale so the sheet has depth, not a noise overlay |
+   | bevel | `inset 1px 1px` light + `inset -1px -1px` warm shade | one light source, upper left, on every edge |
+   | thickness | `inset 0 -2px` sheet edge + `inset 0 -3px` lip | a visible side at 44px tall, no 3D transform |
+
+   Depth is two-tiered: `--paper-shadow-card` for chrome resting on the desk,
+   `--paper-shadow-lifted` for the drawer and menus. Controls inside a sheet are
+   printed on it rather than stacked on it — transparent fills with the same
+   hairline — because a near-white chip on cream reads as a second, brighter
+   layer.
 5. **The switcher must scale.** Replace the two-state toggle with a control
    that shows three options and the current one, works at 420px, and keeps
    the existing keyboard/screen-reader contract.

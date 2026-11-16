@@ -208,11 +208,54 @@
        * fallback only where the theme wants it. That keeps one code path
        * instead of a second rendering engine for one theme.
        */
+      /*
+       * Paper stock.
+       *
+       * Two values per role: the sheet colour and the shadow it throws onto the
+       * desk. Everything else is derived, so adjusting the stock is a two-line
+       * change rather than a hunt through twelve box-shadows.
+       *
+       * The tone is a warm off-white with a slight yellow bias — pure white
+       * reads as a screen, and a stronger cream reads as parchment. This sits
+       * between them, which is what uncoated card stock actually looks like
+       * under office light.
+       */
       --paper-sheet: #fdfbf5;
+      --paper-sheet-warm: #faf6ec;
       --paper-sheet-edge: #f2ebdb;
       --paper-lip: #e4d9c1;
       --paper-crease: rgba(120, 104, 76, 0.14);
       --paper-bevel-light: rgba(255, 255, 255, 0.9);
+      /*
+       * One light source, at 45° from the upper left.
+       *
+       * Physical materials are only convincing when every edge agrees on where
+       * the light is. These two are used by the pane bevel, the button wells,
+       * and the raised states, so a card and a button on it are lit the same
+       * way.
+       */
+      --paper-light-x: -1;
+      --paper-light-y: -1;
+      --paper-shade: rgba(120, 104, 76, 0.1);
+      --paper-shade-deep: rgba(120, 104, 76, 0.2);
+      /*
+       * Layer heights.
+       *
+       * Sketch is a physical desk, so surfaces sit at three depths instead of
+       * all floating at one. `flat` is the canvas itself; `card` is the toolbar
+       * resting on the desk; `lifted` is a drawer or menu held above it. The
+       * numbers differ in offset, blur, and opacity together — a deeper layer
+       * is further away, so its shadow is both longer and softer.
+       */
+      --paper-shadow-card:
+        0 1px 0 0 var(--paper-lip),
+        0 1px 2px var(--paper-shade),
+        0 4px 8px -3px var(--paper-shade);
+      --paper-shadow-lifted:
+        0 1px 0 0 var(--paper-lip),
+        0 2px 4px var(--paper-shade),
+        0 10px 20px -6px var(--paper-shade-deep),
+        0 22px 40px -18px var(--paper-shade);
       --glass-blur: 0px;
       --glass-saturate: 100%;
       --glass-bg: var(--paper-sheet);
@@ -226,15 +269,13 @@
       --glass-lens-blur: 0;
       --glass-frost: 0;
       --glass-tint: rgba(255, 255, 255, 0.4);
-      /* Contact shadow: short falloff, higher opacity — a card on a desk. */
-      --glass-shadow:
-        0 1px 0 0 var(--paper-lip),
-        0 2px 3px rgba(120, 104, 76, 0.16),
-        0 8px 16px -6px rgba(120, 104, 76, 0.28);
-      --glass-shadow-raised:
-        0 1px 0 0 var(--paper-lip),
-        0 3px 5px rgba(120, 104, 76, 0.18),
-        0 12px 24px -8px rgba(120, 104, 76, 0.3);
+      /*
+       * The legacy glass shadow names map onto the paper layers, so every pane
+       * that already asks for `--glass-shadow` gets a paper shadow without a
+       * second class. `raised` is the lifted tier.
+       */
+      --glass-shadow: var(--paper-shadow-card);
+      --glass-shadow-raised: var(--paper-shadow-lifted);
       /*
        * Pressed-in states, not lit-up states.
        *
@@ -586,19 +627,12 @@
     :root[data-doodle-material="paper"] .excalidraw-host {
       background-color: var(--doodle-canvas-bg);
       background-image:
-        repeating-linear-gradient(
-          0deg,
-          rgba(120, 104, 76, 0.008) 0 1px,
-          transparent 1px 6px
-        ),
-        repeating-linear-gradient(
-          90deg,
-          rgba(120, 104, 76, 0.007) 0 1px,
-          transparent 1px 11px
-        ),
+        var(--paper-fibre),
+        var(--paper-tooth),
         radial-gradient(circle, var(--doodle-dot) 1px, transparent 1px);
-      background-size: 100% 100%, 100% 100%, 22px 22px;
+      background-size: 200px 200px, 96px 96px, 22px 22px;
       background-position: 0 0, 0 0, 11px 11px;
+      background-blend-mode: multiply, multiply, normal;
     }
     .excalidraw .App-menu_top { z-index: 4; }
     /*
@@ -1344,36 +1378,101 @@
      * The `::before` sheen is repurposed as a paper grain wash rather than a
      * specular highlight, and `::after` supplies the top bevel.
      */
+    /*
+     * Paper fibre, generated rather than shipped.
+     *
+     * Two fields at different scales: a low-frequency one gives visible fibres
+     * the way card stock has a grain direction, a high-frequency one supplies
+     * tooth at reading distance. A single field reads as noise; the pair reads
+     * as stock. Both are `feTurbulence` desaturated to alpha only, so the sheet
+     * colour shows through and the texture is colourless by construction.
+     *
+     * The alpha is deliberately tiny (0.07 / 0.05). At 4x the fibre is clearly
+     * visible; at 1x it registers as "not a flat fill" rather than as a pattern.
+     */
+    :root[data-doodle-material="paper"] {
+      /*
+       * A single isotropic frequency pair.
+       *
+       * An earlier attempt used `0.06 0.9`, intending "long fibres along x".
+       * At 6x that read as wood grain: paper has no direction, and any
+       * anisotropic field looks like a machined surface instead. The field is
+       * therefore isotropic and sits low — fine enough to be tooth, coarse
+       * enough that it survives the DPR downsample to a 1x screen.
+       */
+      --paper-fibre: url("data:image/svg+xml;utf8,%3Csvg xmlns='http://www.w3.org/2000/svg' width='200' height='200'%3E%3Cfilter id='f' x='0' y='0' width='100%25' height='100%25'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.62' numOctaves='3' seed='19'/%3E%3CfeColorMatrix type='saturate' values='0'/%3E%3CfeComponentTransfer%3E%3CfeFuncA type='linear' slope='0.11'/%3E%3C/feComponentTransfer%3E%3C/filter%3E%3Crect width='200' height='200' filter='url(%23f)'/%3E%3C/svg%3E");
+      --paper-tooth: url("data:image/svg+xml;utf8,%3Csvg xmlns='http://www.w3.org/2000/svg' width='96' height='96'%3E%3Cfilter id='t' x='0' y='0' width='100%25' height='100%25'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.92' numOctaves='3' seed='7'/%3E%3CfeColorMatrix type='saturate' values='0'/%3E%3CfeComponentTransfer%3E%3CfeFuncA type='linear' slope='0.05'/%3E%3C/feComponentTransfer%3E%3C/filter%3E%3Crect width='96' height='96' filter='url(%23t)'/%3E%3C/svg%3E");
+    }
+    /*
+     * A sheet of card.
+     *
+     * Four things make it read as stock rather than as a rounded rectangle:
+     *
+     *   fibre     two generated noise fields, multiplied so they darken the
+     *             sheet rather than washing it out;
+     *   cut edge  a 1px hairline in the stock's own crease colour. Paper edges
+     *             are not a drawn border, but at 1x they read the same, and a
+     *             hairline keeps the corner radius crisp;
+     *   bevel     a bright inner line on the top and left (facing the light) and
+     *             a warmer shade on the bottom and right. Both are inner
+     *             shadows, so they cannot change the layout box;
+     *   thickness a two-step lip under the bottom edge — the sheet edge, then
+     *             the shadow of the sheet edge. That pair is what gives the card
+     *             a visible side at 44px tall without a 3D transform.
+     */
     :root[data-doodle-material="paper"] .doodle-glass {
-      background: var(--paper-sheet);
+      background-color: var(--paper-sheet);
+      background-image: var(--paper-fibre), var(--paper-tooth);
+      background-size: 200px 200px, 96px 96px;
+      background-blend-mode: multiply, multiply;
       border: 1px solid var(--paper-crease);
       box-shadow:
-        inset 0 1px 0 0 var(--paper-bevel-light),
+        inset 1px 1px 0 0 var(--paper-bevel-light),
+        inset -1px -1px 0 0 var(--paper-sheet-warm),
         inset 0 -2px 0 0 var(--paper-sheet-edge),
         inset 0 -3px 0 0 var(--paper-lip),
-        var(--glass-shadow);
+        var(--paper-shadow-card);
       -webkit-backdrop-filter: none;
       backdrop-filter: none;
     }
-    /* A faint grain: two very low-alpha washes at different offsets. Nothing
-       bright enough to read as a highlight, just enough that the sheet is not a
-       perfectly flat fill. */
+    /*
+     * The sheet has no sheen; paper does not reflect.
+     *
+     * The glass themes use `::before` for a specular highlight. Here it is
+     * repurposed as a single, very wide, very soft light gradient from the
+     * upper left — the same light direction as the bevel, so the sheet reads as
+     * one flat plane catching ambient light rather than as a glossy surface.
+     * Opacity stays under 0.35: above that it starts to look like a gradient
+     * fill and the fibre disappears under it.
+     */
     :root[data-doodle-material="paper"] .doodle-glass::before {
-      background:
-        radial-gradient(80% 60% at 20% 0%, rgba(255, 255, 255, 0.5) 0%, transparent 60%),
-        radial-gradient(70% 50% at 85% 110%, rgba(120, 104, 76, 0.05) 0%, transparent 65%);
-      opacity: 0.55;
-      mix-blend-mode: normal;
+      background: linear-gradient(
+        145deg,
+        rgba(255, 255, 255, 0.34) 0%,
+        rgba(255, 255, 255, 0.08) 38%,
+        rgba(120, 104, 76, 0.03) 100%
+      );
+      opacity: 1;
+      mix-blend-mode: soft-light;
     }
+    /*
+     * Cut edge.
+     *
+     * `::after` stops being a sheen and becomes the paper's edge: a hairline of
+     * light on the top inside, a hairline of shade on the bottom inside, and
+     * nothing in between. Two thin lines at the rim are what separate "a
+     * printed rectangle" from "a piece of stock" at 44px tall.
+     */
     :root[data-doodle-material="paper"] .doodle-glass::after {
-      background:
-        linear-gradient(
-          to bottom,
-          rgba(255, 255, 255, 0.7) 0 1px,
-          transparent 1px 88%,
-          rgba(120, 104, 76, 0.07) 100%
-        );
-      opacity: 0.9;
+      background: linear-gradient(
+        to bottom,
+        rgba(255, 255, 255, 0.55) 0 1px,
+        transparent 1px,
+        transparent calc(100% - 1px),
+        rgba(120, 104, 76, 0.09) calc(100% - 1px)
+      );
+      opacity: 1;
+      mix-blend-mode: normal;
     }
     /*
      * Native Excalidraw islands become paper cards too. They are separate from
@@ -1392,11 +1491,15 @@
     :root[data-doodle-material="paper"] .excalidraw .mobile-misc-tools-container,
     :root[data-doodle-material="paper"] .excalidraw .App-bottom-bar > .Island {
       background-color: var(--paper-sheet) !important;
+      background-image: var(--paper-fibre), var(--paper-tooth);
+      background-size: 200px 200px, 96px 96px;
+      background-blend-mode: multiply, multiply;
       border: 1px solid var(--paper-crease);
       box-shadow:
-        inset 0 1px 0 0 var(--paper-bevel-light),
+        inset 1px 1px 0 0 var(--paper-bevel-light),
+        inset -1px -1px 0 0 var(--paper-sheet-warm),
         inset 0 -2px 0 0 var(--paper-lip),
-        var(--glass-shadow) !important;
+        var(--paper-shadow-card) !important;
       -webkit-backdrop-filter: none;
       backdrop-filter: none;
     }
@@ -1404,13 +1507,60 @@
     :root[data-doodle-material="paper"] .excalidraw .dropdown-menu .dropdown-menu-container,
     :root[data-doodle-material="paper"] .excalidraw .dropdown-menu--mobile .dropdown-menu-container {
       background-color: var(--paper-sheet) !important;
+      background-image: var(--paper-fibre), var(--paper-tooth);
+      background-size: 200px 200px, 96px 96px;
+      background-blend-mode: multiply, multiply;
       border: 1px solid var(--paper-crease);
       box-shadow:
-        inset 0 1px 0 0 var(--paper-bevel-light),
+        inset 1px 1px 0 0 var(--paper-bevel-light),
+        inset -1px -1px 0 0 var(--paper-sheet-warm),
         inset 0 -2px 0 0 var(--paper-lip),
-        var(--glass-shadow-raised) !important;
+        var(--paper-shadow-lifted) !important;
       -webkit-backdrop-filter: none;
       backdrop-filter: none;
+    }
+    /*
+     * The drawer is the one surface held above the desk, so it takes the lifted
+     * shadow while everything else rests. That height difference is most of what
+     * makes a physical layout read as layered instead of flat.
+     */
+    :root[data-doodle-material="paper"] .doodle-library-panel {
+      background-color: var(--paper-sheet);
+      background-image: var(--paper-fibre), var(--paper-tooth);
+      background-size: 200px 200px, 96px 96px;
+      background-blend-mode: multiply, multiply;
+      border: 1px solid var(--paper-crease);
+      box-shadow:
+        inset 1px 1px 0 0 var(--paper-bevel-light),
+        inset -1px -1px 0 0 var(--paper-sheet-warm),
+        inset 0 -2px 0 0 var(--paper-lip),
+        var(--paper-shadow-lifted);
+      -webkit-backdrop-filter: none;
+      backdrop-filter: none;
+    }
+    /*
+     * Controls printed on the sheet, not cards stacked on it.
+     *
+     * Rows, buttons, and the name field were inheriting `--doodle-surface-solid`,
+     * which is near-white — on a cream sheet that reads as a second, brighter
+     * layer. They become slightly *darker* than the sheet instead, like ink
+     * printed on stock, and take the same hairline edge as the pane so the
+     * group stays coherent.
+     */
+    :root[data-doodle-material="paper"] .doodle-library-name,
+    :root[data-doodle-material="paper"] .doodle-library-entry,
+    :root[data-doodle-material="paper"] .doodle-library-rename button,
+    :root[data-doodle-material="paper"] .doodle-library-sectionhead-actions button,
+    :root[data-doodle-material="paper"] .doodle-library-footer button,
+    :root[data-doodle-material="paper"] .doodle-library-shares button,
+    :root[data-doodle-material="paper"] .doodle-tool {
+      background-color: transparent;
+      border-color: var(--paper-crease);
+      box-shadow: none;
+    }
+    :root[data-doodle-material="paper"] .doodle-library-entry.active {
+      background-color: rgba(74, 103, 133, 0.09);
+      box-shadow: inset 0 0 0 1px var(--glass-selected-rim);
     }
     /*
      * Tool buttons press into the sheet.

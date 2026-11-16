@@ -266,10 +266,36 @@ describe("liquid glass material", () => {
     // refraction is gone, which is what "paper" has to mean visually.
     expect(template).toContain(':root[data-doodle-material="paper"]');
     const sketchBlock = template.slice(template.indexOf(':root[data-doodle-theme="sketch"] {'));
-    expect(sketchBlock.slice(0, 4000)).toContain("--glass-lens-scale: 0;");
-    expect(sketchBlock.slice(0, 4000)).toContain("--paper-sheet:");
+    expect(sketchBlock.slice(0, 6000)).toContain("--glass-lens-scale: 0;");
+    expect(sketchBlock.slice(0, 6000)).toContain("--paper-sheet:");
     // Paper panes must not keep a backdrop filter — you cannot read through card.
     const paperBlock = template.slice(template.indexOf(':root[data-doodle-material="paper"] .doodle-glass'));
     expect(paperBlock.slice(0, 600)).toContain("backdrop-filter: none");
+  });
+
+  it("gives paper an isotropic fibre, not a machined grain", () => {
+    /*
+     * An anisotropic baseFrequency (e.g. `0.06 0.9`) renders as wood grain at
+     * 6x: paper has no direction. Both fields must be isotropic, and both must
+     * be generated (`feTurbulence`) rather than shipped as an image asset.
+     */
+    expect(template).toContain("feTurbulence");
+    expect(template).toContain("--paper-fibre:");
+    expect(template).toContain("--paper-tooth:");
+    // One number per baseFrequency means isotropic; two would be directional.
+    const baseFreqs = [...template.matchAll(/baseFrequency='([^']+)'/g)].map((m) => m[1]);
+    expect(baseFreqs.length).toBeGreaterThanOrEqual(2);
+    for (const value of baseFreqs) {
+      expect(value.trim().split(/\s+/), `baseFrequency "${value}" is anisotropic`).toHaveLength(1);
+    }
+  });
+
+  it("keeps paper layers at distinct heights", () => {
+    // Sketch is a physical desk: the toolbar rests, the drawer is held above it.
+    // One shared shadow would flatten that relationship.
+    expect(template).toContain("--paper-shadow-card:");
+    expect(template).toContain("--paper-shadow-lifted:");
+    // Both inner bevels exist, so the light comes from one direction on every edge.
+    expect(template).toMatch(/inset 1px 1px 0 0 var\(--paper-bevel-light\)/);
   });
 });

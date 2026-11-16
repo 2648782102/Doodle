@@ -25,6 +25,9 @@
 
 ### Added
 
+- A third appearance: **手绘 (sketch)**, selectable from a three-way switcher beside light and dark. It changes the *material*, not just the palette — panes become opaque card stock instead of glass, because a lens you can read through is the opposite of paper.
+- Paper is generated, not shipped. Two `feTurbulence` fields — one for fibre, one for tooth — are desaturated to alpha and multiplied into the sheet, so the stock has texture at 6× and still reads as a flat sheet at 1×. Adding a fourth appearance is one entry in the `THEMES` table plus a token block.
+- The sketch theme is the cheapest appearance, not the most expensive: it sets lens scale, blur, and frost to zero, and the glass engine skips building a filter entirely, so it runs with no refraction passes at all.
 - Delta reads now explain *what the human change means*, not just which fields moved. `HANDOFF_READINGS` names the intent — a rename is read as a correction of meaning, a move as a layout preference, a resize as emphasis, a new note as something to respond to — with one bounded suggestion each. `NEXT` leads with the most meaningful change.
 - Each board remembers its own camera (scroll and zoom) in browser storage, so reopening lands where you left off instead of at the origin. An empty board never restores a camera, and a remembered view panned away from the content is discarded so a full board cannot look blank.
 - Writes that would clear every object from a non-empty board are refused with a 409. A deliberate per-object delete is unaffected, as is the first write to a new board.
