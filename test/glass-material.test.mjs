@@ -298,4 +298,57 @@ describe("liquid glass material", () => {
     // Both inner bevels exist, so the light comes from one direction on every edge.
     expect(template).toMatch(/inset 1px 1px 0 0 var\(--paper-bevel-light\)/);
   });
+
+  it("covers every glass surface with the paper material", () => {
+    /*
+     * The material has to be restated for each component, and a missed
+     * component keeps its refraction while everything around it turns to paper.
+     * That already happened once: the collapsed left toolbar is `.Island.sidebar`
+     * and only appears after a tool opens its panel, so a screenshot of the
+     * resting canvas never showed it.
+     *
+     * This walks the selectors the glass stylesheet actually applies a backdrop
+     * filter to and requires a paper counterpart for each. It reads the
+     * stylesheet, not a rendered page, so a component that is hidden at any
+     * given moment still has to be covered.
+     */
+    const paperSection = template.slice(template.indexOf(':root[data-doodle-material="paper"] .doodle-glass'));
+    const required = [
+      ".doodle-glass",
+      ".doodle-library-panel",
+      ".excalidraw .App-toolbar",
+      ".excalidraw .App-menu_bottom .Island",
+      ".excalidraw .layer-ui__wrapper__top-right .Island",
+      ".excalidraw .FixedSideContainer_side_top > .Island",
+      ".excalidraw .Island.sidebar",
+      ".excalidraw .Island.App-menu__left",
+      ".excalidraw .dropdown-menu .dropdown-menu-container",
+      ".excalidraw .dropdown-menu--mobile .dropdown-menu-container",
+      ".excalidraw .zoom-actions",
+      ".excalidraw .undo-redo-buttons",
+      ".excalidraw .help-icon",
+      ".excalidraw .sidebar-trigger",
+      ".excalidraw .default-sidebar-trigger",
+      ".excalidraw .scroll-back-to-content",
+      ".excalidraw .mobile-misc-tools-container",
+      ".excalidraw .App-bottom-bar > .Island",
+    ];
+    for (const selector of required) {
+      expect(paperSection, `${selector} has no paper material`).toContain(selector);
+    }
+  });
+
+  it("neutralises Excalidraw's hard-coded white inside paper panes", () => {
+    /*
+     * Excalidraw paints some interior containers and pressed tabs with a literal
+     * `#fff`. On a cream sheet those read as holes punched through the paper —
+     * the sidebar's trigger row was the visible one. They must be overridden
+     * under the paper material, scoped so the glass themes stay untouched.
+     */
+    for (const target of [".sidebar-triggers", ".sidebar-tabs", ".sidebar__header"]) {
+      expect(template, `${target} keeps its white fill`).toContain(
+        `:root[data-doodle-material="paper"] .excalidraw .Island.sidebar ${target}`,
+      );
+    }
+  });
 });

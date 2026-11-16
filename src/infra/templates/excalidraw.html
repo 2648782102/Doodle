@@ -1483,11 +1483,20 @@
     :root[data-doodle-material="paper"] .excalidraw .App-toolbar,
     :root[data-doodle-material="paper"] .excalidraw .App-menu_bottom .Island,
     :root[data-doodle-material="paper"] .excalidraw .layer-ui__wrapper__top-right .Island,
+    /* The collapsed left toolbar is an `.Island.sidebar`. It was missed on the
+       first pass because it only appears once a tool opens its panel, so a
+       screenshot of the resting canvas never showed it. */
+    :root[data-doodle-material="paper"] .excalidraw .Island.sidebar,
+    /* The selected-object style panel, which slides in under the capsule. */
+    :root[data-doodle-material="paper"] .excalidraw .Island.App-menu__left,
+    /* Shape palette host on the top-left of the canvas. */
+    :root[data-doodle-material="paper"] .excalidraw .FixedSideContainer_side_top > .Island,
     :root[data-doodle-material="paper"] .excalidraw .zoom-actions,
     :root[data-doodle-material="paper"] .excalidraw .undo-redo-buttons,
     :root[data-doodle-material="paper"] .excalidraw .help-icon,
     :root[data-doodle-material="paper"] .excalidraw .sidebar-trigger,
     :root[data-doodle-material="paper"] .excalidraw .default-sidebar-trigger,
+    :root[data-doodle-material="paper"] .excalidraw .scroll-back-to-content,
     :root[data-doodle-material="paper"] .excalidraw .mobile-misc-tools-container,
     :root[data-doodle-material="paper"] .excalidraw .App-bottom-bar > .Island {
       background-color: var(--paper-sheet) !important;
@@ -1561,6 +1570,28 @@
     :root[data-doodle-material="paper"] .doodle-library-entry.active {
       background-color: rgba(74, 103, 133, 0.09);
       box-shadow: inset 0 0 0 1px var(--glass-selected-rim);
+    }
+    /*
+     * Interior chrome inside the paper panes.
+     *
+     * Excalidraw paints a few containers and active icons with hard-coded
+     * `#fff` — the sidebar's trigger row, its tab strip, and the pressed state
+     * of a tab. On a cream sheet those read as holes punched through it. They
+     * become the sheet colour (or a tinted press) instead. The selectors are
+     * scoped to the paper material so the glass themes are untouched.
+     */
+    :root[data-doodle-material="paper"] .excalidraw .Island.sidebar .sidebar-triggers,
+    :root[data-doodle-material="paper"] .excalidraw .Island.sidebar .sidebar-tabs,
+    :root[data-doodle-material="paper"] .excalidraw .Island.sidebar .sidebar__header,
+    :root[data-doodle-material="paper"] .excalidraw .Island.sidebar .sidebar-trigger__label-element {
+      background-color: transparent;
+      box-shadow: none;
+    }
+    /* A pressed sidebar tab is printed darker, not filled white. */
+    :root[data-doodle-material="paper"] .excalidraw .Island.sidebar .sidebar-tab.active,
+    :root[data-doodle-material="paper"] .excalidraw .Island.sidebar [role="tab"][aria-selected="true"] {
+      background-color: rgba(74, 103, 133, 0.14);
+      color: var(--doodle-accent);
     }
     /*
      * Tool buttons press into the sheet.
