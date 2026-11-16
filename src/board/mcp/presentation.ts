@@ -10,16 +10,63 @@
 import type { CallToolResult } from "@modelcontextprotocol/sdk/types.js";
 import { logger } from "../../infra/logger.js";
 import { boardAgentView } from "../agent-view.js";
-import { boardCopyText, boardVisualDigest, type SimpleBoard } from "../types.js";
+import { boardCopyText, boardVisualDigest, diagnoseBoard, type SimpleBoard } from "../types.js";
+import { BoardValidationError } from "../errors.js";
 
 export function errorResult(tool: string, error: unknown): CallToolResult {
   const message = error instanceof Error ? error.message : String(error);
   logger.error(`${tool} failed: ${message}`);
-  return { content: [{ type: "text" as const, text: `❌ ${tool} failed: ${message}` }], isError: true };
+  const validation = error instanceof BoardValidationError ? error : undefined;
+  const errorJson = validation ? {
+    code: validation.code,
+    message,
+    path: validation.path,
+    expected: validation.expected,
+    fix: validation.fix,
+  } : { code: "TOOL_ERROR", message };
+  return {
+    content: [{
+      type: "text" as const,
+      text: [
+        `❌ ${tool} failed: ${message}`,
+        "ERROR_JSON:",
+        JSON.stringify(errorJson, null, 2),
+      ].join("\n"),
+    }],
+    isError: true,
+  };
 }
 
 export function jsonLine(payload: Record<string, string | number | boolean>): string {
   return `JSON: ${JSON.stringify(payload)}`;
+}
+
+/** Reduce an agent payload to the requested token level. `full` is unchanged. */
+export function viewPayload(payload: Record<string, any>, view?: "summary" | "structure" | "detail" | "full"): Record<string, unknown> {
+  if (!view || view === "full") return payload;
+  const base = {
+    version: payload.version,
+    readOnly: payload.readOnly,
+    id: payload.id,
+    title: payload.title,
+    revision: payload.revision,
+    itemCount: payload.itemCount,
+  };
+  if (view === "summary") {
+    return { ...base, summary: payload.summary, visualDigest: payload.visualDigest, diagnosis: payload.diagnosis };
+  }
+  if (view === "structure") {
+    return {
+      ...base,
+      items: payload.items.map((item: any) => ({
+        id: item.id, type: item.type, x: item.x, y: item.y, w: item.w, h: item.h,
+        role: item.role, emphasis: item.emphasis, startItemId: item.startItemId, endItemId: item.endItemId,
+      })),
+      visualDigest: payload.visualDigest,
+      diagnosis: payload.diagnosis,
+    };
+  }
+  return { ...base, items: payload.items, copyText: payload.copyText, visualDigest: payload.visualDigest, diagnosis: payload.diagnosis, summary: payload.summary };
 }
 
 export function boardCapabilities() {
@@ -27,7 +74,18 @@ export function boardCapabilities() {
     version: 1,
     objectTypes: ["note", "text", "rect", "ellipse", "line", "stroke", "image"],
     variants: ["plain", "card", "frame", "pill", "diamond", "callout", "heading"],
-    roles: ["normal", "label", "frame", "column", "step", "decision", "annotation"],
+    roles: ["normal", "label", "frame", "column", "step", "decision", "annotation", "question", "constraint", "evidence"],
+    roleMeanings: {
+      step: "one stage in a process",
+      decision: "a choice or branch",
+      question: "an open question awaiting an answer",
+      constraint: "a boundary or requirement",
+      evidence: "supporting data or source",
+      label: "short heading for a group",
+      frame: "container around related items",
+      annotation: "side note or explanation",
+    },
+    emphasisMeaning: "focus marks the item the current exchange is about; use at most one per board unless the person asks otherwise.",
     layouts: ["grid", "row", "column", "timeline", "cluster", "architecture"],
     connectors: ["startItemId", "endItemId"],
     recipes: ["flow", "compare", "cluster", "emphasis", "image-annotation", "architecture", "diagram"],
@@ -66,6 +124,7 @@ export function boardJson(board: SimpleBoard, library?: unknown) {
     items: board.items,
     copyText: boardCopyText(board),
     visualDigest: boardVisualDigest(board),
+    diagnosis: diagnoseBoard(board),
     capabilities: boardCapabilities(),
     ...(library ? { library } : {}),
     safety: {
@@ -97,6 +156,7 @@ export function boardAgentPayload(board: SimpleBoard, library?: unknown) {
     items: view.items,
     copyText: boardCopyText(board),
     visualDigest: boardVisualDigest(board),
+    diagnosis: diagnoseBoard(board),
     summary: view.summary,
     canvasFidelityItems: view.canvasFidelityItems,
     capabilities: boardCapabilities(),

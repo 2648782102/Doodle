@@ -15,6 +15,7 @@ import {
   boardJson,
   boardRecipes,
   errorResult,
+  viewPayload,
 } from "../presentation.js";
 import { boardAgentDelta, summarizeAgentBoard } from "../../agent-view.js";
 import { describeHandoff, handoffNextStep } from "../../handoff.js";
@@ -35,10 +36,12 @@ server.registerTool(
         .describe("Include the full capabilities, recipes, and drawing guide. Defaults to true on a first or empty read and false on later reads, where the initialization instructions already cover them."),
       include_canvas_fidelity: z.boolean().optional()
         .describe("Return Excalidraw scene fidelity with each item. Use only to rebuild a canvas; it is large and not useful for reading or drawing."),
+      view: z.enum(["summary", "structure", "detail", "full"]).optional()
+        .describe("Token level. `full` (default) is unchanged; `summary` returns digest/diagnosis only, `structure` adds ids/coordinates/roles without text blobs, `detail` is the normal agent payload without capabilities/guide."),
     }),
     annotations: READ_ONLY_LOCAL_ANNOTATIONS,
   },
-  async ({ since_revision, include_guide, include_canvas_fidelity }: { since_revision?: number; include_guide?: boolean; include_canvas_fidelity?: boolean }) => {
+  async ({ since_revision, include_guide, include_canvas_fidelity, view }: { since_revision?: number; include_guide?: boolean; include_canvas_fidelity?: boolean; view?: "summary" | "structure" | "detail" | "full" }) => {
     try {
       const current = await ctx.board.snapshot();
       const revisions = ctx.revisions;
@@ -47,6 +50,7 @@ server.registerTool(
       const payload = include_canvas_fidelity
         ? boardJson(current, (await ctx.library.apply({ type: "list" }, current)).index)
         : boardAgentPayload(current, (await ctx.library.apply({ type: "list" }, current)).index);
+      const visiblePayload = viewPayload(payload as Record<string, unknown>, view);
       const firstUse = payload.itemCount === 0;
       const withGuide = include_guide ?? (firstUse || !state.guideSent);
       if (withGuide) state.guideSent = true;
@@ -80,6 +84,9 @@ server.registerTool(
           "BOARD_SUMMARY_JSON:",
           JSON.stringify(summarizeAgentBoard(current), null, 2),
           "",
+          "VISUAL_DIAGNOSIS_JSON:",
+          JSON.stringify(payload.diagnosis, null, 2),
+          "",
           handoffNextStep(handoff),
           `PANEL_URL: ${ctx.preview.panelUrl ?? "unavailable (standalone preview not started)"}`,
         ].join("\n");
@@ -92,6 +99,7 @@ server.registerTool(
             ...delta,
             handoff,
             summary: summarizeAgentBoard(current),
+            diagnosis: payload.diagnosis,
           },
         };
       }
@@ -105,27 +113,30 @@ server.registerTool(
             ``,
             ...(staleSince ? [`NOTE: revision ${since_revision} 已不在缓存中，返回完整画板。`, ``] : []),
             ...guidance,
-            "BOARD_JSON:",
-            JSON.stringify(payload, null, 2),
+            "VISUAL_DIAGNOSIS:",
+            JSON.stringify(visiblePayload.diagnosis, null, 2),
+            "",
+            `${view && view !== "full" ? `BOARD_VIEW_${view.toUpperCase()}` : "BOARD_JSON"}:`,
+            JSON.stringify(visiblePayload, null, 2),
             ``,
             ...(withGuide ? [
               ...(firstUse ? [boardGuidance(), ``] : []),
               "CAPABILITIES:",
-              JSON.stringify(payload.capabilities, null, 2),
+              JSON.stringify((visiblePayload as any).capabilities ?? payload.capabilities, null, 2),
               "VISUAL_DIGEST:",
-              JSON.stringify(payload.visualDigest, null, 2),
+              JSON.stringify(visiblePayload.visualDigest, null, 2),
               "RECIPES:",
               boardRecipes(),
             ] : [
               `GUIDE: capabilities, recipes, and the drawing guide are omitted on rereads. Call get_board with include_guide: true when you need them.`,
               "VISUAL_DIGEST:",
-              JSON.stringify(payload.visualDigest, null, 2),
+              JSON.stringify(visiblePayload.visualDigest, null, 2),
             ]),
             ``,
             `PANEL_URL: ${ctx.preview.panelUrl ?? "unavailable (standalone preview not started)"}`,
           ].join("\n"),
         }],
-        structuredContent: payload,
+        structuredContent: visiblePayload,
       };
     } catch (error) {
       return errorResult("get_board", error);

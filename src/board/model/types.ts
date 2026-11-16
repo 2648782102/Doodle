@@ -10,7 +10,7 @@ export type BoardItemType = "note" | "text" | "rect" | "ellipse" | "line" | "str
 export type BoardLineShape = "straight" | "curve" | "orthogonal";
 export type BoardEmphasis = "normal" | "focus";
 export type BoardVariant = "plain" | "card" | "frame" | "pill" | "diamond" | "callout" | "heading";
-export type BoardRole = "normal" | "label" | "frame" | "column" | "step" | "decision" | "annotation";
+export type BoardRole = "normal" | "label" | "frame" | "column" | "step" | "decision" | "annotation" | "question" | "constraint" | "evidence";
 export type BoardTextAlign = "left" | "center" | "right";
 export type BoardLayoutMode = "grid" | "row" | "column" | "timeline" | "cluster" | "architecture";
 
@@ -131,6 +131,8 @@ export interface DiagramNodeInput {
   detail?: string;
   type?: "rect" | "ellipse";
   color?: string;
+  role?: BoardRole;
+  emphasis?: BoardEmphasis;
   column?: number;
   row?: number;
 }
@@ -145,14 +147,23 @@ export interface DiagramInput {
   title?: string;
   subtitle?: string;
   replace?: boolean;
+  recipe?: "flow" | "review" | "decision" | "timeline" | "architecture";
+  steps?: string[];
+  options?: string[];
   mode?: DiagramMode;
-  nodes: DiagramNodeInput[];
-  edges: DiagramEdgeInput[];
+  nodes?: DiagramNodeInput[];
+  edges?: DiagramEdgeInput[];
   origin?: BoardPoint;
   columnGap?: number;
   rowGap?: number;
   nodeWidth?: number;
   nodeHeight?: number;
+}
+
+/** Input after `diagram/recipe.ts` has expanded the high-level intent. */
+export interface ExpandedDiagramInput extends DiagramInput {
+  nodes: DiagramNodeInput[];
+  edges: DiagramEdgeInput[];
 }
 
 /**

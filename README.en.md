@@ -92,6 +92,7 @@ Version 1 board files may contain old notes. They remain readable for compatibil
 - Call `get_board` first; prefer `updates` for precise changes and reuse object IDs for removals.
 - Put `author` at the `draw_board` top level.
 - Use a strict grid, short labels, and consistent sizes for structured diagrams.
+- For AI callers, read `diagnosis` from `get_board` first: it reports isolated objects, overlaps, focus, and candidate empty areas. Use `view: "summary" | "structure" | "detail"` to save tokens when the full payload is unnecessary. Rejected writes return `ERROR_JSON` with `code`, `path`, `expected`, and `fix`. `diagram.recipe` accepts `steps` for flow/review/decision/timeline authoring, and `draw_board` replies include `CHANGE_JSON` describing the final-state change.
 - A `line` is a directed arrow from `(x,y)` to `(x+w,y+h)`; `w` and `h` may be negative. Set `shape` to `straight`, `curve`, or `orthogonal`. Other objects use `(x,y)` as the top-left corner.
 - `stroke.points` are local to the item bounds; `image.src` is a bounded `data:image/*;base64` source.
 - Use `remove_ids` only when replacing a whole diagram.

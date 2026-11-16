@@ -141,7 +141,7 @@ check(
   "the empty-write guard only runs on the revision-checked path",
 );
 check(boardStore.includes("quarantineCorruptState"), "a corrupt board file still prevents startup");
-check(boardTypes.includes("Item coordinates must be within") && !boardTypes.includes("Math.min(MAX_SHAPE_WIDTH, input.w ?? 180)"), "drawing input is silently clamped instead of rejected");
+check(boardTypes.includes("COORDINATE_OUT_OF_RANGE") && !boardTypes.includes("maxWidth, input.w ?? 180") && !boardTypes.includes("Math.min(MAX_SHAPE_WIDTH, input.w ?? 180)"), "drawing input is silently clamped instead of rejected");
 check(http.includes("this.revisions?.remember(board)") && (await read("src/server.ts")).includes("new BoardHttpServer(board, config, revisions)"), "browser writes are not recorded in the shared revision cache");
 check(troubleshooting.includes("npm run preview:board") && troubleshooting.includes("current MCP server process"), "troubleshooting does not explain PANEL_URL lifetime");
 check(packageJson.scripts.check.includes("setup:codex -- --dry-run"), "npm check does not dry-run the Codex setup");
@@ -224,7 +224,10 @@ check(tools.includes('"show_board"') && tools.includes('"get_board"'), "canvas r
 check(tools.includes("CANVAS_UI_META") && tools.includes("_meta: CANVAS_UI_META"), "draw_board does not advertise the canvas for automatic post-draw rendering");
 check(tools.includes("getAppHtml()") && tools.includes("PANEL_URL"), "Excalidraw MCP App resource is not plugin-safe and the panel URL is missing");
 check(tools.includes("FIRST_USE:") && tools.includes("NEXT_STEPS:") && tools.includes("NEXT:"), "get_board does not use progressive first-use and next-step guidance");
-check(tools.includes("structuredContent: boardJson(board, libraryIndex)"), "draw_board no longer returns the authoritative canvas snapshot");
+check(
+  tools.includes("structuredContent: { ...boardJson(board, libraryIndex), change: changeReport"),
+  "draw_board no longer returns the authoritative canvas snapshot plus change report",
+);
 check(tools.includes("function boardAgentPayload") && tools.includes("canvasFidelityItems") && tools.includes("function boardJson("), "agent payload and full canvas payload are not separated");
 check(tools.includes("since_revision") && tools.includes("boardAgentDelta") && tools.includes("BoardRevisionCache"), "incremental rereads or their revision cache are missing");
 check(tools.includes("include_canvas_fidelity") && excalidrawApp.includes("include_canvas_fidelity: true"), "the canvas cannot request the fidelity that agent reads omit");
@@ -381,6 +384,26 @@ check(
   totalSourceFiles.length >= 25 && totalSourceFiles.length <= 80,
   `src has ${totalSourceFiles.length} TypeScript modules; expected a modular but bounded tree`,
 );
+check(
+  boardTypes.includes("diagnoseBoard") &&
+  tools.includes("VISUAL_DIAGNOSIS") &&
+  tools.includes("VISUAL_DIAGNOSIS_JSON"),
+  "get_board no longer exposes the AI visual diagnosis",
+);
+check(
+  (await read("src/board/errors.ts")).includes("BoardValidationError") &&
+  (await read("src/board/mcp/presentation.ts")).includes("ERROR_JSON") &&
+  (await read("src/board/model/validate.ts")).includes("INVALID_COLOR"),
+  "validation errors are not structured for self-repair",
+);
+check(
+  await exists("src/board/diagram/recipe.ts") &&
+  tools.includes("changeReportText") &&
+  tools.includes("viewPayload") &&
+  (await read("src/board/mcp/presentation.ts")).includes("roleMeanings"),
+  "high-level recipes, change reports, graded reads, or visual semantics are missing",
+);
+check(await exists("docs/GOAL_AI_EXPERIENCE.md") && await exists("test/ai-experience.test.mjs"), "AI experience goal or prompt-contract suite is missing");
 
 if (failures.length) {
   console.error("❌ Offline repository checks failed:");

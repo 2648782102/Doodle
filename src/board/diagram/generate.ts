@@ -10,7 +10,7 @@
 import {
   MAX_LINE_DELTA_X, MAX_LINE_DELTA_Y, MAX_SHAPE_HEIGHT, MAX_SHAPE_WIDTH, MIN_SHAPE_SIZE,
 } from "../model/limits.js";
-import type { BoardAuthor, BoardItem, DiagramInput } from "../model/types.js";
+import type { BoardAuthor, BoardItem, ExpandedDiagramInput } from "../model/types.js";
 import { now } from "../model/clock.js";
 import { parseBoard } from "../model/validate.js";
 import { resolveDiagramLayout } from "./layout.js";
@@ -23,7 +23,7 @@ import { resolveDiagramLayout } from "./layout.js";
  *   suffix, and connector bindings are rewritten to match.
  */
 export function diagramToBoardItems(
-  diagram: DiagramInput,
+  diagram: ExpandedDiagramInput,
   author: BoardAuthor = "ai",
   reservedIds: Iterable<string> = [],
 ): BoardItem[] {
@@ -80,7 +80,9 @@ export function diagramToBoardItems(
     const position = positions.get(node.id)!;
     items.push({
       ...base(node.id), type: node.type ?? "rect", x: position.x, y: position.y, w: width, h: height,
-      text: node.label.slice(0, 24), color: node.color ?? "#f6d365", variant: "card", role: "step", z: 2,
+      text: node.label.slice(0, 24), color: node.color ?? "#f6d365", variant: "card", role: node.role ?? "step",
+      ...(node.emphasis ? { emphasis: node.emphasis } : {}),
+      z: 2,
       style: { fontSize: 15, textAlign: "center" },
     });
     if (node.detail) items.push({

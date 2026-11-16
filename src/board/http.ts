@@ -30,6 +30,7 @@ import type { BoardRevisionCache } from "./revision-cache.js";
 import { isSuspiciousEmptyWrite, type BoardStore } from "./store.js";
 import { projectSnapshotText, scanProject, type ProjectScanOptions } from "./project-scan.js";
 import { assetCandidates, fillTemplate, findExisting, readTemplate } from "./http/templates.js";
+import { expandRecipe } from "./diagram/recipe.js";
 
 function canvasSnapshot(board: SimpleBoard) {
   const { notes: _legacyNotes, ...snapshot } = board;
@@ -229,16 +230,18 @@ export class BoardHttpServer {
       const body = req.body as { confirmedBy?: string; diagram?: DiagramInput };
       if (body.confirmedBy !== "human") return res.status(403).json({ error: "Human confirmation is required" });
       if (!body.diagram || typeof body.diagram !== "object") return res.status(400).json({ error: "diagram is required" });
+      let expanded;
       try {
-        diagramToBoardItems(body.diagram, "human");
+        expanded = expandRecipe(body.diagram);
+        diagramToBoardItems(expanded, "human");
       } catch (error) {
         return res.status(400).json({ error: error instanceof Error ? error.message : String(error) });
       }
       await commit(res, (current) => {
-        const generated = diagramToBoardItems(body.diagram!, "human");
+        const generated = diagramToBoardItems(expanded!, "human");
         const candidate = touchBoard({
           ...current,
-          title: body.diagram!.title ?? current.title,
+          title: expanded!.title ?? current.title,
           items: body.diagram!.replace ? generated : [...current.items, ...generated],
         });
         parseBoard(candidate);

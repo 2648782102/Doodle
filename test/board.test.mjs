@@ -395,11 +395,11 @@ describe("simple shared board", () => {
 
     expect(() => addBoardItems(base, [
       { type: "rect", x: 999999, y: 0, w: 200, h: 100, text: "far" },
-    ])).toThrow(/coordinates must be within/);
+    ])).toThrow(/must be within/);
 
     expect(() => addBoardItems(base, [
       { type: "rect", x: 10, y: 10, w: 99999, h: 100, text: "wide" },
-    ])).toThrow(/size must not exceed/);
+    ])).toThrow(/must not exceed/);
 
     expect(() => addBoardItems(base, [
       { type: "text", x: 10, y: 10, w: 100, h: 24, text: "x".repeat(2000) },

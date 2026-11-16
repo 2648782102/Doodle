@@ -19,3 +19,27 @@ export class EmptyWriteRefusedError extends Error {
     this.name = "EmptyWriteRefusedError";
   }
 }
+
+/**
+ * A validation error the caller can repair without reading source code.
+ *
+ * `path` points at the offending field, `expected` states the contract, and
+ * `fix` is a concrete next action. Tools serialise these into `ERROR_JSON` so
+ * the model gets a machine-readable correction, not just prose.
+ */
+export class BoardValidationError extends Error {
+  constructor(
+    message: string,
+    readonly code: string,
+    readonly path: string,
+    readonly expected: string,
+    readonly fix: string,
+  ) {
+    super(message);
+    this.name = "BoardValidationError";
+  }
+}
+
+export function validationErrorFrom(error: unknown): BoardValidationError | undefined {
+  return error instanceof BoardValidationError ? error : undefined;
+}

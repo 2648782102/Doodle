@@ -9,9 +9,9 @@
  */
 
 import { DIAGRAM_MODES } from "../model/limits.js";
-import type { BoardPoint, DiagramInput, DiagramLayout, DiagramMode } from "../model/types.js";
+import type { BoardPoint, DiagramLayout, DiagramMode, ExpandedDiagramInput } from "../model/types.js";
 
-export function resolveDiagramLayout(diagram: DiagramInput): DiagramLayout {
+export function resolveDiagramLayout(diagram: ExpandedDiagramInput): DiagramLayout {
   if (diagram.nodes.length > 48 || diagram.edges.length > 96) throw new Error("Diagram is too large");
   const mode = diagram.mode ?? "flow";
   if (!DIAGRAM_MODES.includes(mode)) throw new Error("Diagram mode must be flow, timeline, compare, or matrix");

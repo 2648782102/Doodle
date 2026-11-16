@@ -16,7 +16,7 @@ export const itemInput = z.object({
   w: z.number().finite().optional().describe("Shape width, line endpoint delta X, or stroke/image bounds width"),
   h: z.number().finite().optional().describe("Shape height, line endpoint delta Y, or stroke/image bounds height"),
   text: z.string().max(1200).optional().describe("Visible text on the object"),
-  color: z.string().regex(/^#[0-9a-fA-F]{6}$/).optional().describe("Hex fill color"),
+  color: z.string().max(40).optional().describe("Six-digit hex colour; invalid values return ERROR_JSON with a fix"),
   title: z.string().max(120).optional().describe("Short heading rendered above the object text"),
   shape: z.enum(["straight", "curve", "orthogonal"]).optional().describe("Line routing style"),
   points: z.array(z.object({ x: z.number().finite(), y: z.number().finite() })).max(500).optional()
@@ -81,6 +81,12 @@ export const diagramInput = z.object({
   title: z.string().max(120).optional(),
   replace: z.boolean().optional().describe("Replace all existing board objects; defaults to false and adds the generated diagram beside existing objects"),
   subtitle: z.string().max(200).optional(),
+  recipe: z.enum(["flow", "review", "decision", "timeline", "architecture"]).optional()
+    .describe("High-level authoring intent. When set, `steps` supplies the content and nodes/edges are generated; use this instead of hand-computing coordinates. flow: ordered steps; review: draft → feedback → revise; decision: options converging on an outcome; timeline: dated milestones; architecture: layers with dependencies."),
+  steps: z.array(z.string().min(1).max(120)).max(48).optional()
+    .describe("Step captions for `recipe`. Each becomes one node connected to the next in order."),
+  options: z.array(z.string().min(1).max(120)).max(8).optional()
+    .describe("Candidate choices for `recipe: decision`; they fan into the final step/outcome."),
   mode: z.enum(["flow", "timeline", "compare", "matrix"]).optional()
     .describe("Semantic arrangement, default flow. flow derives columns from edges and snakes after six columns so a 16-step chain is not one 3k-wide strip. timeline/compare/matrix place nodes only where you give `column`/`row` - nodes without them are appended in declaration order below the explicit grid, so set both for a timed sequence."),
   nodes: z.array(z.object({
@@ -88,17 +94,20 @@ export const diagramInput = z.object({
     label: z.string().max(80).describe("Node caption; this is the field to fill, not `title`"),
     detail: z.string().max(120).optional(),
     type: z.enum(["rect", "ellipse"]).optional(),
-    color: z.string().regex(/^#[0-9a-fA-F]{6}$/).optional(),
+    color: z.string().max(40).optional().describe("Six-digit hex colour; invalid values return ERROR_JSON with a fix"),
+    role: z.enum(["normal", "label", "frame", "column", "step", "decision", "annotation", "question", "constraint", "evidence"]).optional()
+      .describe("Visual semantics: step, decision, question, constraint, evidence, or annotation"),
+    emphasis: z.enum(["normal", "focus"]).optional().describe("Use focus for the current discussion focus"),
     column: z.number().int().min(0).max(12).optional()
       .describe("Explicit column, 0-12. In timeline/compare/matrix this is the axis step: 17 steps in one row means column 0-16 is NOT available, so use row for the sequence instead."),
     row: z.number().int().min(0).max(47).optional()
       .describe("Explicit row, 0-47. In timeline the sequence usually advances down the page, so increment `row` per step and keep `column` fixed."),
-  })).min(1).max(48),
+  })).max(48).optional(),
   edges: z.array(z.object({
     from: z.string(),
     to: z.string(),
     label: z.string().max(40).optional(),
-  })).max(96),
+  })).max(96).optional(),
   origin: z.object({ x: z.number().finite(), y: z.number().finite() }).optional(),
   columnGap: z.number().finite().min(20).max(200).optional(),
   rowGap: z.number().finite().min(12).max(160).optional(),

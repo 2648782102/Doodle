@@ -21,6 +21,7 @@ import type {
   BoardSceneMeta, BoardTextAlign, BoardVariant, SimpleBoard,
 } from "./types.js";
 import { makeId, now } from "./clock.js";
+import { BoardValidationError } from "../errors.js";
 
 function isFiniteNumber(value: unknown): value is number {
   return typeof value === "number" && Number.isFinite(value);
@@ -299,7 +300,14 @@ export function normalizeItem(input: BoardItemInput): Omit<BoardItem, "createdAt
    */
   if (input.x < -MAX_COORDINATE || input.x > MAX_COORDINATE
     || input.y < -MAX_COORDINATE || input.y > MAX_COORDINATE) {
-    throw new Error(`Item coordinates must be within ±${MAX_COORDINATE}`);
+    const axis = Math.abs(input.x) > MAX_COORDINATE ? "x" : "y";
+    throw new BoardValidationError(
+      `Item ${axis} must be within ±${MAX_COORDINATE}`,
+      "COORDINATE_OUT_OF_RANGE",
+      `items[].${axis}`,
+      `a finite number between -${MAX_COORDINATE} and ${MAX_COORDINATE}`,
+      `Move the object inside the bounded canvas and retry.`,
+    );
   }
   if (input.w !== undefined && !isFiniteNumber(input.w)) throw new Error("Item width must be finite");
   if (input.h !== undefined && !isFiniteNumber(input.h)) throw new Error("Item height must be finite");
@@ -317,7 +325,15 @@ export function normalizeItem(input: BoardItemInput): Omit<BoardItem, "createdAt
     : input.type === "stroke" ? Math.max(MIN_STROKE_SPAN, input.h ?? 1)
       : Math.max(MIN_SHAPE_SIZE, input.h ?? 120);
   if (input.type !== "line" && (width > MAX_SHAPE_WIDTH || height > MAX_SHAPE_HEIGHT)) {
-    throw new Error(`Item size must not exceed ${MAX_SHAPE_WIDTH}×${MAX_SHAPE_HEIGHT}`);
+    const axis = width > MAX_SHAPE_WIDTH ? "w" : "h";
+    const maximum = axis === "w" ? MAX_SHAPE_WIDTH : MAX_SHAPE_HEIGHT;
+    throw new BoardValidationError(
+      `Item ${axis} must not exceed ${maximum}`,
+      "SIZE_OUT_OF_RANGE",
+      `items[].${axis}`,
+      `a number between ${axis === "w" ? 16 : 16} and ${maximum}`,
+      `Split the content into smaller objects instead of oversizing one shape.`,
+    );
   }
   const signedWidth = input.w !== undefined
     ? (input.type === "line" ? input.w : width)
@@ -327,16 +343,42 @@ export function normalizeItem(input: BoardItemInput): Omit<BoardItem, "createdAt
     : (input.type === "line" ? 0 : height);
   if (input.type === "line"
     && (Math.abs(signedWidth) > MAX_LINE_DELTA_X || Math.abs(signedHeight) > MAX_LINE_DELTA_Y)) {
-    throw new Error(`Line endpoint delta must not exceed ${MAX_LINE_DELTA_X}×${MAX_LINE_DELTA_Y}`);
+    const axis = Math.abs(signedWidth) > MAX_LINE_DELTA_X ? "w" : "h";
+    const maximum = axis === "w" ? MAX_LINE_DELTA_X : MAX_LINE_DELTA_Y;
+    throw new BoardValidationError(
+      `Line endpoint delta ${axis} must not exceed ${maximum}`,
+      "LINE_DELTA_OUT_OF_RANGE",
+      `items[].${axis}`,
+      `a signed number between -${maximum} and ${maximum}`,
+      `Bind the line to nearby objects or shorten the endpoint delta.`,
+    );
   }
   const text = (input.text ?? "").slice(0, MAX_TEXT);
-  if ((input.text ?? "").length > MAX_TEXT) throw new Error(`Item text must not exceed ${MAX_TEXT} characters`);
+  if ((input.text ?? "").length > MAX_TEXT) throw new BoardValidationError(
+    `Item text must not exceed ${MAX_TEXT} characters`,
+    "TEXT_TOO_LONG",
+    "items[].text",
+    `at most ${MAX_TEXT} characters`,
+    `Shorten the label; put long explanations in a note or a separate text item.`,
+  );
   if (input.color !== undefined && !/^#[0-9a-fA-F]{6}$/.test(input.color)) {
-    throw new Error("Item color must be a six-digit hex value like #f6d365");
+    throw new BoardValidationError(
+      "Item color must be a six-digit hex value like #f6d365",
+      "INVALID_COLOR",
+      "items[].color",
+      "#rrggbb",
+      `Use one of the palette colours from get_board capabilities or a six-digit hex value.`,
+    );
   }
   const color = input.color ?? COLORS[0];
   if (input.author !== undefined && !isAuthor(input.author)) {
-    throw new Error("Item author must be human or ai");
+    throw new BoardValidationError(
+      "Item author must be human or ai",
+      "INVALID_AUTHOR",
+      "author",
+      `"human" or "ai"`,
+      `Set author once at the draw_board top level; do not put custom names inside items.`,
+    );
   }
   const author = input.author ?? "human";
   if (input.type === "line" && signedWidth === 0 && signedHeight === 0) throw new Error("Line needs a direction");

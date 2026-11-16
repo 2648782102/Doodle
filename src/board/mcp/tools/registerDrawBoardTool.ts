@@ -17,6 +17,8 @@ import {
   type BoardLibraryAction,
 } from "../../library.js";
 import { BoardRevisionConflictError } from "../../errors.js";
+import { expandRecipe } from "../../diagram/recipe.js";
+import { changeReport, changeReportText } from "../change-report.js";
 import {
   addBoardItems,
   boardVisualDigest,
@@ -56,6 +58,7 @@ server.registerTool(
           || layout !== undefined || replace_board !== undefined || library !== undefined) {
           throw new Error("diagram replaces the active board and cannot be combined with other draw_board actions");
         }
+        const expanded = expandRecipe(diagram);
         const current = await ctx.board.snapshot();
         if (expected_revision !== undefined && expected_revision !== current.revision) {
           throw new BoardRevisionConflictError(expected_revision, current.revision);
@@ -63,13 +66,13 @@ server.registerTool(
         // In append mode the existing ids are reserved so a second iteration
         // that reuses `n1` or `diagram_frame` does not collide.
         const generated = diagramToBoardItems(
-          diagram,
+          expanded,
           author ?? "ai",
           diagram.replace ? [] : current.items.map((item) => item.id),
         );
         const candidate = touchBoard({
           ...current,
-          title: diagram.title ?? current.title,
+          title: expanded.title ?? current.title,
           items: diagram.replace ? generated : [...current.items, ...generated],
         });
         parseBoard(candidate);
@@ -81,11 +84,12 @@ server.registerTool(
           content: [{
             type: "text" as const,
             text: [
-              `✅ 图已生成 · ${diagram.nodes.length} 个节点 · ${diagram.edges.length} 条连接`,
+              `✅ 图已生成 · ${expanded.nodes.length} 个节点 · ${expanded.edges.length} 条连接`,
               `JSON: ${JSON.stringify({ revision: board.revision, created: generated.length })}`,
+              changeReportText(changeReport(current, board)),
             ].join("\n"),
           }],
-          structuredContent: boardJson(board, libraryIndex),
+          structuredContent: { ...boardJson(board, libraryIndex), change: changeReport(current, board) },
         };
       }
       if (library) {
@@ -163,9 +167,10 @@ server.registerTool(
               updated,
               removed: removed.size,
             }),
+            changeReportText(changeReport(initial, board)),
           ].join("\n"),
         }],
-          structuredContent: boardJson(board, libraryIndex),
+          structuredContent: { ...boardJson(board, libraryIndex), change: changeReport(initial, board) },
       };
     } catch (error) {
       return errorResult("draw_board", error);

@@ -94,6 +94,8 @@ export {
 
 export { boardVisualDigest } from "./model/digest.js";
 
+export { diagnoseBoard } from "./model/diagnose.js";
+
 export { layoutBoardItems } from "./layout/arrange.js";
 
 export { resolveDiagramLayout } from "./diagram/layout.js";

@@ -123,6 +123,7 @@ npm run preview:board
 - 先读 `capabilities`、`visualDigest` 和 `RECIPES`：流程用 `role: "step"` + `startItemId` / `endItemId`，对比用 `role: "column"` 或 `variant: "frame"`，聚类用 `groupId` + `layout.mode: "cluster"`，重点用 `emphasis: "focus"`。
 - 复杂图优先用 `draw_board.diagram`：只提供短标题、语义节点和边，AI 不必手算坐标；节点标题字段是 `label`。`mode` 可选 `flow`（默认，按边分层，超过 6 列自动折成蛇形，不会变成一条超宽横条）、`timeline`、`compare`、`matrix`，后三者按你给的 `column` / `row` 排布（`row` 上限 47），不会被打乱顺序。每条 `edges` 都会生成可见连线，包括跨列、跨行和折行连接。它默认保留已有对象并追加新图，重名 ID 会自动加数字后缀；仅显式 `replace: true` 才清空整张画板重画。普通整理可用 `layout.mode: "architecture"`；`layout.mode` 支持 `grid / row / column / timeline / cluster / architecture`。可选 `variant / role / z / style / startItemId / endItemId` 都是版本 1 兼容字段。字段细节与常见坑见[画图指南](docs/DIAGRAM_GUIDE.md)。
 - `draw_board.library` 支持 `list / get / create / save / switch / rename / duplicate / delete / import / export`；切换后会改变当前活动画板，`get_board` 随后读到的就是新图。
+- AI 优先读 `get_board` 的 `diagnosis`：它指出孤立对象、重叠、焦点与可放置区域；`view: "summary" | "structure" | "detail"` 可在不需要完整对象时省 token。写入失败返回 `ERROR_JSON`，包含 `code / path / expected / fix`。`diagram.recipe` 可用 `steps` 直接生成流程/评审/决策/时间线，`draw_board` 返回 `CHANGE_JSON` 说明本次改动。
 - 图库文件保存在本地 `OUTPUT_DIR/.doodle/boards/`，每个图都是完整的版本 1 `board.json` 结构，不生成静态图片。
 - 结构化图用严格网格、短标签、一致尺寸。
 - `line` 是箭头：`(x,y)` 为起点，`(x+w,y+h)` 为终点；`w` / `h` 可为负数。
