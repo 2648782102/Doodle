@@ -66,7 +66,10 @@ const boardLibrary = (await Promise.all([
   read("src/board/library/store.ts"),
 ])).join("\n");
 const excalidrawTemplate = await read("src/infra/templates/excalidraw.html");
-const liquidGlass = await read("src/infra/templates/liquid-glass.ts");
+const liquidGlass = [
+  await read("src/infra/templates/liquid-glass.ts"),
+  await read("src/infra/templates/liquid-glass-maps.ts"),
+].join("\n");
 const http = await read("src/board/http.ts");
 const scanner = await read("src/board/project-scan.ts");
 const boardStore = await read("src/board/store.ts");
@@ -158,13 +161,22 @@ check(releasing.includes("publish workflow") && !releasing.includes("does not cr
 check(releasing.includes("npm stage approve") && releasing.includes("npm view doodle-mcp@<version> version"), "releasing guide does not describe the npm 2FA and version verification gates");
 check(experienceAudit.includes("| E12 | P1 | fixed |") && experienceAudit.includes("doodle-mcp@0.6.3"), "experience audit does not record the closed npm publication");
 check(experienceAudit.includes("| E13 | P0 | fixed |") && experienceAudit.includes("final-state delta"), "experience audit does not record host model context sync");
-check(experienceAudit.includes("| E15 | P1 | external |") && experienceAudit.includes("npm `latest`"), "experience audit does not record the npm publication gate");
+check(experienceAudit.includes("| E15 | P1 | fixed |") && experienceAudit.includes("npm `latest`") && experienceAudit.includes("dist-tags.latest"), "experience audit does not record the closed npm publication gate");
 check(experienceAudit.includes("| E19 | P1 | fixed |") && experienceAudit.includes("terminal-owned preview command"), "experience audit does not record PANEL_URL lifecycle clarification");
 check(!readme.includes("尚未更新") && !readmeEn.includes("until `npm view doodle-mcp version`"), "READMEs still warn about a resolved npm version gap");
 check(gitignore.includes(".doodle-plugin/") && gitignore.includes(".doodle-data/") && gitignore.includes("doodle-plugin-submission/"), "generated plugin output, data, or submission ZIP is not ignored");
 check(index.indexOf("await mcp.connect(transport);") < index.indexOf("await preview.start();"), "MCP stdio is not connected before optional preview startup");
 check(index.includes("Preview unavailable"), "preview failure does not keep the MCP server alive");
 check(config.includes("previewPort: rawPort ? parsePort(rawPort) : null") && config.includes("PLUGIN_DATA"), "runtime config is not plugin-safe");
+check(
+  (await read("test/mcp.test.mjs")).includes("function freePort()")
+    && !/withClient(In)?\(\s*(outputDir\s*,\s*)?\d{4,5}\b/.test(await read("test/mcp.test.mjs")),
+  "MCP tests pin a preview port instead of asking the OS for a free one, so parallel checkouts collide",
+);
+check(
+  !/PREVIEW_PORT:\s*"[1-9]\d*"/.test(await read("examples/board-client.mjs")),
+  "the board client example pins a preview port instead of asking the OS for a free one",
+);
 check(version.includes("__DOODLE_PLUGIN_VERSION__"), "bundled server cannot report the injected version");
 check(projectWorkspace.includes("CODEX_PROJECT_ROOT"), "plugin-safe workspace resolution is missing");
 check(packageJson.name === "doodle-mcp", "npm package name is not doodle-mcp");
@@ -273,14 +285,25 @@ check(boardStore.includes("createEmptyBoard") && !boardStore.includes("createSta
 check(excalidrawTemplate.includes("Doodle · Excalidraw Canvas") && excalidrawTemplate.includes('id="excalidrawRoot"'), "Excalidraw-only board template is missing");
 check(excalidrawTemplate.includes("/excalidraw/excalidraw-app.js") && excalidrawTemplate.includes("const PANEL_TOKEN"), "Excalidraw template lost its local entry or panel token");
 check(excalidrawTemplate.includes('id="doodleLibraryPanel"') && !excalidrawTemplate.includes('id="toast"'), "Excalidraw template lost the library overlay or kept an obsolete toast");
-check(excalidrawTemplate.includes('data-library-action="duplicate">另存为') && excalidrawTemplate.includes('id="doodleLibraryStatus"'), "Excalidraw template lost save-as feedback or turned it into a rename");
-check(excalidrawApp.includes('if (action.type === "duplicate")') && excalidrawApp.includes("selectedBoardId"), "canvas library Save As does not duplicate the active or selected snapshot");
+check(excalidrawTemplate.includes('data-library-action="duplicate">另存一份') && excalidrawTemplate.includes('id="doodleLibraryStatus"'), "Excalidraw template lost save-as feedback or turned it into a rename");
+/*
+ * "另存一份" must copy the board the person is looking at. Clicking a row
+ * switches to it, so the active snapshot *is* the source; the guard now binds
+ * to that contract instead of to the removed `selectedBoardId` variable.
+ */
+check(excalidrawApp.includes('if (action.type === "duplicate")') && excalidrawApp.includes('id: activeSnapshot?.id'), "canvas library Save As does not duplicate the active snapshot");
 check(excalidrawApp.includes("exportToBlob") && excalidrawApp.includes("exportToSvg") && excalidrawTemplate.includes('data-snapshot-export="png"') && excalidrawTemplate.includes('data-snapshot-export="jpg"') && excalidrawTemplate.includes('data-snapshot-export="svg"'), "static PNG/JPG/SVG snapshot exports are missing");
 check(excalidrawTemplate.includes("--doodle-accent") && excalidrawTemplate.includes('data-doodle-theme="dark"') && excalidrawTemplate.includes("radial-gradient(circle, var(--doodle-dot)") && excalidrawApp.includes('view: "transparent"'), "unified theme tokens or native Excalidraw dot grid are missing");
-check(excalidrawTemplate.includes(".excalidraw {\n      --color-primary: #2f6b5c") && excalidrawTemplate.includes('.excalidraw.theme--dark,\n    :root[data-doodle-theme="dark"] .excalidraw {\n      --color-primary: #8fcbb4'), "Excalidraw controls are not mapped to the Doodle pine-green palette in both themes");
+check(excalidrawTemplate.includes(".excalidraw {\n      --color-primary: #4a6785") && excalidrawTemplate.includes(':root[data-doodle-theme="glass"] .excalidraw {\n      --color-primary: #2f6b5c') && excalidrawTemplate.includes('.excalidraw.theme--dark,\n    :root[data-doodle-theme="dark"] .excalidraw {\n      --color-primary: #8fcbb4'), "Excalidraw controls are not mapped across the paper, glass, and dark palettes");
 check(excalidrawTemplate.includes(':root[data-doodle-theme="dark"] .excalidraw {') && excalidrawTemplate.includes("--button-gray-1: #2a342f"), "the dark page does not retheme Excalidraw's chrome, so controls stay white");
 check(!/--color-primary:\s*#6965db/.test(excalidrawTemplate) && excalidrawTemplate.includes("--color-surface-primary-container: #dcebe4"), "Excalidraw purple defaults remain visible in the canvas theme");
-check(excalidrawTemplate.includes('id="doodleThemeToggle"') && excalidrawApp.includes("initThemeToggle") && excalidrawApp.includes("THEME_STORAGE_KEY"), "light/dark theme toggle is missing");
+check(excalidrawTemplate.includes('id="doodleThemeToggle"') && excalidrawApp.includes("initThemeToggle") && excalidrawApp.includes("THEME_STORAGE_KEY"), "appearance theme switcher is missing");
+check(
+  ['{ id: "light"', '{ id: "dark"', '{ id: "glass"'].every((entry) => excalidrawApp.includes(entry)) &&
+    ['data-theme-option="light"', 'data-theme-option="dark"', 'data-theme-option="glass"'].every((option) => excalidrawTemplate.includes(option)) &&
+    excalidrawApp.includes('theme === "glass" ? "glass" : "paper"'),
+  "the three appearances or the paper/glass material split are incomplete",
+);
 check(excalidrawTemplate.includes("--doodle-drawer-width") && excalidrawTemplate.includes("doodle-drawer-scrim") && excalidrawApp.includes("doodle-drawer-open"), "library drawer lost its bounded width or accessible scrim");
 check(excalidrawTemplate.includes("body.doodle-drawer-open .doodle-topbar") && !excalidrawTemplate.includes("body.doodle-drawer-open .excalidraw-host > .excalidraw"), "library drawer squeezes or collides with the canvas toolbar");
 check(excalidrawTemplate.includes("body:has(.excalidraw .dropdown-menu) .doodle-topbar") && excalidrawTemplate.includes("body:has(.excalidraw .Modal) .doodle-topbar"), "Doodle toolbar does not yield to Excalidraw menus and modal overlays");

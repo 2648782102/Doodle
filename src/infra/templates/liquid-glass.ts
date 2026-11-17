@@ -22,168 +22,14 @@
  * The easing, specular model, and filter graph here are Doodle's own.
  */
 
+import {
+  MIN_BEZEL, MAX_BEZEL, clamp, readRadius, filterMarkup,
+  type LensTuning,
+} from "./liquid-glass-maps.js";
+
 const FILTER_ID = "doodle-liquid-glass";
 const DEFS_ID = "doodleLiquidGlassDefs";
-const PROFILE_SAMPLES = 96;
-const MIN_BEZEL = 7;
-const MAX_BEZEL = 26;
 const REBUILD_DELAY = 120;
-
-/** Bevel cross-section: a squircle, flat at the rim and level in the middle. */
-function bevelHeight(t: number): number {
-  return Math.pow(1 - Math.pow(1 - Math.min(Math.max(t, 0), 1), 4), 0.25);
-}
-
-/**
- * Displacement amplitude from the rim (t=0) to the inner bevel edge (t=1).
- *
- * Both ends must reach zero. The bevel is a closed band: if the amplitude is
- * still high where the band stops, the map jumps from "displace by N pixels" to
- * "don't displace" on one pixel row, and the backdrop is sampled from two
- * different places on either side of that line. Visually that is a hard seam
- * running across the inside of the pane, which reads as a second rectangle
- * layered under the glass.
- *
- * The curve rises quickly from the rim (that is where the lens bends hardest),
- * peaks around a third of the way in, then eases back to zero at the inner
- * edge so the transition into the flat centre is continuous.
- */
-function bevelAmplitude(t: number): number {
-  const clamped = Math.min(Math.max(t, 0), 1);
-  const rise = Math.pow(Math.sin(clamped * Math.PI * 0.5), 1.4);
-  const fall = 1 - Math.pow(clamped, 3);
-  return rise * fall;
-}
-
-function clamp(value: number, min: number, max: number): number {
-  return Math.min(Math.max(value, min), max);
-}
-
-function readRadius(element: HTMLElement, width: number, height: number): number {
-  const declared = Number.parseFloat(getComputedStyle(element).borderTopLeftRadius) || 0;
-  return Math.round(clamp(declared || Math.min(width, height) / 2, 0, Math.min(width, height) / 2));
-}
-
-/**
- * Distance from a pixel to the nearest edge measured *inside* the rounded
- * rect, plus the outward normal. Points outside the shape report Infinity.
- */
-function edgeField(
-  x: number,
-  y: number,
-  width: number,
-  height: number,
-  radius: number,
-): { distance: number; nx: number; ny: number } | null {
-  const innerWidth = width - radius * 2;
-  const innerHeight = height - radius * 2;
-  const cx = x < radius ? x - radius : x >= width - radius ? x - radius - innerWidth : 0;
-  const cy = y < radius ? y - radius : y >= height - radius ? y - radius - innerHeight : 0;
-  const distance = Math.hypot(cx, cy);
-  if (distance > radius) return null;
-  if (distance === 0) return { distance: radius, nx: 0, ny: 0 };
-  return { distance: radius - distance, nx: cx / distance, ny: cy / distance };
-}
-
-/** Map resolution multiplier: a 1x map shows hard stair-steps at the rim on Retina. */
-function mapScale(): number {
-  return Math.min(Math.max(window.devicePixelRatio || 1, 1), 3);
-}
-
-function canvasUrl(width: number, height: number, paint: (data: Uint8ClampedArray, scale: number) => void): string {
-  const scale = mapScale();
-  const canvas = document.createElement("canvas");
-  canvas.width = Math.max(1, Math.round(width * scale));
-  canvas.height = Math.max(1, Math.round(height * scale));
-  const context = canvas.getContext("2d");
-  if (!context) return "";
-  const image = context.createImageData(canvas.width, canvas.height);
-  paint(image.data, scale);
-  context.putImageData(image, 0, 0);
-  return canvas.toDataURL();
-}
-
-/**
- * Walk the map at device resolution while measuring in CSS pixels, so the map
- * matches the element's raster grid and the bevel is smooth on Retina.
- */
-function paintEdgeMap(
-  width: number,
-  height: number,
-  radius: number,
-  bezel: number,
-  paint: (data: Uint8ClampedArray, offset: number, nx: number, ny: number, t: number) => void,
-  clear: (data: Uint8ClampedArray) => void = (data) => data.fill(0),
-): string {
-  return canvasUrl(width, height, (data, scale) => {
-    clear(data);
-    const columns = Math.round(width * scale);
-    const rows = Math.round(height * scale);
-    for (let row = 0; row < rows; row += 1) {
-      for (let column = 0; column < columns; column += 1) {
-        const field = edgeField((column + 0.5) / scale, (row + 0.5) / scale, width, height, radius);
-        if (!field || field.distance <= 0 || field.distance >= bezel) continue;
-        if (field.nx === 0 && field.ny === 0) continue;
-        paint(data, (row * columns + column) * 4, field.nx, field.ny, field.distance / bezel);
-      }
-    }
-  });
-}
-
-/** Red/green channel displacement map consumed by `feDisplacementMap`. */
-function displacementMap(width: number, height: number, radius: number, bezel: number): string {
-  return paintEdgeMap(width, height, radius, bezel, (data, offset, nx, ny, t) => {
-    const amplitude = bevelAmplitude(t);
-    data[offset] = Math.round(clamp(128 + nx * amplitude * 127, 0, 255));
-    data[offset + 1] = Math.round(clamp(128 + ny * amplitude * 127, 0, 255));
-    data[offset + 2] = 0;
-    data[offset + 3] = 255;
-  }, (data) => {
-    // Neutral 128,128 means "no displacement". Transparent defaults would read
-    // as 0 and pull the whole pane by half a filter unit.
-    for (let index = 0; index < data.length; index += 4) {
-      data[index] = 128;
-      data[index + 1] = 128;
-      data[index + 3] = 255;
-    }
-  });
-}
-
-/** Rim highlight lit from the upper left, fading inward across the bevel. */
-function specularMap(width: number, height: number, radius: number, bezel: number): string {
-  const lightX = 0.42;
-  const lightY = -0.91;
-  return paintEdgeMap(width, height, radius, bezel, (data, offset, nx, ny, t) => {
-    const facing = Math.max(0, nx * lightX + -ny * lightY);
-    const value = Math.pow(facing, 2.2) * Math.pow(1 - t, 1.4);
-    if (value <= 0.004) return;
-    const channel = Math.round(clamp(value * 255 * 1.5, 0, 255));
-    data[offset] = channel;
-    data[offset + 1] = channel;
-    data[offset + 2] = channel;
-    data[offset + 3] = channel;
-  });
-}
-
-/**
- * The shadow side of the bevel.
- *
- * Without this the pane looks flat on a plain page: the highlight is only
- * visible where light lands, and a near-white canvas gives the lens nothing to
- * bend. A real glass edge is a tube, so opposite the highlight it goes *darker*
- * than the backdrop. That dark band is what makes the curvature legible even
- * when there is no texture behind the pane.
- */
-function rimShadeMap(width: number, height: number, radius: number, bezel: number): string {
-  const lightX = 0.42;
-  const lightY = -0.91;
-  return paintEdgeMap(width, height, radius, bezel, (data, offset, nx, ny, t) => {
-    const facing = Math.max(0, -(nx * lightX + -ny * lightY));
-    const value = Math.pow(facing, 1.5) * Math.pow(1 - t, 0.9);
-    if (value <= 0.006) return;
-    data[offset + 3] = Math.round(clamp(value * 130, 0, 130));
-  });
-}
 
 function defsElement(): SVGDefsElement | null {
   let defs = document.getElementById(DEFS_ID) as SVGDefsElement | null;
@@ -202,56 +48,6 @@ function defsElement(): SVGDefsElement | null {
   return defs;
 }
 
-type LensTuning = { blur: number; scale: number; shade: string };
-
-function filterMarkup(
-  id: string,
-  width: number,
-  height: number,
-  radius: number,
-  bezel: number,
-  tuning: LensTuning,
-): string {
-  const displacement = displacementMap(width, height, radius, bezel);
-  const specular = specularMap(width, height, radius, bezel);
-  const rimShade = rimShadeMap(width, height, radius, bezel);
-  if (!displacement || !specular) return "";
-
-  /*
-   * Chromatic dispersion. Glass has a different refractive index per
-   * wavelength, so a bevelled edge fringes with colour: the rim separates
-   * slightly into cyan and amber. This is the single most recognisable cue of
-   * the Apple material at small sizes, where there is too little bevel for
-   * displacement alone to be obvious. Two extra displacement passes at a
-   * fraction of the main scale, isolated into the red and blue channels, then
-   * screened back over the refracted backdrop.
-   */
-  const fringe = Math.max(2, Math.round(tuning.scale * 0.22));
-  return [
-    `<filter id="${id}" x="0" y="0" width="100%" height="100%" color-interpolation-filters="sRGB">`,
-    `<feGaussianBlur in="SourceGraphic" stdDeviation="${tuning.blur}" result="soft" />`,
-    `<feImage href="${displacement}" x="0" y="0" width="100%" height="100%" preserveAspectRatio="none" result="lens" />`,
-    `<feDisplacementMap in="soft" in2="lens" scale="${tuning.scale}" xChannelSelector="R" yChannelSelector="G" result="refracted" />`,
-    `<feColorMatrix in="refracted" type="saturate" values="1.55" result="tinted" />`,
-    `<feDisplacementMap in="soft" in2="lens" scale="${fringe}" xChannelSelector="R" yChannelSelector="G" result="fringeBase" />`,
-    `<feColorMatrix in="fringeBase" type="matrix" values="1 0 0 0 0  0 0 0 0 0  0 0 0 0 0  0 0 0 1 0" result="fringeRed" />`,
-    `<feDisplacementMap in="soft" in2="lens" scale="-${fringe}" xChannelSelector="R" yChannelSelector="G" result="fringeBase2" />`,
-    `<feColorMatrix in="fringeBase2" type="matrix" values="0 0 0 0 0  0 0 0 0 0  0 0 1 0 0  0 0 0 1 0" result="fringeBlue" />`,
-    `<feBlend in="fringeRed" in2="fringeBlue" mode="screen" result="fringes" />`,
-    `<feImage href="${rimShade}" x="0" y="0" width="100%" height="100%" preserveAspectRatio="none" result="fringeMask" />`,
-    `<feComposite in="fringes" in2="fringeMask" operator="in" result="fringesMasked" />`,
-    `<feComponentTransfer in="fringesMasked" result="fringesFaded"><feFuncA type="linear" slope="0.32" /></feComponentTransfer>`,
-    `<feBlend in="fringesFaded" in2="tinted" mode="screen" result="dispersed" />`,
-    `<feImage href="${rimShade}" x="0" y="0" width="100%" height="100%" preserveAspectRatio="none" result="shade" />`,
-    `<feFlood flood-color="${tuning.shade}" result="shadeColor" />`,
-    `<feComposite in="shadeColor" in2="shade" operator="in" result="shadeMasked" />`,
-    `<feBlend in="shadeMasked" in2="dispersed" mode="normal" result="shaded" />`,
-    `<feImage href="${specular}" x="0" y="0" width="100%" height="100%" preserveAspectRatio="none" result="gloss" />`,
-    `<feComponentTransfer in="gloss" result="glossFaded"><feFuncA type="linear" slope="0.72" /></feComponentTransfer>`,
-    `<feBlend in="glossFaded" in2="shaded" mode="screen" />`,
-    `</filter>`,
-  ].join("");
-}
 
 /**
  * Chromium is the only engine that accepts an SVG filter in `backdrop-filter`.
@@ -312,6 +108,14 @@ const GLASS_SELECTOR = [
   ".excalidraw .zoom-actions",
   ".excalidraw .undo-redo-buttons",
   ".excalidraw .help-icon",
+  /*
+   * The library trigger is only a pane when it stands alone. Inside the mobile
+   * strip it is a 40px row of a pane that already has the material, and a
+   * 12px bevel on a 40px box is 60% of its height: it stops reading as a rim
+   * and turns into a bowl. `:not(.mobile-misc-tools-container *)` keeps the
+   * standalone desktop trigger refracting while letting the mobile strip own
+   * the material for its rows.
+   */
   ".excalidraw .sidebar-trigger",
   ".excalidraw .default-sidebar-trigger",
 ].join(", ");
@@ -349,14 +153,100 @@ export function initLiquidGlass(selector = GLASS_SELECTOR): LiquidGlassControlle
     // blur stays under ~1.2px: the displacement does the work and the grid
     // stays legible through the pane.
     const style = getComputedStyle(element);
-    const token = (name: string, fallback: number) => Number.parseFloat(style.getPropertyValue(name)) || fallback;
+    /*
+     * Read a numeric token, treating an explicit `0` as a value.
+     *
+     * `Number.parseFloat(...) || fallback` looks harmless and is wrong: `0` is
+     * falsy, so a theme that sets `--glass-lens-blur: 0` to turn blur off got
+     * the default instead. The paper theme uses zero for scale, blur, and frost
+     * together, and all three were silently replaced — which is why it still
+     * built a full refraction filter after being told to build none.
+     */
+    const token = (name: string, fallback: number) => {
+      const raw = style.getPropertyValue(name).trim();
+      if (!raw) return fallback;
+      const parsed = Number.parseFloat(raw);
+      return Number.isFinite(parsed) ? parsed : fallback;
+    };
     const tuning: LensTuning = {
-      blur: Math.round(clamp(bezel * token("--glass-lens-blur", 0.05), 0.5, 1.2) * 10) / 10,
-      scale: Math.round(clamp(bezel * token("--glass-lens-scale", 2.1), 12, 34)),
+      /*
+       * Frost without losing the lens.
+       *
+       * A single blur has to serve two jobs that want opposite values: the rim
+       * must stay sharp enough to show the bevel bending the backdrop, while
+       * the centre should be soft enough to read as frosted rather than as
+       * clear acetate. Multiplying the same gaussian across the pane can only
+       * satisfy one of them, which is why the earlier cap was 1.2px: anything
+       * more erased the 1px dot grid and the pane turned to fog.
+       *
+       * `blur` here drives the outer band only (the filter chains it *before*
+       * displacement). A second, much softer pass is composited over the flat
+       * centre by `frostVeil` below, so the rim keeps its refraction and the
+       * middle gets the diffuse haze.
+       */
+      /*
+       * Same rule as `scale` below: an explicit zero means "this theme wants no
+       * blur here", and the paper theme relies on that for the frost pass.
+       */
+      blur: (() => {
+        const requested = token("--glass-lens-blur", 0.05);
+        return requested <= 0 ? 0 : Math.round(clamp(bezel * requested, 0.5, 1.4) * 10) / 10;
+      })(),
+      frost: (() => {
+        const requested = token("--glass-frost", 0.12);
+        return requested <= 0 ? 0 : Math.round(clamp(bezel * requested, 1.2, 3.5));
+      })(),
+      /*
+       * Displacement is measured in CSS pixels and must stay *below* the
+       * bevel band's own width. When it exceeded the band, the map pushed the
+       * backdrop by more than the distance it had to fade out over, so the
+       * edge band sampled pixels from far outside itself and smeared into the
+       * plastic-looking strips. Roughly half the bezel reads as a lens; twice
+       * the bezel reads as a smear.
+       *
+       * The profile is a smooth bump, so the *mean* push across the band is
+       * only about half the peak. At a 0.9 peak-to-bezel ratio the average
+       * bend is therefore ~0.45 bezel, which is the range where a rim visibly
+       * magnifies what is behind it without tearing.
+       */
+      /*
+       * `0` is meaningful and must survive the clamp.
+       *
+       * The paper theme sets `--glass-lens-scale: 0` because an opaque sheet
+       * has no refraction to speak of. Clamping a zero up to the 4px floor
+       * would leave a small but visible bend in every card, which reads as a
+       * warped sticker rather than paper.
+       */
+      scale: (() => {
+        const requested = token("--glass-lens-scale", 0.9);
+        if (requested <= 0) return 0;
+        return Math.round(clamp(bezel * requested, 4, 16));
+      })(),
       shade:
         style.getPropertyValue("--glass-shade").trim() ||
         (document.documentElement.dataset.doodleTheme === "dark" ? "rgba(0,0,0,0.55)" : "rgba(16,30,24,0.5)"),
     };
+    /*
+     * A theme may ask for no lens at all.
+     *
+     * The paper appearance sets scale, blur, and frost to zero: an opaque sheet
+     * has nothing to refract and nothing to frost, and its material comes from
+     * borders and shadows instead. Building a filter that would be the identity
+     * map wastes a GPU pass per pane per composite, so skip it and leave
+     * `--glass-refraction` unset — the CSS fallback then resolves to plain
+     * `blur(0) saturate(100%)`, which is also the identity.
+     */
+    if (tuning.scale === 0 && tuning.blur === 0 && tuning.frost === 0) {
+      targets.set(element, { element, id: "", width, height, radius });
+      element.style.removeProperty("--glass-refraction");
+      element.dataset.glass = "";
+      // Drop every filter this pane owned. A theme switch rebuilds each pane in
+      // turn, so the earlier ones leave orphans in `<defs>` unless they are
+      // removed here; on a board with six panes that is six dead filters whose
+      // maps are still referenced by nothing but still cost memory.
+      previous?.remove();
+      return;
+    }
     const markup = filterMarkup(id, width, height, radius, bezel, tuning);
     if (!markup) return;
     // The markup must be parsed in the SVG namespace: a `<filter>` created by
@@ -370,6 +260,15 @@ export function initLiquidGlass(selector = GLASS_SELECTOR): LiquidGlassControlle
     if (!previous) container.append(node);
     targets.set(element, { element, id, width, height, radius });
     element.style.setProperty("--glass-refraction", `url(#${id})`);
+    /*
+     * Mark the element so CSS can scope the reset. See the `:where([data-glass])`
+     * rule in `excalidraw.html`: every descendant of a pane clears the custom
+     * property, and only elements carrying this attribute keep their own
+     * filter. Custom properties inherit, so without that reset every icon and
+     * hidden anchor inside a pane samples the backdrop through a bevel sized
+     * for the parent's box.
+     */
+    element.dataset.glass = "";
   }
 
   function schedule(element: HTMLElement): void {
@@ -386,6 +285,19 @@ export function initLiquidGlass(selector = GLASS_SELECTOR): LiquidGlassControlle
 
   function watch(element: HTMLElement): void {
     if (targets.has(element)) return;
+    /*
+     * A bevel needs room to be a bevel.
+     *
+     * The mobile library trigger is a 40px row inside the mobile tool strip.
+     * Its radius is 12px, and the band is allowed to grow to
+     * `min(width, height) * 0.3`, so the rim ends up covering 60% of the box
+     * and there is no flat centre left: it reads as a bowl rather than a lens,
+     * which is the "tray inside the strip" that survived the light fix. Rows
+     * inside the strip inherit the strip's material instead of getting their
+     * own filter.
+     */
+    const strip = element.closest(".excalidraw .mobile-misc-tools-container");
+    if (strip && strip !== element) return;
     targets.set(element, { element, id: "", width: 0, height: 0, radius: -1 });
     observer.observe(element);
     recompute(element);
@@ -416,13 +328,39 @@ export function initLiquidGlass(selector = GLASS_SELECTOR): LiquidGlassControlle
       scan();
     }, 120);
   });
-  tree.observe(document.body, { childList: true, subtree: true, attributes: true, attributeFilter: ["hidden", "class"] });
+  /*
+   * Watch structure and `hidden`, not `class`.
+   *
+   * Excalidraw rewrites `class` constantly — hover, selection, every pointer
+   * move over the toolbar — so observing it woke the observer dozens of times
+   * a second and re-ran `scan()` over the whole document. `scan()` itself is
+   * cheap (it only touches elements matching the selector), but the callback
+   * and the query were pure overhead on a board that is supposed to feel like
+   * paper. Panes appear through element insertion and `hidden` flips, which is
+   * all this needs; a pane that merely changes class keeps its maps.
+   */
+  tree.observe(document.body, { childList: true, subtree: true, attributes: true, attributeFilter: ["hidden"] });
 
   return {
     refresh() {
       // The rim shade colour is theme-dependent, so a theme switch has to
       // rebuild the filter rather than only re-measure the box.
       for (const element of targets.keys()) recompute(element, true);
+      /*
+       * Sweep filters no pane points at any more.
+       *
+       * A material switch (glass → paper) makes every pane take the no-lens
+       * path, which removes its own filter but leaves the `<filter>` nodes a
+       * *previous* theme created. Those nodes hold three rasterised maps each
+       * and nothing references them, so they are pure leakage. Anything still
+       * unreferenced here is dead.
+       */
+      const live = new Set(
+        [...targets.values()].map((target) => target.id).filter(Boolean),
+      );
+      for (const node of [...container.querySelectorAll("filter")]) {
+        if (!live.has(node.id)) node.remove();
+      }
     },
     dispose() {
       tree.disconnect();

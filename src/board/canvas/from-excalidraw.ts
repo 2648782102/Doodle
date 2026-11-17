@@ -46,7 +46,18 @@ function itemStyle(element: ExcalidrawLikeElement): NonNullable<BoardItem["style
   };
 }
 
+/**
+ * The colour a Board v1 item should remember.
+ *
+ * `color` is the *fill* for shapes and the ink for text, so an unfilled shape
+ * must not borrow its stroke colour: doing so round-tripped an outline-only
+ * rectangle into a solid block on the next render. The stroke lives in
+ * `style.borderColor`, so falling back to it here silently turned a frame into
+ * a black card. `transparent` is preserved so the canvas keeps drawing the
+ * shape as an outline.
+ */
 function elementColor(element: ExcalidrawLikeElement): string {
+  if (element.backgroundColor === "transparent") return "transparent";
   const color = element.backgroundColor && element.backgroundColor !== "transparent"
     ? element.backgroundColor : element.strokeColor ?? "#f6d365";
   return /^#[0-9a-fA-F]{6}$/i.test(color) ? color : "#f6d365";

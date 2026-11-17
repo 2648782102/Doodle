@@ -91,7 +91,7 @@ function isEditing(appState: ExcalidrawAppState | undefined): boolean {
 declare global {
   interface Window {
     DOODLE_EXCALIDRAW_TOKEN?: string;
-    DOODLE_THEME?: "light" | "dark";
+    DOODLE_THEME?: DoodleTheme;
     DoodleExcalidrawInit?: (snapshot: BoardSnapshot, mcpApp?: unknown) => void;
     DoodleExcalidrawUpdate?: (snapshot: BoardSnapshot) => void;
   }
@@ -115,14 +115,51 @@ const pendingTimer: { current: number | null } = { current: null };
  * before any change is treated as a human edit.
  */
 const sceneReady = { current: false };
-let selectedBoardId = "";
 
-type DoodleTheme = "light" | "dark";
+/**
+ * Every appearance Doodle ships, in switcher order.
+ *
+ * This array is the single source of truth: the type is derived from it, the
+ * switcher renders it, and `readTheme` validates against it. Adding a fourth
+ * appearance is a one-line change here plus a token block in the template —
+ * no `if (theme === …)` chain to thread through.
+ */
+const THEMES = [
+  { id: "light", label: "浅色", hint: "纸面与铅笔" },
+  { id: "dark", label: "深色", hint: "夜纸与浅墨" },
+  { id: "glass", label: "液态玻璃", hint: "暖纸与松绿" },
+] as const;
+
+type DoodleTheme = (typeof THEMES)[number]["id"];
+
+const THEME_IDS = THEMES.map((theme) => theme.id) as readonly DoodleTheme[];
+
+function isDoodleTheme(value: unknown): value is DoodleTheme {
+  return typeof value === "string" && (THEME_IDS as readonly string[]).includes(value);
+}
 const THEME_STORAGE_KEY = "doodle-theme";
 const DOODLE_PROJECT_URL = "https://github.com/2648782102/Doodle";
+/**
+ * The canvas ground for each appearance.
+ *
+ * `view` is always transparent: the page behind the canvas is painted by
+ * `--doodle-canvas-bg`, so one transparent canvas works for every theme and a
+ * theme switch never has to reinitialise Excalidraw. `export` is opaque
+ * because a PNG with a transparent background is unreadable in most viewers.
+ *
+ * The paper themes keep their sheet colour as the export ground, while the
+ * glass theme exports on the old warm white — a board exported to PNG should
+ * look like the same drawing, not a different colour grade.
+ */
 const canvasColors: Record<DoodleTheme, { view: string; export: string }> = {
-  light: { view: "transparent", export: "#f7f8f5" },
-  dark: { view: "transparent", export: "#f7f8f5" },
+  /*
+   * Export ground follows the sheet, not the chrome. A paper light board
+   * exported onto the old glass white would come back a different colour than
+   * the one the person drew on.
+   */
+  light: { view: "transparent", export: "#faf7f0" },
+  dark: { view: "transparent", export: "#faf7f0" },
+  glass: { view: "transparent", export: "#f7f8f5" },
 };
 
 function isDoodleProjectLink(link: unknown): boolean {
@@ -190,7 +227,10 @@ function initExternalLinkPolicy(): void {
 
 function readTheme(): DoodleTheme {
   try {
-    return localStorage.getItem(THEME_STORAGE_KEY) === "dark" ? "dark" : "light";
+    const stored = localStorage.getItem(THEME_STORAGE_KEY);
+    // An unknown value — a future theme removed, or a hand-edited key — must
+    // fall back rather than leave the page with no token block at all.
+    return isDoodleTheme(stored) ? stored : "light";
   } catch {
     return "light";
   }
@@ -208,23 +248,50 @@ const EXCALIDRAW_THEME = "light" as const;
 
 function applyTheme(theme: DoodleTheme): void {
   document.documentElement.dataset.doodleTheme = theme;
+  /*
+   * Light and dark are the paper desk; only the glass appearance refracts.
+   *
+   * The two paper appearances differ in luminance, not in material, so the
+   * material switch keys off the single glass id rather than enumerating the
+   * paper ones — adding another paper tone does not have to touch this.
+   */
+  document.documentElement.dataset.doodleMaterial = theme === "glass" ? "glass" : "paper";
   window.DOODLE_THEME = theme;
-  const toggle = document.querySelector<HTMLButtonElement>("#doodleThemeToggle");
-  if (toggle) {
-    toggle.textContent = theme === "dark" ? "☀" : "☾";
-    toggle.setAttribute("aria-label", theme === "dark" ? "切换浅色主题" : "切换深色主题");
-    toggle.title = theme === "dark" ? "切换浅色主题" : "切换深色主题";
-  }
+  syncThemeSwitcher(theme);
   try {
     localStorage.setItem(THEME_STORAGE_KEY, theme);
   } catch {}
   window.dispatchEvent(new CustomEvent("doodle-theme-change", { detail: theme }));
 }
 
+/**
+ * Reflect the active theme on the switcher.
+ *
+ * The control is a group of three buttons rather than one toggle: with three
+ * appearances a single button no longer tells you what you will get, and the
+ * old two-state icon had no room for a third state. `aria-pressed` carries the
+ * selection so a screen reader announces the current theme.
+ */
+function syncThemeSwitcher(theme: DoodleTheme): void {
+  const active = THEMES.find((entry) => entry.id === theme) ?? THEMES[0];
+  const group = document.querySelector<HTMLElement>("#doodleThemeToggle");
+  if (group) {
+    group.setAttribute("aria-label", `外观：${active.label}`);
+    group.title = `外观：${active.label}（${active.hint}）`;
+    for (const button of group.querySelectorAll<HTMLButtonElement>("[data-theme-option]")) {
+      const selected = button.dataset.themeOption === theme;
+      button.setAttribute("aria-pressed", selected ? "true" : "false");
+    }
+  }
+}
+
 function initThemeToggle(): void {
-  const toggle = document.querySelector<HTMLButtonElement>("#doodleThemeToggle");
   applyTheme(readTheme());
-  toggle?.addEventListener("click", () => applyTheme(readTheme() === "dark" ? "light" : "dark"));
+  const group = document.querySelector<HTMLElement>("#doodleThemeToggle");
+  group?.addEventListener("click", (event) => {
+    const button = (event.target as HTMLElement | null)?.closest<HTMLButtonElement>("[data-theme-option]");
+    if (button && isDoodleTheme(button.dataset.themeOption)) applyTheme(button.dataset.themeOption);
+  });
   window.addEventListener("doodle-theme-change", () => {
     // Frames are throttled: a theme flip recomputes every pane once.
     requestAnimationFrame(() => glassController?.refresh());
@@ -311,6 +378,17 @@ async function initHostApp() {
   await hostApp.connect();
   const timer = window.setInterval(async () => {
     if (document.visibilityState === "hidden") return;
+    /*
+     * Never poll while a write is in flight or the pointer is mid-gesture.
+     *
+     * The poll asks for `include_canvas_fidelity`, which is the expensive
+     * shape: every item carries its full Excalidraw `scene`. Firing that during
+     * a drag means the response lands mid-gesture, `applyRemoteSnapshot` sees an
+     * older revision and throws the payload away — all cost, no benefit. The
+     * board also broadcasts its own change through the host tool result, so a
+     * skipped tick is caught by the next one.
+     */
+    if (applyingRemote.current || isEditing(currentAppState.current)) return;
     try {
       // The canvas rebuilds its scene from items, so it must ask for the
       // Excalidraw fidelity that agent-facing reads deliberately omit.
@@ -338,8 +416,21 @@ function connectStandaloneUpdates() {
   socket.addEventListener("close", () => window.setTimeout(connectStandaloneUpdates, 750));
 }
 
+/**
+ * Which *canvas* semantics an appearance needs.
+ *
+ * The adapter decides ink and paper from whether the ground is light or dark;
+ * it has no concept of a third appearance and should not grow one, because
+ * board rendering must stay identical no matter which chrome the person
+ * picked. The paper light and glass appearances sit on light ground; only
+ * the dark paper appearance maps to the dark canvas.
+ */
+function canvasThemeFor(theme: DoodleTheme): "light" | "dark" {
+  return theme === "dark" ? "dark" : "light";
+}
+
 function toElements(snapshot: BoardSnapshot, theme: DoodleTheme = readTheme()) {
-  const skeletons = boardItemsToExcalidrawSkeleton(snapshot.items as never[], theme);
+  const skeletons = boardItemsToExcalidrawSkeleton(snapshot.items as never[], canvasThemeFor(theme));
   return convertToExcalidrawElements(skeletons as never[], { regenerateIds: false })
     .sort((left: ExcalidrawLikeElement, right: ExcalidrawLikeElement) => {
       const leftMeta = (left.customData?.doodle as { z?: number; role?: string; variant?: string } | undefined) ?? {};
@@ -394,38 +485,97 @@ async function refreshLibraryUi() {
   current.textContent = `当前：${boards.find((entry) => entry.id === index?.activeId)?.name ?? "—"} · ${board.items.length} 个对象`;
   if (name && document.activeElement !== name) name.value = boards.find((entry) => entry.id === index?.activeId)?.name ?? "";
   list.replaceChildren();
-  selectedBoardId = index?.activeId ?? "";
   for (const entry of boards) {
     const row = document.createElement("div");
     row.className = "doodle-library-entry";
     row.classList.toggle("active", entry.id === index?.activeId);
     const button = document.createElement("button");
+    button.className = "doodle-library-entry-main";
     button.textContent = entry.name;
     const meta = document.createElement("small");
     meta.textContent = `${entry.itemCount} 个对象 · rev ${entry.revision}`;
     button.append(meta);
-    button.addEventListener("click", () => {
-        selectedBoardId = entry.id;
-      for (const child of list.children) child.classList.toggle("active", child === row);
-    });
-    button.addEventListener("dblclick", () => void runLibraryAction({ type: "switch", id: entry.id }));
+    /*
+     * One click opens the board.
+     *
+     * The list used to have three ways to do the same thing — click to select,
+     * double-click to open, and a footer button to open the selection — which
+     * is why the panel needed a "切换到选中" row that read like a leftover. A
+     * board list is a navigation control: clicking a board opens it.
+     */
+    button.addEventListener("click", () => void runLibraryAction({ type: "switch", id: entry.id }));
+    /*
+     * Per-row actions are a row of small text buttons, not a second grid.
+     *
+     * Each entry used to carry one "导出" button competing for width with the
+     * name, and delete only ever applied to the *active* board even though the
+     * list lets you select any board. Putting both actions on the row that owns
+     * the board makes "which board does this affect" unambiguous.
+     */
+    const actions = document.createElement("div");
+    actions.className = "doodle-library-entry-actions";
     const exportButton = document.createElement("button");
     exportButton.textContent = "导出";
-    exportButton.addEventListener("click", () => void runLibraryAction({ type: "export", id: entry.id }));
-    row.append(button, exportButton);
+    exportButton.title = "导出这个画板的 JSON";
+    exportButton.addEventListener("click", (event) => {
+      event.stopPropagation();
+      void runLibraryAction({ type: "export", id: entry.id });
+    });
+    const deleteButton = document.createElement("button");
+    deleteButton.textContent = "删除";
+    deleteButton.className = "doodle-library-entry-delete";
+    deleteButton.title = "删除这个画板";
+    deleteButton.addEventListener("click", (event) => {
+      event.stopPropagation();
+      if (!window.confirm(`删除画板「${entry.name}」？此操作不可撤销。`)) return;
+      void runLibraryAction({ type: "delete", id: entry.id });
+    });
+    actions.append(exportButton, deleteButton);
+    row.append(button, actions);
     list.append(row);
   }
-  const switchButton = document.querySelector<HTMLButtonElement>("#doodleLibrarySwitch");
-  if (switchButton) switchButton.onclick = () => void runLibraryAction({ type: "switch", id: selectedBoardId });
+  /*
+   * The name field's action lives beside it.
+   *
+   * "重命名" used to sit in the six-button grid, reading from the same field
+   * but looking like a sibling of "新建". Pairing them makes the relationship
+   * obvious, and Enter in the field does the same thing so a person does not
+   * have to reach for the button.
+   */
+  const renameButton = document.querySelector<HTMLButtonElement>("#doodleLibraryRename");
+  const renameTarget = document.querySelector<HTMLInputElement>("#doodleLibraryName");
+  /*
+   * `rename` needs an explicit board id. The visible board is the active one,
+   * so the id comes from the snapshot rather than from a tracked selection.
+   */
+  const renameActive = () => {
+    if (!activeSnapshot) return;
+    void runLibraryAction({ type: "rename", id: activeSnapshot.id });
+  };
+  if (renameButton) renameButton.onclick = renameActive;
+  if (renameTarget) {
+    renameTarget.onkeydown = (event) => {
+      if (event.key === "Enter") {
+        event.preventDefault();
+        renameActive();
+      }
+    };
+  }
 }
 
 async function runLibraryAction(action: Record<string, unknown>) {
   const name = document.querySelector<HTMLInputElement>("#doodleLibraryName")?.value.trim();
   let request: Record<string, unknown> = action;
   if (action.type === "duplicate") {
-    request = { type: "duplicate", id: selectedBoardId, name: name || undefined };
-  } else if (action.type === "duplicate-selected") {
-    request = { type: "duplicate", id: selectedBoardId, name: name || `${selectedBoardId} 副本` };
+    /*
+     * "另存一份" copies the board that is currently open. Clicking a row now
+     * switches to it, so the active board is always the one the person is
+     * looking at; there is no separate selection to track. The library action
+     * still requires an explicit id, so it is read from the live index rather
+     * than remembered in a module variable.
+     */
+    // The snapshot *is* the active board, so its own id is the source to copy.
+    request = { type: "duplicate", id: activeSnapshot?.id, name: name || undefined };
   } else {
     request = { ...action, ...(name && ["save", "create", "rename", "duplicate"].includes(String(action.type)) ? { name } : {}) };
   }
@@ -740,7 +890,7 @@ function CanvasApp({ initial }: { initial: BoardSnapshot }) {
   useEffect(() => {
     const onThemeChange = (event: Event) => {
       const detail = (event as CustomEvent<DoodleTheme>).detail;
-      if (detail === "light" || detail === "dark") setTheme(detail);
+      if (isDoodleTheme(detail)) setTheme(detail);
     };
     window.addEventListener("doodle-theme-change", onThemeChange);
     return () => window.removeEventListener("doodle-theme-change", onThemeChange);

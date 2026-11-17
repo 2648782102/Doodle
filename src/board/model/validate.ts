@@ -55,6 +55,17 @@ function isColor(value: unknown): value is string {
   return typeof value === "string" && /^#[0-9a-fA-F]{6}$/.test(value);
 }
 
+/**
+ * Fill colour, where `transparent` is a real choice.
+ *
+ * A shape the person left unfilled must round-trip as unfilled. Treating
+ * `transparent` as invalid made the adapter fall back to the stroke colour,
+ * which painted an outline-only rectangle as a solid block on the next load.
+ */
+function isFillColor(value: unknown): value is string {
+  return value === "transparent" || isColor(value);
+}
+
 function normalizeStyle(value: unknown): BoardItemStyle | undefined {
   if (value === undefined) return undefined;
   if (!value || typeof value !== "object") throw new Error("Invalid board item style");
@@ -361,13 +372,13 @@ export function normalizeItem(input: BoardItemInput): Omit<BoardItem, "createdAt
     `at most ${MAX_TEXT} characters`,
     `Shorten the label; put long explanations in a note or a separate text item.`,
   );
-  if (input.color !== undefined && !/^#[0-9a-fA-F]{6}$/.test(input.color)) {
+  if (input.color !== undefined && !isFillColor(input.color)) {
     throw new BoardValidationError(
-      "Item color must be a six-digit hex value like #f6d365",
+      "Item color must be a six-digit hex value like #f6d365, or transparent for no fill",
       "INVALID_COLOR",
       "items[].color",
-      "#rrggbb",
-      `Use one of the palette colours from get_board capabilities or a six-digit hex value.`,
+      "#rrggbb or transparent",
+      `Use one of the palette colours from get_board capabilities, a six-digit hex value, or transparent.`,
     );
   }
   const color = input.color ?? COLORS[0];

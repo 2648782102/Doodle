@@ -10,6 +10,43 @@ import { addBoardItems, createEmptyBoard, parseBoard } from "../dist/board/types
 const png = "data:image/png;base64,iVBORw0KGgo=";
 
 describe("Doodle to Excalidraw adapter", () => {
+  it("keeps an unfilled shape unfilled across a round trip", () => {
+    // Regression: an outline-only rectangle used to come back as a solid block.
+    // `elementColor` fell back to `strokeColor` whenever `backgroundColor` was
+    // `transparent`, so the stored `color` became the ink colour and the next
+    // render filled the shape with it — the black box on a light board.
+    const outlineOnly = {
+      id: "outline", type: "rectangle", x: 10, y: 10, width: 180, height: 100, angle: 0,
+      strokeColor: "#1e1e1e", backgroundColor: "transparent", fillStyle: "solid",
+      strokeWidth: 2, strokeStyle: "solid", roughness: 1, opacity: 100,
+      groupIds: [], roundness: { type: 3 }, frameId: null, boundElements: null,
+      version: 1, versionNonce: 1, seed: 1, updated: 1, isDeleted: false,
+    };
+    const board = boardItemsFromExcalidrawBoard(createEmptyBoard(), [outlineOnly]);
+    expect(board.items).toHaveLength(1);
+    expect(board.items[0].color).toBe("transparent");
+    // The stroke colour must still survive on the style, not be lost with it.
+    expect(board.items[0].style?.borderColor).toBe("#1e1e1e");
+
+    const back = boardItemsToExcalidrawSkeleton(board.items, "light");
+    const rect = back.find((element) => element.type === "rectangle");
+    expect(rect?.backgroundColor).toBe("transparent");
+    expect(rect?.strokeColor).toBe("#1e1e1e");
+  });
+
+  it("still fills a shape that has a real background colour", () => {
+    // The guard above must not turn every filled shape transparent.
+    const filled = {
+      id: "filled", type: "rectangle", x: 10, y: 10, width: 180, height: 100, angle: 0,
+      strokeColor: "#1e1e1e", backgroundColor: "#f6d365", fillStyle: "solid",
+      strokeWidth: 2, strokeStyle: "solid", roughness: 1, opacity: 100,
+      groupIds: [], roundness: { type: 3 }, frameId: null, boundElements: null,
+      version: 1, versionNonce: 1, seed: 1, updated: 1, isDeleted: false,
+    };
+    const board = boardItemsFromExcalidrawBoard(createEmptyBoard(), [filled]);
+    expect(board.items[0].color).toBe("#f6d365");
+  });
+
   it("projects common Board v1 objects with official skeleton labels", () => {
     const board = addBoardItems(createEmptyBoard(), [
       { type: "rect", x: 10, y: 20, w: 180, h: 100, text: "输入", title: "开始", role: "step", variant: "card", author: "ai" },

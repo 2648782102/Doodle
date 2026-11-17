@@ -1,12 +1,9 @@
-# Changelog
-
-All notable changes are documented here. Versions follow `VERSIONING.md`.
-
 ## Unreleased — Easier to reach
 
 ### Changed
 
-- Doodle chrome uses a real liquid-glass material, not a frosted panel. Each pane gets its own SVG backdrop filter built at device resolution: a bevelled displacement map bends the page near the rim, a specular map lights the rim from the upper left, its shadow side darkens the opposite bevel, and a light blur plus saturation finish the surface. The fill is only ~6% because anything more hid the lens. Maps rebuild on resize and theme change, and the filter stays on the shell only, never the canvas surface or dialogs. Engines without an SVG backdrop filter (Firefox, Safari) fall back to blur and saturation.
+- The library drawer groups actions by intent instead of laying every verb on one grid. The old panel had six equal buttons plus two more under the list: "另存为" and "复制所选" were literally the same duplicate call under two labels, "重命名" read the name field from rows away, and "删除" always applied to the active board even though the list let you pick any board. Now the name field and its rename action share a row, "新建 / 另存一份 / 导入" sit beside the list title, each board row carries its own "导出 / 删除", and clicking a row opens that board — which removed the separate "切换到选中" button and the select/double-click/switch triple path.
+- Doodle chrome uses a real liquid-glass material, not a frosted panel. Each pane gets its own SVG backdrop filter built at device resolution: a bevelled displacement map bends the page near the rim, a specular map lights the rim from the upper left, its shadow side darkens the opposite bevel, and a light blur plus saturation finish the surface. The fill is a ~12% white wash: enough to read as glass rather than a clear sheet, still under the ~16% point where the dot grid disappeared. Maps rebuild on resize and theme change, and the filter stays on the shell only, never the canvas surface or dialogs. Engines without an SVG backdrop filter (Firefox, Safari) fall back to blur and saturation.
 - The canvas carries a low-amplitude warm/cool colour field at its edges plus a slightly stronger dot grid. A near-white page gave the bevel nothing to bend, which made the first two material attempts read as a white card; the dots now visibly magnify inside a pane and stay the same size outside it. The field fades before the middle of the canvas, so drawing stays untinted.
 - The glass now meets a consistent pane language. Every floating surface is inset 12px, rounded 14–18px, and shares one rim/shadow recipe: the Doodle capsule sits where Excalidraw's wordmark menu used to, the library drawer became a floating card instead of a square docked sheet, the right-hand library sidebar is inset and rounded, the selected-object style panel is a rounded glass popover that clears the zoom controls, and the bottom zoom/undo/help islands share the toolbar radius.
 - Excalidraw's wordmark menu is removed rather than restyled. It only held Search, Help, and an outbound GitHub link: search stays in the toolbar's palette action, help is the `?` button, and a local board ships no external links. Its removal also freed the top-left cell for the Doodle capsule and let the shape toolbar keep its optical centring.
@@ -44,27 +41,17 @@ All notable changes are documented here. Versions follow `VERSIONING.md`.
 ### Fixed
 
 - Native Excalidraw islands follow Excalidraw's own surface tokens rather than the page theme. Doodle keeps Excalidraw on its light theme so board colours stay literal, so a dark page-tinted glass made the dark toolbar icons disappear.
-
-
-### Fixed
-
 - Dark mode rendered board content almost invisibly. Three separate causes: ink was a hardcoded dark grey on a dark page, a frame's white fill became a glaring block, and Excalidraw's own dark theme inverted the colours a person had chosen. Ink and paper fills are now chosen per theme, text ink is chosen against the surface it actually sits on (dark ink inside a light card), and Excalidraw stays on its light theme so stored colours render literally while Doodle paints the dark page.
 - Equal-z backdrops (frames, columns) could be drawn above their contents after a redraw; ordering now keeps them behind.
 
-
 ### Added
 
+- The appearances were reorganised around paper: **浅色 (light)** is the light paper desk, **深色 (dark)** is the same paper at night (charcoal stock, pale ink), and **液态玻璃 (glass)** is the original warm-white lens with pine green. The switcher shows all three. Paper is opaque card stock rather than glass, because a lens you can read through is the opposite of paper.
+- Paper is generated, not shipped. Two `feTurbulence` fields — one for fibre, one for tooth — are desaturated to alpha and multiplied into the sheet, so the stock has texture at 6× and still reads as a flat sheet at 1×. Adding a fourth appearance is one entry in the `THEMES` table plus a token block.
+- The paper appearances are the cheapest, not the most expensive: they set lens scale, blur, and frost to zero, and the glass engine skips building a filter entirely, so they run with no refraction passes at all.
 - Delta reads now explain *what the human change means*, not just which fields moved. `HANDOFF_READINGS` names the intent — a rename is read as a correction of meaning, a move as a layout preference, a resize as emphasis, a new note as something to respond to — with one bounded suggestion each. `NEXT` leads with the most meaningful change.
-
-
-### Added
-
 - Each board remembers its own camera (scroll and zoom) in browser storage, so reopening lands where you left off instead of at the origin. An empty board never restores a camera, and a remembered view panned away from the content is discarded so a full board cannot look blank.
 - Writes that would clear every object from a non-empty board are refused with a 409. A deliberate per-object delete is unaffected, as is the first write to a new board.
-
-
-### Added
-
 - `npm run doodle` is a one-action on-ramp: it starts the local board and opens the default browser, printing the URL and a few gestures for a machine that cannot open one. `--print` forces the terminal-only path.
 - An empty board shows a dismissible first-run card explaining note creation, drawing, panning, and zooming. The dismissal is remembered locally and the card never covers a board that already has content.
 - Running the MCP server directly now prints the board URL with one short instruction, so `npx -y doodle-mcp` is legible to a person and not only to a host.
@@ -82,9 +69,22 @@ All notable changes are documented here. Versions follow `VERSIONING.md`.
 
 - Loading the canvas could erase a board: Excalidraw emits an `onChange` while mounting, before the initial scene is applied, and that empty scene was written back as a human edit. Mutations now wait until the mounted scene actually contains the board's items.
 - Board v1 opacity (a 0-1 fraction) was passed to Excalidraw as if it were a 0-100 percentage, so any item with `opacity: 1` rendered at 1% and looked missing. Opacity is now converted in both directions, and a test covers the round trip.
+- The MCP integration tests no longer pin ports 3421–3448. Each spawned server asks the OS for a free loopback port, so two worktrees can run `npm test` at the same time without one run binding the other's preview server and silently asserting against the wrong board. `scripts/repo-check.mjs` fails if a pinned port returns.
+- The glass no longer paints a rectangle inside the pane. Three separate causes, all fixed: the specular map negated the light vector's `y` term even though `edgeField` already returns outward normals, so the bright band landed on the bottom edge and read as a slab shifted toward the lower left; `feImage` was sized `100%` while `feDisplacementMap` reads offsets in user space, so on a pane whose width is not an integer device pixel (the 90.25px capsule) the two grids drifted apart and smeared the bevel into a hard-edged box; and displacement peaked at twice the bevel width, dragging the band's own surroundings into the pane as a plastic strip.
 
 ### Changed
 
+- Controls inside the glass are lit by the material, not painted on top of it. The toolbar had been switching to upstream's opaque `--button-hover-bg` on hover — invisible on an opaque bar, but a solid sticker over a lens. Hover now thickens the glass with a translucent wash and an inner rim that follows the button's own radius; selected tools get a low accent tint plus a lit edge, staying weak enough that the dot grid still shows through.
+- The zoom and undo groups have hover and active feedback again. Clearing their fills to `transparent !important` so the glass could show through had also erased the hover state those buttons relied on, so they looked dead. Disabled undo/redo now fades the glyph instead of the whole box, which had left an empty-looking capsule.
+- Pane fill comes from one token family (`--glass-surface-float` / `-panel` / `-solid`) instead of three drifting inline `color-mix` percentages, which had made some panes read as glass and others as white cards.
+- The glass carries two sheen layers with different jobs: `::before` is a tight specular highlight, `::after` is the hairline under the top rim plus a soft shade along the bottom. That pair is what makes the surface look like it bulges toward the viewer rather than lying flat.
+- The material no longer leaks into descendants. `--glass-refraction` is a custom property, so every icon, 13px radio input, and 1×1 visually-hidden anchor inside a pane inherited the filter and sampled the backdrop through a bevel sized for the parent's box. The mobile library trigger — a 40px row whose 12px radius spent 60% of its height on the band — painted the "tray inside the strip" that survived the earlier light-direction fix. Rows in the mobile strip now inherit the strip's material instead of becoming panes themselves.
+- The mobile bottom bar is anchored to its content instead of the viewport. Upstream stretches it with `inset: 0`; opening the property sheet resized that flex container and re-laid-out the palette, which is the jitter on every open and close. The bar also drops upstream's `margin: 0 14px 14px`, which stacked with our 12px padding into a 26px inset and made the palette float lower than every other surface.
+- `--glass-surface-*` is declared next to `--island-bg-color` rather than on `:root`. Declared at the root, the `color-mix()` referenced a variable that only existed on `.excalidraw`, so the whole family resolved to nothing and panes using it painted no fill at all.
+- The glass is frosted in the centre and sharp at the rim. A single gaussian cannot serve both: enough blur to read as frosted glass erased the 1px dot grid, while keeping the grid left the middle looking like clear acetate. A second, wider blur now runs on a fresh copy of the backdrop and is masked to the flat middle, so the bevel keeps its refraction while the centre gets a diffuse haze. The frost blend is deliberately partial so the dot grid survives through it.
+- An unfilled shape no longer turns into a solid block. `elementColor` fell back to `strokeColor` whenever `backgroundColor` was `transparent`, so an outline-only rectangle stored its ink colour as its fill; the next render then painted a black box. Fill and stroke are separate fields — `transparent` is now preserved as a real fill value, in both the adapter and `addBoardItems`.
+- The glass no longer rasterises pixels it cannot use. The bevel band is a few pixels along each edge, but `paintEdgeMap` looped every pixel of the flat middle and threw the results away — about 320k `edgeField` calls across six panes at DPR 2. The scan is now limited to the four edge bands (verified pixel-identical against the exhaustive version on six geometries), which took a forced rebuild from ~32ms to a few milliseconds.
+- The pane observer no longer watches `class`. Excalidraw rewrites classes on every hover and selection change, so the document scan woke dozens of times a second for no benefit; only `hidden` and subtree insertion matter.
 - Canvas fidelity metadata (`scene`) no longer appears in agent-facing payloads. It stays persisted, and `canvasFidelityItems` reports how many items carry it. The canvas is a separate consumer: it asks for fidelity with `include_canvas_fidelity: true`, and `draw_board` still returns the authoritative snapshot the canvas rebuilds from.
 - Delta reads end with a state-derived `NEXT` line: no-change reads discourage a redraw, and human-edit reads name what changed and ask for a response first.
 - The capabilities, recipes, and drawing guide are sent once per server process; later reads carry a one-line pointer, and `include_guide: true` asks for them again.
@@ -101,7 +101,6 @@ All notable changes are documented here. Versions follow `VERSIONING.md`.
 - Added layout regression coverage for the human canvas: the `图库` drawer must overlay rather than resize Excalidraw, keep one independently scrollable board list with fixed action rows, and hide its launcher while open; hover/active rules may change only color, border, and shadow.
 - The human canvas now uses a Doodle-owned main menu: local search, local help, and one GitHub link to the current Doodle repository. Upstream social links, help-header external links, the materials-library browse destination, arbitrary web embedding, and Excalidraw AI/Mermaid generation entries are removed.
 - Unified Doodle and Excalidraw under one palette: warm paper with pine green in light mode and green-tinted charcoal with pale mint in dark mode. Native Excalidraw primary, surface, island, input, border, button, and shadow variables now follow those tokens instead of the upstream violet defaults.
-
 - Extended version 1 board objects with freehand `stroke`, bounded local `image`, `title`, `shape`, `groupId`, and `emphasis: focus`; older boards remain valid without migration.
 - `draw_board` now supports precise `updates`, batch `items`, `remove_ids`, and deterministic `layout` while keeping exactly four MCP tools.
 - Human canvas adds marquee multi-select, batch move/delete/group/layout, undo/redo, double-click-to-create notes, arrow-key nudging, alignment snapping, and bounded `Ctrl/⌘+V` image paste.
@@ -234,8 +233,6 @@ All notable changes are documented here. Versions follow `VERSIONING.md`.
 
 ### Public plugin directory
 
-The attached `doodle-0.6.0.zip` is a review-ready local-MCP plugin package. Public directory submission still requires an approved submitting organization, verified developer identity, portal review, policy attestations, and clean desktop testing.
-
 ## 0.5.0 — Canvas embedded in the agent
 
 ### Added
@@ -285,5 +282,3 @@ The attached `doodle-0.6.0.zip` is a review-ready local-MCP plugin package. Publ
 - Removed 0.3.x tool schemas, REST endpoints, and approval workflows are intentionally not restored. Code changes remain ordinary, separately reviewed coding-agent work.
 
 ## 0.3.x and earlier
-
-Earlier releases explored a broader project-workbench and proposal-based collaboration surface. They are preserved in Git history and the archived ADRs; their tool schemas and state contracts are not part of 0.4.0.

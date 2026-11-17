@@ -22,6 +22,25 @@ npm run check
 
 `npm run check` runs TypeScript lint, build, plugin build, Vitest, example syntax checks, offline repository guards, plugin guards, setup dry-run, `doctor`, and `npm pack --dry-run`. It never modifies the active user's Codex configuration. To inspect the human canvas, start `node dist/index.js`, read the `PANEL_URL` returned by `get_board`, and open that local address only when a person wants to see it.
 
+## Parallel worktrees
+
+Several branches can be worked on at the same time without cloning the repository again:
+
+```bash
+git worktree add ../doodle-worktrees/board-library -b codex/board-library
+cd ../doodle-worktrees/board-library
+npm ci
+```
+
+Use one worktree per branch and never two agents in the same checkout. Uncommitted edits belong to the checkout, not to a branch, so a second agent in the same directory will silently pick up and overwrite the first agent's work.
+
+Each worktree builds and tests in isolation. Every preview server asks the OS for a free loopback port, so concurrent `npm test` runs do not collide; do not pin `PREVIEW_PORT` in tests. Board state also stays local: without `OUTPUT_DIR`, a checkout writes to its own `output/` directory, because the package root is the worktree itself. The main checkout's board is never shared into a worktree.
+
+Two things are intentionally still global, so do not expect worktree isolation there:
+
+- `npm run setup:codex` registers the local marketplace in the user's `~/.codex/config.toml`. Running it from a second worktree repoints the same `doodle@doodle` install at that worktree. Use one checkout for plugin installs, or run the others with `--dry-run`.
+- The files that every change has to touch — `scripts/repo-check.mjs`, `CHANGELOG.md`, and `AGENTS.md` — conflict on merge by design. Resolve them when you integrate the branch; do not duplicate their content into per-branch variants.
+
 ## Protocol and safety changes
 
 A change to an MCP tool schema, the version 1 board state, the HTTP API, project scanning, the embedded host context bridge, or a security boundary must update all of these together:
