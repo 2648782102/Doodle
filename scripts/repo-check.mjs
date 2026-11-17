@@ -279,7 +279,12 @@ check(excalidrawTemplate.includes("--glass-bg") && excalidrawTemplate.includes("
 check(excalidrawTemplate.includes("--glass-shade") && liquidGlass.includes("feDisplacementMap") && liquidGlass.includes("bevelAmplitude") && liquidGlass.includes("paintEdgeMap"), "the liquid-glass lens lost its bevelled displacement maps");
 check(excalidrawTemplate.includes("--doodle-wash-c") && liquidGlass.includes("MutationObserver") && liquidGlass.includes("ResizeObserver"), "the glass lost its refraction backdrop or its observer lifecycle");
 check(excalidrawTemplate.includes("color-mix(in srgb, var(--island-bg-color)") && !/\.excalidraw \.Island \{[^}]*background/.test(excalidrawTemplate), "native islands no longer follow Excalidraw surface tokens, so icons can vanish");
-check(excalidrawApp.includes("sceneReady") && excalidrawApp.includes("elements.length < activeSnapshot.items.length"), "canvas can write an empty mount-time scene over a loaded board");
+check(
+  excalidrawApp.includes("sceneReady") &&
+  excalidrawApp.includes("if (elements.length === 0) return;") &&
+  !excalidrawApp.includes("elements.length < activeSnapshot.items.length"),
+  "canvas can write an empty mount-time scene over a loaded board, or rejects real edits by comparing element counts",
+);
 check(boardTypes.includes("createStarterBoard") && boardTypes.includes("createEmptyBoard"), "board types lost the compatibility starter or empty board");
 check(boardStore.includes("createEmptyBoard") && !boardStore.includes("createStarterBoard()"), "new board state is not empty-first");
 check(excalidrawTemplate.includes("Doodle · Excalidraw Canvas") && excalidrawTemplate.includes('id="excalidrawRoot"'), "Excalidraw-only board template is missing");

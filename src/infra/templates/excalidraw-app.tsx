@@ -906,10 +906,23 @@ function CanvasApp({ initial }: { initial: BoardSnapshot }) {
     Object.assign(currentFiles.current, files);
     rememberViewport(activeSnapshot?.id, appState);
     if (!api || applyingRemote.current || !activeSnapshot) return;
-    // Ignore the mount-time callback: the canvas has not applied the initial
-    // scene yet, so an empty element list here is not a human edit.
+    /*
+     * Ignore only the genuinely empty mount callback.
+     *
+     * This used to require `elements.length >= activeSnapshot.items.length`
+     * before accepting any edit, on the assumption that the scene exposes one
+     * element per board object. It does not: a bound label, a frame, or a
+     * standalone text is projected differently, so a healthy board of ten
+     * objects can render nine elements. The count never caught up, `sceneReady`
+     * stayed false, and every human edit was silently dropped — drawing looked
+     * broken while the save endpoint reported success.
+     *
+     * Readiness is now a one-way latch on the first non-empty scene. Board
+     * state remains authoritative for what exists; Excalidraw only decides
+     * *when* it has something to report.
+     */
     if (!sceneReady.current) {
-      if (elements.length === 0 || elements.length < activeSnapshot.items.length) return;
+      if (elements.length === 0) return;
       sceneReady.current = true;
     }
     if (isEditing(appState)) return;

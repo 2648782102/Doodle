@@ -37,6 +37,7 @@
 - AI experience pass 5: added `test/ai-experience.test.mjs` as the first prompt-contract suite, asserting the model-visible facts: diagnosis, recipe expansion, change report, and repairable errors.
 - AI experience pass 6: `capabilities` now documents `roleMeanings` and `emphasisMeaning`; roles include `question`, `constraint`, and `evidence` so human and AI can annotate intent, not just appearance.
 - AI experience pass 7: `get_board` accepts `view: summary | structure | detail | full`. Default remains `full`; lower levels drop text blobs, capabilities, or items while keeping authoritative revision and diagnosis.
+- Fixed drawing silently not saving. The canvas accepted an edit only after `elements.length` reached `activeSnapshot.items.length`, but Excalidraw does not expose one element per board object: a board of ten objects can render nine elements, so the count never satisfied the gate, `sceneReady` stayed false, and every human edit was dropped while the save endpoint still returned 200. Readiness is now a one-way latch on the first non-empty scene.
 
 ### Fixed
 
