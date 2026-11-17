@@ -97,16 +97,40 @@ export function excalidrawElementsToBoardItems(
     const bound = textByContainer.get(element.id);
     const labels = itemText(bound ?? element);
     const previous = bySceneId.get(element.id) ?? byId.get(element.id);
+    /*
+     * A text box must not shrink to its glyphs.
+     *
+     * Excalidraw recomputes a text element's width from its content, so a
+     * centred caption stored at the card's width came back as the width of the
+     * two characters. `textAlign: center` then centred the caption inside those
+     * 24px instead of under the 190px card, and every label drifted left while
+     * the positions still "matched" the data. Keep the stored box for text and
+     * let the canvas render inside it; only other shapes take the reported
+     * width.
+     */
+    const reportedWidth = type === "text" && previous
+      ? Math.max(finite(element.width, 1), previous.w)
+      : finite(element.width, 1);
+    /*
+     * The x of a text box follows its box, not its glyphs.
+     *
+     * Excalidraw nudges a text element's x when it re-measures the content, so a
+     * caption centred under a card came back 24px to the left of where it was
+     * drawn. Keeping the previously stored x for text keeps a centred caption
+     * centred; the canvas still owns the visual result because the box and the
+     * alignment are unchanged.
+     */
+    const reportedX = type === "text" && previous ? previous.x : finite(element.x);
     // Text and thin lines can legitimately be shorter than the stored minimum;
     // clamp rather than emit a board the server will reject wholesale.
-    const width = Math.max(MIN_STORED_SIZE, finite(element.width, 1));
+    const width = Math.max(MIN_STORED_SIZE, reportedWidth);
     const height = Math.max(MIN_STORED_SIZE, finite(element.height, 1));
     const points = elementPoints(element);
     const file = element.fileId ? files[element.fileId] : undefined;
     const item: BoardItem = {
       id: element.id,
       type,
-      x: round(finite(element.x)),
+      x: round(reportedX),
       y: round(finite(element.y)),
     // `round` can land back under the minimum (15.98 → 16 is fine, 15.9 → 15.9
     // is not), so clamp the rounded value instead of the raw one.

@@ -131,6 +131,27 @@ describe("Doodle to Excalidraw adapter", () => {
     expect(() => parseBoard(JSON.parse(JSON.stringify(projected)))).not.toThrow();
   });
 
+  it("does not shrink a text box to its glyphs on the way back", () => {
+    // Excalidraw re-measures text from its content, so a centred caption stored
+    // at the card's width came back as the width of its two characters, and the
+    // caption drifted left. The stored box must survive the round trip.
+    const board = addBoardItems(createEmptyBoard(), [
+      { type: "rect", id: "card", x: 40, y: 120, w: 190, h: 90, text: "开始", author: "ai" },
+    ]);
+    const withCaption = addBoardItems(board, [
+      { type: "text", id: "cap", x: 40, y: 216, w: 190, h: 16, text: "需求冻结", author: "ai", style: { textAlign: "center" } },
+    ]);
+    const projected = boardItemsFromExcalidrawBoard(withCaption, [
+      { id: "card", type: "rectangle", x: 40, y: 120, width: 190, height: 90 },
+      // Excalidraw reports the shrunk width and nudged x for a text element.
+      { id: "cap", type: "text", x: 16, y: 216, width: 48, height: 16, text: "需求冻结" },
+    ]);
+    const caption = projected.items.find((item) => item.id === "cap");
+
+    expect(caption.w).toBe(190);
+    expect(caption.x).toBe(40);
+  });
+
   it("produces a board the server accepts after a human edit", () => {
     // End-to-end guard for the "drawing disappears" regression: project a real
     // scene and parse it the way `/api/board/replace` does.

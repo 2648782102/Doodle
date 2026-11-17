@@ -38,6 +38,7 @@
 - AI experience pass 6: `capabilities` now documents `roleMeanings` and `emphasisMeaning`; roles include `question`, `constraint`, and `evidence` so human and AI can annotate intent, not just appearance.
 - AI experience pass 7: `get_board` accepts `view: summary | structure | detail | full`. Default remains `full`; lower levels drop text blobs, capabilities, or items while keeping authoritative revision and diagnosis.
 - Fixed drawing silently not saving. The canvas accepted an edit only after `elements.length` reached `activeSnapshot.items.length`, but Excalidraw does not expose one element per board object: a board of ten objects can render nine elements, so the count never satisfied the gate, `sceneReady` stayed false, and every human edit was dropped while the save endpoint still returned 200. Readiness is now a one-way latch on the first non-empty scene.
+- Fixed centred captions drifting left. Excalidraw re-measures a text element from its own content, so a caption stored at the card's width (190px) came back as the width of its two characters (24–48px) and 24px to the left. `textAlign: center` then centred the caption inside that narrow box instead of under the card. The projection now keeps the stored x and width for text elements; the canvas still decides how the glyphs render inside the box.
 
 ### Fixed
 
