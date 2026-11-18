@@ -25,6 +25,24 @@
     [data-glass] * {
       --glass-refraction: none;
     }
+    /*
+     * Theme-independent metrics.
+     *
+     * These used to live only in the glass token block, so under either paper
+     * appearance every consumer — drawer width, radii, font, and all the
+     * `--doodle-duration` transitions — resolved to nothing. Define them once
+     * on every root, above the palette blocks, so all three appearances share
+     * the same geometry and motion.
+     */
+    :root {
+      --doodle-radius: 12px;
+      --doodle-radius-sm: 8px;
+      --doodle-space: 8px;
+      --doodle-ease: cubic-bezier(0.22, 1, 0.36, 1);
+      --doodle-duration: 220ms;
+      --doodle-drawer-width: 336px;
+      --doodle-font: "Avenir Next", "PingFang SC", "Hiragino Sans GB", "Microsoft YaHei", sans-serif;
+    }
     :root[data-doodle-theme="glass"] {
       color-scheme: light;
       --doodle-surface: rgba(253, 254, 250, 0.92);
@@ -52,13 +70,6 @@
       --doodle-wash-b: rgba(96, 172, 150, 0.3);
       --doodle-wash-c: rgba(120, 170, 205, 0.22);
       --doodle-shadow: 0 16px 40px rgba(24, 40, 34, 0.12);
-      --doodle-radius: 12px;
-      --doodle-radius-sm: 8px;
-      --doodle-space: 8px;
-      --doodle-ease: cubic-bezier(0.22, 1, 0.36, 1);
-      --doodle-duration: 220ms;
-      --doodle-drawer-width: 336px;
-      --doodle-font: "Avenir Next", "PingFang SC", "Hiragino Sans GB", "Microsoft YaHei", sans-serif;
 
       /*
        * Liquid glass.
@@ -204,6 +215,10 @@
       --paper-sheet: #fdfbf5;
       --paper-sheet-warm: #faf6ec;
       --paper-sheet-edge: #f2ebdb;
+      /* Two more steps of stock so floating chrome is not the same flat colour
+         as the desk: a raised card catches more light, a pressed well less. */
+      --paper-card: #fffefa;
+      --paper-well: #f3eddf;
       --paper-lip: #e4d9c1;
       --paper-crease: rgba(120, 104, 76, 0.14);
       --paper-bevel-light: rgba(255, 255, 255, 0.9);
@@ -240,7 +255,7 @@
       --glass-blur: 0px;
       --glass-saturate: 100%;
       --glass-bg: var(--paper-sheet);
-      --glass-bg-strong: var(--paper-sheet);
+      --glass-bg-strong: var(--paper-card);
       --glass-edge: var(--paper-bevel-light);
       --glass-edge-outer: var(--paper-crease);
       --glass-highlight: rgba(255, 255, 255, 0.55);
@@ -273,7 +288,7 @@
       --glass-selected-rim: rgba(74, 103, 133, 0.5);
       --glass-input-fill: #fdfbf5;
       --glass-surface-float: var(--paper-sheet);
-      --glass-surface-panel: var(--paper-sheet);
+      --glass-surface-panel: var(--paper-card);
       --glass-surface-solid: var(--paper-sheet);
 
     }
@@ -312,9 +327,13 @@
       --paper-sheet: #22262a;
       --paper-sheet-warm: #282d32;
       --paper-sheet-edge: #1b1f23;
+      /* Raised chrome is a touch lighter than the desk; a pressed well is
+         darker. Same single light source as the light paper appearance. */
+      --paper-card: #282d32;
+      --paper-well: #1b1f23;
       --paper-lip: #14181b;
       --paper-crease: rgba(0, 0, 0, 0.5);
-      --paper-bevel-light: rgba(255, 255, 255, 0.09);
+      --paper-bevel-light: rgba(255, 255, 255, 0.17);
       --paper-light-x: -1;
       --paper-light-y: -1;
       --paper-shade: rgba(0, 0, 0, 0.34);
@@ -331,7 +350,7 @@
       --glass-blur: 0px;
       --glass-saturate: 100%;
       --glass-bg: var(--paper-sheet);
-      --glass-bg-strong: var(--paper-sheet);
+      --glass-bg-strong: var(--paper-card);
       --glass-edge: var(--paper-bevel-light);
       --glass-edge-outer: var(--paper-crease);
       --glass-highlight: rgba(255, 255, 255, 0.1);
@@ -352,7 +371,7 @@
       --glass-selected-rim: rgba(143, 203, 180, 0.4);
       --glass-input-fill: #1d2125;
       --glass-surface-float: var(--paper-sheet);
-      --glass-surface-panel: var(--paper-sheet);
+      --glass-surface-panel: var(--paper-card);
       --glass-surface-solid: var(--paper-sheet);
     }
     .excalidraw {
@@ -1305,6 +1324,7 @@
      */
     .doodle-themes { display: inline-flex; align-items: stretch; gap: 2px; height: 30px; padding: 1px; border-radius: 9px; }
     .doodle-theme-option {
+      position: relative;
       min-width: 26px;
       padding: 0 7px;
       border: 1px solid transparent;
@@ -1326,6 +1346,27 @@
       background: var(--doodle-accent-soft);
       border-color: var(--doodle-border-strong);
       font-weight: 600;
+    }
+    /*
+     * Hand-drawn cue, kept to this one spot. The active appearance carries a
+     * slightly wobbly ink underline instead of a ruler-straight rule — the one
+     * place the board's doodle language shows up in the chrome. Inline SVG, so
+     * no font or asset dependency; the stroke follows the accent colour.
+     */
+    .doodle-theme-option[aria-pressed="true"]::after {
+      content: "";
+      position: absolute;
+      left: 6px;
+      right: 6px;
+      bottom: 3px;
+      height: 3px;
+      background: currentColor;
+      -webkit-mask: no-repeat center / 100% 100%
+        url("data:image/svg+xml;utf8,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 3' preserveAspectRatio='none'%3E%3Cpath d='M0 2 C4 1 7 2.4 11 1.6 S18 2.3 24 1.2' fill='none' stroke='black' stroke-width='1.2' stroke-linecap='round'/%3E%3C/svg%3E");
+      mask: no-repeat center / 100% 100%
+        url("data:image/svg+xml;utf8,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 3' preserveAspectRatio='none'%3E%3Cpath d='M0 2 C4 1 7 2.4 11 1.6 S18 2.3 24 1.2' fill='none' stroke='black' stroke-width='1.2' stroke-linecap='round'/%3E%3C/svg%3E");
+      opacity: 0.7;
+      pointer-events: none;
     }
     .doodle-notify-agent { position: fixed; right: 14px; bottom: 14px; z-index: 20; height: 36px; padding: 0 16px; border-radius: 18px; color: var(--doodle-accent-ink); background: var(--doodle-accent); cursor: pointer; font-size: 12px; }
     .doodle-notify-agent:hover { filter: brightness(1.05); }
@@ -1505,6 +1546,16 @@
       background-blend-mode: screen, screen;
     }
     /*
+     * On charcoal the cream-sheet grain (alpha 0.11 / 0.05) screens back to
+     * almost nothing — there is little luminance for a multiply-strength field
+     * to add. Raise both fields for the dark sheet so the stock keeps visible
+     * tooth under the bevel, without lifting the panel off the page.
+     */
+    :root[data-doodle-material="paper"][data-doodle-theme="dark"] {
+      --paper-fibre: url("data:image/svg+xml;utf8,%3Csvg xmlns='http://www.w3.org/2000/svg' width='200' height='200'%3E%3Cfilter id='f' x='0' y='0' width='100%25' height='100%25'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.62' numOctaves='3' seed='19'/%3E%3CfeColorMatrix type='saturate' values='0'/%3E%3CfeComponentTransfer%3E%3CfeFuncA type='linear' slope='0.2'/%3E%3C/feComponentTransfer%3E%3C/filter%3E%3Crect width='200' height='200' filter='url(%23f)'/%3E%3C/svg%3E");
+      --paper-tooth: url("data:image/svg+xml;utf8,%3Csvg xmlns='http://www.w3.org/2000/svg' width='96' height='96'%3E%3Cfilter id='t' x='0' y='0' width='100%25' height='100%25'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.92' numOctaves='3' seed='7'/%3E%3CfeColorMatrix type='saturate' values='0'/%3E%3CfeComponentTransfer%3E%3CfeFuncA type='linear' slope='0.1'/%3E%3C/feComponentTransfer%3E%3C/filter%3E%3Crect width='96' height='96' filter='url(%23t)'/%3E%3C/svg%3E");
+    }
+    /*
      * A sheet of card.
      *
      * Four things make it read as stock rather than as a rounded rectangle:
@@ -1635,7 +1686,7 @@
      * makes a physical layout read as layered instead of flat.
      */
     :root[data-doodle-material="paper"] .doodle-library-panel {
-      background-color: var(--paper-sheet);
+      background-color: var(--paper-card);
       background-image: var(--paper-fibre), var(--paper-tooth);
       background-size: 200px 200px, 96px 96px;
       background-blend-mode: multiply, multiply;
@@ -1745,6 +1796,17 @@
     .doodle-welcome-actions button:hover { filter: brightness(1.05); }
     @keyframes doodle-welcome-in { from { opacity: 0; transform: translate(-50%, 8px); } to { opacity: 1; transform: translate(-50%, 0); } }
     @media (max-height: 620px) { .doodle-welcome { bottom: 96px; padding: 12px 14px; } .doodle-welcome dl { display: none; } }
+    /*
+     * Tablet band (641–900px). Excalidraw's centred toolbar slides left below
+     * ~880px and collides with the Doodle capsule at 860px; the phone layout
+     * only dropped the capsule under 640px, leaving a dead band. Move the
+     * capsule onto its own row here too, but keep the drawer a 336px floating
+     * card — full-screen is a phone-only affordance. Must come after the base
+     * `.doodle-topbar` rule so it wins at equal specificity.
+     */
+    @media (min-width: 641px) and (max-width: 900px) {
+      .doodle-topbar { top: 72px; left: 12px; }
+    }
     @media (max-width: 640px) {
       /*
        * Narrow screens keep the capsule under the toolbar, but Excalidraw's
@@ -1767,6 +1829,38 @@
       .doodle-library-list { min-height: 64px; }
     }
     @media (prefers-reduced-motion: reduce) { .doodle-tool, .doodle-notify-agent, .doodle-library-panel, .doodle-library-entry, .doodle-library-sectionhead-actions button, .doodle-library-footer button, .doodle-library-shares button { transition: none !important; } }
+    /*
+     * Theme-switch easing.
+     *
+     * applyTheme() adds `.theme-switching` for one beat only when a person
+     * clicks a theme, never on first paint, so a reload applies its stored
+     * palette instantly. Ease only paint properties — background, border,
+     * ink, shadow. Geometry (width, height, inset, margin, padding,
+     * transform) must snap, or floating controls slide over each other
+     * mid-switch. Placed last so it wins over each surface's own transition.
+     */
+    .theme-switching body,
+    .theme-switching .excalidraw-host,
+    .theme-switching .doodle-glass,
+    .theme-switching .doodle-library-panel,
+    .theme-switching .doodle-topbar,
+    .theme-switching .excalidraw .Island,
+    .theme-switching .excalidraw .dropdown-menu .dropdown-menu-container {
+      transition:
+        background-color var(--doodle-duration) var(--doodle-ease),
+        border-color var(--doodle-duration) var(--doodle-ease),
+        color var(--doodle-duration) var(--doodle-ease),
+        box-shadow var(--doodle-duration) var(--doodle-ease) !important;
+    }
+    @media (prefers-reduced-motion: reduce) {
+      .theme-switching body,
+      .theme-switching .excalidraw-host,
+      .theme-switching .doodle-glass,
+      .theme-switching .doodle-library-panel,
+      .theme-switching .doodle-topbar,
+      .theme-switching .excalidraw .Island,
+      .theme-switching .excalidraw .dropdown-menu .dropdown-menu-container { transition: none !important; }
+    }
   </style>
 </head>
 <body>
