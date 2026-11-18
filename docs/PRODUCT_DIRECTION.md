@@ -50,8 +50,8 @@ The loop can start from either side and pause at any point. `get_board` remains 
 
 - No hosted accounts, multi-user SaaS, social presence, or mandatory turn-taking workflow.
 - No duplicate chat product, second session model, or board message feed. A host notification is one short message in the existing conversation.
-- No project dashboard, Mermaid diagram library, IDE extension, or static image exporter.
-- Static PNG/JPG/SVG exports are sharing snapshots only; saved “图” remain editable version 1 board snapshots and are not image assets.
+- No project dashboard, Mermaid diagram library, IDE extension, or server-side image pipeline.
+- Static PNG/JPG/SVG exports are human-canvas sharing snapshots only (图库 → 分享快照); saved “图” remain editable version 1 board snapshots and are not image assets. These exports do exist - what does not exist is an MCP tool that returns an image file.
 - No `SessionSnapshot`, `VisualGraph`, annotation threads, proposals, diff review, approval receipts, or derived context catalogues.
 - No AI project writes triggered by drawing or scans. Code changes remain a separately reviewed coding-agent action.
 - No browser or IDE window opening from normal MCP tools.

@@ -198,6 +198,13 @@ describe("MCP board server", () => {
       const board = jsonAfter(text, "BOARD_JSON:");
       expect(board).toMatchObject({ version: 1, readOnly: true });
       expect(board.capabilities.objectTypes).toContain("stroke");
+      // Image export exists on the human canvas, so an agent must never read
+      // the capability list as "Doodle cannot produce a PNG/JPG/SVG".
+      expect(board.capabilities.libraryFormat).toBe("editable-json");
+      expect(board.capabilities.sharingExports).toEqual(["png", "jpg", "svg"]);
+      expect(board.capabilities.sharingExportOwner).toBe("human-canvas");
+      expect(board.capabilities.sharingExportHint).toContain("分享快照");
+      expect(text).toContain("图库 → 分享快照");
       expect(board.visualDigest).toMatchObject({ version: 1, itemCount: 0 });
       expect(Array.isArray(board.items)).toBe(true);
       expect(board.safety).toMatchObject({ projectWritesRequireHumanApproval: true });
@@ -217,7 +224,7 @@ describe("MCP board server", () => {
       expect(text).not.toContain("FIRST_USE:");
       expect(text).not.toContain("BOARD_JSON is the read-only shared state");
       expect(text).toContain("BOARD_JSON:");
-      expect(text).toContain('"text": "context"');
+      expect(text).toContain('"text":"context"');
     });
   }, 30_000);
 
@@ -240,6 +247,68 @@ describe("MCP board server", () => {
 
       const guided = textOf(await client.callTool({ name: "get_board", arguments: { include_guide: true } }));
       expect(guided).toContain("CAPABILITIES:");
+    });
+  }, 30_000);
+
+  it("does not resend the guide on repeated empty reads", async () => {
+    // `firstUse || !state.guideSent` kept the guide permanent on an empty
+    // board, so four consecutive reads all cost the same 10,989 bytes. An empty
+    // board is the most-reread state an agent has.
+    await withClient(async (client) => {
+      const first = textOf(await client.callTool({ name: "get_board", arguments: {} }));
+      expect(first).toContain("CAPABILITIES:");
+      expect(first).toContain("Visual recipes:");
+
+      const second = textOf(await client.callTool({ name: "get_board", arguments: {} }));
+      const third = textOf(await client.callTool({ name: "get_board", arguments: {} }));
+      for (const reread of [second, third]) {
+        expect(reread).not.toContain("CAPABILITIES:");
+        expect(reread).not.toContain("Visual recipes:");
+        expect(reread).not.toContain("Drawing guide:");
+      }
+      expect(second).toBe(third);
+      expect(second.length).toBeLessThan(first.length * 0.75);
+    });
+  }, 30_000);
+
+  it("trims the text block for a summary view", async () => {
+    // `view: "summary"` dropped `items` from structured content while the text
+    // block still carried the guide and recipes, so the cheap view cost almost
+    // as much as a full read.
+    await withClient(async (client) => {
+      await client.callTool({
+        name: "draw_board",
+        arguments: { author: "ai", items: [{ type: "note", x: 0, y: 0, w: 160, h: 90, text: "context" }] },
+      });
+      const full = textOf(await client.callTool({ name: "get_board", arguments: {} }));
+      const summary = textOf(await client.callTool({ name: "get_board", arguments: { view: "summary" } }));
+
+      expect(summary).toContain("BOARD_VIEW_SUMMARY:");
+      expect(summary).not.toContain("CAPABILITIES:");
+      expect(summary).not.toContain("Visual recipes:");
+      expect(summary).not.toContain('"items":');
+      expect(summary).not.toContain('"copyText":');
+      expect(summary.length).toBeLessThan(full.length);
+    });
+  }, 30_000);
+
+  it("rejects a per-item author instead of relabelling it", async () => {
+    // The write path stamps every item with the top-level author. Accepting a
+    // per-item `author` and overriding it let a model mark a person's words as
+    // its own without any signal.
+    await withClient(async (client) => {
+      const result = await client.callTool({
+        name: "draw_board",
+        arguments: {
+          author: "ai",
+          items: [{ type: "note", x: 0, y: 0, w: 160, h: 90, text: "person words", author: "human" }],
+        },
+      });
+      const text = textOf(result);
+
+      expect(result.isError).toBe(true);
+      expect(text).toContain("AUTHOR_ON_ITEM");
+      expect(text).toContain("author must not be set per item");
     });
   }, 30_000);
 

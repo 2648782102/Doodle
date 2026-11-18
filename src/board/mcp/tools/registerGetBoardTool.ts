@@ -52,11 +52,21 @@ server.registerTool(
         : boardAgentPayload(current, (await ctx.library.apply({ type: "list" }, current)).index);
       const visiblePayload = viewPayload(payload as Record<string, unknown>, view);
       const firstUse = payload.itemCount === 0;
-      const withGuide = include_guide ?? (firstUse || !state.guideSent);
+      /*
+       * `guideSent` has to be the deciding flag.
+       *
+       * `firstUse || !state.guideSent` made the guide permanent on an empty
+       * board: `firstUse` stayed true on every reread, so `guideSent` never
+       * suppressed anything and four consecutive empty reads each cost the
+       * same 10,989 bytes. An empty board is the most-reread state there is -
+       * an agent checking whether the person has drawn yet - so it was the
+       * worst place to repeat the full guide.
+       */
+      const withGuide = include_guide ?? !state.guideSent;
       if (withGuide) state.guideSent = true;
       const guidance = firstUse ? [
         "FIRST_USE: 空画板。用户想看时调用 show_board；AI 表达意图时调用 draw_board。",
-        "NEXT_STEPS: draw_board → 保持画布可见 → 读取人的画图后用 get_board 或当前会话上下文。首张画板见下方 Drawing guide。",
+        "NEXT_STEPS: draw_board → 保持画布可见 → 读取人的画图后用 get_board 或当前会话上下文。",
       ] : [
         `NEXT: 这是 revision ${payload.revision} 的完整画板。下次只在需要时传 since_revision: ${payload.revision} 读差量；show_board 显示，draw_board 画图回应。Use draw_board to visualize any context.`,
       ];
@@ -75,17 +85,17 @@ server.registerTool(
               "",
             ] : []),
             "HANDOFF_JSON:",
-            JSON.stringify(handoff, null, 2),
+            JSON.stringify(handoff),
             "",
           ] : []),
           "BOARD_DELTA_JSON:",
-          JSON.stringify(delta, null, 2),
+          JSON.stringify(delta),
           "",
           "BOARD_SUMMARY_JSON:",
-          JSON.stringify(summarizeAgentBoard(current), null, 2),
+          JSON.stringify(summarizeAgentBoard(current)),
           "",
           "VISUAL_DIAGNOSIS_JSON:",
-          JSON.stringify(payload.diagnosis, null, 2),
+          JSON.stringify(payload.diagnosis),
           "",
           handoffNextStep(handoff),
           `PANEL_URL: ${ctx.preview.panelUrl ?? "unavailable (standalone preview not started)"}`,
@@ -117,12 +127,31 @@ server.registerTool(
             JSON.stringify(visiblePayload.diagnosis, null, 2),
             "",
             `${view && view !== "full" ? `BOARD_VIEW_${view.toUpperCase()}` : "BOARD_JSON"}:`,
-            JSON.stringify(visiblePayload, null, 2),
+            /*
+             * Compact JSON, not pretty-printed.
+             *
+             * The board already ships in `structuredContent`; this text copy
+             * exists so a model reading only the text block still sees it. Two
+             * space-indented copies of the same object doubled the read cost
+             * for no gain: a 12-node board cost 40,938 bytes across both
+             * channels. Compact JSON keeps both channels readable and drops the
+             * indentation tax.
+             */
+            JSON.stringify(visiblePayload),
             ``,
-            ...(withGuide ? [
+            /*
+             * `view` has to cut the text block too, not only the payload.
+             *
+             * `view: "summary"` dropped `items` from the structured half while
+             * the text half still carried CAPABILITIES, RECIPES, and the full
+             * drawing guide - so the cheap view cost 15,239 bytes, barely less
+             * than a full read. A summary read is a status check; it does not
+             * need authoring instructions.
+             */
+            ...(view === "summary" ? [] : withGuide ? [
               ...(firstUse ? [boardGuidance(), ``] : []),
               "CAPABILITIES:",
-              JSON.stringify((visiblePayload as any).capabilities ?? payload.capabilities, null, 2),
+              JSON.stringify((visiblePayload as any).capabilities ?? payload.capabilities),
               "VISUAL_DIGEST:",
               JSON.stringify(visiblePayload.visualDigest, null, 2),
               "RECIPES:",

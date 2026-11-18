@@ -46,6 +46,7 @@ const boardTypes = (await Promise.all([
   read("src/board/model/types.ts"),
   read("src/board/model/limits.ts"),
   read("src/board/model/validate.ts"),
+  read("src/board/model/size.ts"),
   read("src/board/model/board.ts"),
   read("src/board/model/digest.ts"),
   read("src/board/layout/arrange.ts"),
@@ -145,6 +146,18 @@ check(
 );
 check(boardStore.includes("quarantineCorruptState"), "a corrupt board file still prevents startup");
 check(boardTypes.includes("COORDINATE_OUT_OF_RANGE") && !boardTypes.includes("maxWidth, input.w ?? 180") && !boardTypes.includes("Math.min(MAX_SHAPE_WIDTH, input.w ?? 180)"), "drawing input is silently clamped instead of rejected");
+check(
+  boardTypes.includes("must be at least") && boardTypes.includes("SIZE_OUT_OF_RANGE"),
+  "the size floor is not rejected: an explicit w/h below the minimum must fail, not be raised",
+);
+check(
+  tools.includes("AUTHOR_ON_ITEM") && tools.includes("author must not be set per item"),
+  "a per-item author is accepted: the write path overwrites it instead of rejecting it",
+);
+check(
+  (await read("src/board/diagram/recipe.ts")).includes("edges: diagram.edges ?? []"),
+  "diagram edges are not normalised: an omitted `edges` field crashes the generator",
+);
 check(http.includes("this.revisions?.remember(board)") && (await read("src/server.ts")).includes("new BoardHttpServer(board, config, revisions)"), "browser writes are not recorded in the shared revision cache");
 check(troubleshooting.includes("npm run preview:board") && troubleshooting.includes("current MCP server process"), "troubleshooting does not explain PANEL_URL lifetime");
 check(packageJson.scripts.check.includes("setup:codex -- --dry-run"), "npm check does not dry-run the Codex setup");

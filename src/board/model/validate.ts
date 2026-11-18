@@ -11,9 +11,8 @@
 import {
   COLORS, DIAGRAM_MODES, EMPHASES, IMAGE_MIMES, ITEM_TYPES, LAYOUT_MODES,
   LINE_SHAPES, MAX_COORDINATE, MAX_FILE_ID, MAX_GROUP_ID, MAX_IMAGE_SRC,
-  MAX_ITEMS, MAX_LINE_DELTA_X, MAX_LINE_DELTA_Y, MAX_NOTES, MAX_SCENE_JSON,
-  MAX_SHAPE_HEIGHT, MAX_SHAPE_WIDTH, MAX_STROKE_POINTS, MAX_TEXT, MAX_TITLE,
-  MIN_SHAPE_SIZE, MIN_STROKE_SPAN, ROLES, TEXT_ALIGNS, VARIANTS,
+  MAX_ITEMS, MAX_NOTES, MAX_SCENE_JSON, MAX_STROKE_POINTS, MAX_TEXT, MAX_TITLE,
+  ROLES, TEXT_ALIGNS, VARIANTS,
 } from "./limits.js";
 import type {
   BoardAuthor, BoardEmphasis, BoardItem, BoardItemInput, BoardItemStyle,
@@ -21,6 +20,7 @@ import type {
   BoardSceneMeta, BoardTextAlign, BoardVariant, SimpleBoard,
 } from "./types.js";
 import { makeId, now } from "./clock.js";
+import { resolveGeometry } from "./size.js";
 import { BoardValidationError } from "../errors.js";
 
 function isFiniteNumber(value: unknown): value is number {
@@ -173,29 +173,17 @@ export function parseBoard(value: unknown): SimpleBoard {
     if (!isAuthor(candidate.author)) throw new Error("Invalid board item author");
     if (itemIds.has(candidate.id)) throw new Error("Duplicate board item ID");
     itemIds.add(candidate.id);
-    if (x < -MAX_COORDINATE || x > MAX_COORDINATE
-      || y < -MAX_COORDINATE || y > MAX_COORDINATE)
-      throw new Error("Board item coordinates are out of range");
-    if (candidate.type !== "line" && candidate.type !== "stroke" && candidate.type !== "image"
-      && (width < MIN_SHAPE_SIZE || width > MAX_SHAPE_WIDTH
-        || height < MIN_SHAPE_SIZE || height > MAX_SHAPE_HEIGHT)) {
-      throw new Error("Board item size is out of range");
-    }
-    if (candidate.type === "stroke"
-      && (width < MIN_STROKE_SPAN || width > MAX_SHAPE_WIDTH
-        || height < MIN_STROKE_SPAN || height > MAX_SHAPE_HEIGHT)) {
-      throw new Error("Stroke size is out of range");
-    }
-    if (candidate.type === "image"
-      && (width < MIN_SHAPE_SIZE || width > MAX_SHAPE_WIDTH
-        || height < MIN_SHAPE_SIZE || height > MAX_SHAPE_HEIGHT)) {
-      throw new Error("Image size is out of range");
-    }
-    if (candidate.type === "line") {
-      if (width === 0 && height === 0) throw new Error("Line needs a direction");
-      if (width < -MAX_LINE_DELTA_X || width > MAX_LINE_DELTA_X
-        || height < -MAX_LINE_DELTA_Y || height > MAX_LINE_DELTA_Y)
-        throw new Error("Line endpoint deltas are out of range");
+    /*
+     * Reuse the same bounds the write path enforces. `parseBoard` guards
+     * persisted state, so a board written before a limit existed, or one edited
+     * by hand, must fail on exactly the rules a fresh write fails on.
+     */
+    try {
+      resolveGeometry(String(candidate.type), x, y, width, height);
+    } catch (error) {
+      throw new Error(
+        error instanceof Error ? `Board item rejected: ${error.message}` : "Board item refused",
+      );
     }
     if (candidate.type === "image" && !isImageSource(candidate.src)) throw new Error("Invalid image source");
     if (candidate.type === "stroke") {
@@ -299,71 +287,7 @@ export function normalizeItem(input: BoardItemInput): Omit<BoardItem, "createdAt
   if (!input || typeof input !== "object") throw new Error("Invalid item input");
   if (!ITEM_TYPES.includes(input.type)) throw new Error("Unknown item type");
   if (![input.x, input.y].every(isFiniteNumber)) throw new Error("Item coordinates must be finite");
-  /*
-   * Reject out-of-range input instead of clamping it.
-   *
-   * Clamping silently moved a shape from x=999999 to x=100000 and shrank a
-   * 99999-wide box to 2000, then reported success. A caller that asked for a
-   * specific position has no way to notice its drawing landed somewhere else,
-   * and the next `get_board` looks like the tool ignored the request. Explicit
-   * bounds keep the caller's coordinates and its expectations in sync; only
-   * *defaults* (an omitted w/h) are filled in.
-   */
-  if (input.x < -MAX_COORDINATE || input.x > MAX_COORDINATE
-    || input.y < -MAX_COORDINATE || input.y > MAX_COORDINATE) {
-    const axis = Math.abs(input.x) > MAX_COORDINATE ? "x" : "y";
-    throw new BoardValidationError(
-      `Item ${axis} must be within ±${MAX_COORDINATE}`,
-      "COORDINATE_OUT_OF_RANGE",
-      `items[].${axis}`,
-      `a finite number between -${MAX_COORDINATE} and ${MAX_COORDINATE}`,
-      `Move the object inside the bounded canvas and retry.`,
-    );
-  }
-  if (input.w !== undefined && !isFiniteNumber(input.w)) throw new Error("Item width must be finite");
-  if (input.h !== undefined && !isFiniteNumber(input.h)) throw new Error("Item height must be finite");
-  if (input.type === "line") {
-    if (input.w === undefined && input.h === undefined) {
-      throw new Error("Line requires w or h as its endpoint delta");
-    }
-    if (input.w !== undefined && !isFiniteNumber(input.w)) throw new Error("Line width must be finite");
-    if (input.h !== undefined && !isFiniteNumber(input.h)) throw new Error("Line height must be finite");
-  }
-  const width = input.type === "line" ? 1
-    : input.type === "stroke" ? Math.max(MIN_STROKE_SPAN, input.w ?? 1)
-      : Math.max(MIN_SHAPE_SIZE, input.w ?? 180);
-  const height = input.type === "line" ? 1
-    : input.type === "stroke" ? Math.max(MIN_STROKE_SPAN, input.h ?? 1)
-      : Math.max(MIN_SHAPE_SIZE, input.h ?? 120);
-  if (input.type !== "line" && (width > MAX_SHAPE_WIDTH || height > MAX_SHAPE_HEIGHT)) {
-    const axis = width > MAX_SHAPE_WIDTH ? "w" : "h";
-    const maximum = axis === "w" ? MAX_SHAPE_WIDTH : MAX_SHAPE_HEIGHT;
-    throw new BoardValidationError(
-      `Item ${axis} must not exceed ${maximum}`,
-      "SIZE_OUT_OF_RANGE",
-      `items[].${axis}`,
-      `a number between ${axis === "w" ? 16 : 16} and ${maximum}`,
-      `Split the content into smaller objects instead of oversizing one shape.`,
-    );
-  }
-  const signedWidth = input.w !== undefined
-    ? (input.type === "line" ? input.w : width)
-    : (input.type === "line" ? 0 : width);
-  const signedHeight = input.h !== undefined
-    ? (input.type === "line" ? input.h : height)
-    : (input.type === "line" ? 0 : height);
-  if (input.type === "line"
-    && (Math.abs(signedWidth) > MAX_LINE_DELTA_X || Math.abs(signedHeight) > MAX_LINE_DELTA_Y)) {
-    const axis = Math.abs(signedWidth) > MAX_LINE_DELTA_X ? "w" : "h";
-    const maximum = axis === "w" ? MAX_LINE_DELTA_X : MAX_LINE_DELTA_Y;
-    throw new BoardValidationError(
-      `Line endpoint delta ${axis} must not exceed ${maximum}`,
-      "LINE_DELTA_OUT_OF_RANGE",
-      `items[].${axis}`,
-      `a signed number between -${maximum} and ${maximum}`,
-      `Bind the line to nearby objects or shorten the endpoint delta.`,
-    );
-  }
+  const { signedWidth, signedHeight } = resolveGeometry(input.type, input.x, input.y, input.w, input.h);
   const text = (input.text ?? "").slice(0, MAX_TEXT);
   if ((input.text ?? "").length > MAX_TEXT) throw new BoardValidationError(
     `Item text must not exceed ${MAX_TEXT} characters`,
@@ -409,8 +333,8 @@ export function normalizeItem(input: BoardItemInput): Omit<BoardItem, "createdAt
   }
   const points = input.type === "stroke"
     ? (input.points ?? []).map((point) => ({
-      x: Math.max(0, Math.min(width, point.x)),
-      y: Math.max(0, Math.min(height, point.y)),
+      x: Math.max(0, Math.min(signedWidth, point.x)),
+      y: Math.max(0, Math.min(signedHeight, point.y)),
     }))
     : undefined;
   const title = input.title?.trim().slice(0, MAX_TITLE) || undefined;

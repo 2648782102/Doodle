@@ -15,6 +15,8 @@ Host capability has three layers: the four tools always work; MCP Apps hosts sho
 
 The board library stores **editable version 1 board snapshots**: save the current image, switch between saved boards, create/rename/duplicate/delete boards, and import/export JSON. It is not a second session model; static PNG/JPG/SVG files are sharing snapshots, not library entries; `get_board`, the MCP App, and the standalone canvas always read and write the same active board.
 
+Export is two separate things, and both exist: `library.export` returns **editable JSON**, while **PNG / JPG / SVG sharing snapshots are produced by the human canvas** under `Library → Sharing snapshots`. No MCP tool returns an image file, but that is not the same as "Doodle cannot export images" - point the person at that drawer.
+
 Since `0.8.0` the legacy DOM canvas has been removed and Excalidraw is the only human-facing canvas. Board v1 is still the sole persisted state and AI-authoritative contract; Excalidraw elements are derived from Board v1 on every render, with no second canvas state. See `docs/GOAL_EXCALIDRAW.md`.
 
 `PANEL_URL` belongs to the current MCP server process: it becomes unavailable when that session or host exits. For a local preview independent of a conversation, run `npm run preview:board`. It starts only the board HTTP server, registers no MCP stdio tools, and installs no background service. Stop it with `Ctrl+C`.

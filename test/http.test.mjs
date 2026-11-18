@@ -88,6 +88,8 @@ describe("board HTTP surface", () => {
     expect(snapshot.library).toMatchObject({ version: 1 });
     expect(snapshot.capabilities.layouts).toContain("cluster");
     expect(snapshot.capabilities.canvasEngine).toBe("excalidraw");
+    expect(snapshot.capabilities.sharingExports).toEqual(["png", "jpg", "svg"]);
+    expect(snapshot.capabilities.sharingExportOwner).toBe("human-canvas");
     expect(snapshot.visualDigest).toMatchObject({ version: 1 });
   });
 

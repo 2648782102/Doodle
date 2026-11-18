@@ -414,6 +414,24 @@ describe("simple shared board", () => {
     ])).toThrow(/author must be human or ai/);
   });
 
+  it("rejects an explicit size below the floor instead of silently raising it", () => {
+    // `Math.max(MIN_SHAPE_SIZE, w)` turned an explicit `w: 12` into 16 and
+    // reported success, so the caller's request and the board disagreed. Only
+    // an omitted size still earns a default.
+    const base = createEmptyBoard();
+
+    expect(() => addBoardItems(base, [
+      { type: "rect", x: 10, y: 10, w: 12, h: 100, text: "narrow" },
+    ])).toThrow(/w must be at least 16/);
+
+    expect(() => addBoardItems(base, [
+      { type: "rect", x: 10, y: 10, w: 100, h: 12, text: "short" },
+    ])).toThrow(/h must be at least 16/);
+
+    const filled = addBoardItems(base, [{ type: "rect", x: 10, y: 10, text: "defaults" }]);
+    expect(filled.items[0].w).toBeGreaterThanOrEqual(16);
+  });
+
   it("still fills defaults for omitted fields", () => {
     // Only missing values get defaults; explicit nonsense must fail.
     const board = addBoardItems(createEmptyBoard(), [

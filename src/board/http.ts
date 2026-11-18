@@ -45,6 +45,8 @@ function canvasSnapshot(board: SimpleBoard) {
       variants: ["plain", "card", "frame", "pill", "diamond", "callout", "heading"],
       roles: ["normal", "label", "frame", "column", "step", "decision", "annotation"],
       recipes: ["flow", "compare", "cluster", "emphasis", "image-annotation", "architecture", "diagram"],
+      sharingExports: ["png", "jpg", "svg"],
+      sharingExportOwner: "human-canvas",
     },
   };
 }

@@ -96,10 +96,21 @@ export function resolveDiagramLayout(diagram: ExpandedDiagramInput): DiagramLayo
   const lastSequencedColumn = [...diagram.nodes]
     .reverse()
     .find((node) => node.column !== undefined)?.column;
+  /*
+   * A timeline that only advances `row` still has one axis.
+   *
+   * When no node declares a column at all, `lastSequencedColumn` is undefined
+   * and each row-only node used to take its own column, so eight steps spread
+   * diagonally across 2030x426 instead of stacking in one vertical column.
+   * That is the shape `AGENTS.md` tells an agent to draw. An explicit
+   * `column` still wins whenever the author states one.
+   */
+  const sequenceColumn = lastSequencedColumn
+    ?? (mode !== "flow" && diagram.nodes.some((node) => node.row !== undefined) ? 0 : undefined);
   for (const node of diagram.nodes) {
     if ((layer.get(node.id) ?? -1) >= 0) continue;
     if (mode === "flow") layer.set(node.id, fallbackColumn++);
-    else if (node.row !== undefined && lastSequencedColumn !== undefined) layer.set(node.id, lastSequencedColumn);
+    else if (node.row !== undefined && sequenceColumn !== undefined) layer.set(node.id, sequenceColumn);
     else layer.set(node.id, fallbackIndex++);
   }
   /*

@@ -16,7 +16,7 @@ import {
   boardLibraryIndexText,
   type BoardLibraryAction,
 } from "../../library.js";
-import { BoardRevisionConflictError } from "../../errors.js";
+import { BoardRevisionConflictError, BoardValidationError } from "../../errors.js";
 import { expandRecipe } from "../../diagram/recipe.js";
 import { changeReport, changeReportText } from "../change-report.js";
 import {
@@ -46,13 +46,45 @@ server.registerTool(
       author: z.enum(["human", "ai"]).optional().describe("Author marker; AI responses should normally use ai"),
       expected_revision: z.number().int().nonnegative().optional().describe("Optional board revision for rejecting stale canvas edits"),
       library: libraryAction.optional().describe("Optional local board-library action for saving, switching, renaming, duplicating, importing, or exporting editable board snapshots"),
-      diagram: diagramInput.optional().describe("Semantic diagram recipe: nodes and edges generate one bounded Board v1 diagram with deterministic layout, short labels, and connected arrows. Each node takes `label` (not `title`). By default it is added beside existing objects and reuses a numeric id suffix if a generated id is taken; replace:true clears the whole active board first. Every edge becomes a routed line, a flow longer than six columns snakes instead of becoming one wide strip, and a timeline row index is not part of the schema - send `column` to advance a timeline."),
+      diagram: diagramInput.optional().describe("Semantic diagram recipe: nodes and optional edges generate one bounded Board v1 diagram with deterministic layout, short labels, and connected arrows. Each node takes `label` (not `title`); `edges` may be omitted for a standalone card or a plain sequence. By default it is added beside existing objects and reuses a numeric id suffix if a generated id is taken; replace:true clears the whole active board first. Every edge becomes a routed line, and a flow longer than six columns snakes instead of becoming one wide strip. To advance an ordered timeline, increment `row` down one column: row-only nodes stack vertically on a single axis. Give an explicit `column` only when you want side-by-side groups."),
     }),
     annotations: BOARD_WRITE_ANNOTATIONS,
     _meta: CANVAS_UI_META,
   },
   async ({ items, updates, remove_ids, layout, replace_board, author, expected_revision, library, diagram }) => {
     try {
+      /*
+       * Reject a per-item author instead of silently rewriting it.
+       *
+       * `author` is a top-level field; the write path stamps every item in a
+       * call with that one value. A caller sending `author` inside an item was
+       * previously overridden without a word, so a model that meant to mark a
+       * person's words as `human` stored them as `ai`. Authorship is the field
+       * that makes the board two-way, so a wrong marker is worse than a
+       * rejection. Callers that need both authors send two calls.
+       */
+      const itemAuthors = [...(items ?? []), ...(updates ?? []).map((update) => update.patch)]
+        .filter((item) => item && typeof item === "object" && "author" in item);
+      if (itemAuthors.length) {
+        throw new BoardValidationError(
+          `author must not be set per item (${itemAuthors.length} item(s) did)`,
+          "AUTHOR_ON_ITEM",
+          "items[].author",
+          "omit it",
+          "Set author once at the draw_board top level, and send separate calls for human and ai objects.",
+        );
+      }
+      /*
+       * `author` is accepted by the schema only so the check above can fire.
+       * Strip it before the write path, where `BoardItemInput.author` is the
+       * narrowed `BoardAuthor` this tool owns.
+       */
+      const stripAuthor = <T extends { author?: string }>(item: T): Omit<T, "author"> => {
+        const { author: _perItemAuthor, ...rest } = item;
+        return rest;
+      };
+      const cleanItems = items?.map(stripAuthor);
+      const cleanUpdates = updates?.map((update) => ({ ...update, patch: stripAuthor(update.patch) }));
       if (diagram) {
         if (items !== undefined || updates !== undefined || remove_ids !== undefined
           || layout !== undefined || replace_board !== undefined || library !== undefined) {
@@ -131,13 +163,13 @@ server.registerTool(
           next = replaceBoardContent(next, replace_board);
           return next;
         }
-        if (items?.length) {
-          next = addBoardItems(next, items.map((item) => ({ ...item, author: author ?? "ai" as const })));
-          created += items.length;
+        if (cleanItems?.length) {
+          next = addBoardItems(next, cleanItems.map((item) => ({ ...item, author: author ?? "ai" as const })));
+          created += cleanItems.length;
         }
-        if (updates?.length) {
-          next = updateBoardItems(next, updates ?? [], author ?? "ai");
-          updated += updates.length;
+        if (cleanUpdates?.length) {
+          next = updateBoardItems(next, cleanUpdates, author ?? "ai");
+          updated += cleanUpdates.length;
         }
         if (removed.size) {
           next = removeBoardItems(next, [...removed]);

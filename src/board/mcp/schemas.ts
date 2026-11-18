@@ -10,6 +10,8 @@ import { z } from "zod";
 
 export const itemInput = z.object({
   id: z.string().optional().describe("Existing item ID to update; omit to create a new item"),
+  author: z.string().optional()
+    .describe("Do NOT set this per item. Put author once at the draw_board top level; setting it here is rejected so two authors never get mixed in one call."),
   type: z.enum(["note", "text", "rect", "ellipse", "line", "stroke", "image"]).describe("Visual object type"),
   x: z.number().finite().describe("Canvas X coordinate"),
   y: z.number().finite().describe("Canvas Y coordinate"),
