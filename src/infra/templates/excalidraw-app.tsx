@@ -246,7 +246,16 @@ function readTheme(): DoodleTheme {
  */
 const EXCALIDRAW_THEME = "light" as const;
 
-function applyTheme(theme: DoodleTheme): void {
+function applyTheme(theme: DoodleTheme, animate = false): void {
+  if (animate) {
+    /*
+     * Only an explicit switch animates. The first paint applies the stored
+     * theme synchronously, so a reload never flashes the wrong palette or
+     * eases every surface in from the default tokens.
+     */
+    document.documentElement.classList.add("theme-switching");
+    window.setTimeout(() => document.documentElement.classList.remove("theme-switching"), 260);
+  }
   document.documentElement.dataset.doodleTheme = theme;
   /*
    * Light and dark are the paper desk; only the glass appearance refracts.
@@ -290,7 +299,7 @@ function initThemeToggle(): void {
   const group = document.querySelector<HTMLElement>("#doodleThemeToggle");
   group?.addEventListener("click", (event) => {
     const button = (event.target as HTMLElement | null)?.closest<HTMLButtonElement>("[data-theme-option]");
-    if (button && isDoodleTheme(button.dataset.themeOption)) applyTheme(button.dataset.themeOption);
+    if (button && isDoodleTheme(button.dataset.themeOption)) applyTheme(button.dataset.themeOption, true);
   });
   window.addEventListener("doodle-theme-change", () => {
     // Frames are throttled: a theme flip recomputes every pane once.
