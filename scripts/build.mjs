@@ -61,6 +61,7 @@ for (const name of await fs.readdir(excalidrawTargetDir)) {
 }
 await fs.copyFile(path.join(excalidrawProdDir, "index.css"), path.join(excalidrawTargetDir, "index.css"));
 await fs.cp(path.join(excalidrawProdDir, "fonts"), path.join(excalidrawTargetDir, "fonts"), { recursive: true });
+await pruneUnusedXiaolaiSubsets(excalidrawProdDir, path.join(excalidrawTargetDir, "fonts", "Xiaolai"));
 const excalidrawBundle = await bundle({
   entryPoints: [path.join(sourceDir, "excalidraw-app.tsx")],
   bundle: true,
@@ -80,3 +81,78 @@ for (const file of excalidrawBundle.outputFiles) {
 }
 console.log(`📦 Bundled Excalidraw engine (${excalidrawBundle.outputFiles.reduce((size, file) => size + file.contents.length, 0)} bytes)`);
 console.log("✅ Copied Excalidraw-only board template");
+
+/**
+ * Xiaolai is Excalidraw's Chinese fallback font, shipped as ~205 unicode-range
+ * subsets. Browsers download only the subsets matching the characters on the
+ * board, but every subset is still packed into the npm tarball. Drop the ones
+ * covering only scripts this app never needs (Kana, Hangul, Latin extensions,
+ * emoji, ...), keeping all CJK ideographs and Chinese punctuation.
+ *
+ * The subset table is read from Excalidraw's own bundle so file hashes are
+ * never hardcoded. If upstream changes that format, the regexes find nothing
+ * and pruning is skipped — the build still succeeds with the full font set.
+ */
+function subsetNeeded(unicodeRange) {
+  const keep = [
+    [0x2000, 0x2bff], // general punctuation, arrows, math, geometric shapes
+    [0x3000, 0x303f], // CJK symbols and punctuation
+    [0x3400, 0x4dbf], // CJK unified ideographs extension A
+    [0x4e00, 0x9fff], // CJK unified ideographs
+    [0xf900, 0xfaff], // CJK compatibility ideographs
+    [0xfe30, 0xfe4f], // CJK compatibility forms
+    [0xff00, 0xffef], // fullwidth / halfwidth forms
+  ];
+  for (const part of unicodeRange.split(",")) {
+    const match = /^U\+([0-9a-fA-F]+)(?:-([0-9a-fA-F]+))?$/.exec(part.trim());
+    if (!match) continue;
+    const start = Number.parseInt(match[1], 16);
+    const end = match[2] ? Number.parseInt(match[2], 16) : start;
+    if (keep.some(([lo, hi]) => start <= hi && end >= lo)) return true;
+  }
+  return false;
+}
+
+async function pruneUnusedXiaolaiSubsets(prodDir, targetXiaolaiDir) {
+  let bundleSource = "";
+  for (const name of await fs.readdir(prodDir)) {
+    if (!name.endsWith(".js")) continue;
+    const candidate = await fs.readFile(path.join(prodDir, name), "utf8");
+    if (candidate.includes("Xiaolai-Regular")) {
+      bundleSource = candidate;
+      break;
+    }
+  }
+  if (!bundleSource) return;
+
+  // var xx="./fonts/Xiaolai/Xiaolai-Regular-<hash>.woff2"
+  const files = new Map(
+    [...bundleSource.matchAll(/var (\w+)="\.\/fonts\/Xiaolai\/(Xiaolai-Regular-[0-9a-f]+\.woff2)"/g)]
+      .map(([, variable, file]) => [variable, file]),
+  );
+  if (files.size === 0) return;
+
+  // {uri:xx,descriptors:{unicodeRange:"U+..."}} — only Xiaolai vars matter
+  const byVariable = new Map(
+    [...bundleSource.matchAll(/uri:(\w+),descriptors:\{unicodeRange:"([^"]+)"/g)]
+      .filter(([, variable]) => files.has(variable))
+      .map(([, variable, range]) => [variable, range]),
+  );
+
+  let removed = 0;
+  let freed = 0;
+  for (const [variable, range] of byVariable) {
+    if (subsetNeeded(range)) continue;
+    const file = path.join(targetXiaolaiDir, files.get(variable));
+    try {
+      freed += (await fs.stat(file)).size;
+      await fs.unlink(file);
+      removed += 1;
+    } catch (error) {
+      if (error.code !== "ENOENT") throw error;
+    }
+  }
+  if (removed > 0) {
+    console.log(`✂️  Pruned ${removed} unused Xiaolai font subsets (${(freed / 1048576).toFixed(1)} MB)`);
+  }
+}
