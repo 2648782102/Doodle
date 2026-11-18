@@ -38,10 +38,33 @@ function parseDataUrl(src: unknown): { ext: string; base64: string } | undefined
   return match ? { ext: EXT_BY_MIME[match[1]], base64: match[2] } : undefined;
 }
 
+/**
+ * Content-addressed file name, cached by a fixed-size fingerprint.
+ *
+ * Hashing the whole data URL on every write would make each stroke
+ * O(total image bytes) even when no image changed. A cache hit avoids that;
+ * a miss still hashes the full source once. Collisions would require identical
+ * length *and* identical head/middle/tail samples, which is negligible for
+ * locally generated board images.
+ */
+const REF_CACHE = new Map<string, string>();
+const REF_CACHE_LIMIT = 2048;
+
+function fingerprint(src: string): string {
+  const middle = Math.floor(src.length / 2);
+  return `${src.length}:${src.slice(0, 80)}:${src.slice(middle, middle + 80)}:${src.slice(-80)}`;
+}
+
 function referenceFor(src: string): string {
   const { ext } = parseDataUrl(src)!;
-  const hash = crypto.createHash("sha256").update(src).digest("hex").slice(0, HASH_LENGTH);
-  return `${hash}.${ext}`;
+  const key = fingerprint(src);
+  let name = REF_CACHE.get(key);
+  if (!name) {
+    name = `${crypto.createHash("sha256").update(src).digest("hex").slice(0, HASH_LENGTH)}.${ext}`;
+    if (REF_CACHE.size >= REF_CACHE_LIMIT) REF_CACHE.clear();
+    REF_CACHE.set(key, name);
+  }
+  return name;
 }
 
 function fileNameOf(ref: string): string | undefined {

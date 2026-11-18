@@ -57,6 +57,19 @@ describe("external image storage", () => {
     expect(await fs.readdir(imagesDir)).toHaveLength(1);
   });
 
+  it("keeps distinct images on distinct files even after repeated writes", async () => {
+    const imagesDir = path.join(await tempDir(), "images");
+    const other = `data:image/png;base64,${"A".repeat(400)}`;
+    let board = addBoardItem(createEmptyBoard(), withImage());
+    board = addBoardItem(board, withImage(other, { x: 120 }));
+
+    const first = await externalizeImages(board, imagesDir);
+    const second = await externalizeImages(board, imagesDir);
+    expect(first.items.map((item) => item.src)).toEqual(second.items.map((item) => item.src));
+    expect(new Set(first.items.map((item) => item.src)).size).toBe(2);
+    expect(await fs.readdir(imagesDir)).toHaveLength(2);
+  });
+
   it("persists a small reference in board.json and rehydrates on a fresh store", async () => {
     const output = await tempDir();
     const store = new BoardStore(output);
