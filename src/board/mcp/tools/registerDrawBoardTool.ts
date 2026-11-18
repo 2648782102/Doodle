@@ -28,6 +28,7 @@ import {
   updateBoardItems,
   replaceBoardContent,
   touchBoard,
+  type BoardItemInput,
   type SimpleBoard,
 } from "../../types.js";
 
@@ -37,12 +38,12 @@ server.registerTool(
   {
     description: "让 AI 直接在共享无限画布上画或改，也可通过 library 参数保存当前画板、切换本地画板图库中的图、新建/重命名/复制/删除/导入/导出可编辑版本 1 画板。普通写入会串行应用到最新状态；line 的 (x,y) 是起点，(x+w,y+h) 是终点，w/h 可为负数；其他对象是左上角与宽高。按整齐网格布局；不打开浏览器，不写项目文件。",
     inputSchema: z.object({
-      items: z.array(itemInput).max(100).optional().describe("Objects to create; omit id"),
-      updates: z.array(updateInput).max(100).optional().describe("Precise updates to existing object IDs"),
-      remove_ids: z.array(z.string()).max(100).optional().describe("Existing object IDs to remove"),
+      items: z.array(itemInput).optional().describe("Objects to create; omit id"),
+      updates: z.array(updateInput).optional().describe("Precise updates to existing object IDs"),
+      remove_ids: z.array(z.string()).optional().describe("Existing object IDs to remove"),
       layout: layoutInput.optional().describe("Optional deterministic arrangement of existing objects"),
       replace_board: z.unknown().optional().describe("Rare full replacement with a version 1 board snapshot; revision and identity are preserved"),
-      author: z.enum(["human", "ai"]).optional().describe("Author marker; AI responses should normally use ai"),
+      author: z.string().optional().describe("Author marker: human or ai. AI responses should normally use ai"),
       expected_revision: z.number().int().nonnegative().optional().describe("Optional board revision for rejecting stale canvas edits"),
       library: libraryAction.optional().describe("Optional local board-library action for saving, switching, renaming, duplicating, importing, or exporting editable board snapshots"),
       diagram: diagramInput.optional().describe("Semantic diagram recipe: nodes and optional edges generate one bounded Board v1 diagram with deterministic layout, short labels, and connected arrows. Each node takes `label` (not `title`); `edges` may be omitted for a standalone card or a plain sequence. By default it is added beside existing objects and reuses a numeric id suffix if a generated id is taken; replace:true clears the whole active board first. Every edge becomes a routed line, and a flow longer than six columns snakes instead of becoming one wide strip. To advance an ordered timeline, increment `row` down one column: row-only nodes stack vertically on a single axis. Give an explicit `column` only when you want side-by-side groups."),
@@ -74,14 +75,29 @@ server.registerTool(
         );
       }
       /*
-       * `author` is accepted by the schema only so the check above can fire.
-       * Strip it before the write path, where `BoardItemInput.author` is the
-       * narrowed `BoardAuthor` this tool owns.
+       * `author` is a plain string in the schema so this check can name the
+       * repair; a `z.enum` would reject with bare SDK prose before the handler.
        */
-      const stripAuthor = <T extends { author?: string }>(item: T): Omit<T, "author"> => {
-        const { author: _perItemAuthor, ...rest } = item;
-        return rest;
+      if (author !== undefined && author !== "human" && author !== "ai") {
+        throw new BoardValidationError(
+          `author must be "human" or "ai", got ${JSON.stringify(author)}`,
+          "INVALID_AUTHOR",
+          "author",
+          `"human" or "ai"`,
+          `Set author: "ai" for your own objects. Attribution is what makes the board two-way, so a custom name is refused rather than coerced.`,
+        );
+      }
+      /*
+       * The schema describes shape, so enums arrive as plain strings and
+       * `model/` narrows them. Re-typing here keeps the write path typed
+       * without a second validation pass: anything outside the union was
+       * already refused by `normalizeItem` with a repair path.
+       */
+      const narrow = <T extends Record<string, unknown>>(item: T): BoardItemInput => {
+        const { author: _perItemAuthor, ...rest } = item as T & { author?: string };
+        return rest as unknown as BoardItemInput;
       };
+      const stripAuthor = (item: Record<string, unknown>) => narrow(item);
       const cleanItems = items?.map(stripAuthor);
       const cleanUpdates = updates?.map((update) => ({ ...update, patch: stripAuthor(update.patch) }));
       /*
@@ -101,6 +117,24 @@ server.registerTool(
         ctx.revisions?.remember(board);
         return board;
       };
+      /*
+       * The per-call batch ceiling moved here from the schema so the rejection
+       * carries a repair path. The MCP SDK validates `inputSchema` before this
+       * handler runs and reports a failure as bare prose, which is exactly the
+       * case a model hits when it tries to draw a large diagram in one call.
+       */
+      const MUTATION_BATCH_LIMIT = 100;
+      for (const [field, list] of [["items", cleanItems], ["updates", cleanUpdates], ["remove_ids", remove_ids]] as const) {
+        if (list && list.length > MUTATION_BATCH_LIMIT) {
+          throw new BoardValidationError(
+            `${field} carries ${list.length} entries, over the ${MUTATION_BATCH_LIMIT} allowed in one call`,
+            "BATCH_TOO_LARGE",
+            field,
+            `at most ${MUTATION_BATCH_LIMIT} entries per call`,
+            `Split into ${Math.ceil(list.length / MUTATION_BATCH_LIMIT)} calls of ${MUTATION_BATCH_LIMIT} or fewer. For a diagram, prefer draw_board.diagram with nodes/edges instead of one object per call.`,
+          );
+        }
+      }
       if (diagram) {
         if (items !== undefined || updates !== undefined || remove_ids !== undefined
           || layout !== undefined || replace_board !== undefined || library !== undefined) {

@@ -12,6 +12,10 @@ import { logger } from "../../infra/logger.js";
 import { boardAgentView } from "../agent-view.js";
 import { boardCopyText, boardVisualDigest, diagnoseBoard, type SimpleBoard } from "../types.js";
 import { BoardValidationError } from "../errors.js";
+import {
+  MAX_COORDINATE, MAX_IMAGE_SRC, MAX_ITEMS, MAX_LINE_DELTA_X, MAX_LINE_DELTA_Y,
+  MAX_SHAPE_HEIGHT, MAX_SHAPE_WIDTH, MAX_STROKE_POINTS, MAX_TEXT, MAX_TITLE, MIN_SHAPE_SIZE,
+} from "../model/limits.js";
 
 export function errorResult(tool: string, error: unknown): CallToolResult {
   const message = error instanceof Error ? error.message : String(error);
@@ -72,6 +76,25 @@ export function viewPayload(payload: Record<string, any>, view?: "summary" | "st
 export function boardCapabilities() {
   return {
     version: 1,
+    /*
+     * Bounds are published so a model can size a write correctly the first
+     * time. They are enforced in `model/` and reported through `ERROR_JSON`,
+     * but knowing them up front avoids the rejection entirely - which is the
+     * cheapest possible repair.
+     */
+    limits: {
+      objectsPerBoard: MAX_ITEMS,
+      objectsPerCall: 100,
+      shapeSize: { min: MIN_SHAPE_SIZE, maxWidth: MAX_SHAPE_WIDTH, maxHeight: MAX_SHAPE_HEIGHT },
+      coordinate: MAX_COORDINATE,
+      textLength: MAX_TEXT,
+      titleLength: MAX_TITLE,
+      strokePoints: MAX_STROKE_POINTS,
+      imageBytes: MAX_IMAGE_SRC,
+      lineDelta: { x: MAX_LINE_DELTA_X, y: MAX_LINE_DELTA_Y },
+      diagram: { nodes: 48, edges: 96, column: 12, row: 48 },
+      z: { min: -1000, max: 1000 },
+    },
     objectTypes: ["note", "text", "rect", "ellipse", "line", "stroke", "image"],
     variants: ["plain", "card", "frame", "pill", "diamond", "callout", "heading"],
     roles: ["normal", "label", "frame", "column", "step", "decision", "annotation", "question", "constraint", "evidence"],
@@ -207,6 +230,7 @@ export function boardGuidance(): string {
     "Drawing guide:",
     "- Read BOARD_JSON first; reuse item IDs and use updates/removes for precise changes.",
     "- Use a strict grid with short labels. Put author at the draw_board top level, not inside items.",
+    `- Size the write to the bounds: at most 100 items per call, shapes 16-2000 wide and 16-1200 tall, text 1200 characters, coordinates within ±100000, and a diagram of 48 nodes / 96 edges. capabilities.limits has the full table; every rejection names the field and the fix.`,
     "- A line is an arrow from (x,y) to (x+w,y+h); w/h are signed endpoint deltas. Set shape to straight, curve, or orthogonal.",
     "- Use stroke for freehand marks with local points, image for a data:image/* source, title for a short heading, and emphasis: focus to highlight what matters.",
     "- Use layout for tidy arrangements; human multi-select can group related objects in the canvas.",

@@ -10,17 +10,64 @@
 
 import { DIAGRAM_MODES } from "../model/limits.js";
 import type { BoardPoint, DiagramLayout, DiagramMode, ExpandedDiagramInput } from "../model/types.js";
+import { BoardValidationError } from "../errors.js";
 
 export function resolveDiagramLayout(diagram: ExpandedDiagramInput): DiagramLayout {
-  if (diagram.nodes.length > 48 || diagram.edges.length > 96) throw new Error("Diagram is too large");
+  if (diagram.nodes.length > 48 || diagram.edges.length > 96) {
+    throw new BoardValidationError(
+      `Diagram has ${diagram.nodes.length} nodes and ${diagram.edges.length} edges; the limit is 48 and 96`,
+      "DIAGRAM_TOO_LARGE",
+      "diagram.nodes",
+      "at most 48 nodes and 96 edges per diagram",
+      `Split into two diagrams drawn side by side, or summarize sub-steps with a single node's detail text.`,
+    );
+  }
   const mode = diagram.mode ?? "flow";
-  if (!DIAGRAM_MODES.includes(mode)) throw new Error("Diagram mode must be flow, timeline, compare, or matrix");
+  if (!DIAGRAM_MODES.includes(mode)) {
+    throw new BoardValidationError(
+      `Diagram mode ${JSON.stringify(mode)} is not one of flow, timeline, compare, matrix`,
+      "INVALID_DIAGRAM_MODE",
+      "diagram.mode",
+      DIAGRAM_MODES.join(", "),
+      `Use "flow" for a dependency graph, "timeline" for an ordered sequence, "compare" for two sides, or "matrix" for a grid.`,
+    );
+  }
   const nodeIds = new Set<string>();
   const reserved = new Set(["diagram_title", "diagram_subtitle", "diagram_legend", "diagram_frame"]);
   for (const node of diagram.nodes) {
     const id = node.id?.trim();
     if (!id || nodeIds.has(id) || reserved.has(id) || id.endsWith("_detail") || /^diagram_edge_\d+$/.test(id)) {
-      throw new Error("Diagram node IDs must be unique and must not use generated object IDs");
+      throw new BoardValidationError(
+        `Diagram node id ${JSON.stringify(node.id)} is empty, repeated, or reserved by the generator`,
+        "INVALID_NODE_ID",
+        "diagram.nodes[].id",
+        "a unique short id that is not diagram_title, diagram_subtitle, diagram_legend, or diagram_frame",
+        `Give every node its own id such as "auth" or "n1"; the generator already reserves diagram_* and *_detail.`,
+      );
+    }
+    /*
+     * These bounds used to live only in the Zod schema, so moving them out
+     * would have silently dropped the limit. `row` is 0-47 to match the 48-node
+     * ceiling; `column` is 0-12 because past that a flow is unreadable and
+     * should snake instead.
+     */
+    if (node.column !== undefined && (!Number.isInteger(node.column) || node.column < 0 || node.column > 12)) {
+      throw new BoardValidationError(
+        `Diagram node ${JSON.stringify(id)} has column ${String(node.column)}; the range is 0-12`,
+        "DIAGRAM_COLUMN_OUT_OF_RANGE",
+        "diagram.nodes[].column",
+        "an integer between 0 and 12",
+        `Use column for side-by-side groups only. For a longer sequence advance row instead, or omit both to let a flow snake.`,
+      );
+    }
+    if (node.row !== undefined && (!Number.isInteger(node.row) || node.row < 0 || node.row > 47)) {
+      throw new BoardValidationError(
+        `Diagram node ${JSON.stringify(id)} has row ${String(node.row)}; the range is 0-47`,
+        "DIAGRAM_ROW_OUT_OF_RANGE",
+        "diagram.nodes[].row",
+        "an integer between 0 and 47",
+        `A diagram holds at most 48 nodes, so row 0-47 covers the longest sequence. Split a longer one into two diagrams.`,
+      );
     }
     nodeIds.add(id);
   }
@@ -39,7 +86,15 @@ export function resolveDiagramLayout(diagram: ExpandedDiagramInput): DiagramLayo
     generatedIds.add(id);
   });
   const origin = diagram.origin ?? { x: 40, y: 120 };
-  if (Math.abs(origin.x) > 20_000 || Math.abs(origin.y) > 20_000) throw new Error("Diagram origin is out of range");
+  if (Math.abs(origin.x) > 20_000 || Math.abs(origin.y) > 20_000) {
+    throw new BoardValidationError(
+      "Diagram origin is out of range",
+      "DIAGRAM_ORIGIN_OUT_OF_RANGE",
+      "diagram.origin",
+      "x and y between -20000 and 20000",
+      `Omit origin to place the diagram at (40, 120), or move it near the existing content.`,
+    );
+  }
   const width = Math.max(160, Math.min(260, diagram.nodeWidth ?? 190));
   const height = Math.max(72, Math.min(130, diagram.nodeHeight ?? 90));
   const columnGap = Math.max(36, Math.min(160, diagram.columnGap ?? 70));
@@ -48,7 +103,16 @@ export function resolveDiagramLayout(diagram: ExpandedDiagramInput): DiagramLayo
   const incoming = new Map(diagram.nodes.map((node) => [node.id, 0]));
   const outgoing = new Map(diagram.nodes.map((node) => [node.id, [] as string[]]));
   for (const edge of diagram.edges) {
-    if (!nodes.has(edge.from) || !nodes.has(edge.to)) throw new Error("Diagram edge references an unknown node");
+    if (!nodes.has(edge.from) || !nodes.has(edge.to)) {
+      const missing = !nodes.has(edge.from) ? edge.from : edge.to;
+      throw new BoardValidationError(
+        `Diagram edge references node ${JSON.stringify(missing)}, which is not declared`,
+        "UNKNOWN_EDGE_NODE",
+        "diagram.edges",
+        "from and to must match a declared node id",
+        `Declare the node first (nodes: [{ id: ${JSON.stringify(String(missing))}, label: "..." }]) or correct the edge endpoint.`,
+      );
+    }
     outgoing.get(edge.from)!.push(edge.to);
     incoming.set(edge.to, (incoming.get(edge.to) ?? 0) + 1);
   }

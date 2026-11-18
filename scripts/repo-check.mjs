@@ -254,6 +254,30 @@ check(tools.includes('"show_board"') && tools.includes('"get_board"'), "canvas r
 check(tools.includes("CANVAS_UI_META") && tools.includes("_meta: CANVAS_UI_META"), "draw_board does not advertise the canvas for automatic post-draw rendering");
 check(tools.includes("getAppHtml()") && tools.includes("PANEL_URL"), "Excalidraw MCP App resource is not plugin-safe and the panel URL is missing");
 check(tools.includes("FIRST_USE:") && tools.includes("NEXT_STEPS:") && tools.includes("NEXT:"), "get_board does not use progressive first-use and next-step guidance");
+/*
+ * Repair over prose.
+ *
+ * The MCP SDK validates `inputSchema` before the tool handler and reports a
+ * failure as a bare `MCP error -32602`, which carries no code, path, or fix.
+ * Bounds therefore live in `model/` so every rejection reaches `errorResult`.
+ * These guards fail if a length or range constraint creeps back into the schema
+ * and starts answering a model with prose on the path it hits first.
+ */
+check(
+  // Only the write path matters: a rejected read is cheap to retry, while a
+  // rejected write is the round trip this contract exists to remove.
+  !/z\.string\(\)\.max\(/.test((await read("src/board/mcp/schemas.ts"))) &&
+    !/z\.array\([^)]*\)\.max\(/.test((await read("src/board/mcp/schemas.ts"))),
+  "a length or range bound moved back into the MCP input schema: the SDK rejects it with bare prose instead of ERROR_JSON",
+);
+check(
+  tools.includes("BATCH_TOO_LARGE") && tools.includes("MUTATION_BATCH_LIMIT"),
+  "the per-call batch ceiling is missing from the handler, so an oversized draw is rejected without a repair path",
+);
+check(
+  (await read("src/board/diagram/layout.ts")).includes("UNKNOWN_EDGE_NODE"),
+  "diagram layout rejects input with bare prose instead of a repairable error",
+);
 check(
   tools.includes('BOARD_VIEW_${view.toUpperCase()}') && tools.includes('["BOARD_JSON:", JSON.stringify(visiblePayload)]'),
   "graded views send the board twice: only `full` may carry the full BOARD_JSON text copy",
@@ -298,7 +322,11 @@ check(
   boardTypes.includes("if (item.startItemId && !allItemIds.has(item.startItemId))"),
   "connector bindings are validated before all items are known, rejecting forward references",
 );
-check(tools.includes("row: z.number().int().min(0).max(47)") && await exists("docs/DIAGRAM_GUIDE.md"), "diagram row limit is too small for a long sequence, or the diagram guide is missing");
+check(
+  (await read("src/board/diagram/layout.ts")).includes("DIAGRAM_ROW_OUT_OF_RANGE")
+    && await exists("docs/DIAGRAM_GUIDE.md"),
+  "diagram row limit is too small for a long sequence, or the diagram guide is missing",
+);
 check(!http.includes('"/api/board/scene"') && !excalidrawApp.includes("loadScene()"), "a second persisted Excalidraw scene source remains");
 check(tools.includes('"scan_project"') && tools.includes("Use draw_board to visualize"), "scan_project is not a read-only board-context tool");
 check(boardTypes.includes("signedWidth") && boardTypes.includes("signedHeight"), "board types lost signed directed-arrow deltas");

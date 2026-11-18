@@ -42,6 +42,12 @@
 
 ### Fixed
 
+- A rejected write now names the field and the repair on every path a model actually hits. Bounds used to live in the MCP input schema, but the SDK validates that *before* the handler runs and answers with bare `MCP error -32602` prose — so a 1,300-character text or a 200-item batch gave the model nothing to correct, while a bad colour gave it a full `ERROR_JSON`. Bounds now live in `model/` and every rejection reaches one serialiser:
+  - `BATCH_TOO_LARGE` (over 100 items in one call, with the number of calls to split into)
+  - `LINE_WITHOUT_DIRECTION`, `STROKE_POINTS_INVALID`, `IMAGE_SOURCE_MISSING`
+  - `CONNECTOR_ON_NON_LINE`, `INVALID_VARIANT`, `INVALID_ROLE`, `INVALID_EMPHASIS`, `INVALID_LINE_SHAPE`, `INVALID_Z`
+  - `DIAGRAM_TOO_LARGE`, `INVALID_DIAGRAM_MODE`, `INVALID_NODE_ID`, `UNKNOWN_EDGE_NODE`, `DIAGRAM_ROW_OUT_OF_RANGE`, `DIAGRAM_COLUMN_OUT_OF_RANGE`, `DIAGRAM_ORIGIN_OUT_OF_RANGE`
+- `capabilities.limits` now publishes the bounds a model is checked against — objects per board and per call, shape size, coordinates, text and title length, stroke points, image size, line deltas, diagram node/edge/column/row ceilings, and `z`. The drawing guide restates the ones that shape a first attempt, so the cheapest repair is not needing one.
 - A write now returns only what the canvas reads. `draw_board` was handing back the full agent payload on every call — on a 26-object board, a 13.5 KB result for a single-note edit, of which the canvas used 6.7 KB. `applyRemoteSnapshot` reads exactly `id`, `revision`, `items`, and `library`, so `copyText`, `visualDigest`, `diagnosis`, `capabilities`, and `safety` were dead weight on every brush stroke. The result is 9.9 KB (−36%), and `get_board` still carries the complete agent contract.
 - Fixed every library action costing a second round trip. `libraryRequest` reads the returned snapshot to repaint the canvas, but the library branch returned only the agent payload, so that snapshot was always missing and the canvas silently fell back to `fetch("/api/board")`. Save, switch, create, rename, duplicate, delete, import, and export each paid for it. The branch now returns the same flat `boardWriteSnapshot` as a normal write, which also trims 3.2 KB down to 2.7 KB for an export.
 - `CHANGE_JSON` in the write reply is compact instead of two-space indented. It duplicates `structuredContent.change`, so it only needs to parse.

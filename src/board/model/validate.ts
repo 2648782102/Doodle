@@ -316,20 +316,90 @@ export function normalizeItem(input: BoardItemInput): Omit<BoardItem, "createdAt
     );
   }
   const author = input.author ?? "human";
-  if (input.type === "line" && signedWidth === 0 && signedHeight === 0) throw new Error("Line needs a direction");
-  if (input.type === "image" && !isImageSource(input.src)) throw new Error("Image source is required");
-  if (input.type === "line" && input.shape !== undefined && !isLineShape(input.shape)) throw new Error("Invalid line shape");
-  if (input.emphasis !== undefined && !isEmphasis(input.emphasis)) throw new Error("Invalid item emphasis");
+  if (input.type === "line" && signedWidth === 0 && signedHeight === 0) {
+    throw new BoardValidationError(
+      "Line needs a direction",
+      "LINE_WITHOUT_DIRECTION",
+      "items[].w",
+      "w or h non-zero",
+      `Give the arrow an endpoint: set w (and/or h) to the delta from its start. A horizontal arrow 160px long uses w: 160, h: 0.`,
+    );
+  }
+  if (input.type === "image" && !isImageSource(input.src)) {
+    throw new BoardValidationError(
+      "Image source is required",
+      "IMAGE_SOURCE_MISSING",
+      "items[].src",
+      "data:image/<png|jpeg|gif|webp|bmp|avif|svg+xml>;base64,...",
+      `Send the image bytes as a base64 data URL in src, with mime set to the same image type.`,
+    );
+  }
+  if (input.type === "line" && input.shape !== undefined && !isLineShape(input.shape)) {
+    throw new BoardValidationError(
+      "Invalid line shape",
+      "INVALID_LINE_SHAPE",
+      "items[].shape",
+      `"straight", "curve", or "orthogonal"`,
+      `Use "straight" for a direct arrow, "curve" for a bowed one, or "orthogonal" for right-angled routing.`,
+    );
+  }
+  if (input.emphasis !== undefined && !isEmphasis(input.emphasis)) {
+    throw new BoardValidationError(
+      "Invalid item emphasis",
+      "INVALID_EMPHASIS",
+      "items[].emphasis",
+      `"normal" or "focus"`,
+      `Use emphasis: "focus" to mark the one item the current exchange is about, or omit the field.`,
+    );
+  }
   const style = normalizeStyle(input.style);
   const scene = normalizeScene(input.scene);
-  if (input.variant !== undefined && !isVariant(input.variant)) throw new Error("Invalid item variant");
-  if (input.role !== undefined && !isRole(input.role)) throw new Error("Invalid item role");
-  if (input.z !== undefined && (!isFiniteNumber(input.z) || input.z < -1000 || input.z > 1000))
-    throw new Error("Invalid item z-order");
-  if ((input.startItemId || input.endItemId) && input.type !== "line") throw new Error("Only line items can bind connectors");
+  if (input.variant !== undefined && !isVariant(input.variant)) {
+    throw new BoardValidationError(
+      "Invalid item variant",
+      "INVALID_VARIANT",
+      "items[].variant",
+      VARIANTS.join(", "),
+      `Pick a variant from get_board capabilities.variants; "card" is the usual choice for a labelled box.`,
+    );
+  }
+  if (input.role !== undefined && !isRole(input.role)) {
+    throw new BoardValidationError(
+      "Invalid item role",
+      "INVALID_ROLE",
+      "items[].role",
+      ROLES.join(", "),
+      `Pick a role from get_board capabilities.roles; "step" is the usual choice in a flow.`,
+    );
+  }
+  if (input.z !== undefined && (!isFiniteNumber(input.z) || input.z < -1000 || input.z > 1000)) {
+    throw new BoardValidationError(
+      "Invalid item z-order",
+      "INVALID_Z",
+      "items[].z",
+      "a number between -1000 and 1000",
+      `Leave z out unless you need explicit stacking; frames and columns already render behind their contents.`,
+    );
+  }
+  if ((input.startItemId || input.endItemId) && input.type !== "line") {
+    throw new BoardValidationError(
+      "Only line items can bind connectors",
+      "CONNECTOR_ON_NON_LINE",
+      "items[].startItemId",
+      "a line item, or omit both connector fields",
+      `Draw the connector as its own type: "line" item with startItemId / endItemId. The arrow follows the bound shapes.`,
+    );
+  }
   if (input.type === "stroke") {
-    if (!Array.isArray(input.points) || input.points.length < 2 || input.points.length > MAX_STROKE_POINTS)
-      throw new Error("Stroke needs bounded points");
+    if (!Array.isArray(input.points) || input.points.length < 2 || input.points.length > MAX_STROKE_POINTS) {
+      throw new BoardValidationError(
+        "Stroke needs bounded points",
+        "STROKE_POINTS_INVALID",
+        "items[].points",
+        `an array of 2-${MAX_STROKE_POINTS} {x,y} points relative to the item bounds`,
+        `Send at least two local points, e.g. points: [{x:0,y:0},{x:40,y:20}]. For a straight arrow use type "line" instead.`,
+      );
+    }
   }
   const points = input.type === "stroke"
     ? (input.points ?? []).map((point) => ({
