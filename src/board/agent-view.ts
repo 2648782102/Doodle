@@ -9,8 +9,15 @@
 
 import type { BoardItem, SimpleBoard } from "./types.js";
 
-/** One item as the agent sees it: no canvas-fidelity payload, just a marker. */
-export type AgentBoardItem = Omit<BoardItem, "scene"> & {
+/**
+ * One item as the agent sees it: no canvas-fidelity payload, just a marker.
+ *
+ * Per-item timestamps are omitted as well. `agentFingerprint` already ignores
+ * them, so they never influenced change detection — they were 28% of the agent
+ * item payload (1,850 of 6,514 bytes on a 25-object board) that no reader used.
+ * Board-level `updatedAt` still tells the agent when anything last moved.
+ */
+export type AgentBoardItem = Omit<BoardItem, "scene" | "createdAt" | "updatedAt"> & {
   /** True when the persisted item carries Excalidraw fidelity the agent does not need. */
   canvasFidelity?: true;
 };
@@ -49,7 +56,7 @@ export interface AgentBoardDelta {
 
 /** Fields the agent must see to draw and to reason about a board. */
 function agentItem(item: BoardItem): AgentBoardItem {
-  const { scene, ...rest } = item;
+  const { scene, createdAt: _createdAt, updatedAt: _updatedAt, ...rest } = item;
   return scene ? { ...rest, canvasFidelity: true } : rest;
 }
 

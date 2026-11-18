@@ -292,6 +292,34 @@ describe("MCP board server", () => {
     });
   }, 30_000);
 
+  it("does not send the board twice on a graded view", async () => {
+    // The text copy is byte-identical to structuredContent, so `full` keeps it
+    // for text-only hosts. A graded view exists to cut tokens, and it was still
+    // shipping both channels in full: `detail` cost 24.5 KB on a 25-object
+    // board. Graded views now name their payload and leave the data to
+    // structuredContent, which every MCP client receives anyway.
+    await withClient(async (client) => {
+      await client.callTool({
+        name: "draw_board",
+        arguments: { author: "ai", items: [{ type: "note", x: 0, y: 0, w: 160, h: 90, text: "graded" }] },
+      });
+      const full = await client.callTool({ name: "get_board", arguments: {} });
+      const detail = await client.callTool({ name: "get_board", arguments: { view: "detail" } });
+      const detailText = textOf(detail);
+
+      // The agent payload is still delivered, just once.
+      expect(detail.structuredContent.items.some((item) => item.text === "graded")).toBe(true);
+      expect(detailText).toContain("BOARD_VIEW_DETAIL:");
+      expect(detailText).not.toContain("BOARD_JSON:");
+      expect(detailText).not.toContain('"items":[');
+      expect(Buffer.byteLength(detailText)).toBeLessThan(Buffer.byteLength(textOf(full)) / 2);
+
+      // `full` keeps the complete text copy, per the documented contract.
+      expect(textOf(full)).toContain("BOARD_JSON:");
+      expect(textOf(full)).toContain('"items":[');
+    });
+  }, 30_000);
+
   it("rejects a per-item author instead of relabelling it", async () => {
     // The write path stamps every item with the top-level author. Accepting a
     // per-item `author` and overriding it let a model mark a person's words as

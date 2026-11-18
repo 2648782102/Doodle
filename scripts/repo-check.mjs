@@ -250,6 +250,10 @@ check(tools.includes("CANVAS_UI_META") && tools.includes("_meta: CANVAS_UI_META"
 check(tools.includes("getAppHtml()") && tools.includes("PANEL_URL"), "Excalidraw MCP App resource is not plugin-safe and the panel URL is missing");
 check(tools.includes("FIRST_USE:") && tools.includes("NEXT_STEPS:") && tools.includes("NEXT:"), "get_board does not use progressive first-use and next-step guidance");
 check(
+  tools.includes('BOARD_VIEW_${view.toUpperCase()}') && tools.includes('["BOARD_JSON:", JSON.stringify(visiblePayload)]'),
+  "graded views send the board twice: only `full` may carry the full BOARD_JSON text copy",
+);
+check(
   tools.includes("structuredContent: { ...boardWriteSnapshot(board, libraryIndex), change: changeReport"),
   "draw_board no longer returns the authoritative canvas snapshot plus change report",
 );

@@ -37,7 +37,7 @@ server.registerTool(
       include_canvas_fidelity: z.boolean().optional()
         .describe("Return Excalidraw scene fidelity with each item. Use only to rebuild a canvas; it is large and not useful for reading or drawing."),
       view: z.enum(["summary", "structure", "detail", "full"]).optional()
-        .describe("Token level. `full` (default) is unchanged; `summary` returns digest/diagnosis only, `structure` adds ids/coordinates/roles without text blobs, `detail` is the normal agent payload without capabilities/guide."),
+        .describe("Token level. `full` (default) returns the complete board in both text and structuredContent. `summary` returns digest/diagnosis only, `structure` adds ids/coordinates/roles without text blobs, `detail` is the agent payload without capabilities/guide. Graded views put the data in structuredContent only and omit the duplicate BOARD_JSON text copy, so they cost roughly a third of `full`."),
     }),
     annotations: READ_ONLY_LOCAL_ANNOTATIONS,
   },
@@ -126,18 +126,23 @@ server.registerTool(
             "VISUAL_DIAGNOSIS:",
             JSON.stringify(visiblePayload.diagnosis, null, 2),
             "",
-            `${view && view !== "full" ? `BOARD_VIEW_${view.toUpperCase()}` : "BOARD_JSON"}:`,
             /*
-             * Compact JSON, not pretty-printed.
+             * `full` keeps a complete `BOARD_JSON` copy; graded views do not.
              *
-             * The board already ships in `structuredContent`; this text copy
-             * exists so a model reading only the text block still sees it. Two
-             * space-indented copies of the same object doubled the read cost
-             * for no gain: a 12-node board cost 40,938 bytes across both
-             * channels. Compact JSON keeps both channels readable and drops the
-             * indentation tax.
+             * The text copy is byte-identical to `structuredContent`, so on a
+             * `full` read it is 11 KB of the 32 KB response — real value for a
+             * model that only reads text, and a contract several docs pin. But
+             * `view` exists to cut tokens, and it was still shipping both
+             * channels in full: `detail` cost 24.5 KB. A graded view names its
+             * payload and lets the host read `structuredContent`, which every
+             * MCP client receives regardless.
              */
-            JSON.stringify(visiblePayload),
+            ...(view && view !== "full"
+              ? [
+                `BOARD_VIEW_${view.toUpperCase()}: 见 structuredContent（已省略重复的文本副本；需要完整 JSON 时用 view: "full"）。`,
+                `BOARD_VIEW_${view.toUpperCase()}_BYTES: ${JSON.stringify(visiblePayload).length}`,
+              ]
+              : ["BOARD_JSON:", JSON.stringify(visiblePayload)]),
             ``,
             /*
              * `view` has to cut the text block too, not only the payload.
