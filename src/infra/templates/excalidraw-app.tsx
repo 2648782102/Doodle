@@ -589,7 +589,16 @@ async function runLibraryAction(action: Record<string, unknown>) {
     request = { ...action, ...(name && ["save", "create", "rename", "duplicate"].includes(String(action.type)) ? { name } : {}) };
   }
   const result = await libraryRequest(request);
-  const board = (result.board as BoardSnapshot | undefined) ?? await loadBoard();
+  /*
+   * The server returns the active snapshot as flat fields (the same shape a
+   * normal write uses), not under a `board` key. Reading `result.board` first
+   * kept every library action on a fallback `/api/board` fetch because that key
+   * never existed. Prefer the flat snapshot and keep the key as a fallback for
+   * hosts that nest it.
+   */
+  const board = (result.board as BoardSnapshot | undefined)
+    ?? (Array.isArray(result.items) ? result as unknown as BoardSnapshot : undefined)
+    ?? await loadBoard();
   applyRemoteSnapshot(board);
   if (action.type === "export" || action.type === "get") {
     const exportBoard = (result.exportBoard as BoardSnapshot | undefined) ?? board;

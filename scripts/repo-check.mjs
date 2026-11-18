@@ -258,6 +258,11 @@ check(
   !tools.includes("structuredContent: { ...boardJson(board"),
   "draw_board is back to returning the full agent payload on every write; a write needs only id/revision/items/library",
 );
+check(
+  (tools.match(/boardWriteSnapshot\(active, result\.index\)/g) ?? []).length === 1
+    && excalidrawApp.includes("Array.isArray(result.items)"),
+  "the library branch no longer returns a flat snapshot the canvas can repaint from, so every library action falls back to an extra fetch",
+);
 check(tools.includes("since_revision") && tools.includes("boardAgentDelta") && tools.includes("BoardRevisionCache"), "incremental rereads or their revision cache are missing");
 check(tools.includes("include_canvas_fidelity") && excalidrawApp.includes("include_canvas_fidelity: true"), "the canvas cannot request the fidelity that agent reads omit");
 check(tools.includes("describeHandoff") && tools.includes("handoff") && tools.includes("needsAttention"), "delta reads do not attribute human edits");

@@ -590,6 +590,32 @@ describe("MCP board server", () => {
     });
   }, 30_000);
 
+  it("returns a repaintable snapshot from library actions, not only the agent payload", async () => {
+    // `libraryRequest` in the canvas reads the active snapshot to repaint
+    // without a second fetch. This branch used to return the agent payload
+    // only, so the canvas fell back to `/api/board` on every library action.
+    await withClient(async (client) => {
+      await client.callTool({
+        name: "draw_board",
+        arguments: { author: "ai", items: [{ type: "note", x: 0, y: 0, w: 160, h: 90, text: "lib snap" }] },
+      });
+
+      const listed = await client.callTool({ name: "draw_board", arguments: { library: { type: "list" } } });
+      const sc = listed.structuredContent;
+      expect(Array.isArray(sc.items)).toBe(true);
+      expect(typeof sc.revision).toBe("number");
+      expect(typeof sc.id).toBe("string");
+      expect(Array.isArray(sc.library.boards)).toBe(true);
+      expect(sc.capabilities).toBeUndefined();
+      expect(sc.copyText).toBeUndefined();
+
+      // Export still carries the requested board separately from the active one.
+      const exported = await client.callTool({ name: "draw_board", arguments: { library: { type: "export" } } });
+      expect(exported.structuredContent.exportBoard).toMatchObject({ version: 1 });
+      expect(exported.structuredContent.exportBoard.items.length).toBeGreaterThan(0);
+    });
+  }, 30_000);
+
   it("saves and switches editable board snapshots through draw_board library actions", async () => {
     await withClient(async (client) => {
       const initial = await client.callTool({

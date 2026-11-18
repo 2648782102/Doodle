@@ -10,7 +10,7 @@
 import type { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { z } from "zod";
 import { BOARD_WRITE_ANNOTATIONS, CANVAS_UI_META, type BoardToolContext } from "../context.js";
-import { boardAgentPayload, boardWriteSnapshot, errorResult, jsonLine } from "../presentation.js";
+import { boardWriteSnapshot, errorResult, jsonLine } from "../presentation.js";
 import { diagramInput, itemInput, layoutInput, libraryAction, updateInput } from "../schemas.js";
 import {
   boardLibraryIndexText,
@@ -149,7 +149,19 @@ server.registerTool(
             ].join("\n"),
           }],
           structuredContent: {
-            ...boardAgentPayload(active, result.index),
+            /*
+             * The canvas repaints from this flat snapshot; `libraryRequest`
+             * reads `result.board` first and falls back to it. That fallback is
+             * the fix for a real bug: this branch used to return only the agent
+             * payload, so `result.board` was always undefined and every library
+             * action paid for a second `/api/board` fetch.
+             *
+             * `active` is deliberately the *current* board, not the requested
+             * one: exporting or reading a different saved board must not switch
+             * what the person is looking at. The requested board travels in
+             * `exportBoard`, which the canvas uses for the download only.
+             */
+            ...boardWriteSnapshot(active, result.index),
             ...(library.type === "export" || library.type === "get" ? { exportBoard: result.board } : {}),
           },
         };
