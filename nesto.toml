@@ -1,0 +1,44 @@
+# Nesto: parallel coding sessions for Doodle.
+#
+# One shared board kernel, two delivery paths (MCP server and Codex plugin).
+# The manifest declares the module boundaries that already exist in the source
+# tree, so two sessions working on different layers do not collide.
+#
+# The state directory lives outside the repository and is set per shell or per
+# client with NESTO_STATE; never commit board state or ledger data here.
+
+version = 1
+
+[[repositories]]
+id = "runtime"
+path = "."
+base = "master"
+
+# Module leases mirror the architecture rules in AGENTS.md.
+# `model/` must not import transport layers, so it is its own write domain.
+[modules.runtime]
+model = ["src/board/model/**"]
+diagram = ["src/board/diagram/**"]
+layout = ["src/board/layout/**"]
+canvas = ["src/board/canvas/**"]
+"mcp-surface" = ["src/board/mcp/**"]
+http-surface = ["src/board/http/**", "src/board/http.ts"]
+library = ["src/board/library/**", "src/board/library.ts"]
+persistence = ["src/board/store.ts", "src/board/mutex.ts", "src/board/errors.ts"]
+chrome = [
+  "src/infra/templates/excalidraw.html",
+  "src/infra/templates/excalidraw-app.tsx",
+  "src/infra/templates/liquid-glass.ts",
+  "src/infra/templates/liquid-glass-maps.ts",
+]
+tooling = ["scripts/**", "plugins/**", ".agents/**", ".github/**"]
+docs = ["docs/**", "*.md"]
+tests = ["test/**", "examples/**"]
+
+[tests]
+runtime = "npm run test"
+
+# The full gate is slow and builds a submission ZIP, so it is opt-in rather
+# than the per-integration test command. Run it before proposing a change.
+[ci]
+runtime = "npm run check"
