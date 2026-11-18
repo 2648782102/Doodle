@@ -42,6 +42,8 @@
 
 ### Fixed
 
+- A write now returns only what the canvas reads. `draw_board` was handing back the full agent payload on every call — on a 26-object board, a 13.5 KB result for a single-note edit, of which the canvas used 6.7 KB. `applyRemoteSnapshot` reads exactly `id`, `revision`, `items`, and `library`, so `copyText`, `visualDigest`, `diagnosis`, `capabilities`, and `safety` were dead weight on every brush stroke. The result is 9.9 KB (−36%), and `get_board` still carries the complete agent contract.
+- `CHANGE_JSON` in the write reply is compact instead of two-space indented. It duplicates `structuredContent.change`, so it only needs to parse.
 - Five defects found by driving the MCP server as a model would, plus three token-cost fixes on the read path:
   - `draw_board.diagram` no longer crashes when `edges` is omitted. `edges` is optional in the schema, so a standalone card or a plain sequence reached the generator as `undefined` and surfaced as `Cannot read properties of undefined (reading 'length')` — a message that named no field. `expandRecipe` now normalises it to `[]`.
   - A timeline advanced only with `row` stacks on one axis. When no node declared a `column`, each row-only step took its own column, so six steps fanned out diagonally across 2030 units instead of forming a readable vertical column — the opposite of what `AGENTS.md` tells an agent to draw.

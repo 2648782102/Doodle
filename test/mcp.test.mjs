@@ -547,6 +547,49 @@ describe("MCP board server", () => {
     });
   }, 30_000);
 
+  it("returns only what the canvas needs from a write, not the whole agent payload", async () => {
+    // A write hands the board back so the embedded canvas can repaint without a
+    // second round trip. `applyRemoteSnapshot` reads exactly id, revision,
+    // items, and library; copyText, visualDigest, diagnosis, capabilities, and
+    // safety were dead weight on every brush stroke.
+    await withClient(async (client) => {
+      const result = await client.callTool({
+        name: "draw_board",
+        arguments: { author: "ai", items: [{ type: "note", x: 0, y: 0, w: 160, h: 90, text: "write cost" }] },
+      });
+      const sc = result.structuredContent;
+
+      // The canvas contract is intact.
+      expect(Array.isArray(sc.items)).toBe(true);
+      expect(typeof sc.revision).toBe("number");
+      expect(typeof sc.id).toBe("string");
+      expect(Array.isArray(sc.library.boards)).toBe(true);
+
+      // Agent-facing fields are gone from the write result.
+      expect(sc.capabilities).toBeUndefined();
+      expect(sc.copyText).toBeUndefined();
+      expect(sc.visualDigest).toBeUndefined();
+      expect(sc.diagnosis).toBeUndefined();
+      expect(sc.safety).toBeUndefined();
+
+      // The agent still gets them from get_board.
+      const read = await client.callTool({ name: "get_board", arguments: {} });
+      expect(read.structuredContent.capabilities).toBeDefined();
+      expect(read.structuredContent.visualDigest).toBeDefined();
+
+      // A canvas edit round-trips through replace_board without losing fields
+      // the person's own copy depends on.
+      const edited = sc.items.map((item) => item.text === "write cost" ? { ...item, text: "edited", x: 20 } : item);
+      const replaced = await client.callTool({
+        name: "draw_board",
+        arguments: { replace_board: { ...sc, items: edited, notes: [] }, expected_revision: sc.revision },
+      });
+      const saved = replaced.structuredContent.items.find((item) => item.text === "edited");
+      expect(saved?.createdAt).toBeTruthy();
+      expect(saved?.author).toBe("ai");
+    });
+  }, 30_000);
+
   it("saves and switches editable board snapshots through draw_board library actions", async () => {
     await withClient(async (client) => {
       const initial = await client.callTool({

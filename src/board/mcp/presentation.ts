@@ -116,6 +116,34 @@ export function boardRecipes(): string {
   ].join("\n");
 }
 
+/**
+ * The canvas-facing write result: only what `applyRemoteSnapshot` consumes.
+ *
+ * A write returns the board so the embedded canvas can repaint without a
+ * second round trip. `applyRemoteSnapshot` reads exactly four things — `id` to
+ * detect a board switch, `revision` to discard stale payloads, `items` to build
+ * the scene, and `library` for the drawer. Everything else in `boardJson`
+ * (`copyText`, `visualDigest`, `diagnosis`, `capabilities`, `safety`) is
+ * agent-facing and was pure overhead on every brush stroke: on a 26-object board
+ * the full result was 13.5 KB, of which the canvas used 6.7 KB.
+ *
+ * The agent still gets its full contract from `get_board`; this only trims what
+ * a write hands back.
+ */
+export function boardWriteSnapshot(board: SimpleBoard, library?: unknown) {
+  return {
+    version: 1,
+    readOnly: true,
+    id: board.id,
+    title: board.title,
+    revision: board.revision,
+    updatedAt: board.updatedAt,
+    itemCount: board.items.length,
+    items: board.items,
+    ...(library ? { library } : {}),
+  };
+}
+
 export function boardJson(board: SimpleBoard, library?: unknown) {
   return {
     version: 1,

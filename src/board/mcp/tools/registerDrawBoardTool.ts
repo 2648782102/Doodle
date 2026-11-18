@@ -10,7 +10,7 @@
 import type { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { z } from "zod";
 import { BOARD_WRITE_ANNOTATIONS, CANVAS_UI_META, type BoardToolContext } from "../context.js";
-import { boardAgentPayload, boardJson, errorResult, jsonLine } from "../presentation.js";
+import { boardAgentPayload, boardWriteSnapshot, errorResult, jsonLine } from "../presentation.js";
 import { diagramInput, itemInput, layoutInput, libraryAction, updateInput } from "../schemas.js";
 import {
   boardLibraryIndexText,
@@ -121,7 +121,7 @@ server.registerTool(
               changeReportText(changeReport(current, board)),
             ].join("\n"),
           }],
-          structuredContent: { ...boardJson(board, libraryIndex), change: changeReport(current, board) },
+          structuredContent: { ...boardWriteSnapshot(board, libraryIndex), change: changeReport(current, board) },
         };
       }
       if (library) {
@@ -202,7 +202,7 @@ server.registerTool(
             changeReportText(changeReport(initial, board)),
           ].join("\n"),
         }],
-          structuredContent: { ...boardJson(board, libraryIndex), change: changeReport(initial, board) },
+          structuredContent: { ...boardWriteSnapshot(board, libraryIndex), change: changeReport(initial, board) },
       };
     } catch (error) {
       return errorResult("draw_board", error);
