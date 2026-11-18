@@ -12,11 +12,13 @@ src/
 │   ├── model/                  Board v1, no I/O and no transport
 │   │   ├── types.ts            persisted shapes and tool inputs (types only)
 │   │   ├── limits.ts           bounded limits and enum members
+│   │   ├── size.ts             geometry bounds shared by writes and persisted state
 │   │   ├── validate.ts         parseBoard, normalizeItem, strict predicates
 │   │   ├── board.ts            construction and item-level mutation
 │   │   ├── digest.ts           deterministic visual summary for agents
 │   │   └── clock.ts            time and identity generation
 │   ├── diagram/
+│   │   ├── recipe.ts           expand high-level intent into nodes and edges
 │   │   ├── layout.ts           deterministic placement for flow/timeline/compare/matrix
 │   │   └── generate.ts         materialise a diagram into Board v1 items
 │   ├── layout/arrange.ts       arrange existing objects, including architecture layers

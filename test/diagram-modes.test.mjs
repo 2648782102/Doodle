@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { diagramToBoardItems, parseBoard, resolveDiagramLayout } from "../dist/board/types.js";
+import { expandRecipe } from "../dist/board/diagram/recipe.js";
 
 function diagram(overrides = {}) {
   return {
@@ -189,5 +190,29 @@ describe("diagram layout modes", () => {
       ],
     };
     expect(() => parseBoard(board)).not.toThrow();
+  });
+
+  it("treats omitted edges as an empty list instead of crashing", () => {
+    // `edges` is optional in the schema, so a node card or a plain sequence is
+    // legitimate. It used to reach the generator as `undefined` and surface as
+    // "Cannot read properties of undefined (reading 'length')", which named no
+    // field and gave the caller no way to recover.
+    expect(() => expandRecipe({ nodes: [{ id: "a", label: "A" }] })).not.toThrow();
+    const items = diagramToBoardItems(expandRecipe({ nodes: [{ id: "a", label: "A" }] }), "ai", []);
+    expect(items.some((item) => item.type === "rect" && item.role === "step")).toBe(true);
+  });
+
+  it("stacks a row-only timeline on one vertical axis", () => {
+    // AGENTS.md tells an agent to advance a timeline with `row`. With no node
+    // declaring a `column`, each row-only step used to take its own column, so
+    // eight steps fanned out into a 2030-wide diagonal band instead of a
+    // readable column.
+    const nodes = Array.from({ length: 6 }, (_, index) => ({ id: `n${index}`, label: `step ${index}`, row: index }));
+    const items = diagramToBoardItems(expandRecipe({ mode: "timeline", nodes, edges: [] }), "ai", []);
+    const steps = items.filter((item) => item.role === "step");
+
+    expect(steps).toHaveLength(6);
+    expect(new Set(steps.map((item) => item.x)).size).toBe(1);
+    expect(new Set(steps.map((item) => item.y)).size).toBe(6);
   });
 });

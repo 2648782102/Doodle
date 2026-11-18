@@ -20,7 +20,13 @@ export function expandRecipe(diagram: DiagramInput): ExpandedDiagramInput {
     if (!diagram.nodes || diagram.nodes.length === 0) {
       throw new Error("diagram requires nodes/edges or a recipe with steps");
     }
-    return diagram as ExpandedDiagramInput;
+    // `edges` is optional in the schema: a node card or a short label sequence
+    // is a legitimate diagram. Leaving it undefined reached `generate.ts` as
+    // `diagram.edges.some(...)` and surfaced as a bare
+    // "Cannot read properties of undefined (reading 'length')", which told the
+    // agent nothing about the fix. Normalise the field here so every downstream
+    // reader can rely on an array.
+    return { ...diagram, edges: diagram.edges ?? [] } as ExpandedDiagramInput;
   }
   const steps = (diagram.steps ?? []).map((step) => step.trim()).filter(Boolean);
   if (!steps.length) throw new Error(`recipe: ${diagram.recipe} requires at least one non-empty step`);
