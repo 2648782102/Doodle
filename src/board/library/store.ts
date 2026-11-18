@@ -10,6 +10,7 @@
 import fs from "node:fs/promises";
 import path from "node:path";
 import { AsyncMutex } from "../mutex.js";
+import { externalizeImages, hydrateImages } from "../image-store.js";
 import { touchBoard, type SimpleBoard } from "../types.js";
 import { makeId, now } from "../model/clock.js";
 import {
@@ -28,11 +29,13 @@ import {
 
 export class BoardLibrary {
   private readonly directory: string;
+  private readonly imagesDir: string;
   private readonly indexFile: string;
   private readonly mutex: AsyncMutex;
 
   constructor(outputDir: string) {
     this.directory = path.join(outputDir, ".doodle", "boards");
+    this.imagesDir = path.join(outputDir, ".doodle", "images");
     this.indexFile = path.join(this.directory, "index.json");
     this.mutex = new AsyncMutex(this.indexFile);
   }
@@ -51,11 +54,13 @@ export class BoardLibrary {
   }
 
   private async readBoard(id: string): Promise<SimpleBoard> {
-    return normalizeBoardSnapshot(JSON.parse(await fs.readFile(this.boardFile(id), "utf8")));
+    const raw = JSON.parse(await fs.readFile(this.boardFile(id), "utf8"));
+    return normalizeBoardSnapshot(await hydrateImages(raw, this.imagesDir));
   }
 
   private async writeBoard(board: SimpleBoard): Promise<void> {
-    await writeJsonAtomic(this.boardFile(board.id), normalizeBoardSnapshot(board));
+    const snapshot = normalizeBoardSnapshot(board);
+    await writeJsonAtomic(this.boardFile(board.id), await externalizeImages(snapshot, this.imagesDir));
   }
 
   private async writeIndex(index: BoardLibraryIndex): Promise<void> {

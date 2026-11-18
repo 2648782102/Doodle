@@ -4,6 +4,9 @@ import { BoardRevisionConflictError } from "./errors.js";
 import { AsyncMutex } from "./mutex.js";
 import { logger } from "../infra/logger.js";
 import { createEmptyBoard, parseBoard, touchBoard, type SimpleBoard } from "./types.js";
+import {
+  collectRefsFromBoards, externalizeImages, hydrateImages, imageRefsOf, pruneOrphanImages,
+} from "./image-store.js";
 
 /**
  * True when a write would erase every object from a board that had some.
@@ -28,11 +31,13 @@ export class BoardStore {
   private revision: number;
   private file: string;
   private legacyFile: string;
+  private readonly imagesDir: string;
   private readonly mutex: AsyncMutex;
 
   constructor(outputDir: string) {
     this.file = path.join(outputDir, ".doodle", "board.json");
     this.legacyFile = path.join(outputDir, ".ai-draw", "board.json");
+    this.imagesDir = path.join(outputDir, ".doodle", "images");
     this.mutex = new AsyncMutex(this.file);
     this.board = createEmptyBoard();
     this.revision = 0;
@@ -66,6 +71,12 @@ export class BoardStore {
         await this.persist(touchBoard(this.board));
       }
       await this.migrateLegacyState();
+      const referenced = new Set([
+        ...imageRefsOf(this.board),
+        ...await collectRefsFromBoards(path.join(path.dirname(this.file), "boards")),
+      ]);
+      const removed = await pruneOrphanImages(this.imagesDir, referenced);
+      if (removed > 0) logger.info(`Removed ${removed} orphaned image file(s).`);
     });
   }
 
@@ -121,7 +132,7 @@ export class BoardStore {
   }
 
   private async readState(): Promise<SimpleBoard> {
-    return parseBoard(JSON.parse(await this.readStateText()));
+    return parseBoard(await hydrateImages(JSON.parse(await this.readStateText()), this.imagesDir));
   }
 
   private async persistIfRevision(board: SimpleBoard, expectedRevision?: number): Promise<SimpleBoard> {
@@ -158,8 +169,9 @@ export class BoardStore {
   }
 
   private async persist(board: SimpleBoard): Promise<SimpleBoard> {
+    const stored = await externalizeImages(board, this.imagesDir);
     const temp = `${this.file}.tmp`;
-    const serialized = JSON.stringify(board, null, 2);
+    const serialized = JSON.stringify(stored, null, 2);
     await fs.writeFile(temp, serialized, "utf-8");
     await fs.rename(temp, this.file);
     this.assign(board);
