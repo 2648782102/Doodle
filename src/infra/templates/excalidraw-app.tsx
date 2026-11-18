@@ -247,6 +247,13 @@ function readTheme(): DoodleTheme {
 const EXCALIDRAW_THEME = "light" as const;
 
 function applyTheme(theme: DoodleTheme, animate = false): void {
+  /*
+   * Re-selecting the active appearance is a no-op. Without this guard a click
+   * on the pressed segment still dispatches doodle-theme-change, which rebuilds
+   * every pane's SVG refraction map and recolours the whole scene for no visual
+   * change. The first call has no dataset yet and must still apply the theme.
+   */
+  if (document.documentElement.dataset.doodleTheme === theme) return;
   if (animate) {
     /*
      * Only an explicit switch animates. The first paint applies the stored

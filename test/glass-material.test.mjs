@@ -520,4 +520,45 @@ describe("liquid glass material", () => {
     expect(body).toMatch(/%3Cpath d='M0 2 C/); // curved, not a straight rule
     expect(template).toMatch(/\.doodle-theme-option \{\s*position: relative/);
   });
+
+  it("does not rebuild the material when the active appearance is re-selected", () => {
+    /*
+     * Clicking the already-pressed theme used to dispatch doodle-theme-change,
+     * rebuilding every pane's SVG maps and recolouring the scene for no visual
+     * change. applyTheme now short-circuits when the dataset already matches;
+     * the very first call still applies because no dataset is set yet.
+     */
+    expect(appSource).toMatch(/if \(document\.documentElement\.dataset\.doodleTheme === theme\) return;/);
+  });
+
+  it("cuts paper corners slightly irregular and lifts cards off the desk", () => {
+    /*
+     * Paper panes get hand-rounded (non-uniform) radii — the one static doodle
+     * cue in the chrome — while glass keeps exact arcs. A fourth, wider shadow
+     * layer detaches the card from the page (claymorphism's depth signal).
+     */
+    expect(template).toMatch(/--paper-radius:\s*\d+px \d+px \d+px \d+px/);
+    expect(template).toMatch(/--paper-radius-lg:\s*\d+px \d+px \d+px \d+px/);
+    expect(template).toMatch(/:root\[data-doodle-material="paper"\] \.doodle-topbar[\s\S]{0,300}border-radius: var\(--paper-radius\)/);
+    expect(template).toMatch(/:root\[data-doodle-material="paper"\] \.doodle-library-panel \{\s*border-radius: var\(--paper-radius-lg\)/);
+    const shadows = [...template.matchAll(/--paper-shadow-card:([\s\S]*?);/g)].map((m) => m[1]);
+    expect(shadows.length).toBeGreaterThanOrEqual(2);
+    for (const shadow of shadows) {
+      expect((shadow.match(/0 /g) || []).length, "card shadow lost a depth layer").toBeGreaterThanOrEqual(4);
+    }
+  });
+
+  it("keeps pane radii in tokens instead of magic numbers", () => {
+    /*
+     * The base pane radii used to be 13 scattered `14px` / `18px` literals and
+     * an unused `--doodle-radius: 12px`. They now come from two tokens, so a
+     * geometry change is one edit and paper's irregular override stays a
+     * single high-specificity rule.
+     */
+    expect(template).toMatch(/--doodle-radius:\s*14px/);
+    expect(template).toMatch(/--doodle-radius-lg:\s*18px/);
+    expect(template).not.toMatch(/border-radius:\s*(14|18)px/);
+    expect(template).toContain("border-radius: var(--doodle-radius)");
+    expect(template).toContain("border-radius: var(--doodle-radius-lg)");
+  });
 });
