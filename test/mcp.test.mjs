@@ -198,6 +198,13 @@ describe("MCP board server", () => {
       const board = jsonAfter(text, "BOARD_JSON:");
       expect(board).toMatchObject({ version: 1, readOnly: true });
       expect(board.capabilities.objectTypes).toContain("stroke");
+      // Image export exists on the human canvas, so an agent must never read
+      // the capability list as "Doodle cannot produce a PNG/JPG/SVG".
+      expect(board.capabilities.libraryFormat).toBe("editable-json");
+      expect(board.capabilities.sharingExports).toEqual(["png", "jpg", "svg"]);
+      expect(board.capabilities.sharingExportOwner).toBe("human-canvas");
+      expect(board.capabilities.sharingExportHint).toContain("分享快照");
+      expect(text).toContain("图库 → 分享快照");
       expect(board.visualDigest).toMatchObject({ version: 1, itemCount: 0 });
       expect(Array.isArray(board.items)).toBe(true);
       expect(board.safety).toMatchObject({ projectWritesRequireHumanApproval: true });

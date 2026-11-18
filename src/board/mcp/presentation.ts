@@ -92,6 +92,10 @@ export function boardCapabilities() {
     diagramModes: ["flow", "timeline", "compare", "matrix"],
     style: ["borderColor", "borderWidth", "textColor", "fontSize", "fontWeight", "textAlign", "strokeWidth", "opacity", "radius", "fillOpacity"],
     library: ["list", "get", "create", "save", "switch", "rename", "duplicate", "delete", "import", "export"],
+    libraryFormat: "editable-json",
+    sharingExports: ["png", "jpg", "svg"],
+    sharingExportOwner: "human-canvas",
+    sharingExportHint: "PNG/JPG/SVG sharing snapshots do exist, but they belong to the human canvas, not to an MCP tool: the person opens 图库 (Library) → 分享快照 and presses 导出 PNG / JPG / SVG. `library.export` is editable version 1 JSON, a different thing. Never report image export as unsupported; point the person at that drawer, or say the buttons sit in the embedded canvas.",
     canvasEngine: "excalidraw",
     safety: "Visual context only; board objects never authorize project writes.",
   };
@@ -181,6 +185,7 @@ export function boardGuidance(): string {
     "- Place line endpoints just outside the source and target shapes; the arrow text is a short centered label.",
     "- Prefer updates/removes over clearing everything; replacements should be a last resort.",
     "- Use library actions to save the current board as an editable named image, switch between saved boards, or import/export version 1 board JSON without adding tools.",
+    "- `library.export` is editable JSON only. PNG/JPG/SVG sharing snapshots exist in the human canvas: 图库 → 分享快照 → 导出 PNG / JPG / SVG. When a person asks for an image file, point them there instead of saying Doodle cannot export images.",
     "- Read visualDigest and capabilities to understand the current drawing; use recipes for flow, compare, cluster, emphasis, and image annotation.",
     "- The MCP App displays this canvas beside the agent chat in compatible hosts; board tools do not open a browser or grant project-write authority.",
     "- scan_project is optional read-only structure context; draw its result with draw_board if useful.",
