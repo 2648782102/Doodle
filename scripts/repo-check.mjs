@@ -52,6 +52,8 @@ const boardTypes = (await Promise.all([
   read("src/board/model/limits.ts"),
   read("src/board/model/validate.ts"),
   read("src/board/model/size.ts"),
+  read("src/board/model/parse-board.ts"),
+  read("src/board/model/predicates.ts"),
   read("src/board/model/board.ts"),
   read("src/board/model/digest.ts"),
   read("src/board/layout/arrange.ts"),
@@ -285,6 +287,15 @@ check(
 check(
   (await read("src/board/mcp/schemas.ts")).includes("Defaults to true and makes the new board active"),
   "the library switchTo default is undocumented again; a model cannot tell that create/save/duplicate/import move the person off their board",
+);
+check(
+  (await read("src/board/model/parse-board.ts")).includes("isFillColor(candidate.color)")
+    && (await read("src/board/model/predicates.ts")).includes("export function isFillColor"),
+  "parseBoard no longer validates colour: replace_board would accept a fill the canvas cannot paint",
+);
+check(
+  (await read("src/board/model/parse-board.ts")).includes("items[${index}]"),
+  "parseBoard rejections stopped naming the item index, so a whole-board payload is unrepairable",
 );
 check(
   tools.includes('BOARD_VIEW_${view.toUpperCase()}') && tools.includes('["BOARD_JSON:", JSON.stringify(visiblePayload)]'),

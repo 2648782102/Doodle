@@ -237,6 +237,57 @@ describe("first-try repair contract", () => {
     });
   }, 30_000);
 
+  it("validates a replace_board payload with the same rules as a write", async () => {
+    // `replace_board` is how the canvas saves a human edit, so it takes a whole
+    // board object. `parseBoard` used to check only that `color` was a string:
+    // a payload with `color: "nope"` was persisted and the canvas then had no
+    // usable fill. Both paths now share the predicates in `model/predicates.ts`.
+    // Own state dir so the exact item count assertion below is meaningful.
+    const outputDir = path.join(tempDir, "replace-board");
+    const transport = new StdioClientTransport({
+      command: "node",
+      args: ["dist/index.js"],
+      env: {
+        ...process.env,
+        PREVIEW_PORT: String(await freePort()),
+        LOG_LEVEL: "error",
+        OUTPUT_DIR: outputDir,
+        DOODLE_WORKSPACE_ROOT: process.cwd(),
+      },
+    });
+    const client = new Client({ name: "doodle-replace", version: "1.0.0" });
+    try {
+      await client.connect(transport);
+      await client.callTool({
+        name: "draw_board",
+        arguments: { author: "ai", items: [{ type: "note", x: 0, y: 0, w: 160, h: 90, text: "original" }] },
+      });
+      const snapshot = (await client.callTool({ name: "get_board", arguments: {} })).structuredContent;
+      const withBadColour = {
+        ...snapshot,
+        notes: [],
+        items: [snapshot.items[0], { ...snapshot.items[0], id: "second", color: "nope" }],
+      };
+
+      const rejected = await client.callTool({
+        name: "draw_board",
+        arguments: { author: "ai", replace_board: withBadColour },
+      });
+      expect(rejected.isError).toBe(true);
+      expect(errorJsonOf(rejected)).toMatchObject({
+        code: "INVALID_COLOR",
+        path: "items[1].color",
+      });
+
+      // The board is untouched by the rejected replacement.
+      const after = (await client.callTool({ name: "get_board", arguments: {} })).structuredContent;
+      expect(after.itemCount).toBe(1);
+      expect(after.items[0].color).not.toBe("nope");
+    } finally {
+      await client.close();
+    }
+  }, 30_000);
+
   it("publishes the bounds a model is checked against", async () => {
     // Knowing a bound up front is cheaper than any repair: it turns a rejected
     // write into a correct one. The table must match what model/ enforces.
