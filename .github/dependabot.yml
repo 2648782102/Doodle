@@ -5,6 +5,14 @@ updates:
     schedule:
       interval: weekly
     open-pull-requests-limit: 5
+    ignore:
+      # @types/node must track the minimum supported runtime (engines: >=20),
+      # not the newest Node. Types ahead of the runtime let code compile
+      # against APIs that do not exist on Node 20; CI would only catch that
+      # when the affected path happens to be exercised. Raise this only
+      # together with engines and the CI matrix.
+      - dependency-name: "@types/node"
+        update-types: ["version-update:semver-major"]
   - package-ecosystem: github-actions
     directory: /
     schedule:
