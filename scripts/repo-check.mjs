@@ -148,9 +148,18 @@ check(excalidrawTemplate.includes('id="doodleWelcome"') && excalidrawApp.include
 check((await read("src/board/viewport-memory.ts")).includes("isViewportNearContent") && excalidrawApp.includes("readStoredViewport"), "the canvas no longer remembers a sane viewport per board");
 check(tools.includes("isSuspiciousEmptyWrite") || http.includes("isSuspiciousEmptyWrite"), "writes are not guarded against accidentally clearing a full board");
 check(
-  (http.match(/isSuspiciousEmptyWrite\(/g) ?? []).length >= 2 &&
-  http.includes("EmptyWriteRefusedError"),
-  "the empty-write guard only runs on the revision-checked path",
+  /*
+   * One guard, reached by every path. This used to require two call sites,
+   * which was checking for duplication rather than coverage: the real property
+   * is that every write builds its candidate through the same check. A single
+   * `candidateFor` helper is stronger than two copies, so assert the helper and
+   * that all three commit branches use it.
+   */
+  http.includes("EmptyWriteRefusedError") &&
+  http.includes("isSuspiciousEmptyWrite(current, candidate)") &&
+  (http.match(/candidateFor\(current\)/g) ?? []).length >= 2 &&
+  http.includes("mutate(candidateFor)"),
+  "a commit path no longer runs the empty-write guard: a stale client could erase a full board",
 );
 check(boardStore.includes("quarantineCorruptState"), "a corrupt board file still prevents startup");
 check(boardTypes.includes("COORDINATE_OUT_OF_RANGE") && !boardTypes.includes("maxWidth, input.w ?? 180") && !boardTypes.includes("Math.min(MAX_SHAPE_WIDTH, input.w ?? 180)"), "drawing input is silently clamped instead of rejected");
@@ -318,6 +327,27 @@ check(
   tools.includes("SIZE: ${payload.itemCount}") && tools.includes('view: "summary"'),
   "a large board no longer advertises the cheaper graded reads",
 );
+
+check(
+  // A delta read answers "what changed"; its diagnosis must be counts, not the
+  // per-object enumeration that made a 1-edit reply cost 6.1 KB.
+  tools.includes("compactDiagnosis(payload.diagnosis)"),
+  "a delta read carries the full per-object diagnosis again instead of counts",
+);
+
+check(
+  /*
+   * `summary` must not carry per-object arrays. It shipped `readingOrder` and
+   * `isolated` in full, so a status check grew linearly with the board — 13 KB
+   * at 60 objects — which defeats the only reason the view exists.
+   */
+  (await read("src/board/mcp/presentation.ts")).includes("export function compactDigest")
+    && (await read("src/board/mcp/presentation.ts")).includes("export function compactDiagnosis")
+    // Neither projection may pass the enumerations through.
+    && !/readingOrder:/.test(await read("src/board/mcp/presentation.ts"))
+    && !/isolated: diagnosis\.isolated,/.test(await read("src/board/mcp/presentation.ts")),
+  "a summary read enumerates every object again instead of reporting counts",
+);
 check(
   tools.includes("cached && cached.id === current.id ? cached : undefined"),
   "since_revision is compared across boards again: a library switch would be reported as every object added and removed",
@@ -342,6 +372,16 @@ check(
 check(
   tools.includes("CONFLICTING_ACTIONS") && tools.includes("primaryShapes.length === 1"),
   "draw_board accepts two whole-board actions again: the extra field is silently dropped and the reply claims success",
+);
+check(
+  /*
+   * A board-wide revision must not reject a write that touches nothing another
+   * writer moved. The HTTP surface answered that question from the start; the
+   * MCP path did not until `reportConflicts` was wired in, so two agents each
+   * adding a note failed each other with "reload and retry".
+   */
+  tools.includes("reportConflicts") && tools.includes("ObjectConflictError") && tools.includes("REVISION_NOT_CACHED"),
+  "a pinned MCP write is back to rejecting every stale revision instead of merging disjoint edits and naming an overlap",
 );
 check(
   tools.includes("registerShowBoardTool(server, ctx, state)") && tools.includes("GUIDE: capabilities and recipes are omitted on repeat shows"),

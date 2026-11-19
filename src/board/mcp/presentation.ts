@@ -46,6 +46,47 @@ export function jsonLine(payload: Record<string, string | number | boolean>): st
 }
 
 /** Reduce an agent payload to the requested token level. `full` is unchanged. */
+/**
+ * Counts, not enumerations.
+ *
+ * `summary` is a status check and so is a delta read: both answer "what is the
+ * state" rather than "list every object". The ids behind these numbers are a
+ * `structure` or `detail` read.
+ */
+export function compactDigest(value: unknown): unknown {
+  const digest = value as Record<string, unknown> | undefined;
+  if (!digest) return digest;
+  return {
+    version: digest.version,
+    itemCount: digest.itemCount,
+    groups: Array.isArray(digest.groups) ? digest.groups.length : digest.groups,
+    connections: Array.isArray(digest.connections) ? digest.connections.length : digest.connections,
+    focus: Array.isArray(digest.focus) ? digest.focus.length : digest.focus,
+    freehandCount: digest.freehandCount,
+    imageCount: digest.imageCount,
+    note: digest.note,
+  };
+}
+
+export function compactDiagnosis(value: unknown): unknown {
+  const diagnosis = value as Record<string, unknown> | undefined;
+  if (!diagnosis) return diagnosis;
+  return {
+    version: diagnosis.version,
+    itemCount: diagnosis.itemCount,
+    nodeCount: diagnosis.nodeCount,
+    lineCount: diagnosis.lineCount,
+    bounds: diagnosis.bounds,
+    focus: Array.isArray(diagnosis.focus) ? diagnosis.focus.length : diagnosis.focus,
+    isolated: Array.isArray(diagnosis.isolated) ? diagnosis.isolated.length : diagnosis.isolated,
+    overlapping: Array.isArray(diagnosis.overlapping) ? diagnosis.overlapping.length : diagnosis.overlapping,
+    unresolved: Array.isArray(diagnosis.unresolved) ? diagnosis.unresolved.length : diagnosis.unresolved,
+    freeSpace: diagnosis.freeSpace,
+    occupancyCount: diagnosis.occupancyCount,
+    note: diagnosis.note,
+  };
+}
+
 export function viewPayload(payload: Record<string, any>, view?: "summary" | "structure" | "detail" | "full"): Record<string, unknown> {
   if (!view || view === "full") return payload;
   const base = {
@@ -57,7 +98,21 @@ export function viewPayload(payload: Record<string, any>, view?: "summary" | "st
     itemCount: payload.itemCount,
   };
   if (view === "summary") {
-    return { ...base, summary: payload.summary, visualDigest: payload.visualDigest, diagnosis: payload.diagnosis };
+    /*
+     * `summary` is a status check, so it must not carry per-object arrays.
+     *
+     * It returned the full `visualDigest.readingOrder` and
+     * `diagnosis.isolated`, both of which enumerate every object: 13 KB on a
+     * 60-object board, growing linearly, for a view whose whole purpose is to
+     * be cheap. The counts and the verdict are what a status check needs;
+     * `structure` and `detail` still carry the enumerations.
+     */
+    return {
+      ...base,
+      summary: payload.summary,
+      visualDigest: compactDigest(payload.visualDigest),
+      diagnosis: compactDiagnosis(payload.diagnosis),
+    };
   }
   if (view === "structure") {
     return {

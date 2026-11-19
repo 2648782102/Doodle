@@ -292,6 +292,83 @@ describe("MCP board server", () => {
     });
   }, 30_000);
 
+  it("keeps a delta read's diagnosis flat too", async () => {
+    // A delta answers "what changed", so the full per-object diagnosis is the
+    // wrong shape: it enumerated every object and cost 1.4 KB at 80 objects on
+    // a reply whose changed-objects array was 135 B.
+    await withClientIn(path.join(tempDir, "delta-flat"), async (client) => {
+      await client.callTool({
+        name: "draw_board",
+        arguments: {
+          author: "ai",
+          items: Array.from({ length: 80 }, (_, index) => ({
+            type: "note", x: (index % 20) * 30, y: Math.floor(index / 20) * 30, w: 24, h: 24, text: `n${index}`,
+          })),
+        },
+      });
+      const seen = (await client.callTool({ name: "get_board", arguments: { include_guide: false } })).structuredContent;
+      const id = seen.items[0].id;
+      await client.callTool({
+        name: "draw_board",
+        arguments: { author: "human", updates: [{ id, patch: { text: "human edit" } }] },
+      });
+
+      const delta = await client.callTool({ name: "get_board", arguments: { since_revision: seen.revision } });
+      const sc = delta.structuredContent;
+
+      expect(sc.mode).toBe("delta");
+      expect(sc.updated).toHaveLength(1);
+      // Counts, not the enumeration.
+      expect(typeof sc.diagnosis.isolated).toBe("number");
+      expect(typeof sc.diagnosis.overlapping).toBe("number");
+      expect(sc.diagnosis.itemCount).toBe(80);
+    });
+  }, 60_000);
+
+  it("keeps a summary read flat as the board grows", async () => {
+    // `summary` is a status check. It used to carry the full
+    // `visualDigest.readingOrder` and `diagnosis.isolated`, both of which
+    // enumerate every object: 13 KB at 60 objects, growing linearly, for a view
+    // whose only purpose is to be cheap.
+    await withClientIn(path.join(tempDir, "summary-flat"), async (client) => {
+      const fill = async (count) => {
+        await client.callTool({
+          name: "draw_board",
+          arguments: {
+            author: "ai",
+            items: Array.from({ length: count }, (_, index) => ({
+              type: "note",
+              x: (index % 20) * 30,
+              y: Math.floor(index / 20) * 30,
+              w: 24,
+              h: 24,
+              text: `n${index}`,
+            })),
+          },
+        });
+      };
+      const sizeOf = async () => {
+        const result = await client.callTool({ name: "get_board", arguments: { view: "summary" } });
+        return { sc: result.structuredContent, bytes: Buffer.byteLength(JSON.stringify(result)) };
+      };
+
+      await fill(10);
+      const small = await sizeOf();
+      await fill(60);
+      const large = await sizeOf();
+
+      // The whole point: 6x the objects must not mean 6x the payload.
+      expect(large.bytes).toBeLessThan(small.bytes * 1.6);
+
+      // Counts survive; the per-object enumerations do not.
+      expect(large.sc.diagnosis.itemCount).toBe(70);
+      expect(typeof large.sc.diagnosis.isolated).toBe("number");
+      expect(typeof large.sc.visualDigest.readingOrder).toBe("undefined");
+      expect(typeof large.sc.visualDigest.connections).toBe("number");
+      expect(Array.isArray(large.sc.items)).toBe(false);
+    });
+  }, 60_000);
+
   it("does not send the board twice on a graded view", async () => {
     // The text copy is byte-identical to structuredContent, so `full` keeps it
     // for text-only hosts. A graded view exists to cut tokens, and it was still
@@ -561,7 +638,8 @@ describe("MCP board server", () => {
         name: "draw_board",
         arguments: { expected_revision: before.revision, items: [{ type: "text", x: 500, y: 0, text: "stale" }] },
       });
-      expect(stale.isError).toBe(true);
+      // Adds an object nobody else touched, so it merges rather than failing.
+      expect(stale.isError).toBeFalsy();
       const after = jsonAfter(textOf(await client.callTool({ name: "get_board", arguments: {} })), "BOARD_JSON:");
       expect(after.items.filter((item) => item.text === "AI revised")).toHaveLength(1);
       expect(after.items.some((item) => item.text === "共享画布")).toBe(true);
@@ -669,10 +747,12 @@ describe("MCP board server", () => {
     }
   }, 60_000);
 
-  it("still rejects a stale write that pins a revision", async () => {
-    // The optimistic check stays strict: `expected_revision` is a claim about
-    // what the caller last saw, and rebasing it onto a newer board would
-    // overwrite whatever the other writer did.
+  it("merges a stale pinned write when it touches nothing that moved", async () => {
+    // A pinned revision is board-wide, so the optimistic check alone rejected
+    // two writers editing different objects. The HTTP surface already answered
+    // the only question that matters — does this request overlap anything that
+    // changed? — and merged when it did not. The MCP path now does the same,
+    // and nothing is overwritten: this stale write only adds a new note.
     const outputDir = path.join(tempDir, "stale-pin");
     await withClientIn(outputDir, async (client) => {
       const seen = (await client.callTool({ name: "get_board", arguments: {} })).structuredContent;
@@ -689,10 +769,86 @@ describe("MCP board server", () => {
         },
       });
 
-      expect(stale.isError).toBe(true);
+      expect(stale.isError).toBeFalsy();
       const board = (await client.callTool({ name: "get_board", arguments: {} })).structuredContent;
       expect(board.items.some((item) => item.text === "human edit")).toBe(true);
-      expect(board.items.some((item) => item.text === "stale ai")).toBe(false);
+      expect(board.items.some((item) => item.text === "stale ai")).toBe(true);
+    });
+  });
+
+  it("tells the caller when a pinned write was merged", async () => {
+    // The write landed on a newer revision than the one it pinned. Nothing it
+    // touched was overwritten, but hiding that the base moved would leave the
+    // model reasoning about a board state it never saw.
+    const outputDir = path.join(tempDir, "merged-notice");
+    await withClientIn(outputDir, async (client) => {
+      const seen = (await client.callTool({
+        name: "draw_board",
+        arguments: { author: "ai", items: [{ type: "note", x: 0, y: 0, w: 160, h: 90, text: "base" }] },
+      })).structuredContent;
+      await client.callTool({
+        name: "draw_board",
+        arguments: { author: "human", items: [{ type: "note", x: 300, y: 0, w: 160, h: 90, text: "human" }] },
+      });
+      const merged = await client.callTool({
+        name: "draw_board",
+        arguments: {
+          expected_revision: seen.revision,
+          author: "ai",
+          items: [{ type: "note", x: 0, y: 300, w: 160, h: 90, text: "ai" }],
+        },
+      });
+
+      expect(merged.isError).toBeFalsy();
+      expect(merged.structuredContent.mergedFrom).toBe(seen.revision);
+      expect(textOf(merged)).toContain("MERGED:");
+
+      // A write that did not need merging must not claim it did.
+      const plain = await client.callTool({
+        name: "draw_board",
+        arguments: { author: "ai", items: [{ type: "note", x: 600, y: 0, w: 160, h: 90, text: "plain" }] },
+      });
+      expect(plain.structuredContent.mergedFrom).toBeUndefined();
+    });
+  }, 30_000);
+
+  it("refuses a stale pinned write that overlaps an object someone else moved", async () => {
+    // The merge is object-level, not a licence to overwrite. When the request
+    // changes an object that moved since the caller's revision, it refuses —
+    // and names the ids, so the caller can re-apply just those.
+    const outputDir = path.join(tempDir, "stale-overlap");
+    await withClientIn(outputDir, async (client) => {
+      const created = await client.callTool({
+        name: "draw_board",
+        arguments: { author: "ai", items: [{ type: "note", x: 0, y: 0, w: 160, h: 90, text: "shared" }] },
+      });
+      const seen = created.structuredContent;
+      const id = seen.items[0].id;
+
+      // Someone else edits the same object.
+      await client.callTool({
+        name: "draw_board",
+        arguments: { author: "human", updates: [{ id, patch: { text: "human took it" } }] },
+      });
+
+      const stale = await client.callTool({
+        name: "draw_board",
+        arguments: {
+          expected_revision: seen.revision,
+          author: "ai",
+          updates: [{ id, patch: { text: "stale ai" } }],
+        },
+      });
+
+      expect(stale.isError).toBe(true);
+      const staleText = textOf(stale);
+      expect(staleText).toContain("REVISION_CONFLICT_OBJECTS");
+      expect(jsonAfter(staleText, "ERROR_JSON:")).toMatchObject({ code: "REVISION_CONFLICT_OBJECTS" });
+      expect(staleText).toContain(id);
+
+      // The other writer's value survives.
+      const board = (await client.callTool({ name: "get_board", arguments: {} })).structuredContent;
+      expect(board.items.find((item) => item.id === id)?.text).toBe("human took it");
     });
   }, 30_000);
 
