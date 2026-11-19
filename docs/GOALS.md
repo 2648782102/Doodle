@@ -14,6 +14,7 @@
 | 6 | 画板上下文经济 | 已交付 2026-11-15 |
 | 7 | 纸面与玻璃外观 | 已交付 |
 | 8 | 一个会去用的画板 | 进行中 |
+| 9 | 让每次被拒绝的写入都可修复 | 已交付 |
 
 ---
 
@@ -308,6 +309,56 @@ clone → npm install → npm run build → 起预览或 MCP 宿主
 字段级增量回答"什么变了"，但回答不了"人想干什么"，agent 只好猜。`HANDOFF` 增加 `HANDOFF_READINGS`：每条人类改动一行，归类为改标签、移动、缩放、改样式、新增、删除，各带一条有界建议；`NEXT` 以最显著的那条开头。
 
 端到端验证：把便签从「开始」改成「从需求评审开始」，输出 `把「开始」改成了「从需求评审开始」，这是含义上的修正`，并建议同步周边标签。
+
+---
+
+## 9. 让每次被拒绝的写入都可修复
+
+### 目标
+
+Doodle 的价值在于 AI 不用人纠语法就能在画板上表达意图。**每一次被拒绝、而模型又无法从返回里自行修好的调用，都是一次由人买单的往返。** 这个目标是：首次写入就成功；失败时错误本身能教模型怎么改。
+
+```json
+{ "code": "...", "message": "...", "path": "items[2].w", "expected": "...", "fix": "..." }
+```
+
+### 起始证据
+
+把 server 当作什么都不懂的新模型来驱动，暴露了两类不同的失败：
+
+1. **schema 层的拒绝完全绕过 `ERROR_JSON`。** 违反 Zod schema 的调用——文本超 1200 字符、超过 100 个 item、未知 `author`——返回裸 `MCP error -32602: Input validation error`，没有 code、没有路径、没有修法。而 `AGENTS.md` 承诺每个被拒绝的写入都带 `ERROR_JSON`，契约与实际行为在新模型最先撞上的那条路径上正好不一致。
+2. **多数领域拒绝是散文。** 79 处 `throw new Error(...)` 对 8 处 `BoardValidationError`。"Stroke needs bounded points" 说了问题，但没说哪个字段、怎么改。
+
+### 验收
+
+- 每次被拒绝的写入都返回可机器修复的结构：`code` / `message` / `path` / `expected` / `fix`。
+- 一套 first-try 套件对每种真实会发生的错误断言：返回里点明了字段，也给出了修法，并且**按 `fix` 改完确实能成功**。
+- 边界值（长度、数量、坐标、尺寸、枚举）必须在 `model/` 里判，并带 `ERROR_JSON`；不能留在 schema 层。
+- 守卫在出现"新的 schema 级拒绝却没有修复路径"时让 CI 失败。
+
+**一个例外是契约的一部分，不是缺口**：**JSON 类型本身错**（`text: 42`、`x: "abc"`）由 MCP SDK 在任何 handler 之前拒绝，无法再序列化，返回的是 SDK 消息——而它已经点明了字段与期望类型（`expected string, received number at items[0].text`）。这在不看源码的前提下就是可修复的，所以保持原样，不去在 model 层复制整套 schema。**边界值不同**：它事先可知，所以必须在 `model/` 里，且必带 `ERROR_JSON`。
+
+### 计划
+
+1. schema 层的拒绝也走与领域拒绝相同的契约。
+2. 按命中频率把写入路径里的裸 throw 改成 `BoardValidationError`：先 item 字段，再 stroke points、连接绑定、diagram 输入。
+3. 画图引导文本直接告诉模型它会被哪些边界检查。
+4. 用 first-try 套件冻结契约，守卫兜住回退。
+
+### 交付结果
+
+17 项修复，分四类：
+
+- **错误契约（MCP）**：边界从 Zod 搬进 `model/`，schema 只描述形状；79 处裸 throw 结构化；`replace_board` 不再接受 `color: "nope"`；整板拒绝带 `items[N].<field>`；`title` / `groupId` 超长改为拒绝并报实际长度；`BOARD_ITEM_LIMIT`、`DIAGRAM_EMPTY`、`SCAN_RANGE_OUT_OF_RANGE`、`INVALID_SINCE_REVISION`、`INVALID_VIEW`、`BOARD_NOT_FOUND`、`UNKNOWN_LIBRARY_ACTION` 都带数量、上限与出路。
+- **错误契约（HTTP，人侧画布）**：校验错误曾被误判成 errno 返回 **500**，现在先判类型再返回 400 + 完整结构；library 路由原本**没有任何错误处理**、全返回 500，现在与写入路径对齐为 400/409/503/500。
+- **正确性**：无 `expected_revision` 的并发写入不再互相失败（`store.mutate` 锁内重读，两个都落地）；批量 `updates` / `remove_ids` 含未知 id 从"静默跳过却报成功"改为整批原子拒绝；`layout` 未知 id 不再排列整张板；切板后差量不再报"全增全删"；`replace_board` / `library` 与 `items` 同传不再静默丢弃。
+- **成本与可发现性**：48 步流程图从 14,740px 高降到 938px；`show_board` 不再每次重发 guide（7.8 KB → 4.3 KB）；超过 80 对象时主动报告更便宜的读法。
+
+**实测**：20 个真实会发生的错误，带字段路径 + 修复建议的从 **10 → 19**；剩下 1 个是 JSON 类型错，由 SDK 拦截且消息本身可修。测试 239 个，守卫 232 条（本轮新增 20 条）。
+
+### 不在范围
+
+不加新工具、不改画板状态、不改 UI、不改任何**合法**输入的结果。这个目标只改变"被拒绝的写入如何被报告"。
 
 ---
 
