@@ -1,5 +1,6 @@
 import fs from "node:fs/promises";
 import path from "node:path";
+import { BoardValidationError } from "./errors.js";
 
 const DEFAULT_MAX_FILES = 80;
 const DEFAULT_MAX_DEPTH = 3;
@@ -52,9 +53,33 @@ export interface ProjectScanOptions {
   includeEvidence?: boolean;
 }
 
-function boundedInteger(value: unknown, fallback: number, minimum: number, maximum: number): number {
-  if (typeof value !== "number" || !Number.isFinite(value)) return fallback;
-  return Math.max(minimum, Math.min(maximum, Math.floor(value)));
+/**
+ * A default is for an omitted value; an explicit out-of-range one is refused.
+ *
+ * This clamped with `Math.max(min, Math.min(max, ...))`, so `max_depth: 99`
+ * silently became 6 and `max_files: 0` silently became 1 — the scan then
+ * reported a result the caller never asked for. The same rule as every other
+ * bound in this codebase: fill defaults, reject nonsense.
+ */
+function boundedInteger(
+  value: unknown,
+  fallback: number,
+  minimum: number,
+  maximum: number,
+  field: string,
+): number {
+  if (value === undefined) return fallback;
+  if (typeof value !== "number" || !Number.isFinite(value) || !Number.isInteger(value)
+    || value < minimum || value > maximum) {
+    throw new BoardValidationError(
+      `${field} is ${JSON.stringify(value)}; the range is ${minimum}-${maximum}`,
+      "SCAN_RANGE_OUT_OF_RANGE",
+      field,
+      `an integer between ${minimum} and ${maximum}`,
+      `Leave it out to use the default, or pick a value inside the range.`,
+    );
+  }
+  return value;
 }
 
 function relativePath(root: string, absolute: string): string {
@@ -101,8 +126,8 @@ async function collectEvidence(root: string, absolute: string): Promise<ProjectE
 
 export async function scanProject(root: string, options: ProjectScanOptions = {}): Promise<ProjectSnapshot> {
   const workspaceRoot = path.resolve(root);
-  const maxDepth = boundedInteger(options.maxDepth, DEFAULT_MAX_DEPTH, 1, 6);
-  const maxFiles = boundedInteger(options.maxFiles, DEFAULT_MAX_FILES, 1, 400);
+  const maxDepth = boundedInteger(options.maxDepth, DEFAULT_MAX_DEPTH, 1, 6, "max_depth");
+  const maxFiles = boundedInteger(options.maxFiles, DEFAULT_MAX_FILES, 1, 400, "max_files");
   const includeEvidence = options.includeEvidence !== false;
   const files: ProjectFile[] = [];
   const directories: string[] = [];

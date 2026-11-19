@@ -7,11 +7,57 @@
  * hand-drawn structure can be tidied without redrawing it.
  */
 
-import { LAYOUT_MODES, MAX_LINE_DELTA_X, MAX_LINE_DELTA_Y } from "../model/limits.js";
+import { LAYOUT_MODES, MAX_COORDINATE, MAX_LINE_DELTA_X, MAX_LINE_DELTA_Y } from "../model/limits.js";
 import type {
   BoardAuthor, BoardItem, BoardItemPatch, BoardLayoutInput, BoardPoint, SimpleBoard,
 } from "../model/types.js";
 import { updateBoardItems } from "../model/board.js";
+import { BoardValidationError } from "../errors.js";
+
+/** Both layout paths share these, but each mode has its own readable range. */
+function assertLayoutBounds(
+  layout: BoardLayoutInput,
+  bounds: { columns: [number, number]; gap: [number, number] },
+): void {
+  const [minColumns, maxColumns] = bounds.columns;
+  if (layout.columns !== undefined
+    && (!Number.isInteger(layout.columns) || layout.columns < minColumns || layout.columns > maxColumns)) {
+    throw new BoardValidationError(
+      `layout.columns is ${layout.columns}; the range for this mode is ${minColumns}-${maxColumns}`,
+      "LAYOUT_COLUMNS_OUT_OF_RANGE",
+      "layout.columns",
+      `an integer between ${minColumns} and ${maxColumns}`,
+      `Leave the field out to use the mode's default, or pick a value inside the range.`,
+    );
+  }
+  const [minGap, maxGap] = bounds.gap;
+  if (layout.gap !== undefined && (!Number.isInteger(layout.gap) || layout.gap < minGap || layout.gap > maxGap)) {
+    throw new BoardValidationError(
+      `layout.gap is ${layout.gap}; the range for this mode is ${minGap}-${maxGap}`,
+      "LAYOUT_GAP_OUT_OF_RANGE",
+      "layout.gap",
+      `an integer between ${minGap} and ${maxGap}`,
+      `Leave the field out to use the mode's default spacing.`,
+    );
+  }
+  /*
+   * `origin` had no bound, so an extreme value landed objects outside the
+   * canvas and the rejection came from `parseBoard` as an internal item error
+   * — which named a coordinate the caller never typed.
+   */
+  if (layout.origin !== undefined) {
+    const { x, y } = layout.origin;
+    if (!Number.isFinite(x) || !Number.isFinite(y) || Math.abs(x) > MAX_COORDINATE || Math.abs(y) > MAX_COORDINATE) {
+      throw new BoardValidationError(
+        `layout.origin is (${x}, ${y}); coordinates must be within ±${MAX_COORDINATE}`,
+        "LAYOUT_ORIGIN_OUT_OF_RANGE",
+        "layout.origin",
+        `x and y between -${MAX_COORDINATE} and ${MAX_COORDINATE}`,
+        `Omit origin to arrange in place, or pick a point near the existing content.`,
+      );
+    }
+  }
+}
 
 export function layoutBoardItems(
   board: SimpleBoard,
@@ -19,14 +65,46 @@ export function layoutBoardItems(
   author: BoardAuthor = "human",
 ): SimpleBoard {
   if (layout.mode === "architecture") return layoutArchitectureBoard(board, layout, author);
+  /*
+   * A layout names objects, so every name has to exist.
+   *
+   * An unknown id used to leave an empty selection, which the filter read as
+   * "no filter" and arranged the *whole* board instead of the requested subset
+   * — a tidy-up that moved everything. The two numeric bounds were likewise
+   * silently corrected: `columns: 0` became 1 and stacked every object on one
+   * spot, and `gap: 500` was quietly reduced to 200. Bounds are rejected, not
+   * repaired, everywhere else on the write path.
+   */
+  const knownIds = new Set(board.items.map((item) => item.id));
+  for (const [index, id] of (layout.ids ?? []).entries()) {
+    if (!knownIds.has(id)) {
+      throw new BoardValidationError(
+        `layout.ids[${index}] names ${JSON.stringify(id)}, which is not on this board`,
+        "ITEM_NOT_FOUND",
+        `layout.ids[${index}]`,
+        "an id that exists on this board",
+        `Re-read the board with get_board and list the ids you want arranged. Nothing was moved.`,
+      );
+    }
+  }
+  assertLayoutBounds(layout, { columns: [1, 12], gap: [8, 200] });
+  if (layout.mode !== undefined && !LAYOUT_MODES.includes(layout.mode)) {
+    throw new BoardValidationError(
+      `Layout mode ${JSON.stringify(layout.mode)} is not one of ${LAYOUT_MODES.join(", ")}`,
+      "INVALID_LAYOUT_MODE",
+      "layout.mode",
+      LAYOUT_MODES.join(", "),
+      `Pick a mode from the list; "grid" is the default when the field is omitted.`,
+    );
+  }
   const selected = new Set(layout.ids ?? []);
   const candidates = board.items.filter((item) =>
     item.type !== "line" && (!selected.size || selected.has(item.id)));
   if (candidates.length < 2) return board;
   const sorted = [...candidates].sort((left, right) => left.y - right.y || left.x - right.x);
-  const mode = layout.mode && LAYOUT_MODES.includes(layout.mode) ? layout.mode : "grid";
-  const columns = Math.max(1, Math.min(12, Math.floor(layout.columns ?? (mode === "timeline" ? sorted.length : 3))));
-  const gap = Math.max(8, Math.min(200, layout.gap ?? 24));
+  const mode = layout.mode ?? "grid";
+  const columns = layout.columns ?? (mode === "timeline" ? sorted.length : 3);
+  const gap = layout.gap ?? 24;
   const origin = layout.origin ?? {
     x: Math.min(...sorted.map((item) => item.x)),
     y: Math.min(...sorted.map((item) => item.y)),
@@ -54,6 +132,24 @@ function layoutArchitectureBoard(
   layout: BoardLayoutInput,
   author: BoardAuthor,
 ): SimpleBoard {
+  /*
+   * `architecture` has its own tighter bounds: it derives dependency layers, so
+   * more than six columns stops being readable and the gap is tuned for
+   * layer separation rather than a generic grid.
+   */
+  assertLayoutBounds(layout, { columns: [2, 6], gap: [24, 120] });
+  const knownIds = new Set(board.items.map((item) => item.id));
+  for (const [index, id] of (layout.ids ?? []).entries()) {
+    if (!knownIds.has(id)) {
+      throw new BoardValidationError(
+        `layout.ids[${index}] names ${JSON.stringify(id)}, which is not on this board`,
+        "ITEM_NOT_FOUND",
+        `layout.ids[${index}]`,
+        "an id that exists on this board",
+        `Re-read the board with get_board and list the ids you want reflowed. Nothing was moved.`,
+      );
+    }
+  }
   const selected = new Set(layout.ids ?? []);
   const nodes = board.items.filter((item) =>
     item.type !== "line" && item.type !== "stroke" && item.type !== "image"
@@ -61,8 +157,8 @@ function layoutArchitectureBoard(
   const connections = board.items.filter((item) => item.type === "line");
   if (!nodes.length) return board;
   const origin = layout.origin ?? { x: 40, y: 120 };
-  const gap = Math.max(24, Math.min(120, layout.gap ?? 48));
-  const columns = Math.max(2, Math.min(6, Math.floor(layout.columns ?? 4)));
+  const gap = layout.gap ?? 48;
+  const columns = layout.columns ?? 4;
   const maxWidth = Math.max(...nodes.map((item) => item.w), 160);
   const maxHeight = Math.max(...nodes.map((item) => item.h), 80);
   const byId = new Map(nodes.map((item) => [item.id, item]));

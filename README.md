@@ -2,181 +2,101 @@
 
 > 一张本地优先的双向画板：人和 AI 都能在上面画图表达意思，并读取对方留下的视觉上下文。
 
-## 产品定义
-
-Doodle 只有一个内核：**人和 AI 共用的无限画板**。AI 通过 MCP 工具在 Agent 内画，人直接在画布上画；任何一方都能接着改，画板本身就是沟通媒介。对话仍留在宿主聊天里，Doodle 不创建第二套会话。
-
-对外只有两个入口：
-
-- **Codex 插件**：推荐安装方式，一条命令完成安装。
-- **直接 MCP / `npx`**：任意 MCP 宿主都可使用，无需 clone 仓库。
-
-宿主能力分三层：四工具始终可用；支持 MCP Apps 时把同一张画布显示在对话旁；支持 `updateModelContext` / `sendMessage` 时增加自动同步和短通知。宿主不渲染画布时，`get_board` 返回的 `PANEL_URL` 是本地兜底页面。项目结构只是可选素材，不是产品主体。
-
-画板图库保存的是**可编辑的版本 1 画板快照**：可以另存当前图、切换不同图、新建 / 重命名 / 复制 / 删除图，以及导入 / 导出 JSON。它不是第二套会话模型；静态 PNG / JPG / SVG 是分享快照，不参与图库和 AI 读写；`get_board`、MCP App 和本地画布始终读写同一张当前活动图。
-
-自 `0.8.0` 起，自研 DOM 画布已移除，Excalidraw 是唯一的人类编辑/渲染画布。Board v1 仍是唯一持久状态和 AI 权威入口；Excalidraw 元素只由 Board v1 派生，不存在第二份画布状态。详见 [docs/GOAL_EXCALIDRAW.md](docs/GOAL_EXCALIDRAW.md)。
-
-`PANEL_URL` 属于当前 MCP server 进程：会话或宿主退出后它会失效，这是正常生命周期。需要脱离会话、手动开关的本地预览时，运行 `npm run preview:board`；它只启动画板 HTTP 服务，不注册 MCP stdio 工具，也不会安装后台服务。用 `Ctrl+C` 停止。
-
-双向主流程：
+Doodle 只有一个内核：**人和 AI 共用的无限画板**。AI 通过 MCP 工具在 Agent 里画，人直接在画布上画；任何一方都能接着改，画板本身就是沟通媒介。对话仍留在宿主聊天里——Doodle 不创建第二套会话。
 
 ```text
-AI 用 draw_board 画 → 人看后直接画 / 改 → 最终状态进入当前会话上下文 / 人点通知
+AI 用 draw_board 画 → 人看后直接画 / 改 → 终态进入当前会话上下文 / 人点通知
 → AI 用 get_board 或上下文读取 → AI 继续画 / 改 → 人再看……可无限往返
 ```
 
-产品定义见 [docs/PRODUCT_DIRECTION.md](docs/PRODUCT_DIRECTION.md)，plugin 目标见 [docs/GOAL_PLUGIN.md](docs/GOAL_PLUGIN.md)，架构见 [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md)，AI 操作手册见 [AGENTS.md](AGENTS.md)。
+对外只有两个入口：**Codex 插件**（推荐，一条命令）和**直接 MCP / `npx`**（任意宿主，不必 clone）。宿主能力分三层：四个工具始终可用；支持 MCP Apps 时把同一张画布显示在对话旁；支持 `updateModelContext` / `sendMessage` 时增加自动同步和短提醒。宿主不渲染画布时，`get_board` 返回的 `PANEL_URL` 是本地兜底页。
+
+自 `0.8.0` 起自研 DOM 画布已移除，**Excalidraw 是唯一的编辑/渲染画布**。Board v1 仍是唯一持久状态和 AI 权威入口，Excalidraw 元素只由它派生，不存在第二份画布状态。
 
 ## 30 秒上手
 
-**先自己画两笔（不需要 AI）**：
+**只想画两笔（不需要 AI）**
 
 ```bash
 npm run doodle
 ```
 
-一条命令启动本地画板并直接在浏览器打开，终端里会印出地址和几个基本手势。关掉终端就停止。空画板第一次打开时会给一张可关闭的引导卡，之后不再出现。
+启动本地画板并打开浏览器，终端里印出地址和几个基本手势；关掉终端就停止。空画板首次打开有可关闭的引导卡。
 
-想和 AI 共用同一张画板时，再选一个入口：
-
-**Codex 桌面插件**：在 Doodle 仓库里运行一条命令：
+**想和 AI 共用同一张画板**
 
 ```bash
 npm run setup:codex
 ```
 
-它会自动安装依赖、构建自包含插件、注册本仓库的本地 marketplace、安装 `doodle@doodle`，并打印首句提示。**开启一个新的 Codex 会话**，然后说：
+一条命令装好依赖、构建自包含插件、注册本地 marketplace、安装 `doodle@doodle`，并打印首句提示。**开启一个新的 Codex 会话**，然后说：
 
 ```text
 打开 Doodle 画板，我们先用画板交流。
 ```
 
-兼容 MCP Apps 的宿主会直接显示画布；AI 会先读画板，再放一个起步对象。你可以选工具点按 / 拖拽直接画，画笔按下即出墨并可连续画，橡皮擦只擦画笔笔迹；双击对象改字、双击空白新建便签；空白处拖拽可框选并批量移动 / 删除 / 成组 / 整理，支持 `Ctrl/⌘+Z` 撤销重做、方向键微调、对齐吸附和 `Ctrl/⌘+V` 粘贴图片。左上角「图库」以抽屉覆盖画布，可另存当前图、切换不同图、导入 / 导出可编辑 JSON，以及导出 PNG / JPG / SVG 分享快照；它不会挤压或遮挡 Excalidraw 工具栏。`?` 可随时查看提示。人画完后，宿主会自动同步最终状态（若支持），也可点「通知 Agent」发一句短提醒；AI 会看画、用文字或继续画图回应。若宿主不显示画布，就问 AI 要 `PANEL_URL`，打开本地地址，并在聊天里让 AI 重读。
+兼容 MCP Apps 的宿主会直接显示画布，AI 先读画板再放一个起步对象。你选工具点按或拖拽即可画；双击对象改字、双击空白新建便签；空白处拖拽框选后可批量移动 / 删除 / 成组 / 整理；`Ctrl/⌘+Z` 撤销、方向键微调、`Ctrl/⌘+V` 粘贴图片。左上角「图库」是覆盖式抽屉，不挤压 Excalidraw 工具栏。人画完后宿主会同步终态，也可点「通知 Agent」发一句短提醒。宿主不显示画布时，向 AI 要 `PANEL_URL`。
 
-完整链路：`npm run setup:codex → 新会话 → 首句提示 → AI 和人双向画 / 改 → 最终状态同步 / 通知 Agent → AI 再看 / 再画`。
+**任意 MCP 宿主**
 
-**任意 MCP 宿主**：把 [examples/mcp-config/](examples/mcp-config/) 的 `npx -y doodle-mcp` 片段加入宿主配置，重启 MCP 会话后使用同一句提示；画布仍通过 `show_board` / `draw_board` 自动呈现，宿主不渲染时询问 `PANEL_URL`。这条路径不需要 clone 仓库，也不等于公共插件目录发布。
+把 [examples/mcp-config/](examples/mcp-config/) 里的 `npx -y doodle-mcp` 片段加进宿主配置，重启 MCP 会话即可，无需 clone 仓库。这条路径不等于公共插件目录发布。
 
 ## 四个 MCP 工具
 
 | 工具 | 用途 |
 |---|---|
-| `get_board` | 读取共享画布；首次返回完整画图规范，之后自动精简。传 `since_revision` 只返回变化对象，并附带 `HANDOFF`：人新增 / 修改 / 删除了什么，不含 AI 自己的改动。画布保真元数据不会出现在返回里；默认第一步，只读 |
-| `show_board` | 在 Agent 对话旁打开可交互的共享画布；用户要求查看或编辑画布时使用 |
-| `draw_board` | 新增对象、精确更新、删除、确定性布局、连接线、变体 / 角色 / 样式 / 层级，以及通过 `library` 保存 / 切换 / 导入 / 导出可编辑画板；`diagram` 用语义节点/边默认追加到当前画板，显式 `replace: true` 才替换整张画板并生成一张分层复杂图；支持便签、文字、形状、箭头、手绘、图片、标题和重点标记；写入会串行应用到最新状态 |
-| `scan_project` | 可选只读扫描当前项目结构，返回有界相对路径和 `file:line` 证据文本；不写文件、不自动画图 |
+| `get_board` | 读取共享画布。首次返回完整画图规范，之后自动精简；传 `since_revision` 只返回变化对象并附 `HANDOFF`（人改了什么，不含 AI 自己的改动）。只读，默认第一步 |
+| `show_board` | 在对话旁打开可交互画布。用户要看或要改时使用 |
+| `draw_board` | 写入面：新增、精确更新、删除、确定性布局、连接线、变体/角色/样式/层级，以及 `library` 图库操作。`diagram` 用语义节点/边追加一张图，`replace: true` 才整张重画 |
+| `scan_project` | 可选只读扫描项目结构，返回有界相对路径与 `file:line` 证据。不写文件、不自动画图 |
 
-默认双向闭环：
+`show_board` 与 `scan_project` 都不创建图库、不改会话、不授权代码变更。
 
-```text
-AI: get_board → draw_board → 看人怎么改
-人: 看画 → 直接画 / 改 → 自动同步或通知 Agent
-然后重复；对话始终留在宿主聊天里
-```
+## 安装与配置
 
-`show_board` 只是在兼容宿主里显示这张画布的可选工具；`scan_project` 只是「项目结构」这个主题的能力之一。AI 决定是否需要，并用 `draw_board` 把结果画到同一张画布；它们不创建图库、不改会话、不授权代码变更。
+**Codex 插件**：`npm run setup:codex` 只在你主动运行时调用 Codex CLI（`npm install` → `npm run build` → `codex plugin marketplace add` → `codex plugin add doodle@doodle`）。重复运行安全，`--dry-run` 只预览命令。插件包装的是同一个自包含 stdio MCP 服务，不依赖仓库里的 `dist/` 或绝对路径。`npm run build:submission` 生成提交审核用的 ZIP；公共插件目录发布还需 OpenAI 侧资格与审核，材料见 [docs/SUBMISSION.md](docs/SUBMISSION.md)。
 
-## 安装
-
-### Codex plugin（推荐）
-
-一条命令即可完成安装，详见上方「30 秒上手」：
-
-```bash
-npm run setup:codex
-```
-
-`scripts/setup-codex.mjs` 只会在你主动运行时调用 Codex CLI：`npm install`（首次）、`npm run build`、`codex plugin marketplace add . --json`、`codex plugin add doodle@doodle --json`。重复运行是安全的；可用 `npm run setup:codex -- --dry-run` 预览命令。官方 OpenAI 文档说明本地 marketplace 与[公共插件目录](https://developers.openai.com/plugins/build/plugins)是不同路径，安装后应[开启新会话](https://learn.chatgpt.com/docs/plugins)再使用插件的 MCP 工具和 skill。插件包由 `scripts/build-plugin.mjs` 生成到忽略的 `.doodle-plugin/doodle/`，使用同一个自包含 stdio MCP server，不依赖仓库里的 `dist/` 或绝对路径。`npm run build:submission` 会生成忽略的 `doodle-plugin-submission/doodle-0.8.0.zip` 供提交审核；本仓库提供本地 / repo marketplace 安装路径，公共插件目录发布仍需要 OpenAI 侧资格、身份验证和审核。材料清单见 [docs/SUBMISSION.md](docs/SUBMISSION.md)。
-
-### 直接 MCP stdio
-
-把 [examples/mcp-config/](examples/mcp-config/) 的零配置片段加入 MCP 宿主即可；发布版使用 `npx -y doodle-mcp`，无需绝对路径。本地 checkout 也可使用 `node dist/index.js`（先运行 `npm run build`）。默认自动选择空闲本地端口、隔离画板状态目录，并通过启动环境推断工作区；只有宿主在项目外启动 MCP 时才需要设置 `DOODLE_WORKSPACE_ROOT`。可选环境变量：
+**直接 MCP stdio**：发布版用 `npx -y doodle-mcp`，本地检出可用 `node dist/index.js`（先 `npm run build`）。默认自动选空闲端口、隔离状态目录，并从启动环境推断工作区；只有宿主在项目外启动时才需要 `DOODLE_WORKSPACE_ROOT`。
 
 | 变量 | 默认值 | 说明 |
 |---|---|---|
-| `PREVIEW_PORT` | 空闲端口 | 固定本地画板 HTTP 端口；未设置或设为 `0` 时自动选择 |
+| `PREVIEW_PORT` | 空闲端口 | 固定本地画板 HTTP 端口；未设置或为 `0` 时自动选择 |
 | `PREVIEW_HOST` | `127.0.0.1` | 本地监听地址 |
 | `OUTPUT_DIR` | plugin data / `.doodle-data` / `./output` | 画板状态目录 |
 | `DOODLE_WORKSPACE_ROOT` | 包根目录 | `scan_project` 的目标工作区 |
 | `LOG_LEVEL` | `info` | stderr 日志级别 |
 
-### 开发者自检
+状态文件是所选目录下的 `.doodle/board.json`（version 1，独立状态，应忽略，勿提交）。`AI_DRAW_WORKSPACE_ROOT` 与旧的 `output/.ai-draw/board.json` 仅作只读兼容保留。
 
-```bash
-npm install
-npm run check
-npm run doctor
-npm run preview:board
-```
-
-状态文件位于所选目录下的 `.doodle/board.json`，是独立 version 1 状态，应加入忽略，不提交到仓库。既有 version 1 留言字段为兼容旧状态而保留；新画布和 Agent 工具不再显示或写入留言流。
-
-`AI_DRAW_WORKSPACE_ROOT` 和旧的 `output/.ai-draw/board.json` 仍作为只读兼容入口保留；新配置请使用 `DOODLE_WORKSPACE_ROOT`。
-
-## 画图规范
-
-- 先调用 `get_board` 读取现有对象 ID 和坐标。
-- 尽量用 `draw_board.updates` 精确修改；确需重画时再用 `remove_ids` 清理旧对象。
-- `author` 放在 `draw_board` 顶层参数，不放进 item。
-- `line` 可用 `shape: "straight" | "curve" | "orthogonal"`；`stroke` 的 `points` 是相对对象边界的局部坐标；`image` 使用有界的 `data:image/*;base64`。
-- 先读 `capabilities`、`visualDigest` 和 `RECIPES`：流程用 `role: "step"` + `startItemId` / `endItemId`，对比用 `role: "column"` 或 `variant: "frame"`，聚类用 `groupId` + `layout.mode: "cluster"`，重点用 `emphasis: "focus"`。
-- 复杂图优先用 `draw_board.diagram`：只提供短标题、语义节点和边，AI 不必手算坐标；节点标题字段是 `label`。`mode` 可选 `flow`（默认，按边分层，超过 6 列自动折成蛇形，不会变成一条超宽横条）、`timeline`、`compare`、`matrix`，后三者按你给的 `column` / `row` 排布（`row` 上限 47），不会被打乱顺序。每条 `edges` 都会生成可见连线，包括跨列、跨行和折行连接。它默认保留已有对象并追加新图，重名 ID 会自动加数字后缀；仅显式 `replace: true` 才清空整张画板重画。普通整理可用 `layout.mode: "architecture"`；`layout.mode` 支持 `grid / row / column / timeline / cluster / architecture`。可选 `variant / role / z / style / startItemId / endItemId` 都是版本 1 兼容字段。字段细节与常见坑见[画图指南](docs/DIAGRAM_GUIDE.md)。
-- `draw_board.library` 支持 `list / get / create / save / switch / rename / duplicate / delete / import / export`；切换后会改变当前活动画板，`get_board` 随后读到的就是新图。
-- AI 优先读 `get_board` 的 `diagnosis`：它指出孤立对象、重叠、焦点与可放置区域；`view: "summary" | "structure" | "detail"` 可在不需要完整对象时省 token。写入失败返回 `ERROR_JSON`，包含 `code / path / expected / fix`。`diagram.recipe` 可用 `steps` 直接生成流程/评审/决策/时间线，`draw_board` 返回 `CHANGE_JSON` 说明本次改动。
-- 图库文件保存在本地 `OUTPUT_DIR/.doodle/boards/`，每个图都是完整的版本 1 `board.json` 结构，不生成静态图片。
-- 结构化图用严格网格、短标签、一致尺寸。
-- `line` 是箭头：`(x,y)` 为起点，`(x+w,y+h)` 为终点；`w` / `h` 可为负数。
-- 箭头端点贴着源对象和目标对象的外缘，标签保持短。
-- 工具调用不主动打开浏览器，画布对象不构成项目写入授权。
-
-## 安全边界
-
-- stdout 只用于 MCP JSON-RPC；所有日志写 stderr。
-- 本地 HTTP 默认只监听 `127.0.0.1`。
-- 非 GET `/api/board/*` 需要页面随机 `X-AI-Draw-Token`、`confirmedBy: "human"` 和匹配的画板 revision。
-- `scan_project` 跳过常见生成目录、dot-private 文件、`.env`-like 文件和大文件，过滤常见凭据行，证据总数最多 40 条；只返回工作区相对路径与短证据。
-- 画布对象只是视觉上下文，不签发凭据，不写项目文件。嵌入 UI 通过 MCP Apps 宿主桥调用正常画布工具。
-- 支持上下文能力的嵌入 UI 还会把当前画板最终状态挂到宿主当前会话的模型上下文；这只是本地视觉上下文，不是操作日志、聊天记录或项目写入授权。独立 `PANEL_URL` 页面没有宿主会话桥，也不会伪装成已同步。
+`PANEL_URL` 属于当前 MCP server 进程，宿主退出即失效——这是正常生命周期。需要脱离会话的预览就运行 `npm run preview:board`（只起画板 HTTP 服务，不注册工具、不装后台服务，`Ctrl+C` 停止）。
 
 ## 开发
 
 ```bash
-npm run lint
-npm run build
-npm test
-npm run repo:check
+npm install
+npm run check     # 完整验收：lint / build / test / 仓库守卫 / 插件守卫 / doctor / 打包
 npm run doctor
+npm run preview:board
 ```
 
-完整验收用 `npm run check`，其中包含 plugin 构建、`npm run repo:plugin-check` 与 `setup:codex --dry-run`；校验不会修改本机 Codex 配置。新增或移除 MCP 工具、协议字段、plugin 打包或安全边界时，必须同步 `AGENTS.md`、架构、决策、plugin 目标文档、测试、示例、CI 和两个离线守卫。
-
-四个工具均带显式 MCP annotations：`get_board` / `show_board` / `scan_project` 为只读、非破坏性、封闭本地；`draw_board` 是可删除或覆盖对象的破坏性写入。任何工具 schema 或行为变化都必须同步这些标注和回归测试。
+新增或移除 MCP 工具、协议字段、插件打包或安全边界时，必须同步 `AGENTS.md`、架构、决策、测试、示例、CI 与两个离线守卫。四个工具都带显式 MCP annotations：`get_board` / `show_board` / `scan_project` 只读、非破坏、封闭本地，`draw_board` 是可删除或覆盖对象的破坏性写入。
 
 ## 文档
 
-| 文档 | 内容 |
+完整索引在 [docs/README.md](docs/README.md)。常看的几个：
+
+| 想了解 | 看这里 |
 |---|---|
-| [English quickstart](README.en.md) | 英文安装和产品概览 |
-| [AGENTS.md](AGENTS.md) | 给 AI coding agent 的短操作手册 |
-| [产品方向](docs/PRODUCT_DIRECTION.md) | 定义、边界与验收 |
-| [体验审计](docs/EXPERIENCE_AUDIT.md) | 双身份实测、问题优先级与闭环状态 |
-| [Plugin 目标](docs/GOAL_PLUGIN.md) | Codex plugin 的目标、范围与验收 |
-| [架构](docs/ARCHITECTURE.md) | 源码结构、协议、HTTP 与安全模型 |
-| [当前决策](docs/DECISIONS.md) | 0.8.0 Excalidraw 画布与历史 ADR 状态 |
-| [文档地图](docs/README.md) | 全部文档入口 |
-| [故障排查](docs/TROUBLESHOOTING.md) | 首用自检与常见问题 |
-| [画图指南](docs/DIAGRAM_GUIDE.md) | `diagram` 的字段、`replace` 语义、布局上限与已知坑 |
-| [贡献指南](CONTRIBUTING.md) | 本地验证与 PR 规范 |
-| [安全政策](SECURITY.md) | 威胁模型与漏洞报告 |
-| [隐私政策](PRIVACY.md) | 本地数据、用途、接收方、保存期限与用户控制 |
-| [支持](SUPPORT.md) | 问题反馈、支持渠道与安全报告入口 |
-| [使用条款](TERMS.md) | 开源许可、项目表面和分发说明 |
-| [FAQ](docs/FAQ.md) | 插件目录、隐私、本地状态与帮助入口 |
-| [公开提交](docs/SUBMISSION.md) | 仓库已备材料与 OpenAI 侧资格事项 |
-| [行为准则](CODE_OF_CONDUCT.md) | 社区参与规则 |
-| [路线图](ROADMAP.md) | 当前基线与非目标 |
-| [更新日志](CHANGELOG.md) | 版本记录 |
+| 产品定义与边界 | [docs/PRODUCT_DIRECTION.md](docs/PRODUCT_DIRECTION.md) |
+| 怎么让 AI 画好图 | [docs/DIAGRAM_GUIDE.md](docs/DIAGRAM_GUIDE.md) |
+| 源码结构、HTTP 与安全模型 | [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) |
+| 目标、验收与实测结果 | [docs/GOALS.md](docs/GOALS.md) |
+| 当前有效的技术决策 | [docs/DECISIONS.md](docs/DECISIONS.md) |
+| 出问题先看这里 | [docs/TROUBLESHOOTING.md](docs/TROUBLESHOOTING.md) |
+| 安全 / 隐私 / 条款 | [SECURITY.md](SECURITY.md) · [PRIVACY.md](PRIVACY.md) · [TERMS.md](TERMS.md) |
+| 给 AI coding agent 的操作手册 | [AGENTS.md](AGENTS.md) |
+
+英文版快速上手见 [README.en.md](README.en.md)。版本记录见 [CHANGELOG.md](CHANGELOG.md)，路线图见 [ROADMAP.md](ROADMAP.md)。
 
 ## License
 

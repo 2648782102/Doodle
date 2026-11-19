@@ -5,7 +5,12 @@ import { fileURLToPath } from "node:url";
 
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
 const failures = [];
-const read = (relative) => fs.readFile(path.join(root, relative), "utf8");
+/*
+ * Normalise line endings: this script matches multi-line source fragments with
+ * `\n` literals, and a Windows checkout with `core.autocrlf=true` writes CRLF,
+ * which made the guard fail locally while passing on Linux CI.
+ */
+const read = async (relative) => (await fs.readFile(path.join(root, relative), "utf8")).replace(/\r\n/g, "\n");
 const exists = async (relative) => {
   try {
     await fs.access(path.join(root, relative));
@@ -46,6 +51,10 @@ const boardTypes = (await Promise.all([
   read("src/board/model/types.ts"),
   read("src/board/model/limits.ts"),
   read("src/board/model/validate.ts"),
+  read("src/board/model/size.ts"),
+  read("src/board/model/parse-board.ts"),
+  read("src/board/model/board-shape.ts"),
+  read("src/board/model/predicates.ts"),
   read("src/board/model/board.ts"),
   read("src/board/model/digest.ts"),
   read("src/board/layout/arrange.ts"),
@@ -84,7 +93,7 @@ const changelog = await read("CHANGELOG.md");
 const contributing = await read("CONTRIBUTING.md");
 const security = await read("SECURITY.md");
 const roadmap = await read("ROADMAP.md");
-const goalPlugin = await read("docs/GOAL_PLUGIN.md");
+const goals = await read("docs/GOALS.md");
 const pluginManifest = JSON.parse(await read("plugins/doodle/.codex-plugin/plugin.json"));
 const pluginMcp = JSON.parse(await read("plugins/doodle/.mcp.json"));
 const marketplace = JSON.parse(await read(".agents/plugins/marketplace.json"));
@@ -129,7 +138,7 @@ check(pluginManifest.requires_local_executor === true, "plugin is not marked des
 check(pluginMcp.mcpServers.doodle.args[0] === "${PLUGIN_ROOT}/server/index.mjs", "plugin MCP entrypoint is not self-contained");
 check(marketplace.plugins[0].source.path === "./.doodle-plugin/doodle", "marketplace does not point at the plugin build output");
 check(pluginSkill.includes("get_board") && pluginSkill.includes("show_board") && !pluginSkill.includes("reply_on_board"), "plugin skill does not describe the current board workflow");
-check(goalPlugin.includes("## Objective") && goalPlugin.includes("plugin") && goalPlugin.includes("MCP Apps"), "plugin goal document is missing or stale");
+check(goals.includes("### 目标") && goals.includes("### 验收") && goals.includes("Codex 插件") && goals.includes("MCP Apps"), "the consolidated goal record is missing or stale");
 check(packageJson.scripts.build.includes("build-plugin.mjs") && packageJson.scripts.check.includes("repo:plugin-check"), "npm scripts do not build and check the plugin");
 check(packageJson.scripts["setup:codex"] === "node scripts/setup-codex.mjs", "one-command Codex setup is missing");
 check(packageJson.scripts["preview:board"] === "node scripts/preview-board.mjs", "explicit local preview command is missing");
@@ -145,6 +154,18 @@ check(
 );
 check(boardStore.includes("quarantineCorruptState"), "a corrupt board file still prevents startup");
 check(boardTypes.includes("COORDINATE_OUT_OF_RANGE") && !boardTypes.includes("maxWidth, input.w ?? 180") && !boardTypes.includes("Math.min(MAX_SHAPE_WIDTH, input.w ?? 180)"), "drawing input is silently clamped instead of rejected");
+check(
+  boardTypes.includes("must be at least") && boardTypes.includes("SIZE_OUT_OF_RANGE"),
+  "the size floor is not rejected: an explicit w/h below the minimum must fail, not be raised",
+);
+check(
+  tools.includes("AUTHOR_ON_ITEM") && tools.includes("author must not be set per item"),
+  "a per-item author is accepted: the write path overwrites it instead of rejecting it",
+);
+check(
+  (await read("src/board/diagram/recipe.ts")).includes("edges: diagram.edges ?? []"),
+  "diagram edges are not normalised: an omitted `edges` field crashes the generator",
+);
 check(http.includes("this.revisions?.remember(board)") && (await read("src/server.ts")).includes("new BoardHttpServer(board, config, revisions)"), "browser writes are not recorded in the shared revision cache");
 check(troubleshooting.includes("npm run preview:board") && troubleshooting.includes("current MCP server process"), "troubleshooting does not explain PANEL_URL lifetime");
 check(packageJson.scripts.check.includes("setup:codex -- --dry-run"), "npm check does not dry-run the Codex setup");
@@ -233,14 +254,178 @@ check((tools.match(/server\.registerTool\(/g) ?? []).length === 4 && !tools.incl
 check(tools.includes("readOnlyHint: true") && tools.includes("destructiveHint: true") && tools.includes("openWorldHint: false"), "tool annotations are incomplete");
 check(tools.includes("registerAppResource") && tools.includes('"ui://doodle/board/excalidraw/v1.html"'), "Excalidraw MCP App canvas resource is missing");
 check(tools.includes('"show_board"') && tools.includes('"get_board"'), "canvas render and data tools are not separated");
+/*
+ * A tool description is the model's only map of a nine-field tool.
+ *
+ * `draw_board` carried a 171-character blurb that never mentioned `diagram`,
+ * `updates`, or the top-level `author`, so a model had to discover the shape by
+ * failing. The description must name the three mutually exclusive uses and the
+ * prefer-updates rule.
+ */
+check(
+  tools.includes("三个互斥的用法") && tools.includes("复杂图优先用它") && tools.includes("改已有内容用 updates"),
+  "draw_board's description no longer explains its three mutually exclusive uses or the prefer-updates rule",
+);
 check(tools.includes("CANVAS_UI_META") && tools.includes("_meta: CANVAS_UI_META"), "draw_board does not advertise the canvas for automatic post-draw rendering");
 check(tools.includes("getAppHtml()") && tools.includes("PANEL_URL"), "Excalidraw MCP App resource is not plugin-safe and the panel URL is missing");
 check(tools.includes("FIRST_USE:") && tools.includes("NEXT_STEPS:") && tools.includes("NEXT:"), "get_board does not use progressive first-use and next-step guidance");
+/*
+ * Repair over prose.
+ *
+ * The MCP SDK validates `inputSchema` before the tool handler and reports a
+ * failure as a bare `MCP error -32602`, which carries no code, path, or fix.
+ * Bounds therefore live in `model/` so every rejection reaches `errorResult`.
+ * These guards fail if a length or range constraint creeps back into the schema
+ * and starts answering a model with prose on the path it hits first.
+ */
 check(
-  tools.includes("structuredContent: { ...boardJson(board, libraryIndex), change: changeReport"),
+  // Only the write path matters: a rejected read is cheap to retry, while a
+  // rejected write is the round trip this contract exists to remove.
+  !/z\.string\(\)\.max\(/.test((await read("src/board/mcp/schemas.ts"))) &&
+    !/z\.array\([^)]*\)\.max\(/.test((await read("src/board/mcp/schemas.ts"))),
+  "a length or range bound moved back into the MCP input schema: the SDK rejects it with bare prose instead of ERROR_JSON",
+);
+check(
+  tools.includes("BATCH_TOO_LARGE") && tools.includes("MUTATION_BATCH_LIMIT"),
+  "the per-call batch ceiling is missing from the handler, so an oversized draw is rejected without a repair path",
+);
+check(
+  (await read("src/board/diagram/layout.ts")).includes("UNKNOWN_EDGE_NODE"),
+  "diagram layout rejects input with bare prose instead of a repairable error",
+);
+check(
+  tools.includes("ctx.board.mutate((current) => change(current))"),
+  "an unpinned draw_board write is back to snapshot-then-replace, so two simultaneous agents fail each other",
+);
+check(
+  (await read("src/board/mcp/schemas.ts")).includes("Defaults to true and makes the new board active"),
+  "the library switchTo default is undocumented again; a model cannot tell that create/save/duplicate/import move the person off their board",
+);
+check(
+  (await read("src/board/model/parse-board.ts")).includes("isFillColor(candidate.color)")
+    && (await read("src/board/model/predicates.ts")).includes("export function isFillColor"),
+  "parseBoard no longer validates colour: replace_board would accept a fill the canvas cannot paint",
+);
+check(
+  (await read("src/board/model/parse-board.ts")).includes("items[${index}]"),
+  "parseBoard rejections stopped naming the item index, so a whole-board payload is unrepairable",
+);
+check(
+  boardTypes.includes("BOARD_ITEM_LIMIT") && boardTypes.includes("ITEM_NOT_FOUND"),
+  "the capacity ceiling or a missing update target rejects with bare prose again",
+);
+check(
+  tools.includes("SIZE: ${payload.itemCount}") && tools.includes('view: "summary"'),
+  "a large board no longer advertises the cheaper graded reads",
+);
+check(
+  tools.includes("cached && cached.id === current.id ? cached : undefined"),
+  "since_revision is compared across boards again: a library switch would be reported as every object added and removed",
+);
+check(
+  (await read("src/board/diagram/layout.ts")).includes("const row = node.row ?? (wrap ? wrappedRow :"),
+  "the flow snake adds the pass index to the running row count again, so long chains drift down the page",
+);
+check(
+  boardTypes.includes("TITLE_TOO_LONG") && boardTypes.includes("GROUP_ID_TOO_LONG"),
+  "a title or group id is truncated again instead of rejected, so the stored board disagrees with the request",
+);
+check(
+  boardTypes.includes("Update ${index} targets") && boardTypes.includes("remove_ids[${index}] names"),
+  "a batch update or removal is best-effort again: a missing id is skipped and the reply claims success",
+);
+check(
+  (await read("src/board/layout/arrange.ts")).includes("layout.ids[${index}] names")
+    && (await read("src/board/layout/arrange.ts")).includes("LAYOUT_COLUMNS_OUT_OF_RANGE"),
+  "layout silently repairs its own input again: an unknown id arranges the whole board and an out-of-range bound is clamped",
+);
+check(
+  tools.includes("CONFLICTING_ACTIONS") && tools.includes("primaryShapes.length === 1"),
+  "draw_board accepts two whole-board actions again: the extra field is silently dropped and the reply claims success",
+);
+check(
+  tools.includes("registerShowBoardTool(server, ctx, state)") && tools.includes("GUIDE: capabilities and recipes are omitted on repeat shows"),
+  "show_board is back to resending the full guide on every call instead of sharing the get_board flag",
+);
+check(
+  (await read("src/board/diagram/recipe.ts")).includes("DIAGRAM_EMPTY"),
+  "an empty diagram rejects with bare prose again instead of naming both routes forward",
+);
+check(
+  (await read("src/board/project-scan.ts")).includes("SCAN_RANGE_OUT_OF_RANGE")
+    && !/Math\.max\(minimum, Math\.min\(maximum/.test(await read("src/board/project-scan.ts")),
+  "scan_project clamps its range bounds again instead of rejecting an explicit out-of-range value",
+);
+check(
+  (await read("src/board/library/store.ts")).includes("BOARD_NOT_FOUND")
+    && (await read("src/board/library/store.ts")).includes("LAST_BOARD"),
+  "a library action names no ids on an unknown board, or refuses the last board without saying why",
+);
+check(
+  http.includes("error instanceof BoardValidationError")
+    && http.indexOf("if (error instanceof BoardValidationError)") < http.indexOf("if ((error as NodeJS.ErrnoException).code)"),
+  "the HTTP surface classifies a validation error as an errno again, so a bad canvas write answers 500 instead of 400",
+);
+check(
+  (http.match(/error instanceof BoardValidationError/g) ?? []).length >= 2,
+  "an HTTP route validates its action without a handler again, so a bad request answers 500 Internal server error",
+);
+check(
+  (await read("src/board/model/predicates.ts")).includes("STYLE_OUT_OF_RANGE")
+    && (await read("src/board/model/predicates.ts")).includes("INVALID_TEXT_ALIGN"),
+  "a wrong style sub-field rejects with bare prose again instead of naming the field and the range",
+);
+check(
+  !/textAlign: z\.enum|fontWeight: z\.enum/.test(await read("src/board/mcp/schemas.ts")),
+  "style enums are back in the schema, so their rejection loses the repair path",
+);
+check(
+  (await read("src/board/model/parse-board.ts")).includes("INVALID_NOTE")
+    && (await read("src/board/model/parse-board.ts")).includes("UNKNOWN_NOTE_ITEM"),
+  "a note inside replace_board rejects with bare prose again, so the caller cannot tell which note is wrong",
+);
+check(
+  (await read("src/board/diagram/recipe.ts")).includes("RECIPE_STEPS_REQUIRED")
+    && (await read("src/board/model/predicates.ts")).includes("INVALID_SCENE"),
+  "a recipe with no steps or a malformed scene rejects with bare prose again",
+);
+check(
+  (await read("src/board/model/validate.ts")).includes("INVALID_IMAGE_MIME")
+    // Strip block comments first: the explanatory note quotes the old code.
+    && !/IMAGE_MIMES\.includes\(input\.mime\)\s*\?/
+      .test((await read("src/board/model/validate.ts")).replace(/\/\*[\s\S]*?\*\//g, "")),
+  "an unknown image mime is silently dropped again instead of rejected",
+);
+check(
+  (await read("src/board/model/board.ts")).includes("DUPLICATE_UPDATE"),
+  "a repeated update id keeps only the last patch again while the reply claims the batch applied",
+);
+check(
+  (await read("src/board/layout/arrange.ts")).includes("LAYOUT_ORIGIN_OUT_OF_RANGE"),
+  "layout.origin is unbounded again, so an extreme value reports an item coordinate the caller never typed",
+);
+check(
+  !/x: Math\.max\(-MAX_COORDINATE/.test((await read("src/board/model/validate.ts"))),
+  "normalizeItem clamps coordinates again; resolveGeometry is the only place that may bound them",
+);
+check(
+  tools.includes('BOARD_VIEW_${view.toUpperCase()}') && tools.includes('["BOARD_JSON:", JSON.stringify(visiblePayload)]'),
+  "graded views send the board twice: only `full` may carry the full BOARD_JSON text copy",
+);
+check(
+  tools.includes("structuredContent: { ...boardWriteSnapshot(board, libraryIndex), change: changeReport"),
   "draw_board no longer returns the authoritative canvas snapshot plus change report",
 );
-check(tools.includes("function boardAgentPayload") && tools.includes("canvasFidelityItems") && tools.includes("function boardJson("), "agent payload and full canvas payload are not separated");
+check(tools.includes("function boardAgentPayload") && tools.includes("canvasFidelityItems") && tools.includes("function boardJson(") && tools.includes("function boardWriteSnapshot("), "agent payload, full canvas payload, and write snapshot are not separated");
+check(
+  !tools.includes("structuredContent: { ...boardJson(board"),
+  "draw_board is back to returning the full agent payload on every write; a write needs only id/revision/items/library",
+);
+check(
+  (tools.match(/boardWriteSnapshot\(active, result\.index\)/g) ?? []).length === 1
+    && excalidrawApp.includes("Array.isArray(result.items)"),
+  "the library branch no longer returns a flat snapshot the canvas can repaint from, so every library action falls back to an extra fetch",
+);
 check(tools.includes("since_revision") && tools.includes("boardAgentDelta") && tools.includes("BoardRevisionCache"), "incremental rereads or their revision cache are missing");
 check(tools.includes("include_canvas_fidelity") && excalidrawApp.includes("include_canvas_fidelity: true"), "the canvas cannot request the fidelity that agent reads omit");
 check(tools.includes("describeHandoff") && tools.includes("handoff") && tools.includes("needsAttention"), "delta reads do not attribute human edits");
@@ -248,8 +433,18 @@ check((await read("src/board/handoff.ts")).includes("HANDOFF_READINGS") === fals
 check(buildScript.includes("excalidraw-app.tsx"), "build is missing the canvas client");
 check(tools.includes("guideSent") && tools.includes("include_guide"), "the guide is not sent once with an explicit opt-in");
 check(tools.includes("boardCapabilities()") && tools.includes("visualDigest: boardVisualDigest(board)") && tools.includes("boardRecipes()"), "board tools lost AI visual language");
-check(tools.includes('startItemId: z.string()') && tools.includes('mode: z.enum(["grid", "row", "column", "timeline", "cluster", "architecture"])') && tools.includes("diagram: diagramInput.optional()"), "draw_board lost connector bindings, expanded layouts, or semantic diagram recipe");
-check(tools.includes('mode: z.enum(["flow", "timeline", "compare", "matrix"])') && tools.includes("diagramModes"), "draw_board.diagram lost its semantic layout modes");
+check(
+  tools.includes("startItemId: z.string()")
+    // `mode` is a string in the schema so the domain layer reports the repair;
+    // the accepted values live in `model/limits.ts` and in the description.
+    && tools.includes("Arrangement mode: grid, row, column, timeline, cluster, or architecture")
+    && tools.includes("diagram: diagramInput.optional()"),
+  "draw_board lost connector bindings, expanded layouts, or semantic diagram recipe",
+);
+check(
+  tools.includes("Semantic arrangement, default flow") && tools.includes("diagramModes"),
+  "draw_board.diagram lost its semantic layout modes",
+);
 check(boardTypes.includes("resolveDiagramLayout") && boardTypes.includes("diagramToBoardItems") && !boardTypes.includes("diagramToExcalidrawScene"), "semantic diagrams are not generated through one deterministic Board v1 layout");
 check(
   boardTypes.includes("const flowWrap = 6;") &&
@@ -267,7 +462,11 @@ check(
   boardTypes.includes("if (item.startItemId && !allItemIds.has(item.startItemId))"),
   "connector bindings are validated before all items are known, rejecting forward references",
 );
-check(tools.includes("row: z.number().int().min(0).max(47)") && await exists("docs/DIAGRAM_GUIDE.md"), "diagram row limit is too small for a long sequence, or the diagram guide is missing");
+check(
+  (await read("src/board/diagram/layout.ts")).includes("DIAGRAM_ROW_OUT_OF_RANGE")
+    && await exists("docs/DIAGRAM_GUIDE.md"),
+  "diagram row limit is too small for a long sequence, or the diagram guide is missing",
+);
 check(!http.includes('"/api/board/scene"') && !excalidrawApp.includes("loadScene()"), "a second persisted Excalidraw scene source remains");
 check(tools.includes('"scan_project"') && tools.includes("Use draw_board to visualize"), "scan_project is not a read-only board-context tool");
 check(boardTypes.includes("signedWidth") && boardTypes.includes("signedHeight"), "board types lost signed directed-arrow deltas");
@@ -317,7 +516,7 @@ check(hoverGeometry.length === 0, `hover or active feedback changes layout geome
 check(excalidrawApp.includes("scrim.hidden = false") && excalidrawApp.includes("scrim?.addEventListener(\"click\", closePanel)") && excalidrawApp.includes("event.key === \"Escape\""), "library drawer lost its scrim, outside-click, or Escape dismissal");
 check(excalidrawApp.includes("https://github.com/2648782102/Doodle") && excalidrawApp.includes("isDoodleProjectLink") && excalidrawApp.includes("group.querySelector(\"a[href]\")"), "canvas link policy no longer allows only the Doodle repository or hides upstream link groups");
 check(excalidrawTemplate.includes('.main-menu-trigger') && excalidrawTemplate.includes(".App-menu_top__left") && !excalidrawApp.includes("MainMenu"), "the upstream wordmark menu is still mounted or is not suppressed in CSS");
-check(excalidrawTemplate.includes(".excalidraw .Island.sidebar {") && excalidrawTemplate.includes("border-radius: 18px") && excalidrawTemplate.includes("top: 72px") && excalidrawTemplate.includes("right: 12px"), "the library sidebar is not inset and rounded like the other panes");
+check(excalidrawTemplate.includes(".excalidraw .Island.sidebar {") && excalidrawTemplate.includes("border-radius: var(--doodle-radius-lg)") && excalidrawTemplate.includes("top: 72px") && excalidrawTemplate.includes("right: 12px"), "the library sidebar is not inset and rounded like the other panes");
 check(excalidrawTemplate.includes(".excalidraw .zoom-actions .zoom-button:first-child .ToolIcon__icon") && excalidrawTemplate.includes("border-radius: 12px 0 0 12px"), "bottom control islands do not share the pane corner radius");
 check(
   excalidrawTemplate.includes(".excalidraw .undo-redo-buttons,\n    .excalidraw .help-icon,\n    .excalidraw .sidebar-trigger,") &&
@@ -389,9 +588,18 @@ check(await exists("LICENSE"), "LICENSE is missing");
 check(await exists("SECURITY.md"), "SECURITY.md is missing");
 check(await exists("PRIVACY.md") && await exists("SUPPORT.md") && await exists("TERMS.md"), "public plugin policy documents are missing");
 check(await exists("docs/FAQ.md") && await exists("docs/SUBMISSION.md"), "public plugin support or submission docs are missing");
-check(await exists("docs/GOAL_EXPERIENCE.md") && (await read("docs/GOAL_EXPERIENCE.md")).includes("## Acceptance"), "native visual expression goal document is missing");
-check(await exists("docs/GOAL_EXCALIDRAW.md") && (await read("docs/GOAL_EXCALIDRAW.md")).includes("## Acceptance"), "Excalidraw engine goal document is missing");
-check(await exists("docs/GOAL_BASIC.md") && (await read("docs/GOAL_BASIC.md")).includes("## Acceptance") && (await read("docs/README.md")).includes("GOAL_BASIC.md"), "active basic-loop goal document or documentation-map link is missing");
+/*
+ * One consolidated goal record replaced nine per-goal documents. The contract
+ * still holds: every shipped goal keeps an 目标/验收 pair, the shared red lines
+ * stay stated once, and the documentation map must point at the file.
+ */
+check(
+  await exists("docs/GOALS.md")
+    && (goals.match(/### 验收/g) ?? []).length >= 6
+    && goals.includes("## 通用红线")
+    && (await read("docs/README.md")).includes("GOALS.md"),
+  "consolidated goal record or its documentation-map link is missing",
+);
 check(packageJson.scripts["build:submission"]?.includes("build-submission.mjs"), "submission ZIP build script is missing");
 check(packageJson.scripts.check.includes("build:submission"), "npm check does not build the submission ZIP");
 check(packageJson.files.includes("PRIVACY.md") && packageJson.files.includes("SUPPORT.md") && packageJson.files.includes("TERMS.md"), "npm package omits public policy documents");
@@ -431,7 +639,7 @@ check(
   (await read("src/board/mcp/presentation.ts")).includes("roleMeanings"),
   "high-level recipes, change reports, graded reads, or visual semantics are missing",
 );
-check(await exists("docs/GOAL_AI_EXPERIENCE.md") && await exists("test/ai-experience.test.mjs"), "AI experience goal or prompt-contract suite is missing");
+check(await exists("docs/GOALS.md") && goals.includes("AI 视觉体验") && await exists("test/ai-experience.test.mjs"), "AI experience goal or prompt-contract suite is missing");
 
 if (failures.length) {
   console.error("❌ Offline repository checks failed:");

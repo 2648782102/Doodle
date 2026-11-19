@@ -246,7 +246,23 @@ function readTheme(): DoodleTheme {
  */
 const EXCALIDRAW_THEME = "light" as const;
 
-function applyTheme(theme: DoodleTheme): void {
+function applyTheme(theme: DoodleTheme, animate = false): void {
+  /*
+   * Re-selecting the active appearance is a no-op. Without this guard a click
+   * on the pressed segment still dispatches doodle-theme-change, which rebuilds
+   * every pane's SVG refraction map and recolours the whole scene for no visual
+   * change. The first call has no dataset yet and must still apply the theme.
+   */
+  if (document.documentElement.dataset.doodleTheme === theme) return;
+  if (animate) {
+    /*
+     * Only an explicit switch animates. The first paint applies the stored
+     * theme synchronously, so a reload never flashes the wrong palette or
+     * eases every surface in from the default tokens.
+     */
+    document.documentElement.classList.add("theme-switching");
+    window.setTimeout(() => document.documentElement.classList.remove("theme-switching"), 260);
+  }
   document.documentElement.dataset.doodleTheme = theme;
   /*
    * Light and dark are the paper desk; only the glass appearance refracts.
@@ -290,7 +306,7 @@ function initThemeToggle(): void {
   const group = document.querySelector<HTMLElement>("#doodleThemeToggle");
   group?.addEventListener("click", (event) => {
     const button = (event.target as HTMLElement | null)?.closest<HTMLButtonElement>("[data-theme-option]");
-    if (button && isDoodleTheme(button.dataset.themeOption)) applyTheme(button.dataset.themeOption);
+    if (button && isDoodleTheme(button.dataset.themeOption)) applyTheme(button.dataset.themeOption, true);
   });
   window.addEventListener("doodle-theme-change", () => {
     // Frames are throttled: a theme flip recomputes every pane once.
@@ -580,7 +596,16 @@ async function runLibraryAction(action: Record<string, unknown>) {
     request = { ...action, ...(name && ["save", "create", "rename", "duplicate"].includes(String(action.type)) ? { name } : {}) };
   }
   const result = await libraryRequest(request);
-  const board = (result.board as BoardSnapshot | undefined) ?? await loadBoard();
+  /*
+   * The server returns the active snapshot as flat fields (the same shape a
+   * normal write uses), not under a `board` key. Reading `result.board` first
+   * kept every library action on a fallback `/api/board` fetch because that key
+   * never existed. Prefer the flat snapshot and keep the key as a fallback for
+   * hosts that nest it.
+   */
+  const board = (result.board as BoardSnapshot | undefined)
+    ?? (Array.isArray(result.items) ? result as unknown as BoardSnapshot : undefined)
+    ?? await loadBoard();
   applyRemoteSnapshot(board);
   if (action.type === "export" || action.type === "get") {
     const exportBoard = (result.exportBoard as BoardSnapshot | undefined) ?? board;

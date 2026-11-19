@@ -61,8 +61,11 @@ describe("local board library", () => {
       const library = new BoardLibrary(outputDir);
       const current = touchBoard(createEmptyBoard());
       const seeded = await library.apply({ type: "list" }, current);
-      await expect(library.apply({ type: "delete", id: seeded.index.activeId }, seeded.board)).rejects.toThrow("last board");
-      await expect(library.apply({ type: "import", board: { version: 2 }, switchTo: true }, seeded.board)).rejects.toThrow("Unsupported board version");
+      // The refusal now says why the library always keeps one board.
+      await expect(library.apply({ type: "delete", id: seeded.index.activeId }, seeded.board)).rejects.toThrow("only saved board");
+      // The message now names the version it found, so a caller can tell an
+      // old snapshot from a corrupted one.
+      await expect(library.apply({ type: "import", board: { version: 2 }, switchTo: true }, seeded.board)).rejects.toThrow("Board version must be 1, got 2");
     } finally {
       await fs.rm(outputDir, { recursive: true, force: true });
     }

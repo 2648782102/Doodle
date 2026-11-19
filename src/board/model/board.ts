@@ -13,9 +13,27 @@ import type {
 } from "./types.js";
 import { makeId, now } from "./clock.js";
 import { isAuthor, normalizeItem, parseBoard } from "./validate.js";
+import { BoardValidationError } from "../errors.js";
 
 export function touchBoard(board: SimpleBoard): SimpleBoard {
   return { ...board, revision: board.revision + 1, updatedAt: now() };
+}
+
+/**
+ * The capacity ceiling is a bound, so it owes the caller a repair.
+ *
+ * "Board item limit reached" told a model nothing it could act on: not how many
+ * objects exist, not how many it tried to add, and not that the answer is a
+ * second board. The reply now carries all three.
+ */
+function itemLimitError(existing: number, adding: number): BoardValidationError {
+  return new BoardValidationError(
+    `Board holds ${existing} objects; adding ${adding} would exceed the ${MAX_ITEMS} limit`,
+    "BOARD_ITEM_LIMIT",
+    "items",
+    `at most ${MAX_ITEMS} objects on one board`,
+    `Remove objects with remove_ids, or put the extra content on a second board: draw_board.library {type: "create", switchTo: false} then draw there.`,
+  );
 }
 
 export function createEmptyBoard(): SimpleBoard {
@@ -94,7 +112,7 @@ export function createStarterBoard(): SimpleBoard {
 
 export function addBoardItem(board: SimpleBoard, input: BoardItemInput): SimpleBoard {
   const normalized = normalizeItem(input);
-  if (board.items.length >= MAX_ITEMS) throw new Error("Board item limit reached");
+  if (board.items.length >= MAX_ITEMS) throw itemLimitError(board.items.length, 1);
   const timestamp = now();
   const item: BoardItem = { ...normalized, createdAt: timestamp, updatedAt: timestamp };
   return touchBoard({ ...board, items: [...board.items, item] });
@@ -107,7 +125,15 @@ export function updateBoardItem(
   author: BoardAuthor = "human",
 ): SimpleBoard {
   const existing = board.items.find((item) => item.id === id);
-  if (!existing) throw new Error("Board item not found");
+  if (!existing) {
+    throw new BoardValidationError(
+      `No item has the id ${JSON.stringify(id)}`,
+      "ITEM_NOT_FOUND",
+      "updates[].id",
+      "an id that exists on this board",
+      `Re-read the board with get_board and use one of its item ids; ids are not recreated between calls.`,
+    );
+  }
   const normalized = normalizeItem({ ...existing, ...patch, id, author });
   const timestamp = now();
   return touchBoard({
@@ -119,7 +145,7 @@ export function updateBoardItem(
 }
 
 export function addBoardItems(board: SimpleBoard, inputs: BoardItemInput[]): SimpleBoard {
-  if (board.items.length + inputs.length > MAX_ITEMS) throw new Error("Board item limit reached");
+  if (board.items.length + inputs.length > MAX_ITEMS) throw itemLimitError(board.items.length, inputs.length);
   const timestamp = now();
   const items = inputs.map((input) => {
     const normalized = normalizeItem(input);
@@ -133,6 +159,46 @@ export function updateBoardItems(
   updates: BoardItemPatch[],
   author: BoardAuthor = "human",
 ): SimpleBoard {
+  /*
+   * Every requested update must name a real item.
+   *
+   * This looped over the *board* and looked each item up in the patch map, so
+   * an update for an id that does not exist was silently dropped while the
+   * call still reported success. A model revising five labels and mistyping one
+   * id would be told all five landed. Checking the request instead of the board
+   * is what makes the report honest.
+   */
+  const knownIds = new Set(board.items.map((item) => item.id));
+  const seen = new Map<string, number>();
+  for (const [index, update] of updates.entries()) {
+    if (!knownIds.has(update.id)) {
+      throw new BoardValidationError(
+        `Update ${index} targets ${JSON.stringify(update.id)}, which is not on this board`,
+        "ITEM_NOT_FOUND",
+        `updates[${index}].id`,
+        "an id that exists on this board",
+        `Re-read the board with get_board and use one of its item ids. Nothing was written; re-send the whole batch with the corrected id.`,
+      );
+    }
+    /*
+     * Two updates for one id silently kept only the last.
+     *
+     * The map below is keyed by id, so the earlier patch vanished while the
+     * reply reported the full batch applied. Merging them would guess the
+     * caller's intent; naming the repeat is honest and keeps the batch atomic.
+     */
+    const first = seen.get(update.id);
+    if (first !== undefined) {
+      throw new BoardValidationError(
+        `Updates ${first} and ${index} both target ${JSON.stringify(update.id)}`,
+        "DUPLICATE_UPDATE",
+        `updates[${index}].id`,
+        "one update per item id",
+        `Merge the two patches into one, or send them in separate calls. Only the last would have applied.`,
+      );
+    }
+    seen.set(update.id, index);
+  }
   const patches = new Map(updates.map((update) => [update.id, update.patch]));
   const timestamp = now();
   const items = board.items.map((item) => {
@@ -145,9 +211,23 @@ export function updateBoardItems(
 }
 
 export function removeBoardItems(board: SimpleBoard, ids: string[]): SimpleBoard {
+  /*
+   * A removal that silently skips an unknown id reports a cleanup that did not
+   * happen. Name the missing id instead, with its position in the request.
+   */
+  const presentIds = new Set(board.items.map((item) => item.id));
+  for (const [index, id] of ids.entries()) {
+    if (!presentIds.has(id)) {
+      throw new BoardValidationError(
+        `remove_ids[${index}] names ${JSON.stringify(id)}, which is not on this board`,
+        "ITEM_NOT_FOUND",
+        `remove_ids[${index}]`,
+        "an id that exists on this board",
+        `Re-read the board with get_board and use one of its item ids. Nothing was removed.`,
+      );
+    }
+  }
   const removeSet = new Set(ids);
-  const found = board.items.some((item) => removeSet.has(item.id));
-  if (!found) throw new Error("Board item not found");
   return touchBoard({
     ...board,
     items: board.items.filter((item) => !removeSet.has(item.id)),
@@ -162,7 +242,15 @@ export function replaceBoardContent(current: SimpleBoard, incoming: unknown): Si
 
 
 export function removeBoardItem(board: SimpleBoard, id: string): SimpleBoard {
-  if (!board.items.some((item) => item.id === id)) throw new Error("Board item not found");
+  if (!board.items.some((item) => item.id === id)) {
+    throw new BoardValidationError(
+      `No item has the id ${JSON.stringify(id)}`,
+      "ITEM_NOT_FOUND",
+      "remove_ids[]",
+      "an id that exists on this board",
+      `Re-read the board with get_board and use one of its item ids. Nothing was removed.`,
+    );
+  }
   return touchBoard({
     ...board,
     items: board.items.filter((item) => item.id !== id),
@@ -175,11 +263,47 @@ export function addBoardNote(
   input: { body: string; author: BoardAuthor; itemId?: string },
 ): SimpleBoard {
   const body = input.body.trim().slice(0, MAX_TEXT);
-  if (!body) throw new Error("Note body is required");
-  if (!isAuthor(input.author)) throw new Error("Invalid note author");
-  if (input.itemId && !board.items.some((item) => item.id === input.itemId))
-    throw new Error("Referenced board item not found");
-  if (board.notes.length >= MAX_NOTES) throw new Error("Board note limit reached");
+  /*
+   * A note is the free-text annotation attached to an object. It is part of
+   * Board v1 and still reachable from `replace_board` payloads, so its
+   * rejections get the same shape as everything else.
+   */
+  if (!body) {
+    throw new BoardValidationError(
+      "A note needs a body",
+      "NOTE_BODY_REQUIRED",
+      "notes[].body",
+      "a non-empty string",
+      `Send the note text in body; whitespace only is treated as empty.`,
+    );
+  }
+  if (!isAuthor(input.author)) {
+    throw new BoardValidationError(
+      `Note author ${JSON.stringify(input.author)} is not "human" or "ai"`,
+      "INVALID_AUTHOR",
+      "notes[].author",
+      `"human" or "ai"`,
+      `Attribution is what makes the board two-way, so a custom name is refused rather than coerced.`,
+    );
+  }
+  if (input.itemId && !board.items.some((item) => item.id === input.itemId)) {
+    throw new BoardValidationError(
+      `Note references item ${JSON.stringify(input.itemId)}, which is not on this board`,
+      "UNKNOWN_NOTE_ITEM",
+      "notes[].itemId",
+      "an item id from this board, or omit it",
+      `Point the note at an existing item, or leave itemId out for a free-standing note.`,
+    );
+  }
+  if (board.notes.length >= MAX_NOTES) {
+    throw new BoardValidationError(
+      `Board holds ${board.notes.length} notes; the limit is ${MAX_NOTES}`,
+      "NOTE_LIMIT",
+      "notes",
+      `at most ${MAX_NOTES} notes`,
+      `Remove an older note before adding another.`,
+    );
+  }
   const note: BoardNote = {
     id: makeId("note"),
     author: input.author,

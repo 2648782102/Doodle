@@ -33,7 +33,9 @@ export function changeReportText(report: Record<string, unknown>): string {
   const updated = report.updated as string[];
   const removed = report.removed as string[];
   return [
-    `CHANGE_JSON: ${JSON.stringify(report, null, 2)}`,
+    // Compact on purpose: the same report is already in `structuredContent`,
+    // so the text copy only needs to be parseable, not pretty.
+    `CHANGE_JSON: ${JSON.stringify(report)}`,
     `CHANGED: 新增 ${added.length} · 更新 ${updated.length} · 删除 ${removed.length}`,
   ].join("\n");
 }

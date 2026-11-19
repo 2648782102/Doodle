@@ -127,7 +127,7 @@ describe("post-cleanup repository shape", () => {
     const files = [
       "README.md", "README.en.md", "AGENTS.md", "CHANGELOG.md", "CONTRIBUTING.md",
       "SECURITY.md", "ROADMAP.md", "docs/PRODUCT_DIRECTION.md", "docs/ARCHITECTURE.md",
-      "docs/DECISIONS.md", "docs/GOAL_PLUGIN.md", "docs/README.md", "docs/TROUBLESHOOTING.md",
+      "docs/DECISIONS.md", "docs/GOALS.md", "docs/README.md", "docs/TROUBLESHOOTING.md",
     ];
     for (const relative of files) {
       const text = await fs.readFile(path.join(root, relative), "utf8");
@@ -149,7 +149,7 @@ describe("post-cleanup repository shape", () => {
     const strictFiles = [
       "AGENTS.md", "CONTRIBUTING.md",
       "SECURITY.md", "ROADMAP.md", "docs/PRODUCT_DIRECTION.md",
-      "docs/DECISIONS.md", "docs/GOAL_PLUGIN.md", "src/board/instructions.ts", "src/server.ts",
+      "docs/DECISIONS.md", "docs/GOALS.md", "src/board/instructions.ts", "src/server.ts",
     ];
     for (const relative of strictFiles) {
       const text = await fs.readFile(path.join(root, relative), "utf8");
@@ -182,8 +182,8 @@ describe("post-cleanup repository shape", () => {
       "README.md", "README.en.md", "AGENTS.md", "CONTRIBUTING.md", "SECURITY.md",
       "ROADMAP.md", "RELEASING.md", "VERSIONING.md", "CHANGELOG.md",
       "docs/README.md", "docs/PRODUCT_DIRECTION.md", "docs/ARCHITECTURE.md",
-      "docs/DECISIONS.md", "docs/TROUBLESHOOTING.md", "docs/GOAL_MODE.md",
-      "docs/GOAL_PLUGIN.md", "docs/GOAL_EXPERIENCE.md", "docs/GOAL_EXCALIDRAW.md", "docs/EXCALIDRAW_COMPARISON.md",
+      "docs/DECISIONS.md", "docs/TROUBLESHOOTING.md", "docs/GOALS.md",
+      "docs/EXCALIDRAW_COMPARISON.md",
       "docs/GOVERNANCE.md", "docs/COMPETITIVE_RESEARCH.md",
       "docs/DEPENDENCY_MAINTENANCE.md", "docs/LAUNCH_KIT.md",
     ];

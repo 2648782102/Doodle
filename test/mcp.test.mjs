@@ -198,6 +198,13 @@ describe("MCP board server", () => {
       const board = jsonAfter(text, "BOARD_JSON:");
       expect(board).toMatchObject({ version: 1, readOnly: true });
       expect(board.capabilities.objectTypes).toContain("stroke");
+      // Image export exists on the human canvas, so an agent must never read
+      // the capability list as "Doodle cannot produce a PNG/JPG/SVG".
+      expect(board.capabilities.libraryFormat).toBe("editable-json");
+      expect(board.capabilities.sharingExports).toEqual(["png", "jpg", "svg"]);
+      expect(board.capabilities.sharingExportOwner).toBe("human-canvas");
+      expect(board.capabilities.sharingExportHint).toContain("分享快照");
+      expect(text).toContain("图库 → 分享快照");
       expect(board.visualDigest).toMatchObject({ version: 1, itemCount: 0 });
       expect(Array.isArray(board.items)).toBe(true);
       expect(board.safety).toMatchObject({ projectWritesRequireHumanApproval: true });
@@ -217,7 +224,7 @@ describe("MCP board server", () => {
       expect(text).not.toContain("FIRST_USE:");
       expect(text).not.toContain("BOARD_JSON is the read-only shared state");
       expect(text).toContain("BOARD_JSON:");
-      expect(text).toContain('"text": "context"');
+      expect(text).toContain('"text":"context"');
     });
   }, 30_000);
 
@@ -240,6 +247,96 @@ describe("MCP board server", () => {
 
       const guided = textOf(await client.callTool({ name: "get_board", arguments: { include_guide: true } }));
       expect(guided).toContain("CAPABILITIES:");
+    });
+  }, 30_000);
+
+  it("does not resend the guide on repeated empty reads", async () => {
+    // `firstUse || !state.guideSent` kept the guide permanent on an empty
+    // board, so four consecutive reads all cost the same 10,989 bytes. An empty
+    // board is the most-reread state an agent has.
+    await withClient(async (client) => {
+      const first = textOf(await client.callTool({ name: "get_board", arguments: {} }));
+      expect(first).toContain("CAPABILITIES:");
+      expect(first).toContain("Visual recipes:");
+
+      const second = textOf(await client.callTool({ name: "get_board", arguments: {} }));
+      const third = textOf(await client.callTool({ name: "get_board", arguments: {} }));
+      for (const reread of [second, third]) {
+        expect(reread).not.toContain("CAPABILITIES:");
+        expect(reread).not.toContain("Visual recipes:");
+        expect(reread).not.toContain("Drawing guide:");
+      }
+      expect(second).toBe(third);
+      expect(second.length).toBeLessThan(first.length * 0.75);
+    });
+  }, 30_000);
+
+  it("trims the text block for a summary view", async () => {
+    // `view: "summary"` dropped `items` from structured content while the text
+    // block still carried the guide and recipes, so the cheap view cost almost
+    // as much as a full read.
+    await withClient(async (client) => {
+      await client.callTool({
+        name: "draw_board",
+        arguments: { author: "ai", items: [{ type: "note", x: 0, y: 0, w: 160, h: 90, text: "context" }] },
+      });
+      const full = textOf(await client.callTool({ name: "get_board", arguments: {} }));
+      const summary = textOf(await client.callTool({ name: "get_board", arguments: { view: "summary" } }));
+
+      expect(summary).toContain("BOARD_VIEW_SUMMARY:");
+      expect(summary).not.toContain("CAPABILITIES:");
+      expect(summary).not.toContain("Visual recipes:");
+      expect(summary).not.toContain('"items":');
+      expect(summary).not.toContain('"copyText":');
+      expect(summary.length).toBeLessThan(full.length);
+    });
+  }, 30_000);
+
+  it("does not send the board twice on a graded view", async () => {
+    // The text copy is byte-identical to structuredContent, so `full` keeps it
+    // for text-only hosts. A graded view exists to cut tokens, and it was still
+    // shipping both channels in full: `detail` cost 24.5 KB on a 25-object
+    // board. Graded views now name their payload and leave the data to
+    // structuredContent, which every MCP client receives anyway.
+    await withClient(async (client) => {
+      await client.callTool({
+        name: "draw_board",
+        arguments: { author: "ai", items: [{ type: "note", x: 0, y: 0, w: 160, h: 90, text: "graded" }] },
+      });
+      const full = await client.callTool({ name: "get_board", arguments: {} });
+      const detail = await client.callTool({ name: "get_board", arguments: { view: "detail" } });
+      const detailText = textOf(detail);
+
+      // The agent payload is still delivered, just once.
+      expect(detail.structuredContent.items.some((item) => item.text === "graded")).toBe(true);
+      expect(detailText).toContain("BOARD_VIEW_DETAIL:");
+      expect(detailText).not.toContain("BOARD_JSON:");
+      expect(detailText).not.toContain('"items":[');
+      expect(Buffer.byteLength(detailText)).toBeLessThan(Buffer.byteLength(textOf(full)) / 2);
+
+      // `full` keeps the complete text copy, per the documented contract.
+      expect(textOf(full)).toContain("BOARD_JSON:");
+      expect(textOf(full)).toContain('"items":[');
+    });
+  }, 30_000);
+
+  it("rejects a per-item author instead of relabelling it", async () => {
+    // The write path stamps every item with the top-level author. Accepting a
+    // per-item `author` and overriding it let a model mark a person's words as
+    // its own without any signal.
+    await withClient(async (client) => {
+      const result = await client.callTool({
+        name: "draw_board",
+        arguments: {
+          author: "ai",
+          items: [{ type: "note", x: 0, y: 0, w: 160, h: 90, text: "person words", author: "human" }],
+        },
+      });
+      const text = textOf(result);
+
+      expect(result.isError).toBe(true);
+      expect(text).toContain("AUTHOR_ON_ITEM");
+      expect(text).toContain("author must not be set per item");
     });
   }, 30_000);
 
@@ -475,6 +572,250 @@ describe("MCP board server", () => {
         },
       });
       expect(before.revision).toBeLessThan(after.revision);
+    });
+  }, 30_000);
+
+  it("returns only what the canvas needs from a write, not the whole agent payload", async () => {
+    // A write hands the board back so the embedded canvas can repaint without a
+    // second round trip. `applyRemoteSnapshot` reads exactly id, revision,
+    // items, and library; copyText, visualDigest, diagnosis, capabilities, and
+    // safety were dead weight on every brush stroke.
+    await withClient(async (client) => {
+      const result = await client.callTool({
+        name: "draw_board",
+        arguments: { author: "ai", items: [{ type: "note", x: 0, y: 0, w: 160, h: 90, text: "write cost" }] },
+      });
+      const sc = result.structuredContent;
+
+      // The canvas contract is intact.
+      expect(Array.isArray(sc.items)).toBe(true);
+      expect(typeof sc.revision).toBe("number");
+      expect(typeof sc.id).toBe("string");
+      expect(Array.isArray(sc.library.boards)).toBe(true);
+
+      // Agent-facing fields are gone from the write result.
+      expect(sc.capabilities).toBeUndefined();
+      expect(sc.copyText).toBeUndefined();
+      expect(sc.visualDigest).toBeUndefined();
+      expect(sc.diagnosis).toBeUndefined();
+      expect(sc.safety).toBeUndefined();
+
+      // The agent still gets them from get_board.
+      const read = await client.callTool({ name: "get_board", arguments: {} });
+      expect(read.structuredContent.capabilities).toBeDefined();
+      expect(read.structuredContent.visualDigest).toBeDefined();
+
+      // A canvas edit round-trips through replace_board without losing fields
+      // the person's own copy depends on.
+      const edited = sc.items.map((item) => item.text === "write cost" ? { ...item, text: "edited", x: 20 } : item);
+      const replaced = await client.callTool({
+        name: "draw_board",
+        arguments: { replace_board: { ...sc, items: edited, notes: [] }, expected_revision: sc.revision },
+      });
+      const saved = replaced.structuredContent.items.find((item) => item.text === "edited");
+      expect(saved?.createdAt).toBeTruthy();
+      expect(saved?.author).toBe("ai");
+    });
+  }, 30_000);
+
+  it("lets two unpinned writes land instead of failing one on a revision race", async () => {
+    // A write without `expected_revision` means "append to whatever is there".
+    // The handler used to read the board outside the store lock and then write
+    // with that revision, so two agents drawing at the same moment produced
+    // `expected N, found N+1` for the loser — a failure neither of them asked
+    // for and neither could act on. `store.mutate` re-reads inside the lock.
+    const outputDir = path.join(tempDir, "concurrent");
+    // Two long-lived clients: `withClientIn` closes its client in `finally`,
+    // which would tear down a connection the other half of the race still needs.
+    const openClient = async (name) => {
+      const transport = new StdioClientTransport({
+        command: "node",
+        args: ["dist/index.js"],
+        env: {
+          ...process.env,
+          PREVIEW_PORT: String(await freePort()),
+          LOG_LEVEL: "error",
+          OUTPUT_DIR: outputDir,
+          DOODLE_WORKSPACE_ROOT: process.cwd(),
+        },
+      });
+      const client = new Client({ name, version: "1.0.0" });
+      await client.connect(transport);
+      return client;
+    };
+    const left = await openClient("doodle-concurrent-left");
+    const right = await openClient("doodle-concurrent-right");
+    try {
+      const [first, second] = await Promise.all([
+        left.callTool({
+          name: "draw_board",
+          arguments: { author: "ai", items: [{ type: "note", x: 0, y: 0, w: 160, h: 90, text: "conc-a" }] },
+        }),
+        right.callTool({
+          name: "draw_board",
+          arguments: { author: "ai", items: [{ type: "note", x: 200, y: 0, w: 160, h: 90, text: "conc-b" }] },
+        }),
+      ]);
+
+      expect(first.isError).toBeFalsy();
+      expect(second.isError).toBeFalsy();
+
+      const board = (await left.callTool({ name: "get_board", arguments: {} })).structuredContent;
+      expect(board.items.some((item) => item.text === "conc-a")).toBe(true);
+      expect(board.items.some((item) => item.text === "conc-b")).toBe(true);
+    } finally {
+      await left.close();
+      await right.close();
+    }
+  }, 60_000);
+
+  it("still rejects a stale write that pins a revision", async () => {
+    // The optimistic check stays strict: `expected_revision` is a claim about
+    // what the caller last saw, and rebasing it onto a newer board would
+    // overwrite whatever the other writer did.
+    const outputDir = path.join(tempDir, "stale-pin");
+    await withClientIn(outputDir, async (client) => {
+      const seen = (await client.callTool({ name: "get_board", arguments: {} })).structuredContent;
+      await client.callTool({
+        name: "draw_board",
+        arguments: { author: "human", items: [{ type: "note", x: 0, y: 0, w: 160, h: 90, text: "human edit" }] },
+      });
+      const stale = await client.callTool({
+        name: "draw_board",
+        arguments: {
+          expected_revision: seen.revision,
+          author: "ai",
+          items: [{ type: "note", x: 200, y: 0, w: 160, h: 90, text: "stale ai" }],
+        },
+      });
+
+      expect(stale.isError).toBe(true);
+      const board = (await client.callTool({ name: "get_board", arguments: {} })).structuredContent;
+      expect(board.items.some((item) => item.text === "human edit")).toBe(true);
+      expect(board.items.some((item) => item.text === "stale ai")).toBe(false);
+    });
+  }, 30_000);
+
+  it("returns a repaintable snapshot from library actions, not only the agent payload", async () => {
+    // `libraryRequest` in the canvas reads the active snapshot to repaint
+    // without a second fetch. This branch used to return the agent payload
+    // only, so the canvas fell back to `/api/board` on every library action.
+    await withClient(async (client) => {
+      await client.callTool({
+        name: "draw_board",
+        arguments: { author: "ai", items: [{ type: "note", x: 0, y: 0, w: 160, h: 90, text: "lib snap" }] },
+      });
+
+      const listed = await client.callTool({ name: "draw_board", arguments: { library: { type: "list" } } });
+      const sc = listed.structuredContent;
+      expect(Array.isArray(sc.items)).toBe(true);
+      expect(typeof sc.revision).toBe("number");
+      expect(typeof sc.id).toBe("string");
+      expect(Array.isArray(sc.library.boards)).toBe(true);
+      expect(sc.capabilities).toBeUndefined();
+      expect(sc.copyText).toBeUndefined();
+
+      // Export still carries the requested board separately from the active one.
+      const exported = await client.callTool({ name: "draw_board", arguments: { library: { type: "export" } } });
+      expect(exported.structuredContent.exportBoard).toMatchObject({ version: 1 });
+      expect(exported.structuredContent.exportBoard.items.length).toBeGreaterThan(0);
+    });
+  }, 30_000);
+
+  it("sends the guide once across get_board and show_board", async () => {
+    // Both tools carry CAPABILITIES and RECIPES, and `show_board` is called
+    // repeatedly: once per view request, and after a draw in hosts that cannot
+    // render the MCP App from the write result. The guide is the same bytes
+    // every time, so the two tools share one flag.
+    const outputDir = path.join(tempDir, "shared-guide");
+    await withClientIn(outputDir, async (client) => {
+      const first = textOf(await client.callTool({ name: "show_board", arguments: {} }));
+      expect(first).toContain("CAPABILITIES:");
+      expect(first).toContain("Visual recipes:");
+
+      const second = textOf(await client.callTool({ name: "show_board", arguments: {} }));
+      expect(second).not.toContain("CAPABILITIES:");
+      expect(second).not.toContain("Visual recipes:");
+      expect(second.length).toBeLessThan(first.length);
+
+      // The cross-tool half: get_board must know the guide already went out.
+      const read = textOf(await client.callTool({ name: "get_board", arguments: {} }));
+      expect(read).not.toContain("Visual recipes:");
+      expect(read).toContain("GUIDE:");
+
+      // The canvas still gets its board every time.
+      const shown = await client.callTool({ name: "show_board", arguments: {} });
+      expect(Array.isArray(shown.structuredContent.items)).toBe(true);
+      expect(shown.structuredContent.capabilities).toBeDefined();
+    });
+  }, 30_000);
+
+  it("does not report a board switch as an edit", async () => {
+    // The revision cache is keyed by revision alone. Asking for a delta after a
+    // library switch compared the new board against the old board's revision,
+    // so every object of the new board read as "added" and every object of the
+    // old one as "removed" — a change report for something nobody did.
+    const outputDir = path.join(tempDir, "switch-delta");
+    await withClientIn(outputDir, async (client) => {
+      await client.callTool({
+        name: "draw_board",
+        arguments: { author: "ai", items: [{ type: "note", x: 0, y: 0, w: 160, h: 90, text: "A only" }] },
+      });
+      const boardA = (await client.callTool({ name: "get_board", arguments: {} })).structuredContent;
+
+      await client.callTool({
+        name: "draw_board",
+        arguments: { library: { type: "create", name: "Other", switchTo: true } },
+      });
+      await client.callTool({
+        name: "draw_board",
+        arguments: { author: "ai", items: [{ type: "note", x: 0, y: 0, w: 160, h: 90, text: "B only" }] },
+      });
+      const boardB = (await client.callTool({ name: "get_board", arguments: {} })).structuredContent;
+      expect(boardB.id).not.toBe(boardA.id);
+
+      const delta = await client.callTool({ name: "get_board", arguments: { since_revision: boardA.revision } });
+      const text = textOf(delta);
+
+      // Falls back to a full read that explains why, instead of inventing edits.
+      expect(delta.structuredContent.mode).toBeUndefined();
+      expect(delta.structuredContent.added).toBeUndefined();
+      expect(delta.structuredContent.removed).toBeUndefined();
+      expect(text).toContain("另一张画板");
+      expect(delta.structuredContent.itemCount).toBe(boardB.itemCount);
+    });
+  }, 30_000);
+
+  it("keeps the person on their board when switchTo is false", async () => {
+    // create/save/duplicate/import make the result active by default, which is
+    // right for the canvas (you just made it, you want to see it) but wrong for
+    // an agent tidying the library: the person's view would move under them.
+    // The field was undocumented, so a model had no way to know either way.
+    // Own state dir: the shared `tempDir` is reused by the library test below,
+    // which asserts an exact board count.
+    const outputDir = path.join(tempDir, "switch-to-false");
+    await withClientIn(outputDir, async (client) => {
+      await client.callTool({
+        name: "draw_board",
+        arguments: { author: "ai", items: [{ type: "note", x: 0, y: 0, w: 160, h: 90, text: "stay here" }] },
+      });
+      const before = (await client.callTool({ name: "get_board", arguments: {} })).structuredContent;
+
+      const background = await client.callTool({
+        name: "draw_board",
+        arguments: { library: { type: "create", name: "Background", switchTo: false } },
+      });
+      expect(background.structuredContent.id).toBe(before.id);
+      expect(background.structuredContent.library.boards.some((board) => board.name === "Background")).toBe(true);
+      expect(background.structuredContent.library.boards.find((board) => board.id === before.id).active).toBe(true);
+
+      // Omitting the field still switches, which is what the canvas relies on.
+      const active = await client.callTool({
+        name: "draw_board",
+        arguments: { library: { type: "create", name: "Foreground" } },
+      });
+      expect(active.structuredContent.id).not.toBe(before.id);
+      expect(active.structuredContent.title).toBe("Foreground");
     });
   }, 30_000);
 

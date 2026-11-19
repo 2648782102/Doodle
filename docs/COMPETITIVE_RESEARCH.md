@@ -35,4 +35,4 @@ No hosted collaboration, general chat product, mandatory workflow, diagram asset
 
 ## Excalidraw engine decision
 
-Since `0.8.0`, Doodle ships `@excalidraw/excalidraw` as its human canvas. Doodle Board v1 stays the authoritative persisted state and Excalidraw scene/appState stay UI-only. tldraw is excluded because its SDK license is not open source and requires a license key for production; React Flow is excluded because it turns the board into a node editor; Konva/Fabric are lower-level engines rather than complete whiteboards. See `GOAL_EXCALIDRAW.md` for acceptance and red lines.
+Since `0.8.0`, Doodle ships `@excalidraw/excalidraw` as its human canvas. Doodle Board v1 stays the authoritative persisted state and Excalidraw scene/appState stay UI-only. tldraw is excluded because its SDK license is not open source and requires a license key for production; React Flow is excluded because it turns the board into a node editor; Konva/Fabric are lower-level engines rather than complete whiteboards. See `GOALS.md` for acceptance and red lines.

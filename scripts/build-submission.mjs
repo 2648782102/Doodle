@@ -11,7 +11,14 @@ const archive = path.join(root, "doodle-plugin-submission", `doodle-${packageJso
 await fs.mkdir(path.dirname(archive), { recursive: true });
 await fs.rm(archive, { force: true });
 await fs.access(pluginRoot);
-const archiveCommand = process.platform === "win32" ? "tar" : "zip";
+/*
+ * Windows ships bsdtar in System32, but a Git Bash or MSYS shell puts a GNU tar
+ * earlier on PATH. GNU tar reads `C:\...` as a `host:path` remote and fails
+ * with "Cannot connect to C: resolve failed", so name the Windows binary.
+ */
+const archiveCommand = process.platform === "win32"
+  ? path.join(process.env.SystemRoot ?? "C:\\Windows", "System32", "tar.exe")
+  : "zip";
 const archiveArgs = process.platform === "win32"
   ? ["-a", "-c", "-f", archive, "doodle"]
   : ["-q", "-r", archive, "doodle"];

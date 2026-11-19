@@ -14,6 +14,7 @@ const glassSource = [
   await readFile(path.join(root, "src", "infra", "templates", "liquid-glass.ts"), "utf8"),
   await readFile(path.join(root, "src", "infra", "templates", "liquid-glass-maps.ts"), "utf8"),
 ].join("\n");
+const appSource = await readFile(path.join(root, "src", "infra", "templates", "excalidraw-app.tsx"), "utf8");
 
 function alphaOf(token) {
   const match = new RegExp(`--${token}:\\s*rgba\\(\\s*\\d+,\\s*\\d+,\\s*\\d+,\\s*([\\d.]+)\\s*\\)`).exec(template);
@@ -281,9 +282,11 @@ describe("liquid glass material", () => {
     // A material switch, not another palette: the sheet is opaque and the
     // refraction is gone, which is what "paper" has to mean visually.
     expect(template).toContain(':root[data-doodle-material="paper"]');
-    const lightPaper = template.slice(template.indexOf(":root {"));
-    expect(lightPaper.slice(0, 6000)).toContain("--glass-lens-scale: 0;");
-    expect(lightPaper.slice(0, 6000)).toContain("--paper-sheet:");
+    // The light paper block is the :root that declares the cream sheet; an
+    // earlier unconditional :root now holds only theme-independent metrics.
+    const creamSheet = template.indexOf("--paper-sheet: #fdfbf5");
+    expect(creamSheet).toBeGreaterThan(0);
+    expect(template.slice(creamSheet, creamSheet + 6000)).toContain("--glass-lens-scale: 0;");
     // Dark is now a dark sheet, not the old tinted lens. It shares the paper
     // material and must zero the lens exactly like the light appearance.
     const darkPaper = template.slice(template.indexOf(':root[data-doodle-theme="dark"] {'));
@@ -410,5 +413,152 @@ describe("liquid glass material", () => {
     expect(template).toMatch(/\.excalidraw \.layer-ui__search-header \.ExcTextField__input\s*\{[^}]*background-color:\s*var\(--input-bg-color\)\s*!important/);
     expect(template).toMatch(/\.excalidraw \.layer-ui__search-header \.ExcTextField__input input\s*\{[^}]*color:\s*var\(--doodle-ink\)/);
     expect(template).toMatch(/\.excalidraw \.layer-ui__search-header \.ExcTextField__input input::placeholder\s*\{[^}]*color:\s*var\(--doodle-muted\)/);
+  });
+
+  it("keeps the dark paper's bevel and fibre visible on charcoal", () => {
+    /*
+     * On the night sheet the multiply-strength cream grain screens back to
+     * almost nothing and a 0.09 bevel highlight is invisible. The dark
+     * appearance raises both so the card still reads as stock, and keeps its
+     * own higher-alpha noise fields.
+     */
+    const dark = template.slice(template.indexOf(':root[data-doodle-theme="dark"] {'));
+    const bevel = /--paper-bevel-light:\s*rgba\(255,\s*255,\s*255,\s*([\d.]+)\)/.exec(dark.slice(0, 6000));
+    expect(bevel).not.toBeNull();
+    expect(Number(bevel[1])).toBeGreaterThan(0.12);
+    const darkFibre = template.slice(template.indexOf(':root[data-doodle-material="paper"][data-doodle-theme="dark"] {'));
+    const slopes = [...darkFibre.slice(0, 1500).matchAll(/feFuncA type='linear' slope='([\d.]+)'/g)].map((m) => Number(m[1]));
+    expect(slopes.length).toBeGreaterThanOrEqual(2);
+    expect(Math.min(...slopes)).toBeGreaterThan(0.05);
+  });
+
+  it("defines theme-independent metrics on every appearance", () => {
+    /*
+     * Radius, drawer width, font, easing and --doodle-duration used to live
+     * only in the glass token block, so both paper appearances resolved them
+     * to nothing: no drawer width, no font, and every transition at 0s.
+     * They must come from an unconditional :root before the palette blocks.
+     */
+    const shared = template.slice(template.indexOf("Theme-independent metrics"), template.indexOf(':root[data-doodle-theme="glass"] {'));
+    for (const name of ["--doodle-radius", "--doodle-radius-sm", "--doodle-space", "--doodle-ease", "--doodle-duration", "--doodle-drawer-width", "--doodle-font"]) {
+      expect(shared, `${name} is not defined for all themes`).toContain(name);
+    }
+    expect(shared).toContain(":root {");
+  });
+
+  it("eases paint on an explicit theme switch but not on first paint", () => {
+    /*
+     * A palette flip should cross-fade backgrounds, borders, ink and shadow,
+     * never geometry. The class is added only for the click path; the initial
+     * applyTheme(readTheme()) must stay synchronous so a reload cannot flash.
+     */
+    expect(appSource).toMatch(/function applyTheme\(theme: DoodleTheme, animate = false\)/);
+    expect(appSource).toContain('classList.add("theme-switching")');
+    expect(appSource).toMatch(/applyTheme\(button\.dataset\.themeOption, true\)/);
+    expect(appSource).toMatch(/applyTheme\(readTheme\(\)\);/);
+    const easeRule = template.slice(template.indexOf(".theme-switching body,"));
+    const transition = easeRule.slice(0, easeRule.indexOf("}"));
+    for (const prop of ["background-color", "border-color", "color", "box-shadow"]) {
+      expect(transition).toContain(prop);
+    }
+    for (const geometry of ["width", "height", "transform", "margin", "padding", "inset"]) {
+      expect(transition.replace(/background-color|border-color|box-shadow/g, ""), `${geometry} must not animate`).not.toContain(geometry);
+    }
+  });
+
+  it("moves the capsule below the toolbar across the tablet band", () => {
+    /*
+     * Excalidraw's centred toolbar slides left below ~880px and collides with
+     * the Doodle capsule from 860px down. The phone layout only moved the
+     * capsule below 640px, so 641–860 overlapped. A dedicated 641–900 band
+     * drops the capsule a row while keeping the drawer a floating card.
+     */
+    expect(template).toMatch(/@media \(min-width: 641px\) and \(max-width: 900px\)\s*\{\s*\.doodle-topbar \{ top: 72px/);
+    // The band rule must come after the base capsule rule to win at equal
+    // specificity; a rule placed before it is silently overridden.
+    const band = template.indexOf("@media (min-width: 641px)");
+    const base = template.indexOf(".doodle-topbar { position: fixed");
+    expect(band).toBeGreaterThan(base);
+    // The phone band keeps its own full-screen drawer behaviour.
+    expect(template).toContain("@media (max-width: 640px)");
+  });
+
+  it("gives paper chrome a raised layer above the desk", () => {
+    /*
+     * All three --glass-surface-* used to equal --paper-sheet, so the desk,
+     * toolbar, drawer and menu were one flat colour. A second stock tint lets
+     * lifted surfaces (drawer, dropdown) sit visibly above resting chrome.
+     */
+    // Light paper is located by its cream sheet token (an earlier :root holds
+    // only theme-independent metrics); dark by its theme selector.
+    const from = (at) => template.slice(at, at + 6500);
+    for (const [name, at] of [
+      ["light", template.indexOf("--paper-sheet: #fdfbf5")],
+      ["dark", template.indexOf('--paper-sheet: #22262a')],
+    ]) {
+      const block = from(at);
+      expect(block, `${name} lacks the card/well steps`).toContain("--paper-card:");
+      expect(block).toContain("--paper-well:");
+      expect(block).toMatch(/--glass-surface-panel:\s*var\(--paper-card\)/);
+      expect(block).toMatch(/--glass-surface-float:\s*var\(--paper-sheet\)/);
+    }
+    // The library drawer is the lifted layer, not the resting one.
+    expect(template).toMatch(/:root\[data-doodle-material="paper"\] \.doodle-library-panel\s*\{\s*background-color:\s*var\(--paper-card\)/);
+  });
+
+  it("marks the active appearance with a hand-drawn cue, not a straight rule", () => {
+    /*
+     * The doodle signature lives in one spot: the pressed theme segment gets
+     * a slightly wobbly SVG underline. It uses currentColor via a mask so it
+     * follows each palette's accent, with no font or image dependency.
+     */
+    expect(template).toMatch(/\.doodle-theme-option\[aria-pressed="true"\]::after/);
+    const rule = template.slice(template.indexOf('.doodle-theme-option[aria-pressed="true"]::after'));
+    const body = rule.slice(0, rule.indexOf("}"));
+    expect(body).toContain("background: currentColor");
+    expect(body).toContain("mask:");
+    expect(body).toMatch(/%3Cpath d='M0 2 C/); // curved, not a straight rule
+    expect(template).toMatch(/\.doodle-theme-option \{\s*position: relative/);
+  });
+
+  it("does not rebuild the material when the active appearance is re-selected", () => {
+    /*
+     * Clicking the already-pressed theme used to dispatch doodle-theme-change,
+     * rebuilding every pane's SVG maps and recolouring the scene for no visual
+     * change. applyTheme now short-circuits when the dataset already matches;
+     * the very first call still applies because no dataset is set yet.
+     */
+    expect(appSource).toMatch(/if \(document\.documentElement\.dataset\.doodleTheme === theme\) return;/);
+  });
+
+  it("cuts paper corners slightly irregular and lifts cards off the desk", () => {
+    /*
+     * Paper panes get hand-rounded (non-uniform) radii — the one static doodle
+     * cue in the chrome — while glass keeps exact arcs. A fourth, wider shadow
+     * layer detaches the card from the page (claymorphism's depth signal).
+     */
+    expect(template).toMatch(/--paper-radius:\s*\d+px \d+px \d+px \d+px/);
+    expect(template).toMatch(/--paper-radius-lg:\s*\d+px \d+px \d+px \d+px/);
+    expect(template).toMatch(/:root\[data-doodle-material="paper"\] \.doodle-topbar[\s\S]{0,300}border-radius: var\(--paper-radius\)/);
+    expect(template).toMatch(/:root\[data-doodle-material="paper"\] \.doodle-library-panel \{\s*border-radius: var\(--paper-radius-lg\)/);
+    const shadows = [...template.matchAll(/--paper-shadow-card:([\s\S]*?);/g)].map((m) => m[1]);
+    expect(shadows.length).toBeGreaterThanOrEqual(2);
+    for (const shadow of shadows) {
+      expect((shadow.match(/0 /g) || []).length, "card shadow lost a depth layer").toBeGreaterThanOrEqual(4);
+    }
+  });
+
+  it("keeps pane radii in tokens instead of magic numbers", () => {
+    /*
+     * The base pane radii used to be 13 scattered `14px` / `18px` literals and
+     * an unused `--doodle-radius: 12px`. They now come from two tokens, so a
+     * geometry change is one edit and paper's irregular override stays a
+     * single high-specificity rule.
+     */
+    expect(template).toMatch(/--doodle-radius:\s*14px/);
+    expect(template).toMatch(/--doodle-radius-lg:\s*18px/);
+    expect(template).not.toMatch(/border-radius:\s*(14|18)px/);
+    expect(template).toContain("border-radius: var(--doodle-radius)");
+    expect(template).toContain("border-radius: var(--doodle-radius-lg)");
   });
 });

@@ -46,7 +46,7 @@ Two things are intentionally still global, so do not expect worktree isolation t
 A change to an MCP tool schema, the version 1 board state, the HTTP API, project scanning, the embedded host context bridge, or a security boundary must update all of these together:
 
 - `AGENTS.md`, `README.md`, and `README.en.md`
-- `docs/PRODUCT_DIRECTION.md`, `docs/GOAL_PLUGIN.md`, `docs/ARCHITECTURE.md`, and `docs/DECISIONS.md`
+- `docs/PRODUCT_DIRECTION.md`, `docs/GOALS.md`, `docs/ARCHITECTURE.md`, and `docs/DECISIONS.md`
 - `CHANGELOG.md`, `SECURITY.md`, `PRIVACY.md`, `SUPPORT.md`, `TERMS.md`, `docs/FAQ.md`, `docs/SUBMISSION.md`, and relevant maintenance docs
 - `test/board.test.mjs`, `test/http.test.mjs`, and `test/mcp.test.mjs`
 - `examples/`, `.github/workflows/ci.yml`, `scripts/repo-check.mjs`, and `scripts/plugin-check.mjs`

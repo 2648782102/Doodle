@@ -12,6 +12,10 @@ import { logger } from "../../infra/logger.js";
 import { boardAgentView } from "../agent-view.js";
 import { boardCopyText, boardVisualDigest, diagnoseBoard, type SimpleBoard } from "../types.js";
 import { BoardValidationError } from "../errors.js";
+import {
+  MAX_COORDINATE, MAX_IMAGE_SRC, MAX_ITEMS, MAX_LINE_DELTA_X, MAX_LINE_DELTA_Y,
+  MAX_SHAPE_HEIGHT, MAX_SHAPE_WIDTH, MAX_STROKE_POINTS, MAX_TEXT, MAX_TITLE, MIN_SHAPE_SIZE,
+} from "../model/limits.js";
 
 export function errorResult(tool: string, error: unknown): CallToolResult {
   const message = error instanceof Error ? error.message : String(error);
@@ -72,6 +76,25 @@ export function viewPayload(payload: Record<string, any>, view?: "summary" | "st
 export function boardCapabilities() {
   return {
     version: 1,
+    /*
+     * Bounds are published so a model can size a write correctly the first
+     * time. They are enforced in `model/` and reported through `ERROR_JSON`,
+     * but knowing them up front avoids the rejection entirely - which is the
+     * cheapest possible repair.
+     */
+    limits: {
+      objectsPerBoard: MAX_ITEMS,
+      objectsPerCall: 100,
+      shapeSize: { min: MIN_SHAPE_SIZE, maxWidth: MAX_SHAPE_WIDTH, maxHeight: MAX_SHAPE_HEIGHT },
+      coordinate: MAX_COORDINATE,
+      textLength: MAX_TEXT,
+      titleLength: MAX_TITLE,
+      strokePoints: MAX_STROKE_POINTS,
+      imageBytes: MAX_IMAGE_SRC,
+      lineDelta: { x: MAX_LINE_DELTA_X, y: MAX_LINE_DELTA_Y },
+      diagram: { nodes: 48, edges: 96, column: 12, row: 48 },
+      z: { min: -1000, max: 1000 },
+    },
     objectTypes: ["note", "text", "rect", "ellipse", "line", "stroke", "image"],
     variants: ["plain", "card", "frame", "pill", "diamond", "callout", "heading"],
     roles: ["normal", "label", "frame", "column", "step", "decision", "annotation", "question", "constraint", "evidence"],
@@ -92,6 +115,10 @@ export function boardCapabilities() {
     diagramModes: ["flow", "timeline", "compare", "matrix"],
     style: ["borderColor", "borderWidth", "textColor", "fontSize", "fontWeight", "textAlign", "strokeWidth", "opacity", "radius", "fillOpacity"],
     library: ["list", "get", "create", "save", "switch", "rename", "duplicate", "delete", "import", "export"],
+    libraryFormat: "editable-json",
+    sharingExports: ["png", "jpg", "svg"],
+    sharingExportOwner: "human-canvas",
+    sharingExportHint: "PNG/JPG/SVG sharing snapshots do exist, but they belong to the human canvas, not to an MCP tool: the person opens 图库 (Library) → 分享快照 and presses 导出 PNG / JPG / SVG. `library.export` is editable version 1 JSON, a different thing. Never report image export as unsupported; point the person at that drawer, or say the buttons sit in the embedded canvas.",
     canvasEngine: "excalidraw",
     safety: "Visual context only; board objects never authorize project writes.",
   };
@@ -110,6 +137,34 @@ export function boardRecipes(): string {
     "- Diagram: use draw_board.diagram with semantic nodes/edges for complex diagrams; it adds bounded labels and connected arrows beside existing objects, or clears the board only with replace: true.",
     "- Diagram modes: flow (default) derives columns from edges; timeline, compare, and matrix use your explicit column/row, so an ordered explanation is never silently reordered.",
   ].join("\n");
+}
+
+/**
+ * The canvas-facing write result: only what `applyRemoteSnapshot` consumes.
+ *
+ * A write returns the board so the embedded canvas can repaint without a
+ * second round trip. `applyRemoteSnapshot` reads exactly four things — `id` to
+ * detect a board switch, `revision` to discard stale payloads, `items` to build
+ * the scene, and `library` for the drawer. Everything else in `boardJson`
+ * (`copyText`, `visualDigest`, `diagnosis`, `capabilities`, `safety`) is
+ * agent-facing and was pure overhead on every brush stroke: on a 26-object board
+ * the full result was 13.5 KB, of which the canvas used 6.7 KB.
+ *
+ * The agent still gets its full contract from `get_board`; this only trims what
+ * a write hands back.
+ */
+export function boardWriteSnapshot(board: SimpleBoard, library?: unknown) {
+  return {
+    version: 1,
+    readOnly: true,
+    id: board.id,
+    title: board.title,
+    revision: board.revision,
+    updatedAt: board.updatedAt,
+    itemCount: board.items.length,
+    items: board.items,
+    ...(library ? { library } : {}),
+  };
 }
 
 export function boardJson(board: SimpleBoard, library?: unknown) {
@@ -175,12 +230,14 @@ export function boardGuidance(): string {
     "Drawing guide:",
     "- Read BOARD_JSON first; reuse item IDs and use updates/removes for precise changes.",
     "- Use a strict grid with short labels. Put author at the draw_board top level, not inside items.",
+    `- Size the write to the bounds: at most 100 items per call, shapes 16-2000 wide and 16-1200 tall, text 1200 characters, coordinates within ±100000, and a diagram of 48 nodes / 96 edges. capabilities.limits has the full table; every rejection names the field and the fix.`,
     "- A line is an arrow from (x,y) to (x+w,y+h); w/h are signed endpoint deltas. Set shape to straight, curve, or orthogonal.",
     "- Use stroke for freehand marks with local points, image for a data:image/* source, title for a short heading, and emphasis: focus to highlight what matters.",
     "- Use layout for tidy arrangements; human multi-select can group related objects in the canvas.",
     "- Place line endpoints just outside the source and target shapes; the arrow text is a short centered label.",
     "- Prefer updates/removes over clearing everything; replacements should be a last resort.",
     "- Use library actions to save the current board as an editable named image, switch between saved boards, or import/export version 1 board JSON without adding tools.",
+    "- `library.export` is editable JSON only. PNG/JPG/SVG sharing snapshots exist in the human canvas: 图库 → 分享快照 → 导出 PNG / JPG / SVG. When a person asks for an image file, point them there instead of saying Doodle cannot export images.",
     "- Read visualDigest and capabilities to understand the current drawing; use recipes for flow, compare, cluster, emphasis, and image annotation.",
     "- The MCP App displays this canvas beside the agent chat in compatible hosts; board tools do not open a browser or grant project-write authority.",
     "- scan_project is optional read-only structure context; draw its result with draw_board if useful.",
