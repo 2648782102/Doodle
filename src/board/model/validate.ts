@@ -153,13 +153,40 @@ export function normalizeItem(input: BoardItemInput): Omit<BoardItem, "createdAt
       y: Math.max(0, Math.min(signedHeight, point.y)),
     }))
     : undefined;
+  /*
+   * A title and a group id are bounds too, so they are rejected, not truncated.
+   *
+   * `slice(0, MAX_TITLE)` silently dropped the tail of a 121-character heading
+   * and still reported success — the same disagreement the size and coordinate
+   * bounds already refuse. A caller that wrote a heading meant to keep all of
+   * it.
+   */
+  if (input.title !== undefined && input.title.trim().length > MAX_TITLE) {
+    throw new BoardValidationError(
+      `Item title is ${input.title.trim().length} characters; the limit is ${MAX_TITLE}`,
+      "TITLE_TOO_LONG",
+      "items[].title",
+      `at most ${MAX_TITLE} characters`,
+      `Shorten the heading and move the rest into text or a note.`,
+    );
+  }
+  if (input.groupId !== undefined && input.groupId.trim().length > MAX_GROUP_ID) {
+    throw new BoardValidationError(
+      `Item groupId is ${input.groupId.trim().length} characters; the limit is ${MAX_GROUP_ID}`,
+      "GROUP_ID_TOO_LONG",
+      "items[].groupId",
+      `at most ${MAX_GROUP_ID} characters`,
+      `Use one short shared marker such as "auth" on the objects that belong together.`,
+    );
+  }
   const title = input.title?.trim().slice(0, MAX_TITLE) || undefined;
   const groupId = input.groupId?.trim().slice(0, MAX_GROUP_ID) || undefined;
   return {
     id: input.id?.trim() || makeId("item"),
     type: input.type,
-    x: Math.max(-MAX_COORDINATE, Math.min(MAX_COORDINATE, input.x)),
-    y: Math.max(-MAX_COORDINATE, Math.min(MAX_COORDINATE, input.y)),
+    // `resolveGeometry` already proved both are inside the bound.
+    x: input.x,
+    y: input.y,
     w: signedWidth,
     h: signedHeight,
     text,

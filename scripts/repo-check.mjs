@@ -326,6 +326,14 @@ check(
   "the flow snake adds the pass index to the running row count again, so long chains drift down the page",
 );
 check(
+  boardTypes.includes("TITLE_TOO_LONG") && boardTypes.includes("GROUP_ID_TOO_LONG"),
+  "a title or group id is truncated again instead of rejected, so the stored board disagrees with the request",
+);
+check(
+  !/x: Math\.max\(-MAX_COORDINATE/.test((await read("src/board/model/validate.ts"))),
+  "normalizeItem clamps coordinates again; resolveGeometry is the only place that may bound them",
+);
+check(
   tools.includes('BOARD_VIEW_${view.toUpperCase()}') && tools.includes('["BOARD_JSON:", JSON.stringify(visiblePayload)]'),
   "graded views send the board twice: only `full` may carry the full BOARD_JSON text copy",
 );
