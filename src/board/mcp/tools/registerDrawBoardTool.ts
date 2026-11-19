@@ -352,6 +352,15 @@ server.registerTool(
           type: "text" as const,
           text: [
             `✅ 画板已更新 · 新增 ${created} · 更新 ${updated} · 删除 ${removed.size}`,
+            /*
+             * Say when the write was rebased. The caller pinned a revision, so
+             * lying about which one it landed on would hide that someone else
+             * wrote in between — the model should know its base moved, even
+             * though nothing it touched was overwritten.
+             */
+            ...(mergedFromRevision === undefined ? [] : [
+              `MERGED: 你的 expected_revision ${mergedFromRevision} 已落后；本次改动未碰到他人修改的对象，已合并到 revision ${board.revision}。`,
+            ]),
             `NEXT: 保持画布可见；人画 / 改完后用 get_board 或当前会话上下文读取。`,
             jsonLine({
               revision: board.revision,
@@ -362,7 +371,11 @@ server.registerTool(
             changeReportText(changeReport(initial, board)),
           ].join("\n"),
         }],
-        structuredContent: { ...boardWriteSnapshot(board, libraryIndex), change: changeReport(initial, board) },
+        structuredContent: {
+          ...boardWriteSnapshot(board, libraryIndex),
+          change: changeReport(initial, board),
+          ...(mergedFromRevision === undefined ? {} : { mergedFrom: mergedFromRevision }),
+        },
       };
     } catch (error) {
       return errorResult("draw_board", error);

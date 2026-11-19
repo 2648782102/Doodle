@@ -699,6 +699,42 @@ describe("MCP board server", () => {
     });
   });
 
+  it("tells the caller when a pinned write was merged", async () => {
+    // The write landed on a newer revision than the one it pinned. Nothing it
+    // touched was overwritten, but hiding that the base moved would leave the
+    // model reasoning about a board state it never saw.
+    const outputDir = path.join(tempDir, "merged-notice");
+    await withClientIn(outputDir, async (client) => {
+      const seen = (await client.callTool({
+        name: "draw_board",
+        arguments: { author: "ai", items: [{ type: "note", x: 0, y: 0, w: 160, h: 90, text: "base" }] },
+      })).structuredContent;
+      await client.callTool({
+        name: "draw_board",
+        arguments: { author: "human", items: [{ type: "note", x: 300, y: 0, w: 160, h: 90, text: "human" }] },
+      });
+      const merged = await client.callTool({
+        name: "draw_board",
+        arguments: {
+          expected_revision: seen.revision,
+          author: "ai",
+          items: [{ type: "note", x: 0, y: 300, w: 160, h: 90, text: "ai" }],
+        },
+      });
+
+      expect(merged.isError).toBeFalsy();
+      expect(merged.structuredContent.mergedFrom).toBe(seen.revision);
+      expect(textOf(merged)).toContain("MERGED:");
+
+      // A write that did not need merging must not claim it did.
+      const plain = await client.callTool({
+        name: "draw_board",
+        arguments: { author: "ai", items: [{ type: "note", x: 600, y: 0, w: 160, h: 90, text: "plain" }] },
+      });
+      expect(plain.structuredContent.mergedFrom).toBeUndefined();
+    });
+  }, 30_000);
+
   it("refuses a stale pinned write that overlaps an object someone else moved", async () => {
     // The merge is object-level, not a licence to overwrite. When the request
     // changes an object that moved since the caller's revision, it refuses —
