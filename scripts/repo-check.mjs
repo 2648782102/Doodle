@@ -279,6 +279,14 @@ check(
   "diagram layout rejects input with bare prose instead of a repairable error",
 );
 check(
+  tools.includes("ctx.board.mutate((current) => change(current))"),
+  "an unpinned draw_board write is back to snapshot-then-replace, so two simultaneous agents fail each other",
+);
+check(
+  (await read("src/board/mcp/schemas.ts")).includes("Defaults to true and makes the new board active"),
+  "the library switchTo default is undocumented again; a model cannot tell that create/save/duplicate/import move the person off their board",
+);
+check(
   tools.includes('BOARD_VIEW_${view.toUpperCase()}') && tools.includes('["BOARD_JSON:", JSON.stringify(visiblePayload)]'),
   "graded views send the board twice: only `full` may carry the full BOARD_JSON text copy",
 );

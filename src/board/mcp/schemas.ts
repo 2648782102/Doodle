@@ -78,13 +78,37 @@ export const layoutInput = z.object({
 export const libraryAction = z.discriminatedUnion("type", [
   z.object({ type: z.literal("list") }),
   z.object({ type: z.literal("get"), id: z.string().optional() }),
-  z.object({ type: z.literal("create"), name: z.string().optional(), switchTo: z.boolean().optional() }),
-  z.object({ type: z.literal("save"), name: z.string().optional(), id: z.string().optional(), switchTo: z.boolean().optional(), board: z.unknown().optional() }),
+  z.object({
+    type: z.literal("create"),
+    name: z.string().optional(),
+    switchTo: z.boolean().optional()
+      .describe("Defaults to true and makes the new board active. Pass false to keep the person on the board they are looking at."),
+  }),
+  z.object({
+    type: z.literal("save"),
+    name: z.string().optional(),
+    id: z.string().optional(),
+    switchTo: z.boolean().optional()
+      .describe("Defaults to true and makes the saved board active. Pass false to save without changing what the person sees."),
+    board: z.unknown().optional(),
+  }),
   z.object({ type: z.literal("switch"), id: z.string() }),
   z.object({ type: z.literal("rename"), id: z.string(), name: z.string() }),
-  z.object({ type: z.literal("duplicate"), id: z.string(), name: z.string().optional(), switchTo: z.boolean().optional() }),
+  z.object({
+    type: z.literal("duplicate"),
+    id: z.string(),
+    name: z.string().optional(),
+    switchTo: z.boolean().optional()
+      .describe("Defaults to true and makes the copy active. Pass false to duplicate in the background."),
+  }),
   z.object({ type: z.literal("delete"), id: z.string() }),
-  z.object({ type: z.literal("import"), name: z.string().optional(), board: z.unknown(), switchTo: z.boolean().optional() }),
+  z.object({
+    type: z.literal("import"),
+    name: z.string().optional(),
+    board: z.unknown(),
+    switchTo: z.boolean().optional()
+      .describe("Defaults to true and makes the imported board active. Pass false to add it to the library only."),
+  }),
   z.object({ type: z.literal("export"), id: z.string().optional() }),
 ]);
 

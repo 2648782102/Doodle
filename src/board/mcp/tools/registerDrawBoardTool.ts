@@ -45,7 +45,7 @@ server.registerTool(
       replace_board: z.unknown().optional().describe("Rare full replacement with a version 1 board snapshot; revision and identity are preserved"),
       author: z.string().optional().describe("Author marker: human or ai. AI responses should normally use ai"),
       expected_revision: z.number().int().nonnegative().optional().describe("Optional board revision for rejecting stale canvas edits"),
-      library: libraryAction.optional().describe("Optional local board-library action for saving, switching, renaming, duplicating, importing, or exporting editable board snapshots"),
+      library: libraryAction.optional().describe("Optional local board-library action for saving, switching, renaming, duplicating, importing, or exporting editable board snapshots. create, save, duplicate, and import make the resulting board active unless you pass switchTo: false — so when you are only tidying the library, pass switchTo: false rather than moving the person off the board they are looking at."),
       diagram: diagramInput.optional().describe("Semantic diagram recipe: nodes and optional edges generate one bounded Board v1 diagram with deterministic layout, short labels, and connected arrows. Each node takes `label` (not `title`); `edges` may be omitted for a standalone card or a plain sequence. By default it is added beside existing objects and reuses a numeric id suffix if a generated id is taken; replace:true clears the whole active board first. Every edge becomes a routed line, and a flow longer than six columns snakes instead of becoming one wide strip. To advance an ordered timeline, increment `row` down one column: row-only nodes stack vertically on a single axis. Give an explicit `column` only when you want side-by-side groups."),
     }),
     annotations: BOARD_WRITE_ANNOTATIONS,
@@ -231,10 +231,28 @@ server.registerTool(
         if (layout) next = layoutBoardItems(next, layout, author ?? "ai");
         return next;
       };
-      const initial = await ctx.board.snapshot();
-      assertRevision(initial);
-      const candidate = change(initial);
-      const board = await commit(candidate, initial);
+      /*
+       * An unpinned write is an append, so it belongs inside the lock.
+       *
+       * Reading outside the lock and then persisting with that revision made two
+       * simultaneous agents fail each other with `expected N, found N+1` even
+       * though neither had asked for an optimistic check. `store.mutate`
+       * re-reads inside the lock, which is what an unpinned write means. A
+       * caller that *did* pin a revision keeps the strict check: that number is
+       * a claim about what they last saw, and rebasing it onto a newer board
+       * would overwrite whoever got there first.
+       */
+      let board: SimpleBoard;
+      let initial: SimpleBoard;
+      if (expected_revision === undefined) {
+        initial = await ctx.board.snapshot();
+        board = await ctx.board.mutate((current) => change(current));
+        ctx.revisions?.remember(board);
+      } else {
+        initial = await ctx.board.snapshot();
+        assertRevision(initial);
+        board = await commit(change(initial), initial);
+      }
       ctx.preview.broadcast({ type: "board_updated", revision: board.revision });
       const libraryIndex = (await ctx.library.apply({ type: "list" }, board)).index;
       return {

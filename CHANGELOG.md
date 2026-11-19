@@ -42,6 +42,8 @@
 
 ### Fixed
 
+- Two agents drawing at the same moment no longer fail each other. A write without `expected_revision` used to read the board *outside* the store lock and then persist with that revision, so the loser got `expected N, found N+1` — a failure it could neither explain nor act on. Unpinned writes now go through `store.mutate`, which re-reads inside the lock; both writes land. A caller that pins a revision still gets the strict rejection, because that number is a claim about what it last saw.
+- The library's `switchTo` default is documented instead of implicit. `create`, `save`, `duplicate`, and `import` make the result active when the field is omitted — correct for the canvas, dangerous for an agent tidying the library, because the person's view moves under them. Each field now states its default, and the `library` description tells the model to pass `switchTo: false` for housekeeping.
 - A rejected write now names the field and the repair on every path a model actually hits. Bounds used to live in the MCP input schema, but the SDK validates that *before* the handler runs and answers with bare `MCP error -32602` prose — so a 1,300-character text or a 200-item batch gave the model nothing to correct, while a bad colour gave it a full `ERROR_JSON`. Bounds now live in `model/` and every rejection reaches one serialiser:
   - `BATCH_TOO_LARGE` (over 100 items in one call, with the number of calls to split into)
   - `LINE_WITHOUT_DIRECTION`, `STROKE_POINTS_INVALID`, `IMAGE_SOURCE_MISSING`
