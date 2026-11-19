@@ -289,7 +289,8 @@ async function writeJsonAtomic(file: string, value: unknown): Promise<void> {
   // Per-writer name, same reason as BoardStore: never share a temp path.
   const temp = `${file}.${process.pid}-${randomUUID()}.tmp`;
   try {
-    await fs.writeFile(temp, JSON.stringify(value, null, 2), "utf8");
+    // Compact for the same reason as BoardStore: these files are read by code.
+    await fs.writeFile(temp, JSON.stringify(value), "utf8");
     await renameWithRetry(temp, file);
   } catch (error) {
     await fs.rm(temp, { force: true }).catch(() => {});
