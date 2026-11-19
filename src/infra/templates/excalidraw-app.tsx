@@ -9,6 +9,7 @@ import {
   type ExcalidrawLikeElement,
 } from "../../board/excalidraw-adapter.js";
 import { App } from "@modelcontextprotocol/ext-apps";
+import { diffBoardItems, isEmptyDiff } from "../../board/item-diff.js";
 import { buildBoardModelContext } from "../../board/app-context.js";
 import {
   browserViewportStorage,
@@ -692,26 +693,43 @@ function initLibraryUi() {
   });
 }
 
-async function replaceBoard(items: unknown[], expectedRevision: number): Promise<BoardSnapshot> {
+/**
+ * Send only what changed.
+ *
+ * This used to POST the whole board on every change. A person nudging one box
+ * sent every object they own, and — because the server compares board revisions,
+ * not objects — a person and an agent editing different objects rejected each
+ * other. The diff keeps a one-object edit to one object's worth of bytes.
+ *
+ * `author: "human"` is deliberate: an item a person touched now reports as human
+ * in `get_board`, which is what `HANDOFF` reads to tell the agent what the person
+ * changed. The single-item endpoints already behaved this way; the canvas simply
+ * never used them.
+ */
+async function syncBoard(next: unknown[], base: BoardSnapshot): Promise<BoardSnapshot> {
+  const diff = diffBoardItems(base.items as never[], next as never[]);
+  if (isEmptyDiff(diff)) return base;
+  const change = { items: diff.added, updates: diff.updated, remove_ids: diff.removed };
   if (hostApp) {
     const result = await hostApp.callServerTool({
       name: "draw_board",
-      arguments: { replace_board: { ...activeSnapshot, items, notes: [] }, expected_revision: expectedRevision },
+      arguments: { ...change, author: "human", expected_revision: base.revision },
     });
     if (result.isError) throw new Error("Board update failed");
     return result.structuredContent as BoardSnapshot;
   }
   if (activeMcpApp?.drawBoard) {
     const result = await activeMcpApp.drawBoard({
-      replace_board: { ...activeSnapshot, items, notes: [] },
-      expected_revision: expectedRevision,
+      ...change,
+      author: "human",
+      expected_revision: base.revision,
     });
     return result as BoardSnapshot;
   }
-  const response = await fetch("/api/board/replace", {
+  const response = await fetch("/api/board/batch", {
     method: "POST",
-    headers: { ...headers, "If-Match-Revision": String(expectedRevision) },
-    body: JSON.stringify({ confirmedBy: "human", board: { ...activeSnapshot, items, notes: [] } }),
+    headers: { ...headers, "If-Match-Revision": String(base.revision) },
+    body: JSON.stringify({ confirmedBy: "human", ...change }),
   });
   const result = await response.json().catch(() => ({}));
   if (!response.ok) throw new Error(result.error || `HTTP ${response.status}`);
@@ -968,7 +986,7 @@ function CanvasApp({ initial }: { initial: BoardSnapshot }) {
       pendingTimer.current = null;
       if (!base || activeSnapshot !== base) return;
       try {
-        const updated = await replaceBoard(projected.items as unknown[], base.revision);
+        const updated = await syncBoard(projected.items as unknown[], base);
         clearError();
         setSnapshot(updated);
       } catch (error) {
