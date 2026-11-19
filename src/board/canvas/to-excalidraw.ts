@@ -54,13 +54,32 @@ function baseSkeleton(item: BoardItem, theme: CanvasTheme): ExcalidrawSkeleton {
   return {
     id: item.id,
     type: skeletonType(item),
-    x: item.x,
+    x: skeletonTextX(item),
     y: item.y,
     width: item.type === "line" ? Math.abs(item.w) : item.w,
     height: item.type === "line" ? Math.abs(item.h) : item.h,
     verticalAlign: item.type === "text" ? "top" : "middle",
     ...styleFor(item, theme),
   };
+}
+
+/**
+ * Standalone text: `x` means left edge in Board v1, but the centre for
+ * `convertToExcalidrawElements` once the text is not left-aligned.
+ *
+ * Board v1 stores a text box as (x, w) with an alignment inside it. Excalidraw's
+ * skeleton API reads `x` as the *centre* of the run for centre-aligned text, so
+ * passing the box's left edge shifted every caption left by half its measured
+ * width — a caption under a card sat over the card's left border, and the
+ * leftmost column's captions escaped the frame. Three samples made it exact:
+ * x=40 with a 141px caption landed at -30, x=560 → 481, x=820 → 760.
+ */
+function skeletonTextX(item: BoardItem): number {
+  if (item.type !== "text") return item.x;
+  const align = item.style?.textAlign ?? "left";
+  if (align === "center") return item.x + item.w / 2;
+  if (align === "right") return item.x + item.w;
+  return item.x;
 }
 
 function boundTextSkeleton(item: BoardItem, parent: ExcalidrawSkeleton, theme: CanvasTheme): ExcalidrawSkeleton {

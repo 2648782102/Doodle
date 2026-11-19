@@ -145,6 +145,30 @@ export function diagramToBoardItems(
       w: legendWidth, h: 28, text: `连接：${legendLabels}`.slice(0, 120), color: "#ffffff", z: 3, style: { fontSize: 12, textAlign: "left" },
     });
   }
+  /*
+   * Make the frame hug what was actually drawn.
+   *
+   * The layout formula above derives its bounds from the node grid, which is
+   * wrong twice over: `maxRows` counts rows per column but the expression reads
+   * it as a row index, so it reserved one empty row (134px) at the bottom; and
+   * the grid knows nothing about detail captions hanging below the last card or
+   * about a title wider than the columns. Measured margins were 20 / 12 / 20 /
+   * 200 with the title overflowing the right edge on a small diagram.
+   *
+   * Deriving all four sides from the items themselves cannot drift from what is
+   * on the board, whatever the layout did.
+   */
+  const drawn = items.filter((item) => item !== frame);
+  if (drawn.length > 0) {
+    const left = Math.min(...drawn.map((item) => item.x));
+    const top = Math.min(...drawn.map((item) => item.y));
+    const right = Math.max(...drawn.map((item) => item.x + item.w));
+    const bottomOfContent = Math.max(...drawn.map((item) => item.y + item.h));
+    frame.x = left - 20;
+    frame.y = top - 12;
+    frame.w = right - left + 40;
+    frame.h = bottomOfContent - top + 32;
+  }
   // Hold the reference: on append the frame id may be suffixed, so looking it
   // up by the original name would return undefined.
   frame.w = Math.max(MIN_SHAPE_SIZE, Math.min(MAX_SHAPE_WIDTH, frame.w));
