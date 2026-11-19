@@ -327,6 +327,17 @@ check(
   tools.includes("SIZE: ${payload.itemCount}") && tools.includes('view: "summary"'),
   "a large board no longer advertises the cheaper graded reads",
 );
+
+check(
+  /*
+   * `summary` must not carry per-object arrays. It shipped `readingOrder` and
+   * `isolated` in full, so a status check grew linearly with the board — 13 KB
+   * at 60 objects — which defeats the only reason the view exists.
+   */
+  (await read("src/board/mcp/presentation.ts")).includes("the ids behind them are a `structure` read")
+    && (await read("src/board/mcp/presentation.ts")).includes("readingOrder"),
+  "a summary read enumerates every object again instead of reporting counts",
+);
 check(
   tools.includes("cached && cached.id === current.id ? cached : undefined"),
   "since_revision is compared across boards again: a library switch would be reported as every object added and removed",

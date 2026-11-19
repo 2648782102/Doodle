@@ -57,7 +57,46 @@ export function viewPayload(payload: Record<string, any>, view?: "summary" | "st
     itemCount: payload.itemCount,
   };
   if (view === "summary") {
-    return { ...base, summary: payload.summary, visualDigest: payload.visualDigest, diagnosis: payload.diagnosis };
+    /*
+     * `summary` is a status check, so it must not carry per-object arrays.
+     *
+     * It returned the full `visualDigest.readingOrder` and
+     * `diagnosis.isolated`, both of which enumerate every object: 13 KB on a
+     * 60-object board, growing linearly, for a view whose whole purpose is to
+     * be cheap. The counts and the verdict are what a status check needs;
+     * `structure` and `detail` still carry the enumerations.
+     */
+    const digest = payload.visualDigest as Record<string, unknown> | undefined;
+    const diagnosis = payload.diagnosis as Record<string, unknown> | undefined;
+    return {
+      ...base,
+      summary: payload.summary,
+      visualDigest: digest ? {
+        version: digest.version,
+        itemCount: digest.itemCount,
+        // Counts only: the ids behind them are a `structure` read.
+        groups: Array.isArray(digest.groups) ? digest.groups.length : digest.groups,
+        connections: Array.isArray(digest.connections) ? digest.connections.length : digest.connections,
+        focus: Array.isArray(digest.focus) ? digest.focus.length : digest.focus,
+        freehandCount: digest.freehandCount,
+        imageCount: digest.imageCount,
+        note: digest.note,
+      } : digest,
+      diagnosis: diagnosis ? {
+        version: diagnosis.version,
+        itemCount: diagnosis.itemCount,
+        nodeCount: diagnosis.nodeCount,
+        lineCount: diagnosis.lineCount,
+        bounds: diagnosis.bounds,
+        focus: Array.isArray(diagnosis.focus) ? diagnosis.focus.length : diagnosis.focus,
+        isolated: Array.isArray(diagnosis.isolated) ? diagnosis.isolated.length : diagnosis.isolated,
+        overlapping: Array.isArray(diagnosis.overlapping) ? diagnosis.overlapping.length : diagnosis.overlapping,
+        unresolved: Array.isArray(diagnosis.unresolved) ? diagnosis.unresolved.length : diagnosis.unresolved,
+        freeSpace: diagnosis.freeSpace,
+        occupancyCount: diagnosis.occupancyCount,
+        note: diagnosis.note,
+      } : diagnosis,
+    };
   }
   if (view === "structure") {
     return {

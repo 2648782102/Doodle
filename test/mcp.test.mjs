@@ -292,6 +292,50 @@ describe("MCP board server", () => {
     });
   }, 30_000);
 
+  it("keeps a summary read flat as the board grows", async () => {
+    // `summary` is a status check. It used to carry the full
+    // `visualDigest.readingOrder` and `diagnosis.isolated`, both of which
+    // enumerate every object: 13 KB at 60 objects, growing linearly, for a view
+    // whose only purpose is to be cheap.
+    await withClientIn(path.join(tempDir, "summary-flat"), async (client) => {
+      const fill = async (count) => {
+        await client.callTool({
+          name: "draw_board",
+          arguments: {
+            author: "ai",
+            items: Array.from({ length: count }, (_, index) => ({
+              type: "note",
+              x: (index % 20) * 30,
+              y: Math.floor(index / 20) * 30,
+              w: 24,
+              h: 24,
+              text: `n${index}`,
+            })),
+          },
+        });
+      };
+      const sizeOf = async () => {
+        const result = await client.callTool({ name: "get_board", arguments: { view: "summary" } });
+        return { sc: result.structuredContent, bytes: Buffer.byteLength(JSON.stringify(result)) };
+      };
+
+      await fill(10);
+      const small = await sizeOf();
+      await fill(60);
+      const large = await sizeOf();
+
+      // The whole point: 6x the objects must not mean 6x the payload.
+      expect(large.bytes).toBeLessThan(small.bytes * 1.6);
+
+      // Counts survive; the per-object enumerations do not.
+      expect(large.sc.diagnosis.itemCount).toBe(70);
+      expect(typeof large.sc.diagnosis.isolated).toBe("number");
+      expect(typeof large.sc.visualDigest.readingOrder).toBe("undefined");
+      expect(typeof large.sc.visualDigest.connections).toBe("number");
+      expect(Array.isArray(large.sc.items)).toBe(false);
+    });
+  }, 60_000);
+
   it("does not send the board twice on a graded view", async () => {
     // The text copy is byte-identical to structuredContent, so `full` keeps it
     // for text-only hosts. A graded view exists to cut tokens, and it was still
