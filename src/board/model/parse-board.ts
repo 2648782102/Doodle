@@ -377,15 +377,52 @@ export function parseBoard(value: unknown): SimpleBoard {
   }
   const itemIdSet = new Set(items.map((item) => item.id));
   const noteIds = new Set<string>();
-  const notes = raw.notes.map((note) => {
-    if (!note || typeof note !== "object") throw new Error("Invalid board note");
+  /*
+   * `notes` travels in a `replace_board` payload, so its rejections reach a
+   * caller the same way items do. Each one names the index.
+   */
+  const notes = raw.notes.map((note, index) => {
+    const at = `notes[${index}]`;
+    if (!note || typeof note !== "object") {
+      throw new BoardValidationError(
+        `Note ${index} is not an object`,
+        "INVALID_NOTE",
+        at,
+        "an object with id, body, and author",
+        `Send notes: [] when you have none. A note needs id, body, and author from the list below.`,
+      );
+    }
     const candidate = note as Partial<BoardNote>;
-    if (typeof candidate.id !== "string" || typeof candidate.body !== "string" || !isAuthor(candidate.author))
-      throw new Error("Invalid board note fields");
-    if (noteIds.has(candidate.id)) throw new Error("Duplicate board note ID");
+    if (typeof candidate.id !== "string" || typeof candidate.body !== "string" || !isAuthor(candidate.author)) {
+      const field = typeof candidate.id !== "string" ? "id" : typeof candidate.body !== "string" ? "body" : "author";
+      const expected = field === "author" ? `"human" or "ai"` : "a string";
+      throw new BoardValidationError(
+        `Note ${index} has a missing or invalid ${field}`,
+        "INVALID_NOTE_FIELD",
+        `${at}.${field}`,
+        expected,
+        `Every note needs a string id, a string body, and author "human" or "ai".`,
+      );
+    }
+    if (noteIds.has(candidate.id)) {
+      throw new BoardValidationError(
+        `Note ${index} repeats the id ${JSON.stringify(candidate.id)}`,
+        "DUPLICATE_NOTE_ID",
+        `${at}.id`,
+        "an id used by no other note",
+        `Give every note its own id, or drop the duplicate.`,
+      );
+    }
     noteIds.add(candidate.id);
-    if (candidate.itemId !== undefined && !itemIdSet.has(candidate.itemId))
-      throw new Error("Board note references an unknown item");
+    if (candidate.itemId !== undefined && !itemIdSet.has(candidate.itemId)) {
+      throw new BoardValidationError(
+        `Note ${index} references item ${JSON.stringify(candidate.itemId)}, which is not on this board`,
+        "UNKNOWN_NOTE_ITEM",
+        `${at}.itemId`,
+        "an item id from this board, or omit it",
+        `Point the note at an existing item, or leave itemId out for a free-standing note.`,
+      );
+    }
     return {
       id: candidate.id,
       author: candidate.author,

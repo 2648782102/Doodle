@@ -603,6 +603,34 @@ describe("first-try repair contract", () => {
     });
   }, 30_000);
 
+  it("names the note when a replace_board payload carries a bad one", async () => {
+    // `notes` travels in `replace_board`, so its rejections reach a caller the
+    // same way items do — and they were all bare strings.
+    await withClient(async (client) => {
+      const snapshot = (await client.callTool({
+        name: "draw_board",
+        arguments: { author: "ai", items: [{ type: "note", x: 0, y: 0, w: 160, h: 90, text: "A" }] },
+      })).structuredContent;
+
+      const cases = [
+        [{ id: "n1", author: "ai" }, "INVALID_NOTE_FIELD", "notes[0].body"],
+        [{ id: "n1", body: "a", author: "ai" }, "INVALID_NOTE", "notes[1]"],
+        [{ id: "n1", body: "a", author: "ai", itemId: "ghost" }, "UNKNOWN_NOTE_ITEM", "notes[0].itemId"],
+      ];
+      for (const [note, code, path] of cases) {
+        const notes = code === "INVALID_NOTE" ? [note, null] : [note];
+        const result = await client.callTool({
+          name: "draw_board",
+          arguments: { author: "ai", replace_board: { ...snapshot, notes } },
+        });
+        const payload = errorJsonOf(result);
+        expect(result.isError, code).toBe(true);
+        expect(payload?.code, code).toBe(code);
+        expect(payload?.path, code).toBe(path);
+      }
+    });
+  }, 30_000);
+
   it("publishes the bounds a model is checked against", async () => {
     // Knowing a bound up front is cheaper than any repair: it turns a rejected
     // write into a correct one. The table must match what model/ enforces.

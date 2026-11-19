@@ -379,6 +379,11 @@ check(
   "style enums are back in the schema, so their rejection loses the repair path",
 );
 check(
+  (await read("src/board/model/parse-board.ts")).includes("INVALID_NOTE")
+    && (await read("src/board/model/parse-board.ts")).includes("UNKNOWN_NOTE_ITEM"),
+  "a note inside replace_board rejects with bare prose again, so the caller cannot tell which note is wrong",
+);
+check(
   !/x: Math\.max\(-MAX_COORDINATE/.test((await read("src/board/model/validate.ts"))),
   "normalizeItem clamps coordinates again; resolveGeometry is the only place that may bound them",
 );
