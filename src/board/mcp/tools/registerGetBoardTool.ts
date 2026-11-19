@@ -69,6 +69,15 @@ server.registerTool(
         "NEXT_STEPS: draw_board → 保持画布可见 → 读取人的画图后用 get_board 或当前会话上下文。",
       ] : [
         `NEXT: 这是 revision ${payload.revision} 的完整画板。下次只在需要时传 since_revision: ${payload.revision} 读差量；show_board 显示，draw_board 画图回应。Use draw_board to visualize any context.`,
+        /*
+         * A full read of a large board is genuinely expensive — 400 objects
+         * came to 152 KB, against 6 KB for the same board at view: "summary".
+         * Naming the cheaper entries in the reply is what lets a model choose
+         * them without being told the byte counts first.
+         */
+        ...(payload.itemCount > 80 ? [
+          `SIZE: ${payload.itemCount} 个对象，整板约 ${Math.round(JSON.stringify(payload).length / 1024)} KB。只想确认状态用 view: "summary"（约 6 KB）；只要对象骨架用 view: "structure"；已知 revision 就传 since_revision 只读差量。`,
+        ] : []),
       ];
 
       if (since_revision !== undefined && previous) {

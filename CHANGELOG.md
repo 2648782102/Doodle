@@ -42,6 +42,8 @@
 
 ### Fixed
 
+- A board at the object ceiling tells the model how to get out. "Board item limit reached" carried no current count, no limit, and no route forward; it is now `BOARD_ITEM_LIMIT` with the numbers and the suggestion to put the rest on a second board. A missing update target is likewise `ITEM_NOT_FOUND` with the re-read instruction instead of "Board item not found".
+- `get_board` names the cheaper reads once a board gets expensive. A 400-object board is 152 KB for a full read and 6 KB at `view: "summary"`, but nothing in the reply said so; boards above 80 objects now report their size and list `summary` / `structure` / `since_revision`. Small boards stay quiet.
 - `draw_board` now describes itself. Its 171-character blurb never mentioned `diagram`, `updates`, or the top-level `author`, so a model had to discover a nine-field tool by failing. The description states the three mutually exclusive uses, says that a complex diagram should prefer `diagram` over hand-computed coordinates, and that an existing board should be revised with `updates` rather than rebuilt.
 - `replace_board` now rejects a payload the write path would reject. It used to check only that `color` was a *string*, so a hand-built board with `color: "nope"` was persisted and the canvas had no usable fill. The persisted-state and write paths now share one set of predicates, so they cannot disagree again.
 - Every `replace_board` rejection names the offending item. A bad colour three levels into a 200-object payload used to surface as "Invalid board collections"; it now reports `items[7].color` with the expected form and a fix, because a whole-board payload is unrepairable without the index.

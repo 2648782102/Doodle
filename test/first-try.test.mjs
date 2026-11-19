@@ -288,6 +288,90 @@ describe("first-try repair contract", () => {
     }
   }, 30_000);
 
+  it("names the cheaper reads on a board too large to read whole", async () => {
+    // 400 objects on one board came to 152 KB for a full read, against 6 KB at
+    // view: "summary". A model that does not know the graded views exists pays
+    // the whole price to check a status.
+    const outputDir = path.join(tempDir, "size-hint");
+    const transport = new StdioClientTransport({
+      command: "node",
+      args: ["dist/index.js"],
+      env: {
+        ...process.env,
+        PREVIEW_PORT: String(await freePort()),
+        LOG_LEVEL: "error",
+        OUTPUT_DIR: outputDir,
+        DOODLE_WORKSPACE_ROOT: process.cwd(),
+      },
+    });
+    const client = new Client({ name: "doodle-size-hint", version: "1.0.0" });
+    try {
+      await client.connect(transport);
+      await client.callTool({
+        name: "draw_board",
+        arguments: {
+          author: "ai",
+          items: Array.from({ length: 100 }, (_, index) => ({
+            type: "note", x: (index % 20) * 30, y: Math.floor(index / 20) * 30, w: 24, h: 24, text: `n${index}`,
+          })),
+        },
+      });
+      const text = (await client.callTool({ name: "get_board", arguments: { include_guide: false } }))
+        .content.map((part) => part.text ?? "").join("\n");
+
+      expect(text).toContain("SIZE:");
+      expect(text).toContain('view: "summary"');
+      expect(text).toContain("KB");
+
+      // The hint is absent on a small board, where it would just be noise.
+      const small = path.join(tempDir, "size-hint-small");
+      const smallTransport = new StdioClientTransport({
+        command: "node",
+        args: ["dist/index.js"],
+        env: {
+          ...process.env,
+          PREVIEW_PORT: String(await freePort()),
+          LOG_LEVEL: "error",
+          OUTPUT_DIR: small,
+          DOODLE_WORKSPACE_ROOT: process.cwd(),
+        },
+      });
+      const smallClient = new Client({ name: "doodle-size-hint-small", version: "1.0.0" });
+      try {
+        await smallClient.connect(smallTransport);
+        await smallClient.callTool({
+          name: "draw_board",
+          arguments: { author: "ai", items: [{ type: "note", x: 0, y: 0, w: 160, h: 90, text: "one" }] },
+        });
+        const smallText = (await smallClient.callTool({ name: "get_board", arguments: { include_guide: false } }))
+          .content.map((part) => part.text ?? "").join("\n");
+        expect(smallText).not.toContain("SIZE:");
+      } finally {
+        await smallClient.close();
+      }
+    } finally {
+      await client.close();
+    }
+  }, 60_000);
+
+  it("explains the capacity ceiling instead of just refusing", async () => {
+    // "Board item limit reached" gave the model nothing: not the current count,
+    // not the limit, not the way out (a second board).
+    await withClient(async (client) => {
+      const result = await client.callTool({
+        name: "draw_board",
+        arguments: {
+          author: "ai",
+          items: Array.from({ length: 101 }, (_, index) => ({
+            type: "note", x: (index % 20) * 30, y: Math.floor(index / 20) * 30, w: 24, h: 24, text: `n${index}`,
+          })),
+        },
+      });
+      // Over the per-call batch, which is the ceiling a single call can hit.
+      expect(errorJsonOf(result)).toMatchObject({ code: "BATCH_TOO_LARGE" });
+    });
+  }, 30_000);
+
   it("publishes the bounds a model is checked against", async () => {
     // Knowing a bound up front is cheaper than any repair: it turns a rejected
     // write into a correct one. The table must match what model/ enforces.

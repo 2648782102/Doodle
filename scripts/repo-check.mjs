@@ -310,6 +310,14 @@ check(
   "parseBoard rejections stopped naming the item index, so a whole-board payload is unrepairable",
 );
 check(
+  boardTypes.includes("BOARD_ITEM_LIMIT") && boardTypes.includes("ITEM_NOT_FOUND"),
+  "the capacity ceiling or a missing update target rejects with bare prose again",
+);
+check(
+  tools.includes("SIZE: ${payload.itemCount}") && tools.includes('view: "summary"'),
+  "a large board no longer advertises the cheaper graded reads",
+);
+check(
   tools.includes('BOARD_VIEW_${view.toUpperCase()}') && tools.includes('["BOARD_JSON:", JSON.stringify(visiblePayload)]'),
   "graded views send the board twice: only `full` may carry the full BOARD_JSON text copy",
 );

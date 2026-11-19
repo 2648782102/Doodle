@@ -13,9 +13,27 @@ import type {
 } from "./types.js";
 import { makeId, now } from "./clock.js";
 import { isAuthor, normalizeItem, parseBoard } from "./validate.js";
+import { BoardValidationError } from "../errors.js";
 
 export function touchBoard(board: SimpleBoard): SimpleBoard {
   return { ...board, revision: board.revision + 1, updatedAt: now() };
+}
+
+/**
+ * The capacity ceiling is a bound, so it owes the caller a repair.
+ *
+ * "Board item limit reached" told a model nothing it could act on: not how many
+ * objects exist, not how many it tried to add, and not that the answer is a
+ * second board. The reply now carries all three.
+ */
+function itemLimitError(existing: number, adding: number): BoardValidationError {
+  return new BoardValidationError(
+    `Board holds ${existing} objects; adding ${adding} would exceed the ${MAX_ITEMS} limit`,
+    "BOARD_ITEM_LIMIT",
+    "items",
+    `at most ${MAX_ITEMS} objects on one board`,
+    `Remove objects with remove_ids, or put the extra content on a second board: draw_board.library {type: "create", switchTo: false} then draw there.`,
+  );
 }
 
 export function createEmptyBoard(): SimpleBoard {
@@ -94,7 +112,7 @@ export function createStarterBoard(): SimpleBoard {
 
 export function addBoardItem(board: SimpleBoard, input: BoardItemInput): SimpleBoard {
   const normalized = normalizeItem(input);
-  if (board.items.length >= MAX_ITEMS) throw new Error("Board item limit reached");
+  if (board.items.length >= MAX_ITEMS) throw itemLimitError(board.items.length, 1);
   const timestamp = now();
   const item: BoardItem = { ...normalized, createdAt: timestamp, updatedAt: timestamp };
   return touchBoard({ ...board, items: [...board.items, item] });
@@ -107,7 +125,15 @@ export function updateBoardItem(
   author: BoardAuthor = "human",
 ): SimpleBoard {
   const existing = board.items.find((item) => item.id === id);
-  if (!existing) throw new Error("Board item not found");
+  if (!existing) {
+    throw new BoardValidationError(
+      `No item has the id ${JSON.stringify(id)}`,
+      "ITEM_NOT_FOUND",
+      "updates[].id",
+      "an id that exists on this board",
+      `Re-read the board with get_board and use one of its item ids; ids are not recreated between calls.`,
+    );
+  }
   const normalized = normalizeItem({ ...existing, ...patch, id, author });
   const timestamp = now();
   return touchBoard({
@@ -119,7 +145,7 @@ export function updateBoardItem(
 }
 
 export function addBoardItems(board: SimpleBoard, inputs: BoardItemInput[]): SimpleBoard {
-  if (board.items.length + inputs.length > MAX_ITEMS) throw new Error("Board item limit reached");
+  if (board.items.length + inputs.length > MAX_ITEMS) throw itemLimitError(board.items.length, inputs.length);
   const timestamp = now();
   const items = inputs.map((input) => {
     const normalized = normalizeItem(input);
