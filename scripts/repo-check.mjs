@@ -401,6 +401,10 @@ check(
   "a repeated update id keeps only the last patch again while the reply claims the batch applied",
 );
 check(
+  (await read("src/board/layout/arrange.ts")).includes("LAYOUT_ORIGIN_OUT_OF_RANGE"),
+  "layout.origin is unbounded again, so an extreme value reports an item coordinate the caller never typed",
+);
+check(
   !/x: Math\.max\(-MAX_COORDINATE/.test((await read("src/board/model/validate.ts"))),
   "normalizeItem clamps coordinates again; resolveGeometry is the only place that may bound them",
 );

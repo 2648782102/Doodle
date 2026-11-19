@@ -7,7 +7,7 @@
  * hand-drawn structure can be tidied without redrawing it.
  */
 
-import { LAYOUT_MODES, MAX_LINE_DELTA_X, MAX_LINE_DELTA_Y } from "../model/limits.js";
+import { LAYOUT_MODES, MAX_COORDINATE, MAX_LINE_DELTA_X, MAX_LINE_DELTA_Y } from "../model/limits.js";
 import type {
   BoardAuthor, BoardItem, BoardItemPatch, BoardLayoutInput, BoardPoint, SimpleBoard,
 } from "../model/types.js";
@@ -39,6 +39,23 @@ function assertLayoutBounds(
       `an integer between ${minGap} and ${maxGap}`,
       `Leave the field out to use the mode's default spacing.`,
     );
+  }
+  /*
+   * `origin` had no bound, so an extreme value landed objects outside the
+   * canvas and the rejection came from `parseBoard` as an internal item error
+   * — which named a coordinate the caller never typed.
+   */
+  if (layout.origin !== undefined) {
+    const { x, y } = layout.origin;
+    if (!Number.isFinite(x) || !Number.isFinite(y) || Math.abs(x) > MAX_COORDINATE || Math.abs(y) > MAX_COORDINATE) {
+      throw new BoardValidationError(
+        `layout.origin is (${x}, ${y}); coordinates must be within ±${MAX_COORDINATE}`,
+        "LAYOUT_ORIGIN_OUT_OF_RANGE",
+        "layout.origin",
+        `x and y between -${MAX_COORDINATE} and ${MAX_COORDINATE}`,
+        `Omit origin to arrange in place, or pick a point near the existing content.`,
+      );
+    }
   }
 }
 
