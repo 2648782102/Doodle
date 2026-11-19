@@ -18,6 +18,7 @@ import {
   updateBoardItems,
   layoutBoardItems,
   replaceBoardContent,
+  touchBoard,
 } from "../dist/board/types.js";
 import { BoardStore } from "../dist/board/store.js";
 import { BoardRevisionConflictError } from "../dist/board/errors.js";
@@ -104,6 +105,28 @@ describe("simple shared board", () => {
     expect(afterBatch.items).toHaveLength(1);
     expect(afterBatch.items[0].startItemId).toBeUndefined();
     expect(afterBatch.items[0].endItemId).toBeUndefined();
+  });
+
+  it("does not raise the revision for an update that restates the stored values", () => {
+    /*
+     * The canvas sends the whole item back whenever it believes one moved, and
+     * its idea of "moved" used to include key-order differences. Panning a board
+     * therefore posted a patch whose values were identical to the stored ones,
+     * which bumped the revision and rewrote the whole file. A no-op patch must
+     * leave the board untouched so the revision keeps meaning "something
+     * changed" — the canvas and the delta reads both depend on that.
+     */
+    const current = touchBoard(addBoardItem(createEmptyBoard(), {
+      type: "rect", x: 10, y: 20, w: 100, h: 60, text: "unchanged", author: "human",
+    }));
+    const stored = current.items[0];
+    const { id, createdAt: _createdAt, ...restated } = stored;
+    const reordered = Object.fromEntries(Object.entries(restated).reverse());
+    const next = updateBoardItems(current, [{ id, patch: reordered }], "human");
+    expect(next).toBe(current);
+    expect(next.revision).toBe(current.revision);
+    // A genuine change still lands.
+    expect(updateBoardItems(current, [{ id, patch: { x: 11 } }], "human").revision).toBe(current.revision + 1);
   });
 
   it("keeps visual-expression fields, connected lines, and deterministic layout modes", () => {

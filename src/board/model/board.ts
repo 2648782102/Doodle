@@ -14,6 +14,7 @@ import type {
 import { makeId, now } from "./clock.js";
 import { isAuthor, normalizeItem, parseBoard } from "./validate.js";
 import { BoardValidationError } from "../errors.js";
+import { stableItemFingerprint } from "./fingerprint.js";
 
 export function touchBoard(board: SimpleBoard): SimpleBoard {
   return { ...board, revision: board.revision + 1, updatedAt: now() };
@@ -201,12 +202,29 @@ export function updateBoardItems(
   }
   const patches = new Map(updates.map((update) => [update.id, update.patch]));
   const timestamp = now();
+  let changed = false;
   const items = board.items.map((item) => {
     const patch = patches.get(item.id);
     if (!patch) return item;
-    const normalized = normalizeItem({ ...item, ...patch, id: item.id, author });
+    /*
+     * A patch that restates the stored values is not an edit.
+     *
+     * The canvas sends the whole item back when it believes something moved.
+     * Because change detection used to compare JSON in insertion order, a pan
+     * — which touches no board object — produced such a patch on every gesture:
+     * byte-identical values, a fresh `updatedAt`, a new revision, and a
+     * whole-board write at 400 objects. Skipping the no-op keeps the revision
+     * meaning "the board changed" and stops idle gestures from rewriting the
+     * file. `touchBoard` is only reached when at least one patch differs, so a
+     * batch of no-op patches leaves revision and `updatedAt` untouched.
+     */
+    const merged = { ...item, ...patch, id: item.id, author };
+    if (stableItemFingerprint(merged) === stableItemFingerprint(item)) return item;
+    const normalized = normalizeItem(merged);
+    changed = true;
     return { ...normalized, createdAt: item.createdAt, updatedAt: timestamp };
   });
+  if (!changed) return board;
   return touchBoard({ ...board, items });
 }
 

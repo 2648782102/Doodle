@@ -10,6 +10,17 @@
  * Pure: no I/O, no clock, no ids minted here.
  */
 import type { BoardItem, BoardItemInput } from "./model/types.js";
+import { stableItemFingerprint } from "./model/fingerprint.js";
+
+/*
+ * Change detection compares values, not key order.
+ *
+ * The keys of a board object depend on who built it — the canvas projection,
+ * `parseBoard`, or a patch spread over a stored item — so a plain
+ * `JSON.stringify` reports identical objects as different. See
+ * `model/fingerprint.ts` for the failure that produced.
+ */
+export { stableStringify } from "./model/fingerprint.js";
 
 export interface BoardItemsDiff {
   added: BoardItemInput[];
@@ -18,7 +29,7 @@ export interface BoardItemsDiff {
 }
 
 function comparable(item: BoardItem): string {
-  return JSON.stringify({ ...item, updatedAt: "" });
+  return stableItemFingerprint(item);
 }
 
 export function diffBoardItems(previous: BoardItem[], next: BoardItem[]): BoardItemsDiff {

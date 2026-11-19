@@ -19,6 +19,7 @@
 
 import type { BoardSnapshot } from "./types.js";
 import type { SyncEvent } from "./sync-state.js";
+import { stableStringify } from "../../../board/model/fingerprint.js";
 
 /** The parts of an Excalidraw element this module reads. */
 export type SceneElement = { id: string; containerId?: string | null };
@@ -96,7 +97,16 @@ export function rebaseScene(
 }
 
 function sameItems(left: unknown[], right: unknown[]): boolean {
-  return JSON.stringify(left) === JSON.stringify(right);
+  /*
+   * Key order is not a change.
+   *
+   * `project` rebuilds every item, so its key order differs from the board
+   * that came back through JSON even when every value matches. Comparing the
+   * raw strings reported that as an edit, which is what made a pan — a gesture
+   * that touches no board object — schedule a whole-board write. Values are
+   * what the caller means.
+   */
+  return stableStringify(left) === stableStringify(right);
 }
 
 export function createCanvasSync(deps: CanvasSyncDeps): CanvasSync {

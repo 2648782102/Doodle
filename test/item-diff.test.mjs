@@ -59,4 +59,19 @@ describe("board item diff", () => {
     expect([...touchedIds(diffBoardItems(previous, next))].sort()).toEqual(["b", "c"]);
     expect([...changedIds(previous, next)].sort()).toEqual(["b", "c", "d"]);
   });
+
+  it("ignores key order, so a pan is not an edit", () => {
+    /*
+     * The canvas projects objects in its own key order and the board comes back
+     * from JSON in another. A plain `JSON.stringify` comparison measured that
+     * difference as a change, so every pan produced a one-item "update" whose
+     * values were identical: a whole-board write and a new revision for a
+     * gesture that touched no object.
+     */
+    const stored = item("a", { scene: { element: { id: "a", type: "rectangle" } } });
+    const reordered = Object.fromEntries(Object.entries(stored).reverse());
+    expect(isEmptyDiff(diffBoardItems([stored], [{ ...reordered, updatedAt: "2026-03-03T00:00:00.000Z" }]))).toBe(true);
+    // Values still matter: the same key order with one moved field is an edit.
+    expect(isEmptyDiff(diffBoardItems([stored], [{ ...reordered, x: 5 }]))).toBe(false);
+  });
 });

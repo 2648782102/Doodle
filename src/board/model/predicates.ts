@@ -169,9 +169,19 @@ export function cloneSceneRecord(value: unknown): Record<string, unknown> | unde
       `Send scene as { element: {...} } or omit it; the canvas adds fidelity itself.`,
     );
   }
-  let cloned: Record<string, unknown>;
+  /*
+   * One stringify, not two.
+   *
+   * The clone and the size check used to serialise the same record twice:
+   * once to prove it is plain JSON and to copy it, then again just to read
+   * `.length`. Scene records are the bulk of a saved board (75% of the item
+   * payload), and every read re-validates the whole document, so the second
+   * pass was pure cost. The length of `JSON.parse(text)` re-serialised is the
+   * same as `text` for plain JSON, which the first pass has already proven.
+   */
+  let text: string;
   try {
-    cloned = JSON.parse(JSON.stringify(value)) as Record<string, unknown>;
+    text = JSON.stringify(value);
   } catch {
     throw new BoardValidationError(
       "A scene record is not JSON serialisable",
@@ -181,16 +191,16 @@ export function cloneSceneRecord(value: unknown): Record<string, unknown> | unde
       `Remove functions, cycles, or class instances from scene. An agent should normally omit scene entirely.`,
     );
   }
-  if (JSON.stringify(cloned).length > MAX_SCENE_JSON) {
+  if (text.length > MAX_SCENE_JSON) {
     throw new BoardValidationError(
-      `A scene record is ${JSON.stringify(cloned).length} characters; the limit is ${MAX_SCENE_JSON}`,
+      `A scene record is ${text.length} characters; the limit is ${MAX_SCENE_JSON}`,
       "SCENE_TOO_LARGE",
       "items[].scene",
       `at most ${MAX_SCENE_JSON} characters`,
       `Omit scene. It is canvas fidelity for round-tripping a person's exact render, not something an agent needs to send.`,
     );
   }
-  return cloned;
+  return JSON.parse(text) as Record<string, unknown>;
 }
 
 export function normalizeScene(value: unknown): BoardSceneMeta | undefined {

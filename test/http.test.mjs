@@ -93,6 +93,33 @@ describe("board HTTP surface", () => {
     expect(snapshot.visualDigest).toMatchObject({ version: 1 });
   });
 
+  it("lets the browser cache hashed assets while unhashed ones revalidate", async () => {
+    /*
+     * Every static file used to be `no-store`, including the 1.4 MB app bundle
+     * and the 1.8 MB Excalidraw engine chunk, so each reload re-downloaded the
+     * whole canvas. Build output is content-hashed, which is exactly the case
+     * where a long immutable cache cannot go stale; Excalidraw's own
+     * `index.css` is not, so it revalidates instead.
+     *
+     * Revalidation is pinned as a 304 rather than a re-read: an ETag that only
+     * ever misses would preserve the download it was meant to remove.
+     */
+    const assetsDir = path.join(process.cwd(), "dist", "infra", "templates", "excalidraw");
+    const hashed = (await fs.readdir(assetsDir)).find((name) => /^chunk-[A-Z0-9]{8}\.js$/.test(name));
+    expect(hashed, "the build emits a content-hashed chunk").toBeTruthy();
+    const hashedResponse = await fetch(`${base}/excalidraw/${hashed}`);
+    expect(hashedResponse.status).toBe(200);
+    expect(hashedResponse.headers.get("cache-control")).toContain("immutable");
+    const hashedEtag = hashedResponse.headers.get("etag");
+    expect(hashedEtag).toBeTruthy();
+    const revalidated = await fetch(`${base}/excalidraw/${hashed}`, { headers: { "if-none-match": hashedEtag } });
+    expect(revalidated.status).toBe(304);
+
+    const css = await fetch(`${base}/excalidraw/index.css`);
+    expect(css.status).toBe(200);
+    expect(css.headers.get("cache-control")).toBe("no-cache");
+  });
+
   it("merges a stale batch that only adds objects", async () => {
     // The same bug the MCP path had: `touched` is empty for an add-only
     // request, and treating that as a conflict rejected the commonest

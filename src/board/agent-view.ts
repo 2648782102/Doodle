@@ -8,6 +8,7 @@
  */
 
 import type { BoardItem, SimpleBoard } from "./types.js";
+import { stableStringify } from "./model/fingerprint.js";
 
 /**
  * One item as the agent sees it: no canvas-fidelity payload, just a marker.
@@ -69,7 +70,14 @@ function countBy(values: string[]): Record<string, number> {
 /** A fingerprint that ignores canvas fidelity, so scene-only churn is not a change. */
 function agentFingerprint(item: BoardItem): string {
   const { scene: _scene, createdAt: _createdAt, updatedAt: _updatedAt, ...rest } = item;
-  return JSON.stringify(rest);
+  /*
+   * Stable across key order, for the same reason `item-diff` is: an item that
+   * came back from disk and one rebuilt by the canvas hold the same values in a
+   * different insertion order, and a plain stringify reported every such pair as
+   * an edit. That made `since_revision` deltas and change reports claim updates
+   * nobody made.
+   */
+  return stableStringify(rest);
 }
 
 export function summarizeAgentBoard(board: SimpleBoard): AgentBoardSummary {
