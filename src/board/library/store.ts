@@ -13,6 +13,7 @@ import { randomUUID } from "node:crypto";
 import { AsyncMutex } from "../mutex.js";
 import { externalizeImages, hydrateImages } from "../image-store.js";
 import { BoardValidationError } from "../errors.js";
+import { renameWithRetry } from "../../infra/atomic-write.js";
 import { touchBoard, type SimpleBoard } from "../types.js";
 import { makeId, now } from "../model/clock.js";
 import {
@@ -289,7 +290,7 @@ async function writeJsonAtomic(file: string, value: unknown): Promise<void> {
   const temp = `${file}.${process.pid}-${randomUUID()}.tmp`;
   try {
     await fs.writeFile(temp, JSON.stringify(value, null, 2), "utf8");
-    await fs.rename(temp, file);
+    await renameWithRetry(temp, file);
   } catch (error) {
     await fs.rm(temp, { force: true }).catch(() => {});
     throw error;

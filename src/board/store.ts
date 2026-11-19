@@ -4,6 +4,7 @@ import { randomUUID } from "node:crypto";
 import { BoardRevisionConflictError } from "./errors.js";
 import { AsyncMutex } from "./mutex.js";
 import { logger } from "../infra/logger.js";
+import { renameWithRetry } from "../infra/atomic-write.js";
 import { createEmptyBoard, parseBoard, touchBoard, type SimpleBoard } from "./types.js";
 import {
   collectRefsFromBoards, externalizeImages, hydrateImages, imageRefsOf, pruneOrphanImages,
@@ -181,7 +182,7 @@ export class BoardStore {
     const serialized = JSON.stringify(stored, null, 2);
     try {
       await fs.writeFile(temp, serialized, "utf-8");
-      await fs.rename(temp, this.file);
+      await renameWithRetry(temp, this.file);
     } catch (error) {
       // A unique name is not overwritten by the next write, so clean it up here.
       await fs.rm(temp, { force: true }).catch(() => {});
