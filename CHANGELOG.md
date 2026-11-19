@@ -42,6 +42,7 @@
 
 ### Fixed
 
+- The note API and single-item removal are structured too. `addBoardNote` and `removeBoardItem` are still part of Board v1 (`notes` travels in `replace_board`), and their five rejections were bare strings: `NOTE_BODY_REQUIRED`, `INVALID_AUTHOR`, `UNKNOWN_NOTE_ITEM`, `NOTE_LIMIT`, and `ITEM_NOT_FOUND`.
 - A bad note in a `replace_board` payload names the note. `notes` travels in that payload, so its rejections reach a caller the same way items do, and all four were bare strings: `INVALID_NOTE`, `INVALID_NOTE_FIELD`, `DUPLICATE_NOTE_ID`, `UNKNOWN_NOTE_ITEM`, each with the index and the field.
 - The last three self-reachable string errors on the item path — `Invalid item input`, `Unknown item type`, `Item coordinates must be finite`, plus the two width/height ones and `Line requires w or h` — are structured now. They sat in `normalizeItem` and `size.ts`, before the field-specific checks, so a wrong item shape was answered with prose while everything behind it was repairable.
 - A wrong `style` now names the sub-field. `normalizeStyle` threw bare strings from the shared predicate (`Invalid board item fontSize`), which reached the caller as `TOOL_ERROR`, and `textAlign` / `fontWeight` were still `z.enum` so they answered with an SDK `Invalid option` and no repair. All seven style fields now return `INVALID_COLOR` / `STYLE_OUT_OF_RANGE` / `INVALID_TEXT_ALIGN` / `INVALID_FONT_WEIGHT` with the value, the range, and the path.

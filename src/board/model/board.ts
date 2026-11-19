@@ -223,7 +223,15 @@ export function replaceBoardContent(current: SimpleBoard, incoming: unknown): Si
 
 
 export function removeBoardItem(board: SimpleBoard, id: string): SimpleBoard {
-  if (!board.items.some((item) => item.id === id)) throw new Error("Board item not found");
+  if (!board.items.some((item) => item.id === id)) {
+    throw new BoardValidationError(
+      `No item has the id ${JSON.stringify(id)}`,
+      "ITEM_NOT_FOUND",
+      "remove_ids[]",
+      "an id that exists on this board",
+      `Re-read the board with get_board and use one of its item ids. Nothing was removed.`,
+    );
+  }
   return touchBoard({
     ...board,
     items: board.items.filter((item) => item.id !== id),
@@ -236,11 +244,47 @@ export function addBoardNote(
   input: { body: string; author: BoardAuthor; itemId?: string },
 ): SimpleBoard {
   const body = input.body.trim().slice(0, MAX_TEXT);
-  if (!body) throw new Error("Note body is required");
-  if (!isAuthor(input.author)) throw new Error("Invalid note author");
-  if (input.itemId && !board.items.some((item) => item.id === input.itemId))
-    throw new Error("Referenced board item not found");
-  if (board.notes.length >= MAX_NOTES) throw new Error("Board note limit reached");
+  /*
+   * A note is the free-text annotation attached to an object. It is part of
+   * Board v1 and still reachable from `replace_board` payloads, so its
+   * rejections get the same shape as everything else.
+   */
+  if (!body) {
+    throw new BoardValidationError(
+      "A note needs a body",
+      "NOTE_BODY_REQUIRED",
+      "notes[].body",
+      "a non-empty string",
+      `Send the note text in body; whitespace only is treated as empty.`,
+    );
+  }
+  if (!isAuthor(input.author)) {
+    throw new BoardValidationError(
+      `Note author ${JSON.stringify(input.author)} is not "human" or "ai"`,
+      "INVALID_AUTHOR",
+      "notes[].author",
+      `"human" or "ai"`,
+      `Attribution is what makes the board two-way, so a custom name is refused rather than coerced.`,
+    );
+  }
+  if (input.itemId && !board.items.some((item) => item.id === input.itemId)) {
+    throw new BoardValidationError(
+      `Note references item ${JSON.stringify(input.itemId)}, which is not on this board`,
+      "UNKNOWN_NOTE_ITEM",
+      "notes[].itemId",
+      "an item id from this board, or omit it",
+      `Point the note at an existing item, or leave itemId out for a free-standing note.`,
+    );
+  }
+  if (board.notes.length >= MAX_NOTES) {
+    throw new BoardValidationError(
+      `Board holds ${board.notes.length} notes; the limit is ${MAX_NOTES}`,
+      "NOTE_LIMIT",
+      "notes",
+      `at most ${MAX_NOTES} notes`,
+      `Remove an older note before adding another.`,
+    );
+  }
   const note: BoardNote = {
     id: makeId("note"),
     author: input.author,
