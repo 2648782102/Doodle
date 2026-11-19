@@ -251,7 +251,18 @@ export class BoardLibrary {
       await this.writeIndex(index);
       return { index, board: { ...current, title: currentEntry.name } };
     }
-    throw new Error("Unsupported board library action");
+    /*
+     * The schema is a discriminated union, so reaching here means the caller
+     * sent a `type` the union does not contain — a shape mistake, not an
+     * internal one. Name the accepted set.
+     */
+    throw new BoardValidationError(
+      `Unknown library action ${JSON.stringify((action as { type?: unknown }).type)}`,
+      "UNKNOWN_LIBRARY_ACTION",
+      "library.type",
+      `list, get, save, switch, create, rename, duplicate, delete, import, or export`,
+      `Use one of the listed action types. "list" shows the library; "switch" opens a saved board.`,
+    );
   }
 
   async apply(action: BoardLibraryAction, current: SimpleBoard): Promise<BoardLibraryMutation> {
