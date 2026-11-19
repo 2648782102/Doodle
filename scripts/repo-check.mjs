@@ -361,6 +361,11 @@ check(
   "a library action names no ids on an unknown board, or refuses the last board without saying why",
 );
 check(
+  http.includes("error instanceof BoardValidationError")
+    && http.indexOf("if (error instanceof BoardValidationError)") < http.indexOf("if ((error as NodeJS.ErrnoException).code)"),
+  "the HTTP surface classifies a validation error as an errno again, so a bad canvas write answers 500 instead of 400",
+);
+check(
   !/x: Math\.max\(-MAX_COORDINATE/.test((await read("src/board/model/validate.ts"))),
   "normalizeItem clamps coordinates again; resolveGeometry is the only place that may bound them",
 );

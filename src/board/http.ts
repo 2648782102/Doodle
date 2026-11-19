@@ -24,7 +24,7 @@ import {
   type DiagramInput,
   type SimpleBoard,
 } from "./types.js";
-import { BoardRevisionConflictError, EmptyWriteRefusedError } from "./errors.js";
+import { BoardRevisionConflictError, BoardValidationError, EmptyWriteRefusedError } from "./errors.js";
 import { BoardLibrary, boardLibraryIndexText, type BoardLibraryAction } from "./library.js";
 import type { BoardRevisionCache } from "./revision-cache.js";
 import { isSuspiciousEmptyWrite, type BoardStore } from "./store.js";
@@ -168,6 +168,24 @@ export class BoardHttpServer {
         }
         if (error instanceof BoardRevisionConflictError) return res.status(409).json({ error: message });
         if (message.toLowerCase().includes("timed out waiting")) return res.status(503).json({ error: message });
+        /*
+         * A validation error carries a `code` too, and it is not an errno.
+         *
+         * `(error as NodeJS.ErrnoException).code` treated `INVALID_COLOR` as a
+         * filesystem failure, so a canvas sending a bad colour got a 500 with
+         * "Unable to persist board changes" — a server error for a client
+         * mistake, and no field to fix. Check the class first and return the
+         * same structured payload the MCP tools use.
+         */
+        if (error instanceof BoardValidationError) {
+          return res.status(400).json({
+            error: message,
+            code: error.code,
+            path: error.path,
+            expected: error.expected,
+            fix: error.fix,
+          });
+        }
         if ((error as NodeJS.ErrnoException).code) {
           logger.error(`Board persistence failed: ${message}`);
           return res.status(500).json({ error: "Unable to persist board changes" });
