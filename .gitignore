@@ -17,3 +17,6 @@ output/.doodle/
 test-results/
 
 output/*.html
+
+# Scratch probes: never part of the project.
+.probe/
