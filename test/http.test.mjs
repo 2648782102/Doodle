@@ -114,6 +114,24 @@ describe("board HTTP surface", () => {
     expect(typeof body.fix).toBe("string");
   });
 
+  it("answers a bad library action with 400 and a code, not 500", async () => {
+    // The library route had no error handler, so switching to an unknown board
+    // surfaced as 500 "Internal server error" while the specific message —
+    // which board ids exist — went only to stderr.
+    const html = await fetch(base).then((response) => response.text());
+    const token = html.match(/const PANEL_TOKEN = "([^"]+)"/)?.[1];
+    const response = await fetch(`${base}/api/board/library`, {
+      method: "POST",
+      headers: { "content-type": "application/json", "x-ai-draw-token": token },
+      body: JSON.stringify({ confirmedBy: "human", action: { type: "switch", id: "ghost" } }),
+    });
+    const body = await response.json();
+
+    expect(response.status).toBe(400);
+    expect(body).toMatchObject({ code: "BOARD_NOT_FOUND", path: "library.id" });
+    expect(body.error).toContain("ghost");
+  });
+
   it("exposes a human-confirmed local board library", async () => {
     const html = await fetch(base).then((response) => response.text());
     const token = html.match(/const PANEL_TOKEN = "([^"]+)"/)?.[1];

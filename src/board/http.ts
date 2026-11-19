@@ -102,23 +102,49 @@ export class BoardHttpServer {
       const body = req.body as { action?: BoardLibraryAction; confirmedBy?: string };
       if (body.confirmedBy !== "human") return res.status(403).json({ error: "Human confirmation is required" });
       if (!body.action || typeof body.action !== "object") return res.status(400).json({ error: "action is required" });
-      const current = await this.board.snapshot();
-      const result = await this.library.apply(body.action, current);
-      if (result.previousRevision !== undefined || result.board.id !== current.id
-        || result.board.revision !== current.revision || result.board.title !== current.title) {
-        const next = await this.board.replace(result.previousRevision === undefined
-          ? touchBoard(result.board)
-          : { ...result.board, revision: current.revision + 1 }, current.revision);
-        result.board = next;
+      /*
+       * A library action is validated too, so it needs the same rejection shape
+       * as a write. This route had no handler at all: switching to an unknown
+       * board surfaced as 500 "Internal server error" and the specific message
+       * -- which board ids do exist -- reached stderr and nowhere else.
+       */
+      try {
+        const current = await this.board.snapshot();
+        const result = await this.library.apply(body.action, current);
+        if (result.previousRevision !== undefined || result.board.id !== current.id
+          || result.board.revision !== current.revision || result.board.title !== current.title) {
+          const next = await this.board.replace(result.previousRevision === undefined
+            ? touchBoard(result.board)
+            : { ...result.board, revision: current.revision + 1 }, current.revision);
+          result.board = next;
+        }
+        this.revisions?.remember(result.board);
+        this.broadcast({ type: "board_library_updated", activeId: result.index.activeId, revision: result.board.revision });
+        res.json({
+          ok: true,
+          index: result.index,
+          board: canvasSnapshot(result.board),
+          ...(body.action.type === "export" || body.action.type === "get" ? { exportBoard: result.board } : {}),
+        });
+      } catch (error) {
+        const message = error instanceof Error ? error.message : String(error);
+        if (error instanceof BoardValidationError) {
+          return res.status(400).json({
+            error: message,
+            code: error.code,
+            path: error.path,
+            expected: error.expected,
+            fix: error.fix,
+          });
+        }
+        if (error instanceof BoardRevisionConflictError) return res.status(409).json({ error: message });
+        if (message.toLowerCase().includes("timed out waiting")) return res.status(503).json({ error: message });
+        if ((error as NodeJS.ErrnoException).code) {
+          logger.error(`Board library persistence failed: ${message}`);
+          return res.status(500).json({ error: "Unable to persist board changes" });
+        }
+        return res.status(400).json({ error: message });
       }
-      this.revisions?.remember(result.board);
-      this.broadcast({ type: "board_library_updated", activeId: result.index.activeId, revision: result.board.revision });
-      res.json({
-        ok: true,
-        index: result.index,
-        board: canvasSnapshot(result.board),
-        ...(body.action.type === "export" || body.action.type === "get" ? { exportBoard: result.board } : {}),
-      });
     });
 
     const commit = async (

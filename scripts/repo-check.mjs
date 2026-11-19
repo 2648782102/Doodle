@@ -366,6 +366,10 @@ check(
   "the HTTP surface classifies a validation error as an errno again, so a bad canvas write answers 500 instead of 400",
 );
 check(
+  (http.match(/error instanceof BoardValidationError/g) ?? []).length >= 2,
+  "an HTTP route validates its action without a handler again, so a bad request answers 500 Internal server error",
+);
+check(
   !/x: Math\.max\(-MAX_COORDINATE/.test((await read("src/board/model/validate.ts"))),
   "normalizeItem clamps coordinates again; resolveGeometry is the only place that may bound them",
 );
