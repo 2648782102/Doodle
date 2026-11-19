@@ -154,6 +154,14 @@ check(await exists("scripts/open-board.mjs") && packageJson.scripts.doodle === "
  * `toolErrorMessage`.
  */
 check(
+  // A closed socket must announce itself. Silent reconnect left the person
+  // drawing on a canvas whose every save would fail.
+  excalidrawApp.includes("function showConnectionNotice(")
+    && excalidrawApp.includes("connectionNoticeVisible")
+    && excalidrawApp.includes('dataset.sticky === "true"'),
+  "the canvas silently reconnects again, so a dead connection looks like a working board",
+);
+check(
   excalidrawApp.includes("function toolErrorMessage(")
     && (excalidrawApp.match(/throw new Error\(toolErrorMessage\(result\)\)/g) ?? []).length >= 2,
   "the canvas discards the rejection reason again, so a failed save shows a message that names nothing",

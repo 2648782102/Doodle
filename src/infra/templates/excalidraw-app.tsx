@@ -430,7 +430,49 @@ function connectStandaloneUpdates() {
       if (refreshed) applyRemoteSnapshot(refreshed);
     } catch {}
   });
-  socket.addEventListener("close", () => window.setTimeout(connectStandaloneUpdates, 750));
+  /*
+   * Say when the canvas is no longer talking to the server.
+   *
+   * A closed socket only reconnected silently. The person kept drawing on a
+   * canvas that looked fine, and found out at the next save — each edit
+   * failing in turn. The banner is deliberately quiet: it appears only while
+   * the socket is actually down and clears itself the moment it is back, so a
+   * transient reconnect never flashes anything.
+   */
+  socket.addEventListener("close", () => {
+    showConnectionNotice("画板连接已断开，正在重连；这期间的改动不会保存。");
+    window.setTimeout(() => connectStandaloneUpdates(), 750);
+  });
+  socket.addEventListener("open", () => showConnectedNotice());
+}
+
+let connectionNoticeVisible = false;
+
+function showConnectionNotice(message: string): void {
+  connectionNoticeVisible = true;
+  /*
+   * Two differences from a save rejection: it has no timeout, because the
+   * socket stays down until it does not, and it outlives an `clearError()` from
+   * an unrelated successful write.
+   */
+  const banner = ensureSyncBanner();
+  banner.textContent = message;
+  banner.dataset.visible = "true";
+  banner.dataset.sticky = "true";
+  if (errorTimer !== null) {
+    window.clearTimeout(errorTimer);
+    errorTimer = null;
+  }
+}
+
+function showConnectedNotice(): void {
+  if (!connectionNoticeVisible) return;
+  connectionNoticeVisible = false;
+  const banner = document.querySelector<HTMLElement>("#doodleSyncBanner");
+  if (banner) {
+    banner.removeAttribute("data-sticky");
+    banner.removeAttribute("data-visible");
+  }
 }
 
 /**
@@ -768,6 +810,19 @@ async function syncBoard(next: unknown[], base: BoardSnapshot): Promise<BoardSna
 
 let errorTimer: number | null = null;
 
+/** The one page-level banner, created on first use. Not board state. */
+function ensureSyncBanner(): HTMLElement {
+  const existing = document.querySelector<HTMLElement>("#doodleSyncBanner");
+  if (existing) return existing;
+  const banner = document.createElement("div");
+  banner.id = "doodleSyncBanner";
+  banner.className = "doodle-sync-banner doodle-glass";
+  banner.setAttribute("role", "status");
+  banner.setAttribute("aria-live", "polite");
+  document.body.append(banner);
+  return banner;
+}
+
 /**
  * Tell the person when a save was rejected.
  *
@@ -779,15 +834,8 @@ let errorTimer: number | null = null;
 function showError(error: unknown) {
   console.warn("Doodle board sync skipped", error);
   const message = error instanceof Error ? error.message : String(error);
-  let banner = document.querySelector<HTMLElement>("#doodleSyncBanner");
-  if (!banner) {
-    banner = document.createElement("div");
-    banner.id = "doodleSyncBanner";
-    banner.className = "doodle-sync-banner doodle-glass";
-    banner.setAttribute("role", "status");
-    banner.setAttribute("aria-live", "polite");
-    document.body.append(banner);
-  }
+  const banner = ensureSyncBanner();
+  banner.removeAttribute("data-sticky");
   banner.textContent = `这次改动没有保存：${message}`;
   banner.dataset.visible = "true";
   if (errorTimer !== null) window.clearTimeout(errorTimer);
@@ -802,7 +850,10 @@ function clearError() {
     window.clearTimeout(errorTimer);
     errorTimer = null;
   }
-  document.querySelector<HTMLElement>("#doodleSyncBanner")?.removeAttribute("data-visible");
+  const banner = document.querySelector<HTMLElement>("#doodleSyncBanner");
+  // A sticky banner belongs to the connection state, not to a save result.
+  if (banner?.dataset.sticky === "true") return;
+  banner?.removeAttribute("data-visible");
 }
 function downloadBlob(blob: Blob, filename: string) {
   const url = URL.createObjectURL(blob);
