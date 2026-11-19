@@ -29,6 +29,7 @@ import { BoardLibrary, boardLibraryIndexText, type BoardLibraryAction } from "./
 import type { BoardRevisionCache } from "./revision-cache.js";
 import { isSuspiciousEmptyWrite, type BoardStore } from "./store.js";
 import { watchBoardState, type StateWatch } from "./state-watch.js";
+import { conflictPayload, reportConflicts } from "./http/conflict.js";
 import { projectSnapshotText, scanProject, type ProjectScanOptions } from "./project-scan.js";
 import { assetCandidates, fillTemplate, findExisting, readTemplate } from "./http/templates.js";
 import { expandRecipe } from "./diagram/recipe.js";
@@ -181,15 +182,27 @@ export class BoardHttpServer {
             throw new BoardRevisionConflictError(-1, expectedRevision);
           }
           const current = await this.board.snapshot();
-          if (current.revision !== expectedRevision) {
-            throw new BoardRevisionConflictError(expectedRevision, current.revision);
+          if (current.revision === expectedRevision) {
+            const candidate = change(current);
+            // A client bug must not look like a deliberate clear.
+            if (isSuspiciousEmptyWrite(current, candidate)) {
+              throw new EmptyWriteRefusedError();
+            }
+            board = await this.board.replaceIfRevision(candidate, expectedRevision);
+          } else {
+            const base = this.revisions?.get(expectedRevision);
+            if (!base) throw new BoardRevisionConflictError(expectedRevision, current.revision);
+            const { touched, conflicts } = reportConflicts(base, current, res.req.body);
+            if (touched.size === 0) throw new BoardRevisionConflictError(expectedRevision, current.revision);
+            if (conflicts.length > 0) {
+              return res.status(409).json(conflictPayload(expectedRevision, current.revision, conflicts));
+            }
+            // Disjoint: both edits land. Persist against the revision we just read.
+            const merged = change(current);
+            if (isSuspiciousEmptyWrite(current, merged)) throw new EmptyWriteRefusedError();
+            board = await this.board.replaceIfRevision(merged, current.revision);
+            res.locals.mergedFrom = expectedRevision;
           }
-          const candidate = change(current);
-          // A client bug must not look like a deliberate clear.
-          if (isSuspiciousEmptyWrite(current, candidate)) {
-            throw new EmptyWriteRefusedError();
-          }
-          board = await this.board.replaceIfRevision(candidate, expectedRevision);
         }
       } catch (error) {
         const message = error instanceof Error ? error.message : String(error);
@@ -224,7 +237,8 @@ export class BoardHttpServer {
       }
       this.broadcast({ type: "board_updated", revision: board.revision });
       this.revisions?.remember(board);
-      return res.json({ ok: true, board: canvasSnapshot(board) });
+      const mergedFrom = res.locals.mergedFrom;
+      return res.json({ ok: true, board: canvasSnapshot(board), ...(typeof mergedFrom === "number" ? { mergedFrom } : {}) });
     };
 
     this.app.post("/api/board/items", async (req, res) => {

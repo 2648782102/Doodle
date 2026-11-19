@@ -87,8 +87,17 @@ function cloneElement(element: ExcalidrawLikeElement): Record<string, unknown> {
  * deliberate 16px square, a perfectly horizontal arrow (`h === 0`) and a thick
  * short stroke are all legitimate and must survive.
  */
-function isDegenerate(element: ExcalidrawLikeElement): boolean {
-  const type = elementType(element);
+/**
+ * True when two projections of one object differ only by `updatedAt`.
+ *
+ * Key order is stable because both sides come out of the same builder, so a
+ * string comparison is enough and cheaper than a deep equal.
+ */
+function sameItemApartFromTimestamp(a: BoardItem, b: BoardItem): boolean {
+  return JSON.stringify({ ...a, updatedAt: "" }) === JSON.stringify({ ...b, updatedAt: "" });
+}
+
+function isDegenerate(element: ExcalidrawLikeElement): boolean {  const type = elementType(element);
   if (type === "image") return false;
   if (type === "stroke") return (element.points?.length ?? 0) < 2;
   if (type === "line") {
@@ -192,6 +201,18 @@ export function excalidrawElementsToBoardItems(
         ...(type === "image" && file ? { fileMime: file.mimeType, fileCreated: file.created } : {}),
       },
     };
+    /*
+     * Only a real change earns a new timestamp.
+     *
+     * This used to stamp every item with `now` on every projection, so a board
+     * with nothing touched came back "different" from what the canvas already
+     * had. The canvas compares the projection with its last known board before
+     * saving, and that comparison could never succeed — every pointer move
+     * rewrote the whole document. Keeping the previous timestamp when the rest
+     * of the item is identical makes "nothing changed" detectable, which is the
+     * precondition for saving nothing.
+     */
+    if (previous && sameItemApartFromTimestamp(previous, item)) item.updatedAt = previous.updatedAt;
     return item;
   });
   /*

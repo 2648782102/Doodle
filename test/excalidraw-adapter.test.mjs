@@ -166,6 +166,43 @@ describe("Doodle to Excalidraw adapter", () => {
   });
 });
 
+describe("projection timestamps", () => {
+  /*
+   * The canvas skips a save when its projection equals the board it already
+   * has. That comparison could never succeed while every projection stamped a
+   * fresh `updatedAt` on every object, so every pointer move rewrote the whole
+   * document.
+   */
+  it("keeps updatedAt when nothing about the object changed", () => {
+    const stamp = "2020-01-01T00:00:00.000Z";
+    const first = boardItemsFromExcalidrawBoard(createEmptyBoard(), [
+      { id: "r1", type: "rectangle", x: 40, y: 40, width: 190, height: 90 },
+    ]);
+    first.items[0].updatedAt = stamp;
+
+    const second = boardItemsFromExcalidrawBoard(first, [
+      { id: "r1", type: "rectangle", x: 40, y: 40, width: 190, height: 90 },
+    ]);
+
+    expect(second.items[0].updatedAt).toBe(stamp);
+    expect(JSON.stringify(second.items)).toBe(JSON.stringify(first.items));
+  });
+
+  it("stamps updatedAt when the object actually moved", () => {
+    const stamp = "2020-01-01T00:00:00.000Z";
+    const first = boardItemsFromExcalidrawBoard(createEmptyBoard(), [
+      { id: "r1", type: "rectangle", x: 40, y: 40, width: 190, height: 90 },
+    ]);
+    first.items[0].updatedAt = stamp;
+
+    const second = boardItemsFromExcalidrawBoard(first, [
+      { id: "r1", type: "rectangle", x: 60, y: 40, width: 190, height: 90 },
+    ]);
+
+    expect(second.items[0].updatedAt).not.toBe(stamp);
+  });
+});
+
 describe("degenerate canvas elements", () => {
   /*
    * A click without a drag left a zero-size shape, which the stored size floor
