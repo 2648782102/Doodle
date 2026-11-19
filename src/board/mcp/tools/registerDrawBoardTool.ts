@@ -137,11 +137,44 @@ server.registerTool(
           );
         }
       }
-      if (diagram) {
-        if (items !== undefined || updates !== undefined || remove_ids !== undefined
-          || layout !== undefined || replace_board !== undefined || library !== undefined) {
-          throw new Error("diagram replaces the active board and cannot be combined with other draw_board actions");
+      /*
+       * The tool has three mutually exclusive shapes, and each must say so.
+       *
+       * Only `diagram` used to guard this. `replace_board + items` and
+       * `library + items` silently dropped the extra field and reported
+       * success, so a caller that sent both believed the second half applied.
+       * The check is shared now, and it lists the fields that clashed so the
+       * caller knows which half to drop.
+       */
+      const mutationFields = {
+        items, updates, remove_ids, layout, replace_board, library, diagram,
+      };
+      const primaryShapes = (["diagram", "library", "replace_board"] as const)
+        .filter((field) => mutationFields[field] !== undefined);
+      if (primaryShapes.length > 1) {
+        throw new BoardValidationError(
+          `draw_board received more than one whole-board action: ${primaryShapes.join(", ")}`,
+          "CONFLICTING_ACTIONS",
+          primaryShapes[primaryShapes.length - 1],
+          "exactly one of diagram, library, or replace_board",
+          `Send these as separate calls. A diagram generates a board, library manages saved boards, and replace_board writes a complete one; they cannot be combined.`,
+        );
+      }
+      if (primaryShapes.length === 1) {
+        const conflicting = (["items", "updates", "remove_ids", "layout"] as const)
+          .filter((field) => mutationFields[field] !== undefined
+            && (mutationFields[field] as unknown[] | undefined)?.length !== 0);
+        if (conflicting.length) {
+          throw new BoardValidationError(
+            `${primaryShapes[0]} cannot be combined with ${conflicting.join(", ")}`,
+            "CONFLICTING_ACTIONS",
+            conflicting[0],
+            `only ${primaryShapes[0]}`,
+            `${primaryShapes[0]} replaces the board wholesale, so item-level fields would be discarded. Send them as a separate call.`,
+          );
         }
+      }
+      if (diagram) {
         // `resolveDiagramLayout` validates `mode` with a repair path; the
         // schema only proves it is a string.
         const expanded = expandRecipe(diagram as DiagramInput);

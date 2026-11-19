@@ -480,6 +480,36 @@ describe("first-try repair contract", () => {
     });
   }, 30_000);
 
+  it("refuses to combine two whole-board actions", async () => {
+    // Only `diagram` used to guard this. `replace_board + items` and
+    // `library + items` silently dropped the extra field and reported success,
+    // so a caller that sent both believed the second half applied.
+    await withClient(async (client) => {
+      const created = await client.callTool({
+        name: "draw_board",
+        arguments: { author: "ai", items: [{ type: "note", x: 0, y: 0, w: 160, h: 90, text: "base" }] },
+      });
+      const snapshot = created.structuredContent;
+      const extra = [{ type: "note", x: 0, y: 900, w: 160, h: 90, text: "extra" }];
+
+      for (const [label, args] of [
+        ["replace_board + items", { replace_board: { ...snapshot, notes: [] }, items: extra }],
+        ["replace_board + remove_ids", { replace_board: { ...snapshot, notes: [] }, remove_ids: [snapshot.items[0].id] }],
+        ["library + items", { library: { type: "list" }, items: extra }],
+        ["diagram + items", { diagram: { nodes: [{ id: "a", label: "A" }] }, items: extra }],
+      ]) {
+        const result = await client.callTool({ name: "draw_board", arguments: { author: "ai", ...args } });
+        expect(result.isError, label).toBe(true);
+        expect(errorJsonOf(result)?.code, label).toBe("CONFLICTING_ACTIONS");
+      }
+
+      // The refusals wrote nothing.
+      const board = (await client.callTool({ name: "get_board", arguments: {} })).structuredContent;
+      expect(board.items.some((item) => item.text === "extra")).toBe(false);
+      expect(board.items.some((item) => item.text === "base")).toBe(true);
+    });
+  }, 30_000);
+
   it("publishes the bounds a model is checked against", async () => {
     // Knowing a bound up front is cheaper than any repair: it turns a rejected
     // write into a correct one. The table must match what model/ enforces.

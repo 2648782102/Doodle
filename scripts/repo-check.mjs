@@ -339,6 +339,10 @@ check(
   "layout silently repairs its own input again: an unknown id arranges the whole board and an out-of-range bound is clamped",
 );
 check(
+  tools.includes("CONFLICTING_ACTIONS") && tools.includes("primaryShapes.length === 1"),
+  "draw_board accepts two whole-board actions again: the extra field is silently dropped and the reply claims success",
+);
+check(
   !/x: Math\.max\(-MAX_COORDINATE/.test((await read("src/board/model/validate.ts"))),
   "normalizeItem clamps coordinates again; resolveGeometry is the only place that may bound them",
 );
