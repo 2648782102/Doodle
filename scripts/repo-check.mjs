@@ -330,6 +330,10 @@ check(
   "a title or group id is truncated again instead of rejected, so the stored board disagrees with the request",
 );
 check(
+  boardTypes.includes("Update ${index} targets") && boardTypes.includes("remove_ids[${index}] names"),
+  "a batch update or removal is best-effort again: a missing id is skipped and the reply claims success",
+);
+check(
   !/x: Math\.max\(-MAX_COORDINATE/.test((await read("src/board/model/validate.ts"))),
   "normalizeItem clamps coordinates again; resolveGeometry is the only place that may bound them",
 );

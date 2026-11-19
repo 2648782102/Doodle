@@ -159,6 +159,27 @@ export function updateBoardItems(
   updates: BoardItemPatch[],
   author: BoardAuthor = "human",
 ): SimpleBoard {
+  /*
+   * Every requested update must name a real item.
+   *
+   * This looped over the *board* and looked each item up in the patch map, so
+   * an update for an id that does not exist was silently dropped while the
+   * call still reported success. A model revising five labels and mistyping one
+   * id would be told all five landed. Checking the request instead of the board
+   * is what makes the report honest.
+   */
+  const knownIds = new Set(board.items.map((item) => item.id));
+  for (const [index, update] of updates.entries()) {
+    if (!knownIds.has(update.id)) {
+      throw new BoardValidationError(
+        `Update ${index} targets ${JSON.stringify(update.id)}, which is not on this board`,
+        "ITEM_NOT_FOUND",
+        `updates[${index}].id`,
+        "an id that exists on this board",
+        `Re-read the board with get_board and use one of its item ids. Nothing was written; re-send the whole batch with the corrected id.`,
+      );
+    }
+  }
   const patches = new Map(updates.map((update) => [update.id, update.patch]));
   const timestamp = now();
   const items = board.items.map((item) => {
@@ -171,9 +192,23 @@ export function updateBoardItems(
 }
 
 export function removeBoardItems(board: SimpleBoard, ids: string[]): SimpleBoard {
+  /*
+   * A removal that silently skips an unknown id reports a cleanup that did not
+   * happen. Name the missing id instead, with its position in the request.
+   */
+  const presentIds = new Set(board.items.map((item) => item.id));
+  for (const [index, id] of ids.entries()) {
+    if (!presentIds.has(id)) {
+      throw new BoardValidationError(
+        `remove_ids[${index}] names ${JSON.stringify(id)}, which is not on this board`,
+        "ITEM_NOT_FOUND",
+        `remove_ids[${index}]`,
+        "an id that exists on this board",
+        `Re-read the board with get_board and use one of its item ids. Nothing was removed.`,
+      );
+    }
+  }
   const removeSet = new Set(ids);
-  const found = board.items.some((item) => removeSet.has(item.id));
-  if (!found) throw new Error("Board item not found");
   return touchBoard({
     ...board,
     items: board.items.filter((item) => !removeSet.has(item.id)),

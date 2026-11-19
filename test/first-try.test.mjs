@@ -372,6 +372,64 @@ describe("first-try repair contract", () => {
     });
   }, 30_000);
 
+  it("refuses a batch whose update targets a missing id, and writes nothing", async () => {
+    // `updateBoardItems` looped over the board and looked each item up in the
+    // patch map, so an update for an id that did not exist was silently
+    // dropped while the call reported success. A model revising five labels
+    // and mistyping one id was told all five landed.
+    await withClient(async (client) => {
+      const created = await client.callTool({
+        name: "draw_board",
+        arguments: {
+          author: "ai",
+          items: [
+            { type: "note", x: 0, y: 0, w: 160, h: 90, text: "one" },
+            { type: "note", x: 200, y: 0, w: 160, h: 90, text: "two" },
+          ],
+        },
+      });
+      const ids = created.structuredContent.items.map((item) => item.id);
+
+      const mixed = await client.callTool({
+        name: "draw_board",
+        arguments: {
+          author: "ai",
+          updates: [
+            { id: ids[0], patch: { text: "good" } },
+            { id: "does-not-exist", patch: { text: "impossible" } },
+          ],
+        },
+      });
+      expect(mixed.isError).toBe(true);
+      expect(errorJsonOf(mixed)).toMatchObject({ code: "ITEM_NOT_FOUND", path: "updates[1].id" });
+
+      // Atomic: the good half of the batch did not land either.
+      const board = (await client.callTool({ name: "get_board", arguments: {} })).structuredContent;
+      expect(board.items.some((item) => item.text === "good")).toBe(false);
+      expect(board.items.some((item) => item.text === "one")).toBe(true);
+    });
+  }, 30_000);
+
+  it("refuses a removal that names a missing id, and removes nothing", async () => {
+    await withClient(async (client) => {
+      const created = await client.callTool({
+        name: "draw_board",
+        arguments: { author: "ai", items: [{ type: "note", x: 0, y: 0, w: 160, h: 90, text: "keep" }] },
+      });
+      const id = created.structuredContent.items[0].id;
+
+      const mixed = await client.callTool({
+        name: "draw_board",
+        arguments: { author: "ai", remove_ids: [id, "nope"] },
+      });
+      expect(mixed.isError).toBe(true);
+      expect(errorJsonOf(mixed)).toMatchObject({ code: "ITEM_NOT_FOUND", path: "remove_ids[1]" });
+
+      const board = (await client.callTool({ name: "get_board", arguments: {} })).structuredContent;
+      expect(board.items.some((item) => item.id === id)).toBe(true);
+    });
+  }, 30_000);
+
   it("publishes the bounds a model is checked against", async () => {
     // Knowing a bound up front is cheaper than any repair: it turns a rejected
     // write into a correct one. The table must match what model/ enforces.
