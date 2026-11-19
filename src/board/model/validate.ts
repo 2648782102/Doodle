@@ -30,9 +30,34 @@ export { parseBoard } from "./parse-board.js";
 export { isAuthor } from "./predicates.js";
 
 export function normalizeItem(input: BoardItemInput): Omit<BoardItem, "createdAt" | "updatedAt"> {
-  if (!input || typeof input !== "object") throw new Error("Invalid item input");
-  if (!ITEM_TYPES.includes(input.type)) throw new Error("Unknown item type");
-  if (![input.x, input.y].every(isFiniteNumber)) throw new Error("Item coordinates must be finite");
+  if (!input || typeof input !== "object") {
+    throw new BoardValidationError(
+      "An item must be an object",
+      "INVALID_ITEM",
+      "items[]",
+      "a board object",
+      `Send a complete object with type, x, y, and text. Use draw_board.diagram when you have several.`,
+    );
+  }
+  if (!ITEM_TYPES.includes(input.type)) {
+    throw new BoardValidationError(
+      `Item type ${JSON.stringify(input.type)} is not one of ${ITEM_TYPES.join(", ")}`,
+      "INVALID_ITEM_TYPE",
+      "items[].type",
+      ITEM_TYPES.join(", "),
+      `Use "note" for a labelled card or "rect" for a plain box; "line" is a directed arrow.`,
+    );
+  }
+  if (![input.x, input.y].every(isFiniteNumber)) {
+    const bad = isFiniteNumber(input.x) ? "y" : "x";
+    throw new BoardValidationError(
+      `Item ${bad} is not a finite number`,
+      "INVALID_ITEM_GEOMETRY",
+      `items[].${bad}`,
+      "a finite number",
+      `Send x and y as numbers, e.g. x: 40, y: 120.`,
+    );
+  }
   const { signedWidth, signedHeight } = resolveGeometry(input.type, input.x, input.y, input.w, input.h);
   const text = (input.text ?? "").slice(0, MAX_TEXT);
   if ((input.text ?? "").length > MAX_TEXT) throw new BoardValidationError(

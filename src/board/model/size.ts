@@ -48,11 +48,33 @@ export function resolveGeometry(
       `Move the object inside the bounded canvas and retry.`,
     );
   }
-  if (w !== undefined && !Number.isFinite(w)) throw new Error("Item width must be finite");
-  if (h !== undefined && !Number.isFinite(h)) throw new Error("Item height must be finite");
+  if (w !== undefined && !Number.isFinite(w)) {
+    throw new BoardValidationError(
+      "Item w is not a finite number",
+      "INVALID_ITEM_GEOMETRY",
+      "items[].w",
+      "a finite number",
+      `Send w as a number. A line treats it as a signed endpoint delta; other types treat it as width.`,
+    );
+  }
+  if (h !== undefined && !Number.isFinite(h)) {
+    throw new BoardValidationError(
+      "Item h is not a finite number",
+      "INVALID_ITEM_GEOMETRY",
+      "items[].h",
+      "a finite number",
+      `Send h as a number. A line treats it as a signed endpoint delta; other types treat it as height.`,
+    );
+  }
   if (type === "line") {
     if (w === undefined && h === undefined) {
-      throw new Error("Line requires w or h as its endpoint delta");
+      throw new BoardValidationError(
+        "A line needs a direction",
+        "LINE_WITHOUT_DIRECTION",
+        "items[].w",
+        "w or h non-zero",
+        `Set the endpoint delta: a horizontal arrow 160px long uses w: 160, h: 0. Both zero is not a direction.`,
+      );
     }
   }
 
