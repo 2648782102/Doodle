@@ -217,3 +217,49 @@ describe("post-cleanup repository shape", () => {
     expect(gitignore).toContain(".doodle-data/");
   });
 });
+
+/**
+ * Budgets, not measurements.
+ *
+ * The Excalidraw engine dominates every artifact: 9 MB of bundled canvas in
+ * dist, the same again inside the plugin package. That is an accepted cost, but
+ * it is the kind of cost that silently doubles — one duplicate copy of the
+ * engine or the locale tree and the plugin ships twice the bytes for no feature.
+ * These ceilings allow normal growth and fail on that class of regression.
+ */
+const ARTIFACT_BUDGETS_MB = { dist: 24, plugin: 48, submissionZip: 32 };
+
+async function directorySize(dir) {
+  let total = 0;
+  for (const entry of await fs.readdir(dir, { withFileTypes: true })) {
+    const target = path.join(dir, entry.name);
+    if (entry.isDirectory()) total += await directorySize(target);
+    else total += (await fs.stat(target)).size;
+  }
+  return total;
+}
+
+describe("shipped artifact size", () => {
+  it("keeps dist, the plugin package and the submission ZIP inside their budgets", async () => {
+    const measured = {};
+    for (const [label, relative] of [
+      ["dist", "dist"],
+      ["plugin", path.join(".doodle-plugin", "doodle")],
+    ]) {
+      const present = await fs.access(path.join(root, relative)).then(() => true, () => false);
+      if (present) measured[label] = await directorySize(path.join(root, relative));
+    }
+    const submissionDir = path.join(root, "doodle-plugin-submission");
+    const zips = await fs.readdir(submissionDir).catch(() => []);
+    const zip = zips.find((name) => name.endsWith(".zip"));
+    if (zip) measured.submissionZip = (await fs.stat(path.join(submissionDir, zip))).size;
+
+    // `npm test` on its own runs without a build; only judge what exists.
+    const oversized = Object.entries(measured)
+      .map(([label, bytes]) => [label, bytes / (1024 * 1024)])
+      .filter(([label, mb]) => mb > ARTIFACT_BUDGETS_MB[label])
+      .map(([label, mb]) => `${label} ${mb.toFixed(1)}MB > ${ARTIFACT_BUDGETS_MB[label]}MB`);
+
+    expect(oversized, `artifacts over budget: ${oversized.join(", ")}`).toEqual([]);
+  });
+});

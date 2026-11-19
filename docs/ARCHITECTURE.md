@@ -82,8 +82,11 @@ historical import paths working. They are re-export lists, not implementation;
 `scripts/repo-check.mjs` fails if a barrel grows past 120 lines or if the
 deleted `tools.ts` monolith returns.
 
-No source module may exceed 450 lines. The check reports the offending file, so
-a growing module is a review signal rather than something to discover later.
+No `src/board` module may exceed 450 lines. The check reports the offending
+file, so a growing module is a review signal rather than something to discover
+later. The frontend templates under `src/infra/templates/` are outside that
+guard — `excalidraw-app.tsx` is already over 1000 lines — so treat them as the
+known remainder of the same rule rather than as exempt.
 
 ## Request flows
 
