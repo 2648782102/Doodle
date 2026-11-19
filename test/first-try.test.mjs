@@ -430,6 +430,56 @@ describe("first-try repair contract", () => {
     });
   }, 30_000);
 
+  it("refuses a layout that names a missing object or an out-of-range bound", async () => {
+    // An unknown id left an empty selection, which the filter read as "no
+    // filter" and arranged the *whole* board instead of the requested subset —
+    // a tidy-up that moved everything. `columns: 0` became 1 and stacked every
+    // object on one spot; `gap: 500` was quietly reduced to 200.
+    await withClient(async (client) => {
+      const created = await client.callTool({
+        name: "draw_board",
+        arguments: {
+          author: "ai",
+          items: [
+            { type: "note", x: 0, y: 0, w: 160, h: 90, text: "A" },
+            { type: "note", x: 200, y: 0, w: 160, h: 90, text: "B" },
+          ],
+        },
+      });
+      const id = created.structuredContent.items[0].id;
+      const before = (await client.callTool({ name: "get_board", arguments: {} })).structuredContent;
+
+      const ghost = await client.callTool({
+        name: "draw_board",
+        arguments: { author: "ai", layout: { ids: [id, "ghost"], mode: "row" } },
+      });
+      expect(errorJsonOf(ghost)).toMatchObject({ code: "ITEM_NOT_FOUND", path: "layout.ids[1]" });
+
+      const zero = await client.callTool({
+        name: "draw_board",
+        arguments: { author: "ai", layout: { columns: 0 } },
+      });
+      expect(errorJsonOf(zero)).toMatchObject({ code: "LAYOUT_COLUMNS_OUT_OF_RANGE", path: "layout.columns" });
+
+      const wide = await client.callTool({
+        name: "draw_board",
+        arguments: { author: "ai", layout: { gap: 500 } },
+      });
+      expect(errorJsonOf(wide)).toMatchObject({ code: "LAYOUT_GAP_OUT_OF_RANGE", path: "layout.gap" });
+
+      const mode = await client.callTool({
+        name: "draw_board",
+        arguments: { author: "ai", layout: { mode: "spiral" } },
+      });
+      expect(errorJsonOf(mode)).toMatchObject({ code: "INVALID_LAYOUT_MODE", path: "layout.mode" });
+
+      // Nothing moved through any of the refusals.
+      const after = (await client.callTool({ name: "get_board", arguments: {} })).structuredContent;
+      const positions = (board) => board.items.map((item) => `${item.id}:${item.x},${item.y}`).sort();
+      expect(positions(after)).toEqual(positions(before));
+    });
+  }, 30_000);
+
   it("publishes the bounds a model is checked against", async () => {
     // Knowing a bound up front is cheaper than any repair: it turns a rejected
     // write into a correct one. The table must match what model/ enforces.

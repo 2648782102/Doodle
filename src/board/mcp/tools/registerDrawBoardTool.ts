@@ -29,6 +29,8 @@ import {
   replaceBoardContent,
   touchBoard,
   type BoardItemInput,
+  type BoardLayoutInput,
+  type DiagramInput,
   type SimpleBoard,
 } from "../../types.js";
 
@@ -140,7 +142,9 @@ server.registerTool(
           || layout !== undefined || replace_board !== undefined || library !== undefined) {
           throw new Error("diagram replaces the active board and cannot be combined with other draw_board actions");
         }
-        const expanded = expandRecipe(diagram);
+        // `resolveDiagramLayout` validates `mode` with a repair path; the
+        // schema only proves it is a string.
+        const expanded = expandRecipe(diagram as DiagramInput);
         const current = await ctx.board.snapshot();
         assertRevision(current);
         // In append mode the existing ids are reserved so a second iteration
@@ -228,7 +232,9 @@ server.registerTool(
         if (removed.size) {
           next = removeBoardItems(next, [...removed]);
         }
-        if (layout) next = layoutBoardItems(next, layout, author ?? "ai");
+        // `layoutBoardItems` validates `mode` itself so the rejection carries a
+        // repair path; the schema only proves the field is a string.
+        if (layout) next = layoutBoardItems(next, layout as BoardLayoutInput, author ?? "ai");
         return next;
       };
       /*

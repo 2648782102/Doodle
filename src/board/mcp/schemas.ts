@@ -72,7 +72,7 @@ export const layoutInput = z.object({
   origin: z.object({ x: z.number().finite(), y: z.number().finite() }).optional().describe("Top-left grid origin"),
   columns: z.number().int().optional().describe("Grid columns, 1-12; defaults to 3"),
   gap: z.number().int().optional().describe("Gap in canvas units, 8-200; defaults to 24"),
-  mode: z.enum(["grid", "row", "column", "timeline", "cluster", "architecture"]).optional().describe("Arrangement mode; architecture derives layers from connected line IDs"),
+  mode: z.string().optional().describe("Arrangement mode: grid, row, column, timeline, cluster, or architecture. architecture derives layers from connected line IDs"),
 });
 
 export const libraryAction = z.discriminatedUnion("type", [
@@ -122,7 +122,7 @@ export const diagramInput = z.object({
     .describe("Step captions for `recipe`. Each becomes one node connected to the next in order."),
   options: z.array(z.string()).optional()
     .describe("Candidate choices for `recipe: decision`; they fan into the final step/outcome."),
-  mode: z.enum(["flow", "timeline", "compare", "matrix"]).optional()
+  mode: z.string().optional()
     .describe("Semantic arrangement, default flow. flow derives columns from edges and snakes after six columns so a 16-step chain is not one 3k-wide strip. timeline/compare/matrix place nodes only where you give `column`/`row` - nodes without them are appended in declaration order below the explicit grid, so set both for a timed sequence."),
   nodes: z.array(z.object({
     id: z.string(),

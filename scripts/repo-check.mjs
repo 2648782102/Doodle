@@ -334,6 +334,11 @@ check(
   "a batch update or removal is best-effort again: a missing id is skipped and the reply claims success",
 );
 check(
+  (await read("src/board/layout/arrange.ts")).includes("layout.ids[${index}] names")
+    && (await read("src/board/layout/arrange.ts")).includes("LAYOUT_COLUMNS_OUT_OF_RANGE"),
+  "layout silently repairs its own input again: an unknown id arranges the whole board and an out-of-range bound is clamped",
+);
+check(
   !/x: Math\.max\(-MAX_COORDINATE/.test((await read("src/board/model/validate.ts"))),
   "normalizeItem clamps coordinates again; resolveGeometry is the only place that may bound them",
 );
@@ -362,8 +367,18 @@ check((await read("src/board/handoff.ts")).includes("HANDOFF_READINGS") === fals
 check(buildScript.includes("excalidraw-app.tsx"), "build is missing the canvas client");
 check(tools.includes("guideSent") && tools.includes("include_guide"), "the guide is not sent once with an explicit opt-in");
 check(tools.includes("boardCapabilities()") && tools.includes("visualDigest: boardVisualDigest(board)") && tools.includes("boardRecipes()"), "board tools lost AI visual language");
-check(tools.includes('startItemId: z.string()') && tools.includes('mode: z.enum(["grid", "row", "column", "timeline", "cluster", "architecture"])') && tools.includes("diagram: diagramInput.optional()"), "draw_board lost connector bindings, expanded layouts, or semantic diagram recipe");
-check(tools.includes('mode: z.enum(["flow", "timeline", "compare", "matrix"])') && tools.includes("diagramModes"), "draw_board.diagram lost its semantic layout modes");
+check(
+  tools.includes("startItemId: z.string()")
+    // `mode` is a string in the schema so the domain layer reports the repair;
+    // the accepted values live in `model/limits.ts` and in the description.
+    && tools.includes("Arrangement mode: grid, row, column, timeline, cluster, or architecture")
+    && tools.includes("diagram: diagramInput.optional()"),
+  "draw_board lost connector bindings, expanded layouts, or semantic diagram recipe",
+);
+check(
+  tools.includes("Semantic arrangement, default flow") && tools.includes("diagramModes"),
+  "draw_board.diagram lost its semantic layout modes",
+);
 check(boardTypes.includes("resolveDiagramLayout") && boardTypes.includes("diagramToBoardItems") && !boardTypes.includes("diagramToExcalidrawScene"), "semantic diagrams are not generated through one deterministic Board v1 layout");
 check(
   boardTypes.includes("const flowWrap = 6;") &&
