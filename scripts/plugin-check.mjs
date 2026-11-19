@@ -47,7 +47,7 @@ const indexSource = await read("src/index.ts");
 const instructions = await read("src/board/instructions.ts");
 const ci = await read(".github/workflows/ci.yml");
 const gitignore = await read(".gitignore");
-const goal = await read("docs/GOAL_PLUGIN.md");
+const goals = await read("docs/GOALS.md");
 const privacy = await read("PRIVACY.md");
 const support = await read("SUPPORT.md");
 const terms = await read("TERMS.md");
@@ -109,7 +109,7 @@ check(ci.includes("npm run build:submission"), "CI does not build the submission
 check(ci.includes("resolveDiagramLayout") && ci.includes("diagramToBoardItems"), "CI does not verify deterministic semantic diagrams");
 check(ci.includes("BoardLibrary"), "CI does not verify the local board library");
 check(gitignore.includes(".doodle-plugin/") && gitignore.includes(".doodle-data/") && gitignore.includes("doodle-plugin-submission/"), "generated plugin output, plugin data, or submission ZIP is not ignored");
-check(goal.includes("## Objective") && goal.includes("show_board") && goal.includes("plugin"), "plugin goal document is incomplete");
+check(goals.includes("## 5. Codex 插件分发") && goals.includes("show_board") && goals.includes("Codex 插件"), "plugin goal section is incomplete");
 check(await exists("src/infra/project-workspace.ts"), "plugin-safe workspace resolution is missing");
 for (const [name, content, phrase] of [
   ["PRIVACY.md", privacy, "Data categories"],

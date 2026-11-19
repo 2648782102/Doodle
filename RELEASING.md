@@ -6,7 +6,7 @@ Releases are made from `master` by a maintainer. CI and the publish workflow ver
 
 1. `CHANGELOG.md` has an entry for every user-visible change.
 2. `package.json` version follows `VERSIONING.md`.
-3. `README.md`, `README.en.md`, `AGENTS.md`, `docs/GOAL_PLUGIN.md`, `docs/ARCHITECTURE.md`, `docs/DECISIONS.md`, `SECURITY.md`, `PRIVACY.md`, `SUPPORT.md`, `TERMS.md`, `docs/FAQ.md`, `docs/SUBMISSION.md`, and `CONTRIBUTING.md` are current.
+3. `README.md`, `README.en.md`, `AGENTS.md`, `docs/GOALS.md`, `docs/ARCHITECTURE.md`, `docs/DECISIONS.md`, `SECURITY.md`, `PRIVACY.md`, `SUPPORT.md`, `TERMS.md`, `docs/FAQ.md`, `docs/SUBMISSION.md`, and `CONTRIBUTING.md` are current.
 4. `npm run check` passes locally, including the versioned submission ZIP.
 5. `npm run repo:plugin-check` passes and `npm pack --dry-run` includes `dist/index.js`, `dist/infra/templates/board.html`, `dist/infra/templates/excalidraw/index.css`, `dist/infra/templates/excalidraw/excalidraw-app.js`, `scripts/doctor.mjs`, `README.md`, `LICENSE`, `CHANGELOG.md`, `SECURITY.md`, `PRIVACY.md`, `SUPPORT.md`, and `TERMS.md`.
 6. CI passes on Node 20, 22, and 24.
