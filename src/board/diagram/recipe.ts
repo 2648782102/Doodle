@@ -36,7 +36,15 @@ export function expandRecipe(diagram: DiagramInput): ExpandedDiagramInput {
     return { ...diagram, edges: diagram.edges ?? [] } as ExpandedDiagramInput;
   }
   const steps = (diagram.steps ?? []).map((step) => step.trim()).filter(Boolean);
-  if (!steps.length) throw new Error(`recipe: ${diagram.recipe} requires at least one non-empty step`);
+  if (!steps.length) {
+    throw new BoardValidationError(
+      `recipe "${diagram.recipe}" has no usable steps`,
+      "RECIPE_STEPS_REQUIRED",
+      "diagram.steps",
+      "at least one non-empty string",
+      `Send steps: ["收集需求", "实现", "验证"]. Blank and whitespace-only entries are ignored, so an array of them counts as empty.`,
+    );
+  }
   if (diagram.recipe === "review") {
     const labels = [steps[0], "收集反馈", "修订并完成", ...steps.slice(1)];
     return expandRecipe({ ...diagram, recipe: "flow", steps: labels });

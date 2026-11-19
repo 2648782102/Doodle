@@ -384,6 +384,11 @@ check(
   "a note inside replace_board rejects with bare prose again, so the caller cannot tell which note is wrong",
 );
 check(
+  (await read("src/board/diagram/recipe.ts")).includes("RECIPE_STEPS_REQUIRED")
+    && (await read("src/board/model/predicates.ts")).includes("INVALID_SCENE"),
+  "a recipe with no steps or a malformed scene rejects with bare prose again",
+);
+check(
   !/x: Math\.max\(-MAX_COORDINATE/.test((await read("src/board/model/validate.ts"))),
   "normalizeItem clamps coordinates again; resolveGeometry is the only place that may bound them",
 );

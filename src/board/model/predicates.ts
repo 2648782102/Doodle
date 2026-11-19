@@ -160,36 +160,88 @@ export function isImageSource(value: unknown): value is string {
 }
 
 export function cloneSceneRecord(value: unknown): Record<string, unknown> | undefined {
-  if (!value || typeof value !== "object" || Array.isArray(value)) throw new Error("Invalid board scene record");
+  if (!value || typeof value !== "object" || Array.isArray(value)) {
+    throw new BoardValidationError(
+      "A scene record must be an object",
+      "INVALID_SCENE",
+      "items[].scene",
+      "a JSON object",
+      `Send scene as { element: {...} } or omit it; the canvas adds fidelity itself.`,
+    );
+  }
   let cloned: Record<string, unknown>;
   try {
     cloned = JSON.parse(JSON.stringify(value)) as Record<string, unknown>;
   } catch {
-    throw new Error("Board scene record must be JSON serializable");
+    throw new BoardValidationError(
+      "A scene record is not JSON serialisable",
+      "INVALID_SCENE",
+      "items[].scene",
+      "plain JSON values only",
+      `Remove functions, cycles, or class instances from scene. An agent should normally omit scene entirely.`,
+    );
   }
-  if (JSON.stringify(cloned).length > MAX_SCENE_JSON) throw new Error("Board scene record is too large");
+  if (JSON.stringify(cloned).length > MAX_SCENE_JSON) {
+    throw new BoardValidationError(
+      `A scene record is ${JSON.stringify(cloned).length} characters; the limit is ${MAX_SCENE_JSON}`,
+      "SCENE_TOO_LARGE",
+      "items[].scene",
+      `at most ${MAX_SCENE_JSON} characters`,
+      `Omit scene. It is canvas fidelity for round-tripping a person's exact render, not something an agent needs to send.`,
+    );
+  }
   return cloned;
 }
 
 export function normalizeScene(value: unknown): BoardSceneMeta | undefined {
   if (value === undefined) return undefined;
-  if (!value || typeof value !== "object" || Array.isArray(value)) throw new Error("Invalid board scene metadata");
+  if (!value || typeof value !== "object" || Array.isArray(value)) {
+    throw new BoardValidationError(
+      `Item scene is ${JSON.stringify(value)}, which is not an object`,
+      "INVALID_SCENE",
+      "items[].scene",
+      "an object, or omit it",
+      `An agent should omit scene; it exists so the canvas can round-trip its own render.`,
+    );
+  }
   const candidate = value as Partial<BoardSceneMeta>;
   const scene: BoardSceneMeta = {};
   if (candidate.element !== undefined) scene.element = cloneSceneRecord(candidate.element);
   if (candidate.boundText !== undefined) scene.boundText = cloneSceneRecord(candidate.boundText);
   if (candidate.fileId !== undefined) {
-    if (typeof candidate.fileId !== "string" || !candidate.fileId.trim() || candidate.fileId.length > MAX_FILE_ID)
-      throw new Error("Invalid board scene file ID");
+    if (typeof candidate.fileId !== "string" || !candidate.fileId.trim() || candidate.fileId.length > MAX_FILE_ID) {
+      throw new BoardValidationError(
+        `scene.fileId is not a non-empty string of at most ${MAX_FILE_ID} characters`,
+        "INVALID_SCENE_FILE",
+        "items[].scene.fileId",
+        `a non-empty string of at most ${MAX_FILE_ID} characters`,
+        `Omit scene for agent-authored items; the canvas assigns file ids itself.`,
+      );
+    }
     scene.fileId = candidate.fileId;
   }
   if (candidate.fileMime !== undefined) {
-    if (typeof candidate.fileMime !== "string" || !IMAGE_MIMES.includes(candidate.fileMime))
-      throw new Error("Invalid board scene file mime");
+    if (typeof candidate.fileMime !== "string" || !IMAGE_MIMES.includes(candidate.fileMime)) {
+      throw new BoardValidationError(
+        `scene.fileMime is ${JSON.stringify(candidate.fileMime)}`,
+        "INVALID_SCENE_FILE",
+        "items[].scene.fileMime",
+        IMAGE_MIMES.join(", "),
+        `Use the same type as the image source. An agent should omit scene entirely.`,
+      );
+    }
     scene.fileMime = candidate.fileMime;
   }
   if (candidate.fileCreated !== undefined) {
-    if (!isFiniteNumber(candidate.fileCreated)) throw new Error("Invalid board scene file timestamp");
+    if (!isFiniteNumber(candidate.fileCreated)) {
+      throw new BoardValidationError(
+        "scene.fileCreated is not a number",
+        "INVALID_SCENE_FILE",
+        "items[].scene.fileCreated",
+        "a finite number",
+        `Omit scene for agent-authored items; the canvas records file timestamps itself.`,
+      );
+    }
     scene.fileCreated = candidate.fileCreated;
   }
   return Object.keys(scene).length ? scene : undefined;
