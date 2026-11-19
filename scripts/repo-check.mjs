@@ -370,6 +370,15 @@ check(
   "an HTTP route validates its action without a handler again, so a bad request answers 500 Internal server error",
 );
 check(
+  (await read("src/board/model/predicates.ts")).includes("STYLE_OUT_OF_RANGE")
+    && (await read("src/board/model/predicates.ts")).includes("INVALID_TEXT_ALIGN"),
+  "a wrong style sub-field rejects with bare prose again instead of naming the field and the range",
+);
+check(
+  !/textAlign: z\.enum|fontWeight: z\.enum/.test(await read("src/board/mcp/schemas.ts")),
+  "style enums are back in the schema, so their rejection loses the repair path",
+);
+check(
   !/x: Math\.max\(-MAX_COORDINATE/.test((await read("src/board/model/validate.ts"))),
   "normalizeItem clamps coordinates again; resolveGeometry is the only place that may bound them",
 );

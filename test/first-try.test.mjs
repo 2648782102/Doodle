@@ -562,6 +562,47 @@ describe("first-try repair contract", () => {
     });
   }, 30_000);
 
+  it("names the style sub-field when a visual style is wrong", async () => {
+    // `style` is a field an agent uses freely, and every rejection here was a
+    // bare string in a shared predicate — reaching the caller as TOOL_ERROR —
+    // or a schema-level `Invalid option` with no repair.
+    await withClient(async (client) => {
+      const cases = [
+        [{ borderColor: "nope" }, "INVALID_COLOR", "items[].style.borderColor"],
+        [{ textColor: "nope" }, "INVALID_COLOR", "items[].style.textColor"],
+        [{ fontSize: 999 }, "STYLE_OUT_OF_RANGE", "items[].style.fontSize"],
+        [{ opacity: 5 }, "STYLE_OUT_OF_RANGE", "items[].style.opacity"],
+        [{ borderWidth: 40 }, "STYLE_OUT_OF_RANGE", "items[].style.borderWidth"],
+        [{ textAlign: "justify" }, "INVALID_TEXT_ALIGN", "items[].style.textAlign"],
+        [{ fontWeight: "heavy" }, "INVALID_FONT_WEIGHT", "items[].style.fontWeight"],
+      ];
+      for (const [style, code, path] of cases) {
+        const result = await client.callTool({
+          name: "draw_board",
+          arguments: { author: "ai", items: [{ type: "rect", x: 0, y: 0, w: 160, h: 90, text: "x", style }] },
+        });
+        const payload = errorJsonOf(result);
+        expect(result.isError, JSON.stringify(style)).toBe(true);
+        expect(payload?.code, JSON.stringify(style)).toBe(code);
+        expect(payload?.path, JSON.stringify(style)).toBe(path);
+      }
+
+      // Valid styles still land untouched.
+      const ok = await client.callTool({
+        name: "draw_board",
+        arguments: {
+          author: "ai",
+          items: [{
+            type: "rect", x: 0, y: 0, w: 160, h: 90, text: "ok",
+            style: { borderColor: "#334155", fontSize: 14, fontWeight: "bold", textAlign: "center", opacity: 0.8 },
+          }],
+        },
+      });
+      expect(ok.isError).toBeFalsy();
+      expect(ok.structuredContent.items.at(-1).style).toMatchObject({ fontWeight: "bold", textAlign: "center" });
+    });
+  }, 30_000);
+
   it("publishes the bounds a model is checked against", async () => {
     // Knowing a bound up front is cheaper than any repair: it turns a rejected
     // write into a correct one. The table must match what model/ enforces.

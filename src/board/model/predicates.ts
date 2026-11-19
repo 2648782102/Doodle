@@ -63,11 +63,32 @@ export function isFillColor(value: unknown): value is string {
 
 export function normalizeStyle(value: unknown): BoardItemStyle | undefined {
   if (value === undefined) return undefined;
-  if (!value || typeof value !== "object") throw new Error("Invalid board item style");
+  /*
+   * `style` is a field an agent uses freely, so every rejection here names the
+   * sub-field, the value it got, and the range. These were bare strings in a
+   * shared predicate, which reached the caller as `TOOL_ERROR`.
+   */
+  if (!value || typeof value !== "object") {
+    throw new BoardValidationError(
+      "Item style must be an object",
+      "INVALID_STYLE",
+      "items[].style",
+      "an object of bounded visual fields",
+      `Send style as an object such as { fontSize: 14, fontWeight: "bold" }, or omit it.`,
+    );
+  }
   const candidate = value as Partial<BoardItemStyle>;
   const style: BoardItemStyle = {};
   if (candidate.borderColor !== undefined) {
-    if (!isColor(candidate.borderColor)) throw new Error("Invalid board item border color");
+    if (!isColor(candidate.borderColor)) {
+      throw new BoardValidationError(
+        `style.borderColor is ${JSON.stringify(candidate.borderColor)}, which is not a hex colour`,
+        "INVALID_COLOR",
+        "items[].style.borderColor",
+        "#rrggbb",
+        `Use a six-digit hex value such as #334155. The item-level color may also be transparent; a border may not.`,
+      );
+    }
     style.borderColor = candidate.borderColor;
   }
   for (const [key, minimum, maximum] of [
@@ -76,19 +97,51 @@ export function normalizeStyle(value: unknown): BoardItemStyle | undefined {
   ] as const) {
     const raw = candidate[key];
     if (raw === undefined) continue;
-    if (!isFiniteNumber(raw) || raw < minimum || raw > maximum) throw new Error(`Invalid board item ${key}`);
+    if (!isFiniteNumber(raw) || raw < minimum || raw > maximum) {
+      throw new BoardValidationError(
+        `style.${key} is ${JSON.stringify(raw)}; the range is ${minimum}-${maximum}`,
+        "STYLE_OUT_OF_RANGE",
+        `items[].style.${key}`,
+        `a number between ${minimum} and ${maximum}`,
+        `Omit the field to use the default, or pick a value inside the range.`,
+      );
+    }
     style[key] = raw;
   }
   if (candidate.textColor !== undefined) {
-    if (!isColor(candidate.textColor)) throw new Error("Invalid board item text color");
+    if (!isColor(candidate.textColor)) {
+      throw new BoardValidationError(
+        `style.textColor is ${JSON.stringify(candidate.textColor)}, which is not a hex colour`,
+        "INVALID_COLOR",
+        "items[].style.textColor",
+        "#rrggbb",
+        `Use a six-digit hex value with enough contrast for the fill you chose.`,
+      );
+    }
     style.textColor = candidate.textColor;
   }
   if (candidate.fontWeight !== undefined) {
-    if (candidate.fontWeight !== "normal" && candidate.fontWeight !== "bold") throw new Error("Invalid board item font weight");
+    if (candidate.fontWeight !== "normal" && candidate.fontWeight !== "bold") {
+      throw new BoardValidationError(
+        `style.fontWeight is ${JSON.stringify(candidate.fontWeight)}`,
+        "INVALID_FONT_WEIGHT",
+        "items[].style.fontWeight",
+        `"normal" or "bold"`,
+        `Use "bold" to emphasise a heading, or omit the field.`,
+      );
+    }
     style.fontWeight = candidate.fontWeight;
   }
   if (candidate.textAlign !== undefined) {
-    if (!isTextAlign(candidate.textAlign)) throw new Error("Invalid board item text align");
+    if (!isTextAlign(candidate.textAlign)) {
+      throw new BoardValidationError(
+        `style.textAlign is ${JSON.stringify(candidate.textAlign)}`,
+        "INVALID_TEXT_ALIGN",
+        "items[].style.textAlign",
+        TEXT_ALIGNS.join(", "),
+        `Use "left", "center", or "right"; "center" suits a caption under a card.`,
+      );
+    }
     style.textAlign = candidate.textAlign;
   }
   return Object.keys(style).length ? style : undefined;
