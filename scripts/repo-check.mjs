@@ -347,6 +347,10 @@ check(
   "show_board is back to resending the full guide on every call instead of sharing the get_board flag",
 );
 check(
+  (await read("src/board/diagram/recipe.ts")).includes("DIAGRAM_EMPTY"),
+  "an empty diagram rejects with bare prose again instead of naming both routes forward",
+);
+check(
   !/x: Math\.max\(-MAX_COORDINATE/.test((await read("src/board/model/validate.ts"))),
   "normalizeItem clamps coordinates again; resolveGeometry is the only place that may bound them",
 );

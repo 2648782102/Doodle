@@ -8,6 +8,7 @@
  */
 
 import type { DiagramInput, DiagramMode, ExpandedDiagramInput } from "../model/types.js";
+import { BoardValidationError } from "../errors.js";
 
 export type DiagramRecipe = NonNullable<DiagramInput["recipe"]>;
 
@@ -18,7 +19,13 @@ function idFor(index: number): string {
 export function expandRecipe(diagram: DiagramInput): ExpandedDiagramInput {
   if (!diagram.recipe) {
     if (!diagram.nodes || diagram.nodes.length === 0) {
-      throw new Error("diagram requires nodes/edges or a recipe with steps");
+      throw new BoardValidationError(
+        "diagram has no nodes and no recipe",
+        "DIAGRAM_EMPTY",
+        "diagram.nodes",
+        "at least one node, or recipe + steps",
+        `Send nodes: [{ id: "a", label: "Start" }, ...] with optional edges, or use the shortcut recipe: "flow" with steps: ["Start", "Next", ...].`,
+      );
     }
     // `edges` is optional in the schema: a node card or a short label sequence
     // is a legitimate diagram. Leaving it undefined reached `generate.ts` as

@@ -510,6 +510,30 @@ describe("first-try repair contract", () => {
     });
   }, 30_000);
 
+  it("explains an empty diagram instead of failing with a bare error", async () => {
+    // `diagram: { nodes: [] }` raised "diagram requires nodes/edges or a recipe
+    // with steps" with no code and no path, so a model could not tell whether
+    // the shape was wrong or the content.
+    await withClient(async (client) => {
+      const empty = await client.callTool({ name: "draw_board", arguments: { author: "ai", diagram: { nodes: [] } } });
+      expect(empty.isError).toBe(true);
+      expect(errorJsonOf(empty)).toMatchObject({ code: "DIAGRAM_EMPTY", path: "diagram.nodes" });
+
+      // Both fixes the message names actually work.
+      const nodes = await client.callTool({
+        name: "draw_board",
+        arguments: { author: "ai", diagram: { nodes: [{ id: "a", label: "Start" }] } },
+      });
+      expect(nodes.isError).toBeFalsy();
+
+      const recipe = await client.callTool({
+        name: "draw_board",
+        arguments: { author: "ai", diagram: { recipe: "flow", steps: ["Start", "Next"] } },
+      });
+      expect(recipe.isError).toBeFalsy();
+    });
+  }, 30_000);
+
   it("publishes the bounds a model is checked against", async () => {
     // Knowing a bound up front is cheaper than any repair: it turns a rejected
     // write into a correct one. The table must match what model/ enforces.

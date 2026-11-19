@@ -126,8 +126,8 @@ export const diagramInput = z.object({
     .describe("Semantic arrangement, default flow. flow derives columns from edges and snakes after six columns so a 16-step chain is not one 3k-wide strip. timeline/compare/matrix place nodes only where you give `column`/`row` - nodes without them are appended in declaration order below the explicit grid, so set both for a timed sequence."),
   nodes: z.array(z.object({
     id: z.string(),
-    label: z.string().describe("Node caption; this is the field to fill, not `title`"),
-    detail: z.string().optional(),
+    label: z.string().describe("Node caption; this is the field to fill, not `title`. Keep it to about 24 characters - the card renders it at one line, and anything longer is cut, so put the rest in `detail`."),
+    detail: z.string().optional().describe("One-line note under the caption, about 40 characters before it is cut."),
     type: z.enum(["rect", "ellipse"]).optional(),
     color: z.string().optional().describe("Six-digit hex colour; invalid values return ERROR_JSON with a fix"),
     role: z.enum(["normal", "label", "frame", "column", "step", "decision", "annotation", "question", "constraint", "evidence"]).optional()
