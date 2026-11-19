@@ -13,6 +13,17 @@ updates:
       # together with engines and the CI matrix.
       - dependency-name: "@types/node"
         update-types: ["version-update:semver-major"]
+      # Excalidraw 0.18 renders the human canvas and depends on React 18, so
+      # react, react-dom and their types are pinned to 18.3.1 on purpose.
+      # Lifting this needs an Excalidraw version that supports React 19.
+      - dependency-name: "react"
+        update-types: ["version-update:semver-major"]
+      - dependency-name: "react-dom"
+        update-types: ["version-update:semver-major"]
+      - dependency-name: "@types/react"
+        update-types: ["version-update:semver-major"]
+      - dependency-name: "@types/react-dom"
+        update-types: ["version-update:semver-major"]
   - package-ecosystem: github-actions
     directory: /
     schedule:
