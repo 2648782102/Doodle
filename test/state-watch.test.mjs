@@ -21,6 +21,16 @@ function freePort() {
 
 const wait = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
 
+/** Inotify delivery is not synchronous, and CI runners are slow. Wait for the fact. */
+async function waitFor(predicate, timeoutMs = 3000) {
+  const started = Date.now();
+  while (Date.now() - started < timeoutMs) {
+    if (predicate()) return true;
+    await wait(25);
+  }
+  return false;
+}
+
 describe("cross-process board state watch", () => {
   /*
    * The state is a file, the broadcast bus is a process. Running
@@ -38,10 +48,11 @@ describe("cross-process board state watch", () => {
       const watcher = watchBoardState(file, (revision) => seen.push(revision));
 
       await fs.writeFile(file, JSON.stringify({ ...board, revision: 4 }), "utf8");
-      await wait(250);
+      expect(await waitFor(() => seen.length > 0), "no revision reported").toBe(true);
+
       // Rewriting the same revision must not fire again.
       await fs.writeFile(file, JSON.stringify({ ...board, revision: 4 }), "utf8");
-      await wait(250);
+      await wait(300);
       watcher.close();
 
       expect(seen).toEqual([4]);
@@ -79,11 +90,11 @@ describe("cross-process board state watch", () => {
       const state = JSON.parse(await fs.readFile(store.statePath, "utf8"));
       await fs.writeFile(store.statePath, JSON.stringify({ ...state, revision: state.revision + 5 }), "utf8");
 
-      await wait(400);
+      const found = await waitFor(() => messages.some((message) => message.type === "board_updated"));
       socket.close();
 
+      expect(found, `messages: ${JSON.stringify(messages)}`).toBe(true);
       const update = messages.find((message) => message.type === "board_updated");
-      expect(update, `messages: ${JSON.stringify(messages)}`).toBeTruthy();
       expect(update.revision).toBe(state.revision + 5);
     } finally {
       await preview.stop().catch(() => {});

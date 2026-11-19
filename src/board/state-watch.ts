@@ -11,7 +11,7 @@
  * truth, no protocol change. The caller decides what to do with a revision it
  * did not write.
  */
-import { watch, type FSWatcher } from "node:fs";
+import { readFileSync, watch, type FSWatcher } from "node:fs";
 import fs from "node:fs/promises";
 import path from "node:path";
 
@@ -28,23 +28,34 @@ export function watchBoardState(
   const name = path.basename(file);
   let timer: NodeJS.Timeout | null = null;
   let closed = false;
+  /*
+   * Seed synchronously, before the watcher exists.
+   *
+   * An async seed loses a race it cannot win: a write arriving while the seed
+   * read is in flight gets recorded as the baseline, and that genuine change is
+   * then silently swallowed. Reading once, blocking, at construction makes the
+   * baseline true by the time any event can fire.
+   */
   let lastRevision: number | null = null;
-
-  const readRevision = async (): Promise<number | null> => {
-    try {
-      const parsed = JSON.parse(await fs.readFile(file, "utf8")) as { revision?: unknown };
-      return typeof parsed.revision === "number" ? parsed.revision : null;
-    } catch {
-      // A missing or half-written file is not a state change worth reporting.
-      return null;
-    }
-  };
+  try {
+    const parsed = JSON.parse(readFileSync(file, "utf8")) as { revision?: unknown };
+    if (typeof parsed.revision === "number") lastRevision = parsed.revision;
+  } catch {
+    // No state file yet; the first write becomes the baseline instead.
+  }
 
   const check = async (): Promise<void> => {
     if (closed) return;
-    await seeded;
-    const revision = await readRevision();
-    if (revision === null || revision === lastRevision) return;
+    let revision: number;
+    try {
+      const parsed = JSON.parse(await fs.readFile(file, "utf8")) as { revision?: unknown };
+      if (typeof parsed.revision !== "number") return;
+      revision = parsed.revision;
+    } catch {
+      // A missing or half-written file is not a state change worth reporting.
+      return;
+    }
+    if (revision === lastRevision) return;
     lastRevision = revision;
     onChange(revision);
   };
@@ -64,13 +75,6 @@ export function watchBoardState(
   } catch {
     watcher = null;
   }
-
-  /*
-   * Seed the baseline from what is already on disk. This must not emit: the
-   * revision that exists when a watcher starts is not a change, and announcing
-   * it made every canvas refetch once for nothing.
-   */
-  const seeded = readRevision().then((revision) => { lastRevision = revision; });
 
   return {
     close(): void {
