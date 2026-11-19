@@ -154,6 +154,18 @@ check(await exists("scripts/open-board.mjs") && packageJson.scripts.doodle === "
  * `toolErrorMessage`.
  */
 check(
+  /*
+   * A debounced write must be re-based, not dropped, when a remote snapshot
+   * lands inside its window. Returning there lost the person's edit with no
+   * banner, no retry and no record — they saw their drawing and believed it
+   * was saved.
+   */
+  excalidrawApp.includes("elementsForWrite")
+    && excalidrawApp.includes("const latestBase = activeSnapshot;")
+    && !/if \(!base \|\| activeSnapshot !== base\) return;/.test(excalidrawApp),
+  "a debounced canvas write is silently dropped again when a remote snapshot arrives mid-window",
+);
+check(
   // A closed socket must announce itself. Silent reconnect left the person
   // drawing on a canvas whose every save would fail.
   excalidrawApp.includes("function showConnectionNotice(")

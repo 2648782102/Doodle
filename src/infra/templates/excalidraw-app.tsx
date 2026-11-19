@@ -107,6 +107,11 @@ const apiRef: { current: ExcalidrawAPI | null } = { current: null };
 const applyingRemote = { current: false };
 const currentFiles: { current: Record<string, ExcalidrawFileData> } = { current: {} };
 const currentAppState: { current: ExcalidrawAppState } = { current: {} };
+/**
+ * The last scene Excalidraw reported, kept so a debounced write can be re-based
+ * when a remote snapshot landed inside its window.
+ */
+const elementsForWrite: { current: ExcalidrawLikeElement[] } = { current: [] };
 const pendingRemote: { current: BoardSnapshot | null } = { current: null };
 const pendingTimer: { current: number | null } = { current: null };
 /**
@@ -1028,6 +1033,7 @@ function CanvasApp({ initial }: { initial: BoardSnapshot }) {
   const onChange = useCallback((elements: ExcalidrawLikeElement[], appState: ExcalidrawAppState, files: Record<string, ExcalidrawFileData>) => {
     currentAppState.current = appState;
     Object.assign(currentFiles.current, files);
+    elementsForWrite.current = elements;
     rememberViewport(activeSnapshot?.id, appState);
     if (!api || applyingRemote.current || !activeSnapshot) return;
     /*
@@ -1065,7 +1071,32 @@ function CanvasApp({ initial }: { initial: BoardSnapshot }) {
     if (pendingTimer.current !== null) window.clearTimeout(pendingTimer.current);
     pendingTimer.current = window.setTimeout(async () => {
       pendingTimer.current = null;
-      if (!base || activeSnapshot !== base) return;
+      /*
+       * A remote snapshot may have landed inside the debounce window.
+       *
+       * Returning here dropped the person's edit with no banner, no retry and
+       * no record: they saw their drawing on screen and believed it was saved.
+       * The scene is still theirs, so the write is re-based onto whatever
+       * `activeSnapshot` now is — `syncBoard` diffs against that baseline, which
+       * sends only this person's objects and leaves the agent's alone.
+       */
+      const latestBase = activeSnapshot;
+      if (!latestBase) return;
+      if (latestBase !== base) {
+        const rebound = boardItemsFromExcalidrawBoard(
+          latestBase as never,
+          elementsForWrite.current,
+          currentFiles.current,
+        );
+        try {
+          const updated = await syncBoard(rebound.items as unknown[], latestBase);
+          clearError();
+          setSnapshot(updated as BoardSnapshot);
+        } catch (error) {
+          showError(error);
+        }
+        return;
+      }
       try {
         const updated = await syncBoard(projected.items as unknown[], base);
         clearError();
@@ -1081,7 +1112,10 @@ function CanvasApp({ initial }: { initial: BoardSnapshot }) {
          * happened.
          */
         const latest = await loadBoard().catch(() => null);
-        if (latest) activeSnapshot = { ...activeSnapshot, revision: latest.revision };
+        // Keep the drawing, adopt only the revision so a retry can succeed.
+        if (latest && activeSnapshot) {
+          activeSnapshot = { ...activeSnapshot, revision: latest.revision } as BoardSnapshot;
+        }
         showError(error);
       }
     }, 450);
