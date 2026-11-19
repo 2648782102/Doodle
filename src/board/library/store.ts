@@ -9,6 +9,7 @@
 
 import fs from "node:fs/promises";
 import path from "node:path";
+import { randomUUID } from "node:crypto";
 import { AsyncMutex } from "../mutex.js";
 import { touchBoard, type SimpleBoard } from "../types.js";
 import { makeId, now } from "../model/clock.js";
@@ -239,7 +240,13 @@ function isMissingFile(error: unknown): error is NodeJS.ErrnoException {
 
 async function writeJsonAtomic(file: string, value: unknown): Promise<void> {
   await fs.mkdir(path.dirname(file), { recursive: true });
-  const temp = `${file}.tmp`;
-  await fs.writeFile(temp, JSON.stringify(value, null, 2), "utf8");
-  await fs.rename(temp, file);
+  // Per-writer name, same reason as BoardStore: never share a temp path.
+  const temp = `${file}.${process.pid}-${randomUUID()}.tmp`;
+  try {
+    await fs.writeFile(temp, JSON.stringify(value, null, 2), "utf8");
+    await fs.rename(temp, file);
+  } catch (error) {
+    await fs.rm(temp, { force: true }).catch(() => {});
+    throw error;
+  }
 }
