@@ -343,6 +343,10 @@ check(
   "draw_board accepts two whole-board actions again: the extra field is silently dropped and the reply claims success",
 );
 check(
+  tools.includes("registerShowBoardTool(server, ctx, state)") && tools.includes("GUIDE: capabilities and recipes are omitted on repeat shows"),
+  "show_board is back to resending the full guide on every call instead of sharing the get_board flag",
+);
+check(
   !/x: Math\.max\(-MAX_COORDINATE/.test((await read("src/board/model/validate.ts"))),
   "normalizeItem clamps coordinates again; resolveGeometry is the only place that may bound them",
 );

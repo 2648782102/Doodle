@@ -10,7 +10,11 @@ import { z } from "zod";
 import { APP_RESOURCE_URI, CANVAS_UI_META, READ_ONLY_LOCAL_ANNOTATIONS, type BoardToolContext } from "../context.js";
 import { boardJson, boardRecipes, errorResult } from "../presentation.js";
 
-export function registerShowBoardTool(server: McpServer, ctx: BoardToolContext): void {
+export function registerShowBoardTool(
+  server: McpServer,
+  ctx: BoardToolContext,
+  state: { guideSent: boolean },
+): void {
 server.registerTool(
   "show_board",
   {
@@ -23,6 +27,16 @@ server.registerTool(
     try {
       const current = await ctx.board.snapshot();
       const snapshot = boardJson(current, (await ctx.library.apply({ type: "list" }, current)).index);
+      /*
+       * The canvas needs the board; the model needs the guide once.
+       *
+       * `show_board` returned CAPABILITIES and RECIPES on every call, and it is
+       * called repeatedly (once per view request, and after a draw in hosts
+       * that cannot render the MCP App from the write result). The guide is the
+       * same bytes each time and `get_board` already shares this flag.
+       */
+      const withGuide = !state.guideSent;
+      if (withGuide) state.guideSent = true;
       return {
         content: [{
           type: "text" as const,
@@ -30,12 +44,16 @@ server.registerTool(
             `🎨 共享画布 · revision ${snapshot.revision} · ${snapshot.itemCount} 个对象`,
             "兼容宿主会显示可交互画布；文本宿主请从 get_board 的 PANEL_URL 打开本地画板。",
             `NEXT: 画布显示的是完整保真数据；要读对象用 get_board（可传 since_revision: ${snapshot.revision} 只取差量）。`,
-            "CAPABILITIES:",
-            JSON.stringify(snapshot.capabilities, null, 2),
+            ...(withGuide ? [
+              "CAPABILITIES:",
+              JSON.stringify(snapshot.capabilities),
+              "RECIPES:",
+              boardRecipes(),
+            ] : [
+              "GUIDE: capabilities and recipes are omitted on repeat shows. Call get_board with include_guide: true when you need them.",
+            ]),
             "VISUAL_DIGEST:",
             JSON.stringify(snapshot.visualDigest, null, 2),
-            "RECIPES:",
-            boardRecipes(),
           ].join("\n"),
         }],
         structuredContent: snapshot,

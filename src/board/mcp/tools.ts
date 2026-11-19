@@ -36,7 +36,7 @@ export function registerBoardTools(server: McpServer, ctx: BoardToolContext): vo
   // once per server process unless the caller explicitly asks for it again.
   const state = { guideSent: false };
   registerGetBoardTool(server, ctx, state);
-  registerShowBoardTool(server, ctx);
+  registerShowBoardTool(server, ctx, state);
   registerDrawBoardTool(server, ctx);
   registerScanProjectTool(server, ctx);
 }

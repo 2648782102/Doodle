@@ -722,6 +722,34 @@ describe("MCP board server", () => {
     });
   }, 30_000);
 
+  it("sends the guide once across get_board and show_board", async () => {
+    // Both tools carry CAPABILITIES and RECIPES, and `show_board` is called
+    // repeatedly: once per view request, and after a draw in hosts that cannot
+    // render the MCP App from the write result. The guide is the same bytes
+    // every time, so the two tools share one flag.
+    const outputDir = path.join(tempDir, "shared-guide");
+    await withClientIn(outputDir, async (client) => {
+      const first = textOf(await client.callTool({ name: "show_board", arguments: {} }));
+      expect(first).toContain("CAPABILITIES:");
+      expect(first).toContain("Visual recipes:");
+
+      const second = textOf(await client.callTool({ name: "show_board", arguments: {} }));
+      expect(second).not.toContain("CAPABILITIES:");
+      expect(second).not.toContain("Visual recipes:");
+      expect(second.length).toBeLessThan(first.length);
+
+      // The cross-tool half: get_board must know the guide already went out.
+      const read = textOf(await client.callTool({ name: "get_board", arguments: {} }));
+      expect(read).not.toContain("Visual recipes:");
+      expect(read).toContain("GUIDE:");
+
+      // The canvas still gets its board every time.
+      const shown = await client.callTool({ name: "show_board", arguments: {} });
+      expect(Array.isArray(shown.structuredContent.items)).toBe(true);
+      expect(shown.structuredContent.capabilities).toBeDefined();
+    });
+  }, 30_000);
+
   it("does not report a board switch as an edit", async () => {
     // The revision cache is keyed by revision alone. Asking for a delta after a
     // library switch compared the new board against the old board's revision,
