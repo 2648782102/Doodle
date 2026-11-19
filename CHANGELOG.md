@@ -42,6 +42,7 @@
 
 ### Fixed
 
+- A board switch is no longer reported as an edit. The revision cache is keyed by revision alone, so asking for a delta after a library switch compared the new board against the previous board's revision: every object of the new board read as "added" and every object of the old one as "removed", which describes a change nobody made. A revision from a different board now falls back to a full read that says it did.
 - A board at the object ceiling tells the model how to get out. "Board item limit reached" carried no current count, no limit, and no route forward; it is now `BOARD_ITEM_LIMIT` with the numbers and the suggestion to put the rest on a second board. A missing update target is likewise `ITEM_NOT_FOUND` with the re-read instruction instead of "Board item not found".
 - `get_board` names the cheaper reads once a board gets expensive. A 400-object board is 152 KB for a full read and 6 KB at `view: "summary"`, but nothing in the reply said so; boards above 80 objects now report their size and list `summary` / `structure` / `since_revision`. Small boards stay quiet.
 - `draw_board` now describes itself. Its 171-character blurb never mentioned `diagram`, `updates`, or the top-level `author`, so a model had to discover a nine-field tool by failing. The description states the three mutually exclusive uses, says that a complex diagram should prefer `diagram` over hand-computed coordinates, and that an existing board should be revised with `updates` rather than rebuilt.

@@ -318,6 +318,10 @@ check(
   "a large board no longer advertises the cheaper graded reads",
 );
 check(
+  tools.includes("cached && cached.id === current.id ? cached : undefined"),
+  "since_revision is compared across boards again: a library switch would be reported as every object added and removed",
+);
+check(
   tools.includes('BOARD_VIEW_${view.toUpperCase()}') && tools.includes('["BOARD_JSON:", JSON.stringify(visiblePayload)]'),
   "graded views send the board twice: only `full` may carry the full BOARD_JSON text copy",
 );

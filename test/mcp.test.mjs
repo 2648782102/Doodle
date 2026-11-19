@@ -722,6 +722,42 @@ describe("MCP board server", () => {
     });
   }, 30_000);
 
+  it("does not report a board switch as an edit", async () => {
+    // The revision cache is keyed by revision alone. Asking for a delta after a
+    // library switch compared the new board against the old board's revision,
+    // so every object of the new board read as "added" and every object of the
+    // old one as "removed" — a change report for something nobody did.
+    const outputDir = path.join(tempDir, "switch-delta");
+    await withClientIn(outputDir, async (client) => {
+      await client.callTool({
+        name: "draw_board",
+        arguments: { author: "ai", items: [{ type: "note", x: 0, y: 0, w: 160, h: 90, text: "A only" }] },
+      });
+      const boardA = (await client.callTool({ name: "get_board", arguments: {} })).structuredContent;
+
+      await client.callTool({
+        name: "draw_board",
+        arguments: { library: { type: "create", name: "Other", switchTo: true } },
+      });
+      await client.callTool({
+        name: "draw_board",
+        arguments: { author: "ai", items: [{ type: "note", x: 0, y: 0, w: 160, h: 90, text: "B only" }] },
+      });
+      const boardB = (await client.callTool({ name: "get_board", arguments: {} })).structuredContent;
+      expect(boardB.id).not.toBe(boardA.id);
+
+      const delta = await client.callTool({ name: "get_board", arguments: { since_revision: boardA.revision } });
+      const text = textOf(delta);
+
+      // Falls back to a full read that explains why, instead of inventing edits.
+      expect(delta.structuredContent.mode).toBeUndefined();
+      expect(delta.structuredContent.added).toBeUndefined();
+      expect(delta.structuredContent.removed).toBeUndefined();
+      expect(text).toContain("另一张画板");
+      expect(delta.structuredContent.itemCount).toBe(boardB.itemCount);
+    });
+  }, 30_000);
+
   it("keeps the person on their board when switchTo is false", async () => {
     // create/save/duplicate/import make the result active by default, which is
     // right for the canvas (you just made it, you want to see it) but wrong for

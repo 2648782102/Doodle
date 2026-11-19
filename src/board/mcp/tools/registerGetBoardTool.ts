@@ -45,7 +45,18 @@ server.registerTool(
     try {
       const current = await ctx.board.snapshot();
       const revisions = ctx.revisions;
-      const previous = since_revision === undefined ? undefined : revisions?.get(since_revision);
+      /*
+       * A revision only means something relative to the board it came from.
+       *
+       * The cache is keyed by revision alone, so asking for a delta after a
+       * library switch compared the *new* board against the *old* board's
+       * revision. The reply then described every object of the new board as
+       * "added" and every object of the old one as "removed" — a change report
+       * for something the person never did. Dropping `previous` when the ids
+       * differ falls back to a full read that says so.
+       */
+      const cached = since_revision === undefined ? undefined : revisions?.get(since_revision);
+      const previous = cached && cached.id === current.id ? cached : undefined;
       revisions?.remember(current);
       const payload = include_canvas_fidelity
         ? boardJson(current, (await ctx.library.apply({ type: "list" }, current)).index)
@@ -124,13 +135,16 @@ server.registerTool(
       }
 
       const staleSince = since_revision !== undefined && !previous;
+      const switchedBoard = since_revision !== undefined && Boolean(cached) && cached!.id !== current.id;
       return {
         content: [{
           type: "text" as const,
           text: [
             `🎨 共享画布 · revision ${payload.revision} · ${payload.itemCount} 个对象`,
             ``,
-            ...(staleSince ? [`NOTE: revision ${since_revision} 已不在缓存中，返回完整画板。`, ``] : []),
+            ...(switchedBoard
+              ? [`NOTE: revision ${since_revision} 属于另一张画板（切换前）。差量只在同一张板内有意义，这里返回完整画板。`, ``]
+              : staleSince ? [`NOTE: revision ${since_revision} 已不在缓存中，返回完整画板。`, ``] : []),
             ...guidance,
             "VISUAL_DIAGNOSIS:",
             JSON.stringify(visiblePayload.diagnosis, null, 2),
