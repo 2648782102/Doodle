@@ -1,5 +1,6 @@
 import fs from "node:fs/promises";
 import path from "node:path";
+import { randomUUID } from "node:crypto";
 import { BoardRevisionConflictError } from "./errors.js";
 import { AsyncMutex } from "./mutex.js";
 import { logger } from "../infra/logger.js";
@@ -158,10 +159,22 @@ export class BoardStore {
   }
 
   private async persist(board: SimpleBoard): Promise<SimpleBoard> {
-    const temp = `${this.file}.tmp`;
+    /*
+     * The mutex makes writers sequential today, but a fixed `<file>.tmp` name
+     * still assumes that. A per-writer name costs one UUID and removes the
+     * assumption entirely, so a future writer outside the lock cannot have its
+     * half-written file renamed into place by someone else.
+     */
+    const temp = `${this.file}.${process.pid}-${randomUUID()}.tmp`;
     const serialized = JSON.stringify(board, null, 2);
-    await fs.writeFile(temp, serialized, "utf-8");
-    await fs.rename(temp, this.file);
+    try {
+      await fs.writeFile(temp, serialized, "utf-8");
+      await fs.rename(temp, this.file);
+    } catch (error) {
+      // A unique name is not overwritten by the next write, so clean it up here.
+      await fs.rm(temp, { force: true }).catch(() => {});
+      throw error;
+    }
     this.assign(board);
     return board;
   }

@@ -5,7 +5,12 @@ import { fileURLToPath } from "node:url";
 
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
 const failures = [];
-const read = (relative) => fs.readFile(path.join(root, relative), "utf8");
+/*
+ * Normalise line endings: this script matches multi-line source fragments with
+ * `\n` literals, and a Windows checkout with `core.autocrlf=true` writes CRLF,
+ * which made the guard fail locally while passing on Linux CI.
+ */
+const read = async (relative) => (await fs.readFile(path.join(root, relative), "utf8")).replace(/\r\n/g, "\n");
 const exists = async (relative) => {
   try {
     await fs.access(path.join(root, relative));
@@ -85,7 +90,7 @@ const changelog = await read("CHANGELOG.md");
 const contributing = await read("CONTRIBUTING.md");
 const security = await read("SECURITY.md");
 const roadmap = await read("ROADMAP.md");
-const goalPlugin = await read("docs/GOAL_PLUGIN.md");
+const goals = await read("docs/GOALS.md");
 const pluginManifest = JSON.parse(await read("plugins/doodle/.codex-plugin/plugin.json"));
 const pluginMcp = JSON.parse(await read("plugins/doodle/.mcp.json"));
 const marketplace = JSON.parse(await read(".agents/plugins/marketplace.json"));
@@ -130,7 +135,7 @@ check(pluginManifest.requires_local_executor === true, "plugin is not marked des
 check(pluginMcp.mcpServers.doodle.args[0] === "${PLUGIN_ROOT}/server/index.mjs", "plugin MCP entrypoint is not self-contained");
 check(marketplace.plugins[0].source.path === "./.doodle-plugin/doodle", "marketplace does not point at the plugin build output");
 check(pluginSkill.includes("get_board") && pluginSkill.includes("show_board") && !pluginSkill.includes("reply_on_board"), "plugin skill does not describe the current board workflow");
-check(goalPlugin.includes("## Objective") && goalPlugin.includes("plugin") && goalPlugin.includes("MCP Apps"), "plugin goal document is missing or stale");
+check(goals.includes("### 目标") && goals.includes("### 验收") && goals.includes("Codex 插件") && goals.includes("MCP Apps"), "the consolidated goal record is missing or stale");
 check(packageJson.scripts.build.includes("build-plugin.mjs") && packageJson.scripts.check.includes("repo:plugin-check"), "npm scripts do not build and check the plugin");
 check(packageJson.scripts["setup:codex"] === "node scripts/setup-codex.mjs", "one-command Codex setup is missing");
 check(packageJson.scripts["preview:board"] === "node scripts/preview-board.mjs", "explicit local preview command is missing");
@@ -415,9 +420,18 @@ check(await exists("LICENSE"), "LICENSE is missing");
 check(await exists("SECURITY.md"), "SECURITY.md is missing");
 check(await exists("PRIVACY.md") && await exists("SUPPORT.md") && await exists("TERMS.md"), "public plugin policy documents are missing");
 check(await exists("docs/FAQ.md") && await exists("docs/SUBMISSION.md"), "public plugin support or submission docs are missing");
-check(await exists("docs/GOAL_EXPERIENCE.md") && (await read("docs/GOAL_EXPERIENCE.md")).includes("## Acceptance"), "native visual expression goal document is missing");
-check(await exists("docs/GOAL_EXCALIDRAW.md") && (await read("docs/GOAL_EXCALIDRAW.md")).includes("## Acceptance"), "Excalidraw engine goal document is missing");
-check(await exists("docs/GOAL_BASIC.md") && (await read("docs/GOAL_BASIC.md")).includes("## Acceptance") && (await read("docs/README.md")).includes("GOAL_BASIC.md"), "active basic-loop goal document or documentation-map link is missing");
+/*
+ * One consolidated goal record replaced nine per-goal documents. The contract
+ * still holds: every shipped goal keeps an 目标/验收 pair, the shared red lines
+ * stay stated once, and the documentation map must point at the file.
+ */
+check(
+  await exists("docs/GOALS.md")
+    && (goals.match(/### 验收/g) ?? []).length >= 6
+    && goals.includes("## 通用红线")
+    && (await read("docs/README.md")).includes("GOALS.md"),
+  "consolidated goal record or its documentation-map link is missing",
+);
 check(packageJson.scripts["build:submission"]?.includes("build-submission.mjs"), "submission ZIP build script is missing");
 check(packageJson.scripts.check.includes("build:submission"), "npm check does not build the submission ZIP");
 check(packageJson.files.includes("PRIVACY.md") && packageJson.files.includes("SUPPORT.md") && packageJson.files.includes("TERMS.md"), "npm package omits public policy documents");
@@ -457,7 +471,7 @@ check(
   (await read("src/board/mcp/presentation.ts")).includes("roleMeanings"),
   "high-level recipes, change reports, graded reads, or visual semantics are missing",
 );
-check(await exists("docs/GOAL_AI_EXPERIENCE.md") && await exists("test/ai-experience.test.mjs"), "AI experience goal or prompt-contract suite is missing");
+check(await exists("docs/GOALS.md") && goals.includes("AI 视觉体验") && await exists("test/ai-experience.test.mjs"), "AI experience goal or prompt-contract suite is missing");
 
 if (failures.length) {
   console.error("❌ Offline repository checks failed:");

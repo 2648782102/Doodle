@@ -21,7 +21,6 @@ import { expandRecipe } from "../../diagram/recipe.js";
 import { changeReport, changeReportText } from "../change-report.js";
 import {
   addBoardItems,
-  boardVisualDigest,
   diagramToBoardItems,
   parseBoard,
   layoutBoardItems,
@@ -85,6 +84,23 @@ server.registerTool(
       };
       const cleanItems = items?.map(stripAuthor);
       const cleanUpdates = updates?.map((update) => ({ ...update, patch: stripAuthor(update.patch) }));
+      /*
+       * Every write branch ends the same way: reject a stale expected revision,
+       * land the candidate at the revision it was derived from, and record the
+       * committed revision for delta reads. Three inlined copies of that
+       * sequence drifted apart once already — the library branch shipped
+       * without the snapshot the canvas repaints from — so it lives here.
+       */
+      const assertRevision = (current: SimpleBoard): void => {
+        if (expected_revision !== undefined && expected_revision !== current.revision) {
+          throw new BoardRevisionConflictError(expected_revision, current.revision);
+        }
+      };
+      const commit = async (candidate: SimpleBoard, from: SimpleBoard): Promise<SimpleBoard> => {
+        const board = await ctx.board.replaceIfRevision(candidate, from.revision);
+        ctx.revisions?.remember(board);
+        return board;
+      };
       if (diagram) {
         if (items !== undefined || updates !== undefined || remove_ids !== undefined
           || layout !== undefined || replace_board !== undefined || library !== undefined) {
@@ -92,9 +108,7 @@ server.registerTool(
         }
         const expanded = expandRecipe(diagram);
         const current = await ctx.board.snapshot();
-        if (expected_revision !== undefined && expected_revision !== current.revision) {
-          throw new BoardRevisionConflictError(expected_revision, current.revision);
-        }
+        assertRevision(current);
         // In append mode the existing ids are reserved so a second iteration
         // that reuses `n1` or `diagram_frame` does not collide.
         const generated = diagramToBoardItems(
@@ -108,8 +122,7 @@ server.registerTool(
           items: diagram.replace ? generated : [...current.items, ...generated],
         });
         parseBoard(candidate);
-        const board = await ctx.board.replaceIfRevision(candidate, current.revision);
-        ctx.revisions?.remember(board);
+        const board = await commit(candidate, current);
         ctx.preview.broadcast({ type: "board_updated", revision: board.revision });
         const libraryIndex = (await ctx.library.apply({ type: "list" }, board)).index;
         return {
@@ -126,17 +139,12 @@ server.registerTool(
       }
       if (library) {
         const current = await ctx.board.snapshot();
-        if (expected_revision !== undefined && expected_revision !== current.revision) {
-          throw new BoardRevisionConflictError(expected_revision, current.revision);
-        }
+        assertRevision(current);
         const result = await ctx.library.apply(library as BoardLibraryAction, current);
         let active = current;
         if (result.previousRevision !== undefined || result.board.id !== current.id
           || result.board.revision !== current.revision || result.board.title !== current.title) {
-          active = await ctx.board.replace(result.previousRevision === undefined
-            ? { ...result.board, revision: current.revision + 1 }
-            : { ...result.board, revision: current.revision + 1 }, current.revision);
-          ctx.revisions?.remember(active);
+          active = await commit({ ...result.board, revision: current.revision + 1 }, current);
         }
         ctx.preview.broadcast({ type: "board_library_updated", activeId: result.index.activeId, revision: active.revision });
         return {
@@ -190,13 +198,9 @@ server.registerTool(
         return next;
       };
       const initial = await ctx.board.snapshot();
-      if (expected_revision !== undefined && expected_revision !== initial.revision) {
-        throw new BoardRevisionConflictError(expected_revision, initial.revision);
-      }
-      let candidate = initial;
-      candidate = change(candidate);
-      const board = await ctx.board.replaceIfRevision(candidate, initial.revision);
-      ctx.revisions?.remember(board);
+      assertRevision(initial);
+      const candidate = change(initial);
+      const board = await commit(candidate, initial);
       ctx.preview.broadcast({ type: "board_updated", revision: board.revision });
       const libraryIndex = (await ctx.library.apply({ type: "list" }, board)).index;
       return {
@@ -214,7 +218,7 @@ server.registerTool(
             changeReportText(changeReport(initial, board)),
           ].join("\n"),
         }],
-          structuredContent: { ...boardWriteSnapshot(board, libraryIndex), change: changeReport(initial, board) },
+        structuredContent: { ...boardWriteSnapshot(board, libraryIndex), change: changeReport(initial, board) },
       };
     } catch (error) {
       return errorResult("draw_board", error);
