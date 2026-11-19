@@ -393,3 +393,66 @@ describe("board HTTP surface", () => {
     expect(addBoardItem(current, { type: "text", x: 0, y: 0, text: "manual only" }).items.length).toBe(current.items.length + 1);
   });
 });
+
+describe("object-level conflict handling", () => {
+  const auth = async () => {
+    const html = await fetch(base).then((response) => response.text());
+    return html.match(/const PANEL_TOKEN = "([^"]+)"/)?.[1];
+  };
+  const post = (path, body, revision, token) => fetch(`${base}${path}`, {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+      "X-AI-Draw-Token": token,
+      ...(revision === undefined ? {} : { "If-Match-Revision": String(revision) }),
+    },
+    body: JSON.stringify(body),
+  });
+
+  it("merges a stale batch that touches objects nobody else moved, and names the overlap otherwise", async () => {
+    const token = await auth();
+    const rev0 = (await fetch(`${base}/api/board`).then((response) => response.json())).revision;
+
+    const created = await post("/api/board/batch", {
+      confirmedBy: "human",
+      items: [
+        { type: "rect", x: 10, y: 10, w: 100, h: 60, text: "conflict-a" },
+        { type: "rect", x: 10, y: 200, w: 100, h: 60, text: "conflict-b" },
+      ],
+    }, rev0, token).then((response) => response.json());
+    const rev1 = created.board.revision;
+    const a = created.board.items.find((item) => item.text === "conflict-a");
+    const b = created.board.items.find((item) => item.text === "conflict-b");
+
+    // Somebody else moves A while our canvas still holds rev1.
+    const moved = await post("/api/board/batch", {
+      confirmedBy: "human",
+      updates: [{ id: a.id, patch: { ...a, x: 60 } }],
+    }, rev1, token).then((response) => response.json());
+    expect(moved.ok).toBe(true);
+
+    // Moving B from rev1 must land: nothing else touched B.
+    const mergedResponse = await post("/api/board/batch", {
+      confirmedBy: "human",
+      updates: [{ id: b.id, patch: { ...b, y: 240 } }],
+    }, rev1, token);
+    expect(mergedResponse.status).toBe(200);
+    const merged = await mergedResponse.json();
+    expect(merged.mergedFrom).toBe(rev1);
+
+    const afterMerge = await fetch(`${base}/api/board`).then((response) => response.json());
+    expect(afterMerge.items.find((item) => item.id === a.id).x).toBe(60);
+    expect(afterMerge.items.find((item) => item.id === b.id).y).toBe(240);
+
+    // Touching A from the same stale base must refuse, and name the object.
+    const conflict = await post("/api/board/batch", {
+      confirmedBy: "human",
+      updates: [{ id: a.id, patch: { ...a, x: 999 } }],
+    }, rev1, token);
+    expect(conflict.status).toBe(409);
+    const body = await conflict.json();
+    expect(body.code).toBe("REVISION_CONFLICT_OBJECTS");
+    expect(body.conflicts).toEqual([a.id]);
+    expect(body.expectedRevision).toBe(afterMerge.revision);
+  });
+});
