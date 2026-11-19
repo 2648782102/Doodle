@@ -329,13 +329,23 @@ check(
 );
 
 check(
+  // A delta read answers "what changed"; its diagnosis must be counts, not the
+  // per-object enumeration that made a 1-edit reply cost 6.1 KB.
+  tools.includes("compactDiagnosis(payload.diagnosis)"),
+  "a delta read carries the full per-object diagnosis again instead of counts",
+);
+
+check(
   /*
    * `summary` must not carry per-object arrays. It shipped `readingOrder` and
    * `isolated` in full, so a status check grew linearly with the board — 13 KB
    * at 60 objects — which defeats the only reason the view exists.
    */
-  (await read("src/board/mcp/presentation.ts")).includes("the ids behind them are a `structure` read")
-    && (await read("src/board/mcp/presentation.ts")).includes("readingOrder"),
+  (await read("src/board/mcp/presentation.ts")).includes("export function compactDigest")
+    && (await read("src/board/mcp/presentation.ts")).includes("export function compactDiagnosis")
+    // Neither projection may pass the enumerations through.
+    && !/readingOrder:/.test(await read("src/board/mcp/presentation.ts"))
+    && !/isolated: diagnosis\.isolated,/.test(await read("src/board/mcp/presentation.ts")),
   "a summary read enumerates every object again instead of reporting counts",
 );
 check(

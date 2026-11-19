@@ -292,6 +292,39 @@ describe("MCP board server", () => {
     });
   }, 30_000);
 
+  it("keeps a delta read's diagnosis flat too", async () => {
+    // A delta answers "what changed", so the full per-object diagnosis is the
+    // wrong shape: it enumerated every object and cost 1.4 KB at 80 objects on
+    // a reply whose changed-objects array was 135 B.
+    await withClientIn(path.join(tempDir, "delta-flat"), async (client) => {
+      await client.callTool({
+        name: "draw_board",
+        arguments: {
+          author: "ai",
+          items: Array.from({ length: 80 }, (_, index) => ({
+            type: "note", x: (index % 20) * 30, y: Math.floor(index / 20) * 30, w: 24, h: 24, text: `n${index}`,
+          })),
+        },
+      });
+      const seen = (await client.callTool({ name: "get_board", arguments: { include_guide: false } })).structuredContent;
+      const id = seen.items[0].id;
+      await client.callTool({
+        name: "draw_board",
+        arguments: { author: "human", updates: [{ id, patch: { text: "human edit" } }] },
+      });
+
+      const delta = await client.callTool({ name: "get_board", arguments: { since_revision: seen.revision } });
+      const sc = delta.structuredContent;
+
+      expect(sc.mode).toBe("delta");
+      expect(sc.updated).toHaveLength(1);
+      // Counts, not the enumeration.
+      expect(typeof sc.diagnosis.isolated).toBe("number");
+      expect(typeof sc.diagnosis.overlapping).toBe("number");
+      expect(sc.diagnosis.itemCount).toBe(80);
+    });
+  }, 60_000);
+
   it("keeps a summary read flat as the board grows", async () => {
     // `summary` is a status check. It used to carry the full
     // `visualDigest.readingOrder` and `diagnosis.isolated`, both of which

@@ -14,6 +14,7 @@ import {
   boardGuidance,
   boardJson,
   boardRecipes,
+  compactDiagnosis,
   errorResult,
   viewPayload,
 } from "../presentation.js";
@@ -142,7 +143,9 @@ server.registerTool(
           JSON.stringify(summarizeAgentBoard(current)),
           "",
           "VISUAL_DIAGNOSIS_JSON:",
-          JSON.stringify(payload.diagnosis),
+          // A delta answers "what changed", so the full per-object diagnosis
+          // (1.4 KB at 80 objects) is the wrong shape here: counts suffice.
+          JSON.stringify(compactDiagnosis(payload.diagnosis)),
           "",
           handoffNextStep(handoff),
           `PANEL_URL: ${ctx.preview.panelUrl ?? "unavailable (standalone preview not started)"}`,
@@ -156,7 +159,7 @@ server.registerTool(
             ...delta,
             handoff,
             summary: summarizeAgentBoard(current),
-            diagnosis: payload.diagnosis,
+            diagnosis: compactDiagnosis(payload.diagnosis),
           },
         };
       }
