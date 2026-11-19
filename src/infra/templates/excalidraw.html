@@ -174,6 +174,9 @@
          graphite ink has something to sit on without the page looking dusty. */
       --doodle-canvas-bg: #f8f4ea;
       --doodle-dot: rgba(58, 55, 51, 0.2);
+      /* Half-pitch companion dot. Kept far lighter than the grid dot: it is a
+         wobble on the printed grid, not a second grid at double density. */
+      --doodle-dot-soft: rgba(58, 55, 51, 0.075);
       /*
        * Softer washes than the glass themes. Paper does not carry a colour
        * field; these stay warm and very low so the page reads as stock rather
@@ -309,6 +312,10 @@
       --doodle-danger: #e89288;
       --doodle-canvas-bg: #131a18;
       --doodle-dot: rgba(143, 203, 180, 0.24);
+      /* Night paper gets its own companion dot rather than inheriting the
+         light one — it is light ink on a dark sheet, and the light value would
+         be nearly invisible here. */
+      --doodle-dot-soft: rgba(143, 203, 180, 0.09);
       --doodle-wash-a: rgba(232, 178, 60, 0.18);
       --doodle-wash-b: rgba(143, 203, 180, 0.24);
       --doodle-wash-c: rgba(120, 170, 205, 0.16);
@@ -657,10 +664,13 @@
       background-image:
         var(--paper-fibre),
         var(--paper-tooth),
+        radial-gradient(circle, var(--doodle-dot-soft) 0.7px, transparent 0.7px),
         radial-gradient(circle, var(--doodle-dot) 1px, transparent 1px);
-      background-size: 200px 200px, 96px 96px, 22px 22px;
-      background-position: 0 0, 0 0, 11px 11px;
-      background-blend-mode: multiply, multiply, normal;
+      background-size: 200px 200px, 96px 96px, 22px 22px, 22px 22px;
+      /* The half-pitch offset tiny dot makes the grid read as hand-dotted
+         rather than machine-printed, without touching the fibre/tooth grain. */
+      background-position: 0 0, 0 0, 0 0, 11px 11px;
+      background-blend-mode: multiply, multiply, normal, normal;
     }
     .excalidraw .App-menu_top { z-index: 4; }
     /*
@@ -1469,7 +1479,44 @@
     .excalidraw [data-doodle-hidden="true"] { display: none !important; }
     .doodle-welcome { position: fixed; left: 50%; bottom: 132px; z-index: 24; width: min(520px, calc(100vw - 32px)); transform: translateX(-50%); display: grid; gap: 10px; padding: 18px 20px; border-radius: 20px; animation: doodle-welcome-in var(--doodle-duration) var(--doodle-ease); }
     .doodle-welcome[hidden] { display: none; }
-    .doodle-welcome h2 { margin: 0; font-size: 14px; font-weight: 650; letter-spacing: 0.01em; }
+    /*
+     * Doodle signature on the first-use card: a hand-drawn underline under the
+     * heading, wider and looser than the appearance switcher's. Same inline
+     * SVG mask technique, currentColor so it follows the accent, no font or
+     * image dependency.
+     *
+     * The card is a grid container, so `inline-block` alone is blockified and
+     * stretched to the full column — the underline then ran the card's whole
+     * width. `justify-self: start` keeps the heading at its own text width.
+     */
+    .doodle-welcome h2 {
+      position: relative;
+      justify-self: start;
+      margin: 0;
+      padding-bottom: 6px;
+      font-size: 14px;
+      font-weight: 650;
+      letter-spacing: 0.01em;
+    }
+    .doodle-welcome h2::after {
+      content: "";
+      position: absolute;
+      left: 0;
+      right: 22%;
+      bottom: 0;
+      height: 4px;
+      background: var(--doodle-accent);
+      opacity: 0.4;
+      -webkit-mask: no-repeat left center / 100% 100%
+        url("data:image/svg+xml;utf8,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 120 5' preserveAspectRatio='none'%3E%3Cpath d='M1 3.4 C14 1.2 26 4.2 40 2.6 S66 4.3 82 2.2 108 3.4 119 1.6' fill='none' stroke='black' stroke-width='1.6' stroke-linecap='round'/%3E%3C/svg%3E");
+      mask: no-repeat left center / 100% 100%
+        url("data:image/svg+xml;utf8,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 120 5' preserveAspectRatio='none'%3E%3Cpath d='M1 3.4 C14 1.2 26 4.2 40 2.6 S66 4.3 82 2.2 108 3.4 119 1.6' fill='none' stroke='black' stroke-width='1.6' stroke-linecap='round'/%3E%3C/svg%3E");
+      pointer-events: none;
+    }
+    /* The accent is light on a dark card, so the same alpha that reads as a
+       pencil stroke on cream disappears here. Declared after the base rule so
+       it wins on specificity alone, without !important. */
+    :root[data-doodle-theme="dark"] .doodle-welcome h2::after { opacity: 0.6; }
     /*
      * Paper typography, applied narrowly.
      *
@@ -1845,6 +1892,21 @@
      * the irregular radius; inner controls stay exact so nothing misaligns.
      * Glass appearances keep their precise arcs.
      */
+    /*
+     * Selected tool on paper reads as circled by hand: a second, loose ring
+     * drawn just outside the exact selected rim, offset a pixel so it looks
+     * traced rather than printed. A non-inset shadow, so the icon's box and
+     * the toolbar layout never change.
+     */
+    :root[data-doodle-material="paper"] .excalidraw .App-toolbar .ToolIcon--selected .ToolIcon__icon,
+    :root[data-doodle-material="paper"] .excalidraw .App-toolbar .ToolIcon .ToolIcon_type_radio:checked + .ToolIcon__icon,
+    :root[data-doodle-material="paper"] .excalidraw .App-toolbar .ToolIcon .ToolIcon_type_checkbox:checked + .ToolIcon__icon {
+      box-shadow:
+        inset 0 1px 0 0 var(--glass-hover-rim),
+        inset 0 0 0 1px var(--glass-selected-rim),
+        inset 0 -2px 3px -2px var(--glass-hover-shade),
+        1.5px 1.5px 0 0.5px rgba(106, 92, 68, 0.14);
+    }
     :root[data-doodle-material="paper"] .doodle-topbar,
     :root[data-doodle-material="paper"] .excalidraw .App-toolbar,
     :root[data-doodle-material="paper"] .excalidraw .App-menu_bottom .Island,

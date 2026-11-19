@@ -521,6 +521,57 @@ describe("liquid glass material", () => {
     expect(template).toMatch(/\.doodle-theme-option \{\s*position: relative/);
   });
 
+  it("underlines the first-use heading at its own text width", () => {
+    /*
+     * The welcome card is a grid container, so `display: inline-block` on the
+     * heading is blockified and stretched: the first draft drew the hand-drawn
+     * underline across the whole card. `justify-self: start` is what keeps it
+     * under the words. Dark cards also need more alpha, because the light
+     * accent loses contrast there.
+     */
+    const heading = template.slice(template.indexOf(".doodle-welcome h2 {"));
+    const body = heading.slice(0, heading.indexOf("}"));
+    expect(body).toContain("justify-self: start");
+    const underline = template.slice(template.indexOf(".doodle-welcome h2::after"));
+    expect(underline.slice(0, underline.indexOf("}"))).toContain("mask:");
+    expect(template).toMatch(/:root\[data-doodle-theme="dark"\] \.doodle-welcome h2::after \{ opacity: [\d.]+; \}/);
+    // The dark override must follow the base rule, or the cascade eats it.
+    expect(template.indexOf(':root[data-doodle-theme="dark"] .doodle-welcome h2::after'))
+      .toBeGreaterThan(template.indexOf(".doodle-welcome h2::after"));
+  });
+
+  it("keeps the hand-dotted paper grid at the printed pitch", () => {
+    /*
+     * The second, half-pitch dot layer is a wobble on the printed grid, not a
+     * second grid: painting it at the grid dot's alpha doubled the perceived
+     * density and read as noise. It gets its own much lighter token.
+     */
+    expect(template).toMatch(/--doodle-dot-soft:\s*rgba\([^)]*\)/);
+    // Both paper appearances declare it: an undefined var() would invalidate
+    // the whole background-image and drop the grain along with the dots.
+    const declarations = [...template.matchAll(/--doodle-dot-soft:\s*rgba\(/g)];
+    expect(declarations.length, "the soft dot is missing from one paper theme").toBe(2);
+    const soft = [...template.matchAll(/--doodle-dot-soft:\s*rgba\(\s*\d+,\s*\d+,\s*\d+,\s*([\d.]+)\s*\)/g)];
+    for (const [, alpha] of soft) expect(Number(alpha)).toBeLessThan(0.1);
+    const host = template.slice(template.indexOf(':root[data-doodle-material="paper"] .excalidraw-host'));
+    const body = host.slice(0, host.indexOf("background-blend-mode"));
+    expect(body).toContain("var(--doodle-dot-soft)");
+    expect(body).toMatch(/background-size:[^;]*22px 22px, 22px 22px/);
+  });
+
+  it("traces the selected toolbar tool with a second, offset ring", () => {
+    /*
+     * On paper the pressed tool reads as circled by hand: a loose ring drawn
+     * just outside the exact selected rim. It is a non-inset box-shadow, so the
+     * icon box and the toolbar layout never change.
+     */
+    const start = template.indexOf("1.5px 1.5px 0 0.5px rgba(");
+    expect(start, "the offset ring is gone").toBeGreaterThan(0);
+    const rule = template.slice(template.lastIndexOf("{", start), template.indexOf("}", start));
+    expect(rule).toContain("inset 0 0 0 1px var(--glass-selected-rim)");
+    expect(rule).not.toMatch(/transform|scale\(|width:|height:/);
+  });
+
   it("does not rebuild the material when the active appearance is re-selected", () => {
     /*
      * Clicking the already-pressed theme used to dispatch doodle-theme-change,
