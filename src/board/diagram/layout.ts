@@ -197,10 +197,34 @@ export function resolveDiagramLayout(diagram: ExpandedDiagramInput): DiagramLayo
   const positions = new Map<string, BoardPoint>();
   const rows = new Map<number, number>();
   for (const node of diagram.nodes) {
-    const rawColumn = Math.min(12, Math.max(0, layer.get(node.id) ?? 0));
+    /*
+     * Do not clamp the derived layer to 12.
+     *
+     * The clamp was meant to keep an explicit `column` sane, but it also
+     * applied to layers derived from the edge graph: a 48-step flow capped at
+     * column 12, so passes 3 and 4 collapsed onto the same rows and the diagram
+     * read as overlapping. Explicit columns are already bounded by the
+     * `DIAGRAM_COLUMN_OUT_OF_RANGE` check, so the raw layer is safe to use.
+     */
+    const rawColumn = Math.max(0, layer.get(node.id) ?? 0);
     const column = wrap ? rawColumn % perRow : rawColumn;
     const wrappedRow = wrap ? Math.floor(rawColumn / perRow) : 0;
-    const row = node.row ?? (rows.get(column) ?? 0) + wrappedRow;
+    /*
+     * A snaked pass owns its row; a node inside the pass shares it.
+     *
+     * This used to add `wrappedRow` on top of the running row count for the
+     * column, so each pass pushed the base up as well: an 18-step chain, which
+     * is three passes of six, laid out as eight rows (2,680px tall) and a
+     * 48-step chain as thirty-eight (14,740px), far past any usable canvas.
+     * Packing within a pass and starting the next one immediately below is what
+     * the snake is supposed to draw.
+     */
+    /*
+     * Inside a snaked pass the row is the pass index; outside it, nodes that
+     * share a column stack downwards as before. Both cases still honour an
+     * explicit `node.row`.
+     */
+    const row = node.row ?? (wrap ? wrappedRow : (rows.get(column) ?? 0));
     rows.set(column, Math.max(rows.get(column) ?? 0, row + 1));
     const reversed = wrap && wrappedRow % 2 === 1;
     const xColumn = reversed ? perRow - 1 - column : column;

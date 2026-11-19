@@ -112,4 +112,24 @@ describe("board model golden contract", () => {
     expect(items.filter((item) => item.type === "line")).toHaveLength(15);
     expect(Math.max(...xs) - Math.min(...xs)).toBeLessThanOrEqual(6 * 260);
   });
+
+  it("packs a long flow into full passes instead of drifting down the page", () => {
+    // A snaked pass owns its row. The row counter used to add the pass index on
+    // top of the running column count, so each pass pushed the base further
+    // down: an 18-step chain (three passes of six) laid out as eight rows and a
+    // 48-step chain as thirty-eight — 14,740px of height, past any usable
+    // canvas. Packing within a pass is what the snake is supposed to draw.
+    const rowsFor = (count) => {
+      const nodes = Array.from({ length: count }, (_, index) => ({ id: `n${index}`, label: `S${index}` }));
+      const edges = Array.from({ length: count - 1 }, (_, index) => ({ from: `n${index}`, to: `n${index + 1}` }));
+      const cards = diagramToBoardItems({ mode: "flow", nodes, edges }).filter((item) => item.role === "step");
+      return new Set(cards.map((item) => item.y)).size;
+    };
+
+    // Six columns per pass, so the row count is ceil(n / 6).
+    expect(rowsFor(12)).toBe(2);
+    expect(rowsFor(18)).toBe(3);
+    expect(rowsFor(24)).toBe(4);
+    expect(rowsFor(48)).toBe(8);
+  });
 });

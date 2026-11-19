@@ -322,6 +322,10 @@ check(
   "since_revision is compared across boards again: a library switch would be reported as every object added and removed",
 );
 check(
+  (await read("src/board/diagram/layout.ts")).includes("const row = node.row ?? (wrap ? wrappedRow :"),
+  "the flow snake adds the pass index to the running row count again, so long chains drift down the page",
+);
+check(
   tools.includes('BOARD_VIEW_${view.toUpperCase()}') && tools.includes('["BOARD_JSON:", JSON.stringify(visiblePayload)]'),
   "graded views send the board twice: only `full` may carry the full BOARD_JSON text copy",
 );
