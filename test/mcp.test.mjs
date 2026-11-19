@@ -561,7 +561,8 @@ describe("MCP board server", () => {
         name: "draw_board",
         arguments: { expected_revision: before.revision, items: [{ type: "text", x: 500, y: 0, text: "stale" }] },
       });
-      expect(stale.isError).toBe(true);
+      // Adds an object nobody else touched, so it merges rather than failing.
+      expect(stale.isError).toBeFalsy();
       const after = jsonAfter(textOf(await client.callTool({ name: "get_board", arguments: {} })), "BOARD_JSON:");
       expect(after.items.filter((item) => item.text === "AI revised")).toHaveLength(1);
       expect(after.items.some((item) => item.text === "共享画布")).toBe(true);
@@ -669,10 +670,12 @@ describe("MCP board server", () => {
     }
   }, 60_000);
 
-  it("still rejects a stale write that pins a revision", async () => {
-    // The optimistic check stays strict: `expected_revision` is a claim about
-    // what the caller last saw, and rebasing it onto a newer board would
-    // overwrite whatever the other writer did.
+  it("merges a stale pinned write when it touches nothing that moved", async () => {
+    // A pinned revision is board-wide, so the optimistic check alone rejected
+    // two writers editing different objects. The HTTP surface already answered
+    // the only question that matters — does this request overlap anything that
+    // changed? — and merged when it did not. The MCP path now does the same,
+    // and nothing is overwritten: this stale write only adds a new note.
     const outputDir = path.join(tempDir, "stale-pin");
     await withClientIn(outputDir, async (client) => {
       const seen = (await client.callTool({ name: "get_board", arguments: {} })).structuredContent;
@@ -689,10 +692,86 @@ describe("MCP board server", () => {
         },
       });
 
-      expect(stale.isError).toBe(true);
+      expect(stale.isError).toBeFalsy();
       const board = (await client.callTool({ name: "get_board", arguments: {} })).structuredContent;
       expect(board.items.some((item) => item.text === "human edit")).toBe(true);
-      expect(board.items.some((item) => item.text === "stale ai")).toBe(false);
+      expect(board.items.some((item) => item.text === "stale ai")).toBe(true);
+    });
+  });
+
+  it("tells the caller when a pinned write was merged", async () => {
+    // The write landed on a newer revision than the one it pinned. Nothing it
+    // touched was overwritten, but hiding that the base moved would leave the
+    // model reasoning about a board state it never saw.
+    const outputDir = path.join(tempDir, "merged-notice");
+    await withClientIn(outputDir, async (client) => {
+      const seen = (await client.callTool({
+        name: "draw_board",
+        arguments: { author: "ai", items: [{ type: "note", x: 0, y: 0, w: 160, h: 90, text: "base" }] },
+      })).structuredContent;
+      await client.callTool({
+        name: "draw_board",
+        arguments: { author: "human", items: [{ type: "note", x: 300, y: 0, w: 160, h: 90, text: "human" }] },
+      });
+      const merged = await client.callTool({
+        name: "draw_board",
+        arguments: {
+          expected_revision: seen.revision,
+          author: "ai",
+          items: [{ type: "note", x: 0, y: 300, w: 160, h: 90, text: "ai" }],
+        },
+      });
+
+      expect(merged.isError).toBeFalsy();
+      expect(merged.structuredContent.mergedFrom).toBe(seen.revision);
+      expect(textOf(merged)).toContain("MERGED:");
+
+      // A write that did not need merging must not claim it did.
+      const plain = await client.callTool({
+        name: "draw_board",
+        arguments: { author: "ai", items: [{ type: "note", x: 600, y: 0, w: 160, h: 90, text: "plain" }] },
+      });
+      expect(plain.structuredContent.mergedFrom).toBeUndefined();
+    });
+  }, 30_000);
+
+  it("refuses a stale pinned write that overlaps an object someone else moved", async () => {
+    // The merge is object-level, not a licence to overwrite. When the request
+    // changes an object that moved since the caller's revision, it refuses —
+    // and names the ids, so the caller can re-apply just those.
+    const outputDir = path.join(tempDir, "stale-overlap");
+    await withClientIn(outputDir, async (client) => {
+      const created = await client.callTool({
+        name: "draw_board",
+        arguments: { author: "ai", items: [{ type: "note", x: 0, y: 0, w: 160, h: 90, text: "shared" }] },
+      });
+      const seen = created.structuredContent;
+      const id = seen.items[0].id;
+
+      // Someone else edits the same object.
+      await client.callTool({
+        name: "draw_board",
+        arguments: { author: "human", updates: [{ id, patch: { text: "human took it" } }] },
+      });
+
+      const stale = await client.callTool({
+        name: "draw_board",
+        arguments: {
+          expected_revision: seen.revision,
+          author: "ai",
+          updates: [{ id, patch: { text: "stale ai" } }],
+        },
+      });
+
+      expect(stale.isError).toBe(true);
+      const staleText = textOf(stale);
+      expect(staleText).toContain("REVISION_CONFLICT_OBJECTS");
+      expect(jsonAfter(staleText, "ERROR_JSON:")).toMatchObject({ code: "REVISION_CONFLICT_OBJECTS" });
+      expect(staleText).toContain(id);
+
+      // The other writer's value survives.
+      const board = (await client.callTool({ name: "get_board", arguments: {} })).structuredContent;
+      expect(board.items.find((item) => item.id === id)?.text).toBe("human took it");
     });
   }, 30_000);
 

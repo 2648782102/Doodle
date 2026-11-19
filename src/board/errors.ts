@@ -43,3 +43,25 @@ export class BoardValidationError extends Error {
 export function validationErrorFrom(error: unknown): BoardValidationError | undefined {
   return error instanceof BoardValidationError ? error : undefined;
 }
+
+/**
+ * A write lost the race for an object it also meant to change.
+ *
+ * Distinct from `BoardRevisionConflictError`: the board moved, but this request
+ * only collides on the named ids. Disjoint edits are merged, so seeing this
+ * means a genuine overlap — re-reading and re-applying just those objects is
+ * enough, and the ids are what make that possible.
+ */
+export class ObjectConflictError extends BoardValidationError {
+  constructor(readonly baseRevision: number, readonly currentRevision: number, readonly conflicts: string[]) {
+    const named = conflicts.slice(0, 10);
+    super(
+      `Revision ${baseRevision} is behind ${currentRevision}, and this change touches objects that moved meanwhile: ${named.join(", ")}`,
+      "REVISION_CONFLICT_OBJECTS",
+      "expected_revision",
+      `expected_revision: ${currentRevision}`,
+      `Re-read the board, re-apply your change to those specific objects, and send it again. Objects you did not touch need not be re-sent.`,
+    );
+    this.name = "ObjectConflictError";
+  }
+}
