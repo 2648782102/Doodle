@@ -1,69 +1,69 @@
-# Product Direction
+# 产品方向
 
-**Doodle is a local-first two-way board for a person and an AI.** Both sides can draw notes, text, shapes, directed arrows, freehand strokes, and images on one infinite canvas to express intent. The AI draws through four MCP tools; the person draws directly on the canvas. The board is the communication medium, not a one-way display of AI output or a human annotation form.
+**Doodle 是一张本地优先的双向画板，给一个人和一个 AI 共用。** 双方都能在同一张无限画布上画便签、文字、形状、有向箭头、手绘笔迹和图片，用图形表达意图。AI 通过四个 MCP 工具画，人直接在画布上画。画板是沟通媒介——它既不是 AI 输出的单向展示屏，也不是人填写的批注表单。
 
-The product story is deliberately small: one kernel, two entry points, three capability layers.
+产品叙事刻意做小：一个内核、两个入口、三层能力。
 
-- One kernel: the shared infinite board and version 1 state with optional extended object fields; a local library stores named editable snapshots of that same state.
-- Two entry points: the recommended Codex plugin and direct MCP / `npx` for any MCP host.
-- Three layers: four tools always work; MCP Apps hosts render the canvas; hosts with `updateModelContext` / `sendMessage` add automatic final-state sync and a short notification. The standalone `PANEL_URL` page is the fallback when no embedded canvas is available.
+- **一个内核**：共享无限画板 + version 1 状态（含可选扩展字段）；本地图库为同一份状态保存具名可编辑快照。
+- **两个入口**：推荐的 Codex 插件，以及面向任意 MCP 宿主的直接 MCP / `npx`。
+- **三层能力**：四个工具始终可用；MCP Apps 宿主渲染画布；支持 `updateModelContext` / `sendMessage` 的宿主再加自动终态同步和一句短提醒。没有内嵌画布时，独立 `PANEL_URL` 页面是兜底。
 
-Project structure is optional source material, not the product. Conversation stays in the host chat. MCP is the AI access channel. The source repository remains the source of truth for code.
+项目结构只是可选的素材，不是产品。对话留在宿主聊天里。MCP 是 AI 的接入通道。代码的唯一事实源仍是源码仓库。
 
-## Shared loop
+## 双向回路
 
 ```text
-AI draws with draw_board
-  → person sees the board and draws or edits directly
-  → final-state delta is attached to the current host conversation's model context, or the person sends a short notification
-  → AI reads with get_board or current model context
-  → AI continues in chat or draws another response on the board
-  → repeat in either direction
+AI 用 draw_board 画
+  → 人看到画板，直接画或改
+  → 终态增量挂到当前宿主会话的模型上下文，或由人发一句短通知
+  → AI 用 get_board 或当前模型上下文读取
+  → AI 在聊天里回应，或继续在画板上画
+  → 任意方向重复
 ```
 
-The loop can start from either side and pause at any point. `get_board` remains the authoritative read. `scan_project` is an optional read-only helper: when project structure is useful, the AI receives bounded paths and evidence, then may use `draw_board` to show relevant context.
+回路可以从任意一侧开始，也可以随时暂停。`get_board` 始终是权威读取。`scan_project` 是可选的只读辅助：当项目结构确实有用时，AI 收到有界路径与证据，再决定是否用 `draw_board` 把相关上下文画出来。
 
-## Product model
+## 产品模型
 
-- **Canvas:** an infinite surface with bounded objects: notes, text, rectangles, ellipses, directed arrows, freehand strokes, and local `data:image/*` images. A line runs from `(x,y)` to `(x+w,y+h)` and can route as a straight, curve, or orthogonal path. Click to place a default-sized object or drag to size shapes, sketch, and draw arrows in any direction. Space-drag or middle-drag pans; the wheel pans and Ctrl/Command-wheel zooms.
-- **Human input:** clicking, dragging, immediate freehand ink, freehand-only drag-to-erase, double-click-to-create, text editing, marquee multi-select, batch move/delete/group/layout, undo/redo, image paste, arrow-key nudging, alignment snapping, and drawing new visual context. Discussion happens in the agent host conversation; an optional `通知 Agent` button adds one short message there, never a second chat surface.
-- **AI input:** `get_board` reads progressive first-use or concise next-step guidance, canvas data, `capabilities`, `visualDigest`, recipes, and the active loopback `PANEL_URL`; `show_board` returns the optional MCP App view; `draw_board` adds items, applies precise updates/removals, deterministic layouts, connected lines, visual-expression fields, and rejects stale UI edits by revision. The visible App refreshes the shared board so either side sees the other's drawings in place. `scan_project` optionally reads bounded project structure.
-- **Board library:** local version 1 snapshots can be saved, listed, switched, renamed, duplicated, deleted, imported, and exported as editable JSON. The active board remains the single shared communication surface; switching changes which saved board is active for both the person and the AI.
-- **Visual expression:** a small set of optional version 1 fields and deterministic recipes turns primitives into intentional diagrams without a template library: variants, roles, z-order, bounded styles, connector bindings, group IDs, deterministic layout modes, and a bounded semantic `diagram` recipe. The board remains a whiteboard, not a Figma clone.
-- **Authors:** every object records whether a person or AI created it. Legacy board notes remain in version 1 state for compatibility but are hidden from current tools and UI.
-- **Approval:** this product has no built-in code-change approval protocol. Board content never authorizes project writes.
+- **画布**：一张无限表面，对象有界——便签、文字、矩形、椭圆、有向箭头、手绘笔迹、本地 `data:image/*` 图片。线条从 `(x,y)` 到 `(x+w,y+h)`，可走直线、曲线或正交折线。点按放置默认尺寸对象，拖拽调整形状大小、随手画、朝任意方向拉箭头。空格拖拽或中键拖拽平移，滚轮平移，`Ctrl/⌘` + 滚轮缩放。
+- **人的输入**：点按、拖拽、落下即出墨的手绘、只擦笔迹的拖拽橡皮、双击新建、文字编辑、框选多选、批量移动/删除/成组/整理、撤销重做、粘贴图片、方向键微调、对齐吸附，以及画新的视觉上下文。讨论发生在 agent 宿主会话里；可选的「通知 Agent」按钮只在那边加一句短消息，绝不另起一个聊天面。
+- **AI 的输入**：`get_board` 读取渐进式首用/精简后续引导、画布数据、`capabilities`、`visualDigest`、配方，以及活动的 loopback `PANEL_URL`；`show_board` 返回可选的 MCP App 视图；`draw_board` 新增对象、精确更新/删除、确定性布局、连接线、视觉表达字段，并按 revision 拒绝过期的 UI 编辑。可见的 App 会刷新共享画板，让双方就地看到对方的画。`scan_project` 可选地读取有界的项目结构。
+- **画板图库**：本地 version 1 快照可保存、列出、切换、重命名、复制、删除、导入、导出为可编辑 JSON。活动画板始终是那唯一的共享沟通面；切换只改变"哪张已保存的画板是活动的"，对人和 AI 同时生效。
+- **视觉表达**：少量可选的 version 1 字段加确定性配方，让图元组成有意图的图，而不需要模板库——变体、角色、z 序、有界样式、连接绑定、分组 ID、确定性布局模式，以及有界的语义 `diagram` 配方。画板仍是白板，不是 Figma 复刻。
+- **作者**：每个对象都记录是人还是 AI 创建的。历史留言字段为兼容保留在 version 1 状态里，但当前工具与 UI 都不显示。
+- **审批**：本产品没有内建的代码变更审批协议。画板内容永不构成项目写入授权。
 
-## Experience principles
+## 体验原则
 
-1. Keep one shared canvas and one four-tool MCP server as the product.
-2. Make plugin installation one command and first use one prompt, while preserving zero-configuration direct MCP configuration.
-3. Keep conversation in the host. Do not reproduce its composer or message feed inside Doodle.
-4. Keep drawing obvious with direct click and drag gestures, one dismissible help popover, and progressive shortcuts rather than permanent control panels. The board library is an overlay drawer with one scrollable list and fixed actions; it never resizes the canvas or covers Excalidraw's toolbar. Transient Excalidraw menus and modals take precedence over Doodle chrome. Hover feedback is color-only and must not move, scale, or resize controls. The canvas has no third-party outbound navigation: its only external link is the current Doodle repository. One palette covers the shell and the canvas in both themes; native controls never fall back to a second accent or a violet default.
-5. Keep the MCP App optional, attach it to `show_board`, and advertise it on successful `draw_board` results so AI drawings are visible immediately in compatible hosts. In capable hosts, publish the latest final board snapshot plus a delta from the last published state to the current session's model context without triggering a turn.
-6. Keep the local browser page as a standalone fallback; normal MCP tool calls do not open the system browser.
-7. Keep project context optional, bounded, read-only, and free of absolute paths or secrets.
-8. Keep the server local-first, plugin-safe, and dependencies small.
-9. Keep publication metadata honest: review-facing policies describe local data, explicit tool annotations classify effects, and public directory approval is never implied by a repository marketplace.
-10. Optimize the complete two-way experience path, not isolated features: install, first session, visible canvas, AI drawing, human drawing, final-state sync, and AI reread must each be obvious without adding a fifth tool or second state model.
+1. 产品就是一张共享画布 + 一个四工具 MCP 服务。
+2. 插件安装一条命令、首次使用一句话；同时保住零配置的直接 MCP。
+3. 对话留在宿主。不在 Doodle 里复刻输入框或消息流。
+4. 画图要一眼就懂：直接点按和拖拽、一个可关闭的帮助浮层、渐进的快捷键提示，而不是常驻控制面板。图库是覆盖式抽屉，只有一个可滚动列表和固定操作区；它绝不改变画布尺寸，也不遮住 Excalidraw 工具栏。Excalidraw 的临时菜单与弹窗优先于 Doodle 的 chrome。悬停反馈只改颜色，不得移动、缩放或改变控件尺寸。画布没有第三方外链，唯一外部链接是当前的 Doodle 仓库。Doodle 外壳与画布共用一套配色，原生控件永不落到第二套强调色或上游紫色。
+5. MCP App 保持可选，挂在 `show_board` 上，并在成功的 `draw_board` 结果里一并声明，让兼容宿主立即看到 AI 的画。在支持上下文能力的宿主里，把最新终态快照及"相对上次已发布状态"的增量挂到当前会话的模型上下文，且不触发新一轮对话。
+6. 本地浏览器页面保持独立兜底；正常 MCP 工具调用不打开系统浏览器。
+7. 项目上下文保持可选、有界、只读，不含绝对路径或密钥。
+8. 服务端保持本地优先、插件安全、依赖精简。
+9. 发布元数据要诚实：面向审核的政策文档说明本地数据，显式工具注解标明副作用，仓库内 marketplace 绝不暗示已获公共目录批准。
+10. 优化完整双向路径，而不是孤立功能：安装、首个会话、可见画布、AI 画、人画、终态同步、AI 重读——每一环都要显而易见，且不为此加第五个工具或第二套状态。
 
-## Boundaries
+## 边界
 
-- No hosted accounts, multi-user SaaS, social presence, or mandatory turn-taking workflow.
-- No duplicate chat product, second session model, or board message feed. A host notification is one short message in the existing conversation.
-- No project dashboard, Mermaid diagram library, IDE extension, or server-side image pipeline.
-- Static PNG/JPG/SVG exports are human-canvas sharing snapshots only (图库 → 分享快照); saved “图” remain editable version 1 board snapshots and are not image assets. These exports do exist - what does not exist is an MCP tool that returns an image file.
-- No `SessionSnapshot`, `VisualGraph`, annotation threads, proposals, diff review, approval receipts, or derived context catalogues.
-- No AI project writes triggered by drawing or scans. Code changes remain a separately reviewed coding-agent action.
-- No browser or IDE window opening from normal MCP tools.
+- 不做托管账号、多用户 SaaS、社交存在感，也不强制人机轮流。
+- 不做重复的聊天产品、第二会话模型或画板消息流。宿主通知只是既有会话里的一句短消息。
+- 不做项目看板、Mermaid 图表库、IDE 扩展或服务端图片管线。
+- 静态 PNG/JPG/SVG 导出只是人侧画布的分享快照（图库 → 分享快照）；保存的「图」仍是可编辑的 version 1 画板快照，不是图片资产。这些导出**确实存在**——不存在的只是"返回图片文件的 MCP 工具"。
+- 不做 `SessionSnapshot`、`VisualGraph`、批注线程、提案、diff 审阅、审批回执或派生的上下文目录。
+- 画图或扫描都不触发 AI 写项目文件。代码变更仍是独立的、单独审阅的编码 agent 动作。
+- 正常 MCP 工具不打开浏览器或 IDE 窗口。
 
-## Acceptance
+## 验收
 
-A fresh checkout installs through `npm run setup:codex`, and any MCP host can use the zero-configuration `npx -y doodle-mcp` CLI. Both paths build or expose exactly four tools. Text-only hosts can use all tools without rendering UI. MCP Apps-compatible hosts can show and edit the shared canvas beside their conversation; the UI reads and writes only through the host's `get_board` and `draw_board` calls. Hosts that advertise `updateModelContext` receive a complete current structured snapshot plus `added` / `updated` / `removed` final-state differences, never an operation log; `sendMessage` is used only by the user-initiated notification button. A person can open the standalone local page at the reported `PANEL_URL`, move objects, edit text, draw new objects, save/switch editable board snapshots, and see AI changes on the same active board; this fallback has no current-host-session bridge. Official OpenAI documentation says local marketplace installs are separate from the public directory and should be used in a new session.
+全新检出可用 `npm run setup:codex` 安装，任意 MCP 宿主可用零配置的 `npx -y doodle-mcp` CLI。两条路径都只构建或暴露四个工具。纯文本宿主不渲染 UI 也能用全部工具。兼容 MCP Apps 的宿主能在对话旁显示并编辑共享画布，UI 只通过宿主的 `get_board` / `draw_board` 读写。声明 `updateModelContext` 的宿主会收到完整的当前结构化快照，以及 `added` / `updated` / `removed` 的终态差异，永远不是操作日志；`sendMessage` 只由用户主动点击的通知按钮使用。人可以打开 `PANEL_URL` 报告的独立本地页面，移动对象、编辑文字、画新对象、保存/切换可编辑快照，并在同一张活动画板上看到 AI 的改动；这个兜底页面没有当前会话的桥。官方 OpenAI 文档说明本地 marketplace 安装与公共目录是两回事，且应在新会话中使用。
 
-## Next work
+## 下一步
 
-Keep the core canvas stable and two-way. Improve drawing ergonomics, accessibility, install and reload ergonomics, and agent-facing layout guidance while keeping discussion in the agent host and shared visual context on the board. Extended object fields are optional version 1 additions; old boards remain valid without migration.
+保持核心画布稳定且双向。改进画图手感、可访问性、安装与重载体验，以及面向 agent 的布局指导——同时让讨论留在 agent 宿主、让共享视觉上下文留在画板上。扩展对象字段都是可选的 version 1 增量，老画板无需迁移即保持有效。
 
-## Experience audit
+## 体验审计
 
-[`EXPERIENCE_AUDIT.md`](EXPERIENCE_AUDIT.md) is the maintained record of live AI/human tests, prioritized friction, and closure evidence. All locally actionable items are closed; update it with any end-to-end product change. External host limitations remain documented as fallback paths; they do not expand the product surface.
+[`EXPERIENCE_AUDIT.md`](EXPERIENCE_AUDIT.md) 是 AI/人实测、摩擦优先级与闭环证据的维护记录。本地可动的项已全部关闭；任何端到端的产品改动都要同步更新它。宿主侧的外部限制以兜底路径的形式记录，它们不扩大产品表面。

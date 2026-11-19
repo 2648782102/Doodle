@@ -55,6 +55,16 @@
 |---|---|
 | [`archive/adr-legacy/`](archive/adr-legacy/README.md) | 已移除的项目工作台时期 ADR |
 
+## 语言约定
+
+中英混排本身也是"乱"的来源，所以约定成规则：
+
+- **中文**：入口与产品类文档——根 `README.md`、本索引、`PRODUCT_DIRECTION.md`、`GOALS.md`。这几份是第一次进来会读的东西。
+- **英文**：工程记录与对外材料——`ARCHITECTURE.md`、`DECISIONS.md`、`EXPERIENCE_AUDIT.md`、`DIAGRAM_GUIDE.md`、`AGENTS.md`、`CHANGELOG.md`，以及 `SECURITY.md` / `PRIVACY.md` / `SUPPORT.md` / `TERMS.md`。前几份被 `repo-check.mjs` 按英文原句断言，后几份直接面向 GitHub 与 OpenAI 的审核方。
+- `README.en.md` 与 `README.md` 保持结构对应，只做语言差异。
+
+新增文档请先归入某一类，再决定语言；不要出现两份讲同一件事、语言还不同的文档。
+
 ---
 
 发布前跑 `npm run check`。文档与源码同版本：改动 MCP 工具面、画板协议、插件打包、宿主上下文桥或安全边界时，必须同时更新架构、agent 手册、目标记录、测试、CI 与两个离线守卫。
