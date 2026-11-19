@@ -42,6 +42,7 @@
 
 ### Fixed
 
+- `draw_board` now describes itself. Its 171-character blurb never mentioned `diagram`, `updates`, or the top-level `author`, so a model had to discover a nine-field tool by failing. The description states the three mutually exclusive uses, says that a complex diagram should prefer `diagram` over hand-computed coordinates, and that an existing board should be revised with `updates` rather than rebuilt.
 - `replace_board` now rejects a payload the write path would reject. It used to check only that `color` was a *string*, so a hand-built board with `color: "nope"` was persisted and the canvas had no usable fill. The persisted-state and write paths now share one set of predicates, so they cannot disagree again.
 - Every `replace_board` rejection names the offending item. A bad colour three levels into a 200-object payload used to surface as "Invalid board collections"; it now reports `items[7].color` with the expected form and a fix, because a whole-board payload is unrepairable without the index.
 - Validation split into `model/predicates.ts` (shared shape rules), `model/parse-board.ts` (persisted state), and `model/validate.ts` (write path). `validate.ts` had crossed the 450-line budget, and the split is what makes the two paths share rules instead of drifting.

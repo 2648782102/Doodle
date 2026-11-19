@@ -253,6 +253,18 @@ check((tools.match(/server\.registerTool\(/g) ?? []).length === 4 && !tools.incl
 check(tools.includes("readOnlyHint: true") && tools.includes("destructiveHint: true") && tools.includes("openWorldHint: false"), "tool annotations are incomplete");
 check(tools.includes("registerAppResource") && tools.includes('"ui://doodle/board/excalidraw/v1.html"'), "Excalidraw MCP App canvas resource is missing");
 check(tools.includes('"show_board"') && tools.includes('"get_board"'), "canvas render and data tools are not separated");
+/*
+ * A tool description is the model's only map of a nine-field tool.
+ *
+ * `draw_board` carried a 171-character blurb that never mentioned `diagram`,
+ * `updates`, or the top-level `author`, so a model had to discover the shape by
+ * failing. The description must name the three mutually exclusive uses and the
+ * prefer-updates rule.
+ */
+check(
+  tools.includes("三个互斥的用法") && tools.includes("复杂图优先用它") && tools.includes("改已有内容用 updates"),
+  "draw_board's description no longer explains its three mutually exclusive uses or the prefer-updates rule",
+);
 check(tools.includes("CANVAS_UI_META") && tools.includes("_meta: CANVAS_UI_META"), "draw_board does not advertise the canvas for automatic post-draw rendering");
 check(tools.includes("getAppHtml()") && tools.includes("PANEL_URL"), "Excalidraw MCP App resource is not plugin-safe and the panel URL is missing");
 check(tools.includes("FIRST_USE:") && tools.includes("NEXT_STEPS:") && tools.includes("NEXT:"), "get_board does not use progressive first-use and next-step guidance");

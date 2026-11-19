@@ -36,7 +36,7 @@ export function registerDrawBoardTool(server: McpServer, ctx: BoardToolContext):
 server.registerTool(
   "draw_board",
   {
-    description: "让 AI 直接在共享无限画布上画或改，也可通过 library 参数保存当前画板、切换本地画板图库中的图、新建/重命名/复制/删除/导入/导出可编辑版本 1 画板。普通写入会串行应用到最新状态；line 的 (x,y) 是起点，(x+w,y+h) 是终点，w/h 可为负数；其他对象是左上角与宽高。按整齐网格布局；不打开浏览器，不写项目文件。",
+    description: "让 AI 直接在共享无限画布上画或改。三个互斥的用法：items/updates/remove_ids/layout 做对象级增删改；diagram 用语义 nodes/edges 一次画完一张图，复杂图优先用它而不是手算坐标；library 管理本地可编辑画板库。改已有内容用 updates 复用已有 id，不要整板重建。author 放顶层，items 里不要再写。line 的 (x,y) 是起点，(x+w,y+h) 是终点，w/h 可为负数；其他对象是左上角与宽高。写入串行应用到最新状态；不传 expected_revision 即追加（并发安全），传了则严格校验。不打开浏览器，不写项目文件。",
     inputSchema: z.object({
       items: z.array(itemInput).optional().describe("Objects to create; omit id"),
       updates: z.array(updateInput).optional().describe("Precise updates to existing object IDs"),
