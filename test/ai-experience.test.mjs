@@ -71,3 +71,36 @@ describe("AI experience contract", () => {
     expect(text).toContain('"fix"');
   });
 });
+
+describe("generated diagram frame", () => {
+  /*
+   * The frame used to reserve a whole extra row at the bottom: `maxRows` counts
+   * rows per column and the formula read it as a row index, and detail captions
+   * that hang below the last card were never included. Measured margins were
+   * 20 / 12 / 20 / 200.
+   */
+  it("hugs its content on all four sides", () => {
+    const expanded = expandRecipe({
+      title: "Frame fit",
+      nodes: [
+        { id: "a", label: "A", detail: "first", column: 0, row: 0 },
+        { id: "b", label: "B", detail: "second", column: 0, row: 1 },
+        { id: "c", label: "C", detail: "third", column: 1, row: 0 },
+      ],
+      edges: [{ from: "a", to: "c" }],
+    });
+    const items = diagramToBoardItems(expanded);
+    const frame = items.find((item) => item.id === "diagram_frame");
+    const content = items.filter((item) => item !== frame);
+
+    const left = Math.min(...content.map((item) => item.x));
+    const top = Math.min(...content.map((item) => item.y));
+    const right = Math.max(...content.map((item) => item.x + item.w));
+    const bottom = Math.max(...content.map((item) => item.y + item.h));
+
+    expect(left - frame.x).toBe(20);
+    expect(top - frame.y).toBe(12);
+    expect(frame.x + frame.w - right).toBe(20);
+    expect(frame.y + frame.h - bottom).toBe(20);
+  });
+});

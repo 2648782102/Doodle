@@ -203,6 +203,27 @@ describe("projection timestamps", () => {
   });
 });
 
+describe("standalone text placement", () => {
+  /*
+   * `convertToExcalidrawElements` reads `x` as the centre of the run once the
+   * text is not left-aligned, while Board v1 stores the box's left edge. Passing
+   * the edge shifted every caption left by half its measured width: a caption
+   * under a card sat over the card's border and the leftmost column's captions
+   * escaped the diagram frame.
+   */
+  it("gives a centred caption the box centre, not its left edge", () => {
+    const board = createEmptyBoard();
+    const items = [
+      { id: "a", type: "text", x: 40, y: 0, w: 190, h: 24, text: "centred", color: "#ffffff", style: { fontSize: 12, textAlign: "center" } },
+      { id: "b", type: "text", x: 40, y: 40, w: 190, h: 24, text: "left", color: "#ffffff", style: { fontSize: 12, textAlign: "left" } },
+    ];
+    const skeleton = boardItemsToExcalidrawSkeleton(items, "light");
+    expect(skeleton.find((element) => element.id === "a").x).toBe(135);
+    expect(skeleton.find((element) => element.id === "b").x).toBe(40);
+    expect(board.items).toHaveLength(0);
+  });
+});
+
 describe("degenerate canvas elements", () => {
   /*
    * A click without a drag left a zero-size shape, which the stored size floor
