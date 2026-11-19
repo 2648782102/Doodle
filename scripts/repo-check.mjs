@@ -344,6 +344,16 @@ check(
   "draw_board accepts two whole-board actions again: the extra field is silently dropped and the reply claims success",
 );
 check(
+  /*
+   * A board-wide revision must not reject a write that touches nothing another
+   * writer moved. The HTTP surface answered that question from the start; the
+   * MCP path did not until `reportConflicts` was wired in, so two agents each
+   * adding a note failed each other with "reload and retry".
+   */
+  tools.includes("reportConflicts") && tools.includes("ObjectConflictError") && tools.includes("REVISION_NOT_CACHED"),
+  "a pinned MCP write is back to rejecting every stale revision instead of merging disjoint edits and naming an overlap",
+);
+check(
   tools.includes("registerShowBoardTool(server, ctx, state)") && tools.includes("GUIDE: capabilities and recipes are omitted on repeat shows"),
   "show_board is back to resending the full guide on every call instead of sharing the get_board flag",
 );
