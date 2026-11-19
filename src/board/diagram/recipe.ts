@@ -8,6 +8,7 @@
  */
 
 import type { DiagramInput, DiagramMode, ExpandedDiagramInput } from "../model/types.js";
+import { BoardValidationError } from "../errors.js";
 
 export type DiagramRecipe = NonNullable<DiagramInput["recipe"]>;
 
@@ -18,7 +19,13 @@ function idFor(index: number): string {
 export function expandRecipe(diagram: DiagramInput): ExpandedDiagramInput {
   if (!diagram.recipe) {
     if (!diagram.nodes || diagram.nodes.length === 0) {
-      throw new Error("diagram requires nodes/edges or a recipe with steps");
+      throw new BoardValidationError(
+        "diagram has no nodes and no recipe",
+        "DIAGRAM_EMPTY",
+        "diagram.nodes",
+        "at least one node, or recipe + steps",
+        `Send nodes: [{ id: "a", label: "Start" }, ...] with optional edges, or use the shortcut recipe: "flow" with steps: ["Start", "Next", ...].`,
+      );
     }
     // `edges` is optional in the schema: a node card or a short label sequence
     // is a legitimate diagram. Leaving it undefined reached `generate.ts` as
@@ -29,7 +36,15 @@ export function expandRecipe(diagram: DiagramInput): ExpandedDiagramInput {
     return { ...diagram, edges: diagram.edges ?? [] } as ExpandedDiagramInput;
   }
   const steps = (diagram.steps ?? []).map((step) => step.trim()).filter(Boolean);
-  if (!steps.length) throw new Error(`recipe: ${diagram.recipe} requires at least one non-empty step`);
+  if (!steps.length) {
+    throw new BoardValidationError(
+      `recipe "${diagram.recipe}" has no usable steps`,
+      "RECIPE_STEPS_REQUIRED",
+      "diagram.steps",
+      "at least one non-empty string",
+      `Send steps: ["收集需求", "实现", "验证"]. Blank and whitespace-only entries are ignored, so an array of them counts as empty.`,
+    );
+  }
   if (diagram.recipe === "review") {
     const labels = [steps[0], "收集反馈", "修订并完成", ...steps.slice(1)];
     return expandRecipe({ ...diagram, recipe: "flow", steps: labels });

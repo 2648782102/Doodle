@@ -28,6 +28,9 @@ import {
   updateBoardItems,
   replaceBoardContent,
   touchBoard,
+  type BoardItemInput,
+  type BoardLayoutInput,
+  type DiagramInput,
   type SimpleBoard,
 } from "../../types.js";
 
@@ -35,16 +38,16 @@ export function registerDrawBoardTool(server: McpServer, ctx: BoardToolContext):
 server.registerTool(
   "draw_board",
   {
-    description: "让 AI 直接在共享无限画布上画或改，也可通过 library 参数保存当前画板、切换本地画板图库中的图、新建/重命名/复制/删除/导入/导出可编辑版本 1 画板。普通写入会串行应用到最新状态；line 的 (x,y) 是起点，(x+w,y+h) 是终点，w/h 可为负数；其他对象是左上角与宽高。按整齐网格布局；不打开浏览器，不写项目文件。",
+    description: "让 AI 直接在共享无限画布上画或改。三个互斥的用法：items/updates/remove_ids/layout 做对象级增删改；diagram 用语义 nodes/edges 一次画完一张图，复杂图优先用它而不是手算坐标；library 管理本地可编辑画板库。改已有内容用 updates 复用已有 id，不要整板重建。author 放顶层，items 里不要再写。line 的 (x,y) 是起点，(x+w,y+h) 是终点，w/h 可为负数；其他对象是左上角与宽高。写入串行应用到最新状态；不传 expected_revision 即追加（并发安全），传了则严格校验。不打开浏览器，不写项目文件。",
     inputSchema: z.object({
-      items: z.array(itemInput).max(100).optional().describe("Objects to create; omit id"),
-      updates: z.array(updateInput).max(100).optional().describe("Precise updates to existing object IDs"),
-      remove_ids: z.array(z.string()).max(100).optional().describe("Existing object IDs to remove"),
+      items: z.array(itemInput).optional().describe("Objects to create; omit id"),
+      updates: z.array(updateInput).optional().describe("Precise updates to existing object IDs"),
+      remove_ids: z.array(z.string()).optional().describe("Existing object IDs to remove"),
       layout: layoutInput.optional().describe("Optional deterministic arrangement of existing objects"),
       replace_board: z.unknown().optional().describe("Rare full replacement with a version 1 board snapshot; revision and identity are preserved"),
-      author: z.enum(["human", "ai"]).optional().describe("Author marker; AI responses should normally use ai"),
+      author: z.string().optional().describe("Author marker: human or ai. AI responses should normally use ai"),
       expected_revision: z.number().int().nonnegative().optional().describe("Optional board revision for rejecting stale canvas edits"),
-      library: libraryAction.optional().describe("Optional local board-library action for saving, switching, renaming, duplicating, importing, or exporting editable board snapshots"),
+      library: libraryAction.optional().describe("Optional local board-library action for saving, switching, renaming, duplicating, importing, or exporting editable board snapshots. create, save, duplicate, and import make the resulting board active unless you pass switchTo: false — so when you are only tidying the library, pass switchTo: false rather than moving the person off the board they are looking at."),
       diagram: diagramInput.optional().describe("Semantic diagram recipe: nodes and optional edges generate one bounded Board v1 diagram with deterministic layout, short labels, and connected arrows. Each node takes `label` (not `title`); `edges` may be omitted for a standalone card or a plain sequence. By default it is added beside existing objects and reuses a numeric id suffix if a generated id is taken; replace:true clears the whole active board first. Every edge becomes a routed line, and a flow longer than six columns snakes instead of becoming one wide strip. To advance an ordered timeline, increment `row` down one column: row-only nodes stack vertically on a single axis. Give an explicit `column` only when you want side-by-side groups."),
     }),
     annotations: BOARD_WRITE_ANNOTATIONS,
@@ -74,14 +77,29 @@ server.registerTool(
         );
       }
       /*
-       * `author` is accepted by the schema only so the check above can fire.
-       * Strip it before the write path, where `BoardItemInput.author` is the
-       * narrowed `BoardAuthor` this tool owns.
+       * `author` is a plain string in the schema so this check can name the
+       * repair; a `z.enum` would reject with bare SDK prose before the handler.
        */
-      const stripAuthor = <T extends { author?: string }>(item: T): Omit<T, "author"> => {
-        const { author: _perItemAuthor, ...rest } = item;
-        return rest;
+      if (author !== undefined && author !== "human" && author !== "ai") {
+        throw new BoardValidationError(
+          `author must be "human" or "ai", got ${JSON.stringify(author)}`,
+          "INVALID_AUTHOR",
+          "author",
+          `"human" or "ai"`,
+          `Set author: "ai" for your own objects. Attribution is what makes the board two-way, so a custom name is refused rather than coerced.`,
+        );
+      }
+      /*
+       * The schema describes shape, so enums arrive as plain strings and
+       * `model/` narrows them. Re-typing here keeps the write path typed
+       * without a second validation pass: anything outside the union was
+       * already refused by `normalizeItem` with a repair path.
+       */
+      const narrow = <T extends Record<string, unknown>>(item: T): BoardItemInput => {
+        const { author: _perItemAuthor, ...rest } = item as T & { author?: string };
+        return rest as unknown as BoardItemInput;
       };
+      const stripAuthor = (item: Record<string, unknown>) => narrow(item);
       const cleanItems = items?.map(stripAuthor);
       const cleanUpdates = updates?.map((update) => ({ ...update, patch: stripAuthor(update.patch) }));
       /*
@@ -101,12 +119,65 @@ server.registerTool(
         ctx.revisions?.remember(board);
         return board;
       };
-      if (diagram) {
-        if (items !== undefined || updates !== undefined || remove_ids !== undefined
-          || layout !== undefined || replace_board !== undefined || library !== undefined) {
-          throw new Error("diagram replaces the active board and cannot be combined with other draw_board actions");
+      /*
+       * The per-call batch ceiling moved here from the schema so the rejection
+       * carries a repair path. The MCP SDK validates `inputSchema` before this
+       * handler runs and reports a failure as bare prose, which is exactly the
+       * case a model hits when it tries to draw a large diagram in one call.
+       */
+      const MUTATION_BATCH_LIMIT = 100;
+      for (const [field, list] of [["items", cleanItems], ["updates", cleanUpdates], ["remove_ids", remove_ids]] as const) {
+        if (list && list.length > MUTATION_BATCH_LIMIT) {
+          throw new BoardValidationError(
+            `${field} carries ${list.length} entries, over the ${MUTATION_BATCH_LIMIT} allowed in one call`,
+            "BATCH_TOO_LARGE",
+            field,
+            `at most ${MUTATION_BATCH_LIMIT} entries per call`,
+            `Split into ${Math.ceil(list.length / MUTATION_BATCH_LIMIT)} calls of ${MUTATION_BATCH_LIMIT} or fewer. For a diagram, prefer draw_board.diagram with nodes/edges instead of one object per call.`,
+          );
         }
-        const expanded = expandRecipe(diagram);
+      }
+      /*
+       * The tool has three mutually exclusive shapes, and each must say so.
+       *
+       * Only `diagram` used to guard this. `replace_board + items` and
+       * `library + items` silently dropped the extra field and reported
+       * success, so a caller that sent both believed the second half applied.
+       * The check is shared now, and it lists the fields that clashed so the
+       * caller knows which half to drop.
+       */
+      const mutationFields = {
+        items, updates, remove_ids, layout, replace_board, library, diagram,
+      };
+      const primaryShapes = (["diagram", "library", "replace_board"] as const)
+        .filter((field) => mutationFields[field] !== undefined);
+      if (primaryShapes.length > 1) {
+        throw new BoardValidationError(
+          `draw_board received more than one whole-board action: ${primaryShapes.join(", ")}`,
+          "CONFLICTING_ACTIONS",
+          primaryShapes[primaryShapes.length - 1],
+          "exactly one of diagram, library, or replace_board",
+          `Send these as separate calls. A diagram generates a board, library manages saved boards, and replace_board writes a complete one; they cannot be combined.`,
+        );
+      }
+      if (primaryShapes.length === 1) {
+        const conflicting = (["items", "updates", "remove_ids", "layout"] as const)
+          .filter((field) => mutationFields[field] !== undefined
+            && (mutationFields[field] as unknown[] | undefined)?.length !== 0);
+        if (conflicting.length) {
+          throw new BoardValidationError(
+            `${primaryShapes[0]} cannot be combined with ${conflicting.join(", ")}`,
+            "CONFLICTING_ACTIONS",
+            conflicting[0],
+            `only ${primaryShapes[0]}`,
+            `${primaryShapes[0]} replaces the board wholesale, so item-level fields would be discarded. Send them as a separate call.`,
+          );
+        }
+      }
+      if (diagram) {
+        // `resolveDiagramLayout` validates `mode` with a repair path; the
+        // schema only proves it is a string.
+        const expanded = expandRecipe(diagram as DiagramInput);
         const current = await ctx.board.snapshot();
         assertRevision(current);
         // In append mode the existing ids are reserved so a second iteration
@@ -194,13 +265,33 @@ server.registerTool(
         if (removed.size) {
           next = removeBoardItems(next, [...removed]);
         }
-        if (layout) next = layoutBoardItems(next, layout, author ?? "ai");
+        // `layoutBoardItems` validates `mode` itself so the rejection carries a
+        // repair path; the schema only proves the field is a string.
+        if (layout) next = layoutBoardItems(next, layout as BoardLayoutInput, author ?? "ai");
         return next;
       };
-      const initial = await ctx.board.snapshot();
-      assertRevision(initial);
-      const candidate = change(initial);
-      const board = await commit(candidate, initial);
+      /*
+       * An unpinned write is an append, so it belongs inside the lock.
+       *
+       * Reading outside the lock and then persisting with that revision made two
+       * simultaneous agents fail each other with `expected N, found N+1` even
+       * though neither had asked for an optimistic check. `store.mutate`
+       * re-reads inside the lock, which is what an unpinned write means. A
+       * caller that *did* pin a revision keeps the strict check: that number is
+       * a claim about what they last saw, and rebasing it onto a newer board
+       * would overwrite whoever got there first.
+       */
+      let board: SimpleBoard;
+      let initial: SimpleBoard;
+      if (expected_revision === undefined) {
+        initial = await ctx.board.snapshot();
+        board = await ctx.board.mutate((current) => change(current));
+        ctx.revisions?.remember(board);
+      } else {
+        initial = await ctx.board.snapshot();
+        assertRevision(initial);
+        board = await commit(change(initial), initial);
+      }
       ctx.preview.broadcast({ type: "board_updated", revision: board.revision });
       const libraryIndex = (await ctx.library.apply({ type: "list" }, board)).index;
       return {

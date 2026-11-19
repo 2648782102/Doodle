@@ -93,6 +93,45 @@ describe("board HTTP surface", () => {
     expect(snapshot.visualDigest).toMatchObject({ version: 1 });
   });
 
+  it("answers a bad canvas write with 400 and a field, not 500", async () => {
+    // `(error as NodeJS.ErrnoException).code` treated `INVALID_COLOR` as a
+    // filesystem failure, so the canvas got a 500 "Unable to persist board
+    // changes" for a client mistake — a server error that named no field.
+    const html = await fetch(base).then((response) => response.text());
+    const token = html.match(/const PANEL_TOKEN = "([^"]+)"/)?.[1];
+    const response = await fetch(`${base}/api/board/items`, {
+      method: "POST",
+      headers: { "content-type": "application/json", "x-ai-draw-token": token },
+      body: JSON.stringify({
+        confirmedBy: "human",
+        item: { type: "rect", x: 0, y: 0, w: 100, h: 100, text: "x", color: "nope" },
+      }),
+    });
+    const body = await response.json();
+
+    expect(response.status).toBe(400);
+    expect(body).toMatchObject({ code: "INVALID_COLOR", path: "items[].color" });
+    expect(typeof body.fix).toBe("string");
+  });
+
+  it("answers a bad library action with 400 and a code, not 500", async () => {
+    // The library route had no error handler, so switching to an unknown board
+    // surfaced as 500 "Internal server error" while the specific message —
+    // which board ids exist — went only to stderr.
+    const html = await fetch(base).then((response) => response.text());
+    const token = html.match(/const PANEL_TOKEN = "([^"]+)"/)?.[1];
+    const response = await fetch(`${base}/api/board/library`, {
+      method: "POST",
+      headers: { "content-type": "application/json", "x-ai-draw-token": token },
+      body: JSON.stringify({ confirmedBy: "human", action: { type: "switch", id: "ghost" } }),
+    });
+    const body = await response.json();
+
+    expect(response.status).toBe(400);
+    expect(body).toMatchObject({ code: "BOARD_NOT_FOUND", path: "library.id" });
+    expect(body.error).toContain("ghost");
+  });
+
   it("exposes a human-confirmed local board library", async () => {
     const html = await fetch(base).then((response) => response.text());
     const token = html.match(/const PANEL_TOKEN = "([^"]+)"/)?.[1];
