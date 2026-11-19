@@ -390,6 +390,17 @@ check(
   "a recipe with no steps or a malformed scene rejects with bare prose again",
 );
 check(
+  (await read("src/board/model/validate.ts")).includes("INVALID_IMAGE_MIME")
+    // Strip block comments first: the explanatory note quotes the old code.
+    && !/IMAGE_MIMES\.includes\(input\.mime\)\s*\?/
+      .test((await read("src/board/model/validate.ts")).replace(/\/\*[\s\S]*?\*\//g, "")),
+  "an unknown image mime is silently dropped again instead of rejected",
+);
+check(
+  (await read("src/board/model/board.ts")).includes("DUPLICATE_UPDATE"),
+  "a repeated update id keeps only the last patch again while the reply claims the batch applied",
+);
+check(
   !/x: Math\.max\(-MAX_COORDINATE/.test((await read("src/board/model/validate.ts"))),
   "normalizeItem clamps coordinates again; resolveGeometry is the only place that may bound them",
 );

@@ -169,6 +169,7 @@ export function updateBoardItems(
    * is what makes the report honest.
    */
   const knownIds = new Set(board.items.map((item) => item.id));
+  const seen = new Map<string, number>();
   for (const [index, update] of updates.entries()) {
     if (!knownIds.has(update.id)) {
       throw new BoardValidationError(
@@ -179,6 +180,24 @@ export function updateBoardItems(
         `Re-read the board with get_board and use one of its item ids. Nothing was written; re-send the whole batch with the corrected id.`,
       );
     }
+    /*
+     * Two updates for one id silently kept only the last.
+     *
+     * The map below is keyed by id, so the earlier patch vanished while the
+     * reply reported the full batch applied. Merging them would guess the
+     * caller's intent; naming the repeat is honest and keeps the batch atomic.
+     */
+    const first = seen.get(update.id);
+    if (first !== undefined) {
+      throw new BoardValidationError(
+        `Updates ${first} and ${index} both target ${JSON.stringify(update.id)}`,
+        "DUPLICATE_UPDATE",
+        `updates[${index}].id`,
+        "one update per item id",
+        `Merge the two patches into one, or send them in separate calls. Only the last would have applied.`,
+      );
+    }
+    seen.set(update.id, index);
   }
   const patches = new Map(updates.map((update) => [update.id, update.patch]));
   const timestamp = now();

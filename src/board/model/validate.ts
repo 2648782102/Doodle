@@ -204,6 +204,23 @@ export function normalizeItem(input: BoardItemInput): Omit<BoardItem, "createdAt
       `Use one short shared marker such as "auth" on the objects that belong together.`,
     );
   }
+  /*
+   * A mime the image list does not contain was dropped silently.
+   *
+   * `...(input.mime && IMAGE_MIMES.includes(input.mime) ? { mime } : {})` left
+   * an `image/tiff` item stored with no `mime` at all, so the caller's request
+   * and the board disagreed — and `parseBoard` rejects the same value, which
+   * means the two paths already disagreed about what is valid.
+   */
+  if (input.mime !== undefined && !IMAGE_MIMES.includes(input.mime)) {
+    throw new BoardValidationError(
+      `Item mime ${JSON.stringify(input.mime)} is not one of ${IMAGE_MIMES.join(", ")}`,
+      "INVALID_IMAGE_MIME",
+      "items[].mime",
+      IMAGE_MIMES.join(", "),
+      `Use the same type as the data URL in src. Omit mime when src already names it.`,
+    );
+  }
   const title = input.title?.trim().slice(0, MAX_TITLE) || undefined;
   const groupId = input.groupId?.trim().slice(0, MAX_GROUP_ID) || undefined;
   return {
@@ -221,7 +238,8 @@ export function normalizeItem(input: BoardItemInput): Omit<BoardItem, "createdAt
     ...(input.type === "line" ? { shape: isLineShape(input.shape) ? input.shape : "straight" as BoardLineShape } : {}),
     ...(points ? { points } : {}),
     ...(input.src ? { src: input.src } : {}),
-    ...(input.mime && IMAGE_MIMES.includes(input.mime) ? { mime: input.mime } : {}),
+    // Validated above, so the value is kept verbatim.
+    ...(input.mime ? { mime: input.mime } : {}),
     ...(groupId ? { groupId } : {}),
     ...(isEmphasis(input.emphasis) ? { emphasis: input.emphasis } : {}),
     ...(isVariant(input.variant) ? { variant: input.variant } : {}),

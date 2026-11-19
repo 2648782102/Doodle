@@ -631,6 +631,55 @@ describe("first-try repair contract", () => {
     });
   }, 30_000);
 
+  it("rejects a bad image mime and a repeated update id instead of dropping one", async () => {
+    // Both were accepted with a success reply. `mime` fell through a
+    // `IMAGE_MIMES.includes(...) ? {...} : {}` guard and was stored as
+    // undefined, and a repeated update id kept only the last patch because the
+    // batch map is keyed by id.
+    // Own state dir: the shared one carries earlier cases' objects.
+    const outputDir = path.join(tempDir, "mime-and-dup");
+    const transport = new StdioClientTransport({
+      command: "node",
+      args: ["dist/index.js"],
+      env: {
+        ...process.env,
+        PREVIEW_PORT: String(await freePort()),
+        LOG_LEVEL: "error",
+        OUTPUT_DIR: outputDir,
+        DOODLE_WORKSPACE_ROOT: process.cwd(),
+      },
+    });
+    const client = new Client({ name: "doodle-mime-dup", version: "1.0.0" });
+    try {
+      await client.connect(transport);
+      const badMime = await client.callTool({
+        name: "draw_board",
+        arguments: {
+          author: "ai",
+          items: [{ type: "image", x: 0, y: 0, w: 100, h: 100, src: "data:image/png;base64,AA==", mime: "image/tiff" }],
+        },
+      });
+      expect(errorJsonOf(badMime)).toMatchObject({ code: "INVALID_IMAGE_MIME", path: "items[].mime" });
+
+      const created = await client.callTool({
+        name: "draw_board",
+        arguments: { author: "ai", items: [{ type: "note", x: 0, y: 0, w: 160, h: 90, text: "base" }] },
+      });
+      const id = created.structuredContent.items[0].id;
+      const repeated = await client.callTool({
+        name: "draw_board",
+        arguments: { author: "ai", updates: [{ id, patch: { text: "first" } }, { id, patch: { text: "second" } }] },
+      });
+      expect(errorJsonOf(repeated)).toMatchObject({ code: "DUPLICATE_UPDATE", path: "updates[1].id" });
+
+      // Neither patch landed.
+      const board = (await client.callTool({ name: "get_board", arguments: {} })).structuredContent;
+      expect(board.items.find((item) => item.id === id)?.text).toBe("base");
+    } finally {
+      await client.close();
+    }
+  }, 30_000);
+
   it("publishes the bounds a model is checked against", async () => {
     // Knowing a bound up front is cheaper than any repair: it turns a rejected
     // write into a correct one. The table must match what model/ enforces.
