@@ -16,6 +16,7 @@ import type {
 } from "./types.js";
 import { now } from "./clock.js";
 import { resolveGeometry } from "./size.js";
+import { assertBoardHeader } from "./board-shape.js";
 import { BoardValidationError } from "../errors.js";
 import {
   isAuthor, isEmphasis, isFillColor, isFiniteNumber, isImageSource, isLineShape,
@@ -23,62 +24,7 @@ import {
 } from "./predicates.js";
 
 export function parseBoard(value: unknown): SimpleBoard {
-  if (!value || typeof value !== "object") throw new Error("Board must be an object");
-  const raw = value as Partial<SimpleBoard>;
-  /*
-   * Every rejection here names the field it came from.
-   *
-   * `replace_board` accepts a whole board object, and a model that hand-built
-   * one got "Invalid board collections" for a bad colour three levels down —
-   * no index, no field, no repair. The write path already reports structured
-   * errors; the persisted-state path has to be just as specific or the caller
-   * cannot tell which of two hundred objects it got wrong.
-   */
-  if (raw.version !== 1) {
-    throw new BoardValidationError(
-      `Board version must be 1, got ${JSON.stringify(raw.version)}`,
-      "INVALID_BOARD_VERSION",
-      "version",
-      "1",
-      `Send version: 1. Version 1 is the only persisted shape; omit the field rather than inventing a new one.`,
-    );
-  }
-  if (typeof raw.id !== "string" || typeof raw.title !== "string") {
-    throw new BoardValidationError(
-      "Board id and title must be strings",
-      "INVALID_BOARD_IDENTITY",
-      typeof raw.id !== "string" ? "id" : "title",
-      "a string",
-      `Keep the id and title you read from get_board; both are plain strings.`,
-    );
-  }
-  if (!isFiniteNumber(raw.revision) || raw.revision < 0) {
-    throw new BoardValidationError(
-      `Board revision must be a non-negative number, got ${JSON.stringify(raw.revision)}`,
-      "INVALID_BOARD_REVISION",
-      "revision",
-      "a non-negative integer",
-      `Send the revision you read from get_board. Do not compute or decrement it; the store assigns the next one.`,
-    );
-  }
-  if (!Array.isArray(raw.items) || !Array.isArray(raw.notes)) {
-    throw new BoardValidationError(
-      `Board ${Array.isArray(raw.items) ? "notes" : "items"} must be an array`,
-      "INVALID_BOARD_COLLECTIONS",
-      Array.isArray(raw.items) ? "notes" : "items",
-      "an array (empty is fine)",
-      `Send both items and notes as arrays. A board snapshot with notes: [] and its items unchanged is the usual shape.`,
-    );
-  }
-  if (raw.items.length > MAX_ITEMS || raw.notes.length > MAX_NOTES) {
-    throw new BoardValidationError(
-      `Board holds ${raw.items.length} items and ${raw.notes.length} notes; the limits are ${MAX_ITEMS} and ${MAX_NOTES}`,
-      "BOARD_TOO_LARGE",
-      raw.items.length > MAX_ITEMS ? "items" : "notes",
-      `at most ${MAX_ITEMS} items and ${MAX_NOTES} notes`,
-      `Split the content across two boards in the library instead of one oversized board.`,
-    );
-  }
+  const raw = assertBoardHeader(value);
   const itemIds = new Set<string>();
   const items = raw.items.map((item, index) => {
     const at = `items[${index}]`;

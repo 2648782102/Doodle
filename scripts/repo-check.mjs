@@ -53,6 +53,7 @@ const boardTypes = (await Promise.all([
   read("src/board/model/validate.ts"),
   read("src/board/model/size.ts"),
   read("src/board/model/parse-board.ts"),
+  read("src/board/model/board-shape.ts"),
   read("src/board/model/predicates.ts"),
   read("src/board/model/board.ts"),
   read("src/board/model/digest.ts"),
