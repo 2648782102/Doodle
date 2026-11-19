@@ -477,7 +477,9 @@ async function libraryRequest(action: Record<string, unknown>) {
       name: "draw_board",
       arguments: { library: action, expected_revision: activeSnapshot?.revision ?? 0 },
     });
-    if (result.isError) throw new Error("Library action failed");
+    // A refused save/switch/rename carries the board ids that exist; the panel
+    // status line should show that, not a generic sentence.
+    if (result.isError) throw new Error(toolErrorMessage(result));
     return result.structuredContent as Record<string, unknown>;
   }
   const response = await fetch("/api/board/library", {
@@ -706,6 +708,34 @@ function initLibraryUi() {
  * changed. The single-item endpoints already behaved this way; the canvas simply
  * never used them.
  */
+/**
+ * The message a person should see when the host rejects a write.
+ *
+ * `draw_board` returns `ERROR_JSON` with a human-readable `message` plus a
+ * `fix`. Throwing the bare "Board update failed" replaced all of that with a
+ * sentence that says nothing: the banner could not tell a bad colour from a
+ * revision conflict, so the person had no idea what to change.
+ */
+function toolErrorMessage(result: { content?: Array<{ type: string; text?: string }> }): string {
+  const text = (result.content ?? [])
+    .filter((part) => part.type === "text")
+    .map((part) => part.text ?? "")
+    .join("\n");
+  const match = text.match(/ERROR_JSON:\n(\{[\s\S]*\})/);
+  if (match) {
+    try {
+      const payload = JSON.parse(match[1]) as { message?: string; fix?: string };
+      const message = payload.message?.trim();
+      const fix = payload.fix?.trim();
+      if (message) return fix ? `${message} — ${fix}` : message;
+    } catch {
+      // Fall through to the raw text below.
+    }
+  }
+  const first = text.split("\n").find((line) => line.trim().length > 0)?.trim();
+  return first && !first.startsWith("MCP error") ? first : "Board update failed";
+}
+
 async function syncBoard(next: unknown[], base: BoardSnapshot): Promise<BoardSnapshot> {
   const diff = diffBoardItems(base.items as never[], next as never[]);
   if (isEmptyDiff(diff)) return base;
@@ -715,7 +745,7 @@ async function syncBoard(next: unknown[], base: BoardSnapshot): Promise<BoardSna
       name: "draw_board",
       arguments: { ...change, author: "human", expected_revision: base.revision },
     });
-    if (result.isError) throw new Error("Board update failed");
+    if (result.isError) throw new Error(toolErrorMessage(result));
     return result.structuredContent as BoardSnapshot;
   }
   if (activeMcpApp?.drawBoard) {

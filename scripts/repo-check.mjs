@@ -144,6 +144,20 @@ check(packageJson.scripts["setup:codex"] === "node scripts/setup-codex.mjs", "on
 check(packageJson.scripts["preview:board"] === "node scripts/preview-board.mjs", "explicit local preview command is missing");
 check(await exists("scripts/preview-board.mjs"), "local preview script is missing");
 check(await exists("scripts/open-board.mjs") && packageJson.scripts.doodle === "node scripts/open-board.mjs", "the one-action board open command is missing");
+/*
+ * A rejected save must tell the person why.
+ *
+ * The canvas threw a bare "Board update failed" and discarded the
+ * `ERROR_JSON` the tool had already produced, so the banner could not
+ * distinguish a bad colour from a revision conflict — the person had no idea
+ * what to change. Both the sync path and the library path must go through
+ * `toolErrorMessage`.
+ */
+check(
+  excalidrawApp.includes("function toolErrorMessage(")
+    && (excalidrawApp.match(/throw new Error\(toolErrorMessage\(result\)\)/g) ?? []).length >= 2,
+  "the canvas discards the rejection reason again, so a failed save shows a message that names nothing",
+);
 check(excalidrawTemplate.includes('id="doodleWelcome"') && excalidrawApp.includes("WELCOME_STORAGE_KEY") && excalidrawApp.includes("initWelcome"), "the first-run board guidance is missing or not dismissible");
 check((await read("src/board/viewport-memory.ts")).includes("isViewportNearContent") && excalidrawApp.includes("readStoredViewport"), "the canvas no longer remembers a sane viewport per board");
 check(tools.includes("isSuspiciousEmptyWrite") || http.includes("isSuspiciousEmptyWrite"), "writes are not guarded against accidentally clearing a full board");
