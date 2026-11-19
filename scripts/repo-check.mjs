@@ -351,6 +351,16 @@ check(
   "an empty diagram rejects with bare prose again instead of naming both routes forward",
 );
 check(
+  (await read("src/board/project-scan.ts")).includes("SCAN_RANGE_OUT_OF_RANGE")
+    && !/Math\.max\(minimum, Math\.min\(maximum/.test(await read("src/board/project-scan.ts")),
+  "scan_project clamps its range bounds again instead of rejecting an explicit out-of-range value",
+);
+check(
+  (await read("src/board/library/store.ts")).includes("BOARD_NOT_FOUND")
+    && (await read("src/board/library/store.ts")).includes("LAST_BOARD"),
+  "a library action names no ids on an unknown board, or refuses the last board without saying why",
+);
+check(
   !/x: Math\.max\(-MAX_COORDINATE/.test((await read("src/board/model/validate.ts"))),
   "normalizeItem clamps coordinates again; resolveGeometry is the only place that may bound them",
 );

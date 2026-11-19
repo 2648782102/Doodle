@@ -18,8 +18,8 @@ server.registerTool(
   {
     description: "可选能力：只读扫描当前工作区的目录与文件路径，并返回少量 file:line 证据文本，同时给一份可直接传给 draw_board.diagram 的草图（DIAGRAM_DRAFT_JSON）。项目结构只是画板可以讨论的内容之一；本工具不生成图、不改画板、不写文件，也不授权代码变更。要可视化时把草图传给 draw_board。",
     inputSchema: z.object({
-      max_depth: z.number().int().min(1).max(6).optional().describe("Maximum directory depth; defaults to 3, maximum 6"),
-      max_files: z.number().int().min(1).max(400).optional().describe("Maximum number of entries; defaults to 80, maximum 400"),
+      max_depth: z.number().int().optional().describe("Maximum directory depth, 1-6; defaults to 3"),
+      max_files: z.number().int().optional().describe("Maximum number of entries, 1-400; defaults to 80"),
       include_evidence: z.boolean().optional().describe("Include bounded file:line evidence; defaults to true"),
     }),
     annotations: READ_ONLY_LOCAL_ANNOTATIONS,

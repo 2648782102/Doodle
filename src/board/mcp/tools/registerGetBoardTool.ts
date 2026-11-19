@@ -18,6 +18,7 @@ import {
   viewPayload,
 } from "../presentation.js";
 import { boardAgentDelta, summarizeAgentBoard } from "../../agent-view.js";
+import { BoardValidationError } from "../../errors.js";
 import { describeHandoff, handoffNextStep } from "../../handoff.js";
 
 export function registerGetBoardTool(
@@ -30,19 +31,45 @@ server.registerTool(
   {
     description: "读取人和 AI 共享画布的数据：revision、对象 ID、坐标、作者、BOARD_JSON 和画图规范。用于回答画布内容或给 Agent 提供视觉上下文；只读，不打开浏览器，也不写项目文件。重复读取同一画板时传 since_revision，只返回变化的对象。画布保真元数据不会出现在返回里。想显示可编辑画布时调用 show_board。",
     inputSchema: z.object({
-      since_revision: z.number().int().min(0).optional()
+      since_revision: z.number().int().optional()
         .describe("Optional revision you already read. Returns only objects added, updated, or removed since it, or a compact unchanged summary."),
       include_guide: z.boolean().optional()
         .describe("Include the full capabilities, recipes, and drawing guide. Defaults to true on a first or empty read and false on later reads, where the initialization instructions already cover them."),
       include_canvas_fidelity: z.boolean().optional()
         .describe("Return Excalidraw scene fidelity with each item. Use only to rebuild a canvas; it is large and not useful for reading or drawing."),
-      view: z.enum(["summary", "structure", "detail", "full"]).optional()
+      view: z.string().optional()
         .describe("Token level. `full` (default) returns the complete board in both text and structuredContent. `summary` returns digest/diagnosis only, `structure` adds ids/coordinates/roles without text blobs, `detail` is the agent payload without capabilities/guide. Graded views put the data in structuredContent only and omit the duplicate BOARD_JSON text copy, so they cost roughly a third of `full`."),
     }),
     annotations: READ_ONLY_LOCAL_ANNOTATIONS,
   },
-  async ({ since_revision, include_guide, include_canvas_fidelity, view }: { since_revision?: number; include_guide?: boolean; include_canvas_fidelity?: boolean; view?: "summary" | "structure" | "detail" | "full" }) => {
+  async ({ since_revision, include_guide, include_canvas_fidelity, view: rawView }: { since_revision?: number; include_guide?: boolean; include_canvas_fidelity?: boolean; view?: string }) => {
     try {
+      /*
+       * Both arguments are validated here rather than by `z.enum` / `.min(0)`
+       * so a bad value comes back as `ERROR_JSON` naming the accepted range,
+       * the same as every other bound. A read is cheap to retry, but the model
+       * still should not have to guess what the field accepts.
+       */
+      const VIEWS = ["summary", "structure", "detail", "full"] as const;
+      if (rawView !== undefined && !VIEWS.includes(rawView as typeof VIEWS[number])) {
+        throw new BoardValidationError(
+          `view is ${JSON.stringify(rawView)}; expected one of ${VIEWS.join(", ")}`,
+          "INVALID_VIEW",
+          "view",
+          VIEWS.join(", "),
+          `Leave it out for a full read, or use "summary" for a status check and "structure" for ids and coordinates without text.`,
+        );
+      }
+      if (since_revision !== undefined && (!Number.isInteger(since_revision) || since_revision < 0)) {
+        throw new BoardValidationError(
+          `since_revision is ${JSON.stringify(since_revision)}; it must be a revision you already read`,
+          "INVALID_SINCE_REVISION",
+          "since_revision",
+          "a non-negative integer",
+          `Pass the revision from the last get_board reply, or omit it for a full read.`,
+        );
+      }
+      const view = rawView as typeof VIEWS[number] | undefined;
       const current = await ctx.board.snapshot();
       const revisions = ctx.revisions;
       /*

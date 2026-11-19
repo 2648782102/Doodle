@@ -534,6 +534,34 @@ describe("first-try repair contract", () => {
     });
   }, 30_000);
 
+  it("answers read-tool and library mistakes with a repair path too", async () => {
+    // The write path was converted first; these are the remaining rejections
+    // that still came back as bare SDK prose or `TOOL_ERROR`.
+    await withClient(async (client) => {
+      await client.callTool({
+        name: "draw_board",
+        arguments: { author: "ai", items: [{ type: "note", x: 0, y: 0, w: 160, h: 90, text: "A" }] },
+      });
+
+      const cases = [
+        ["scan_project", { max_depth: 99 }, "SCAN_RANGE_OUT_OF_RANGE", "max_depth"],
+        ["scan_project", { max_files: 0 }, "SCAN_RANGE_OUT_OF_RANGE", "max_files"],
+        ["get_board", { since_revision: -1 }, "INVALID_SINCE_REVISION", "since_revision"],
+        ["get_board", { view: "ultra" }, "INVALID_VIEW", "view"],
+        ["draw_board", { library: { type: "switch", id: "ghost" } }, "BOARD_NOT_FOUND", "library.id"],
+        ["draw_board", { library: { type: "rename", id: "ghost", name: "x" } }, "BOARD_NOT_FOUND", "library.id"],
+      ];
+      for (const [tool, args, code, path] of cases) {
+        const result = await client.callTool({ name: tool, arguments: args });
+        const payload = errorJsonOf(result);
+        expect(result.isError, `${tool} ${JSON.stringify(args)}`).toBe(true);
+        expect(payload?.code, `${tool} ${JSON.stringify(args)}`).toBe(code);
+        expect(payload?.path, `${tool} ${JSON.stringify(args)}`).toBe(path);
+        expect(typeof payload?.fix, `${tool} ${JSON.stringify(args)}`).toBe("string");
+      }
+    });
+  }, 30_000);
+
   it("publishes the bounds a model is checked against", async () => {
     // Knowing a bound up front is cheaper than any repair: it turns a rejected
     // write into a correct one. The table must match what model/ enforces.

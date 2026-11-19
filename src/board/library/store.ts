@@ -11,6 +11,7 @@ import fs from "node:fs/promises";
 import path from "node:path";
 import { randomUUID } from "node:crypto";
 import { AsyncMutex } from "../mutex.js";
+import { BoardValidationError } from "../errors.js";
 import { touchBoard, type SimpleBoard } from "../types.js";
 import { makeId, now } from "../model/clock.js";
 import {
@@ -102,7 +103,15 @@ export class BoardLibrary {
     const boards = existing
       ? index.boards.map((candidate) => candidate.id === board.id ? entry : candidate)
       : [...index.boards, entry];
-    if (!existing && boards.length > MAX_LIBRARY_BOARDS) throw new Error("Board library limit reached");
+    if (!existing && boards.length > MAX_LIBRARY_BOARDS) {
+      throw new BoardValidationError(
+        `Library already holds ${boards.length} boards; the limit is ${MAX_LIBRARY_BOARDS}`,
+        "BOARD_LIBRARY_LIMIT",
+        "library",
+        `at most ${MAX_LIBRARY_BOARDS} saved boards`,
+        `Delete a board you no longer need with library {type: "delete", id}, then create this one.`,
+      );
+    }
     return makeIndex(index.activeId, boards.map((candidate) => ({ ...candidate, active: candidate.id === index.activeId })));
   }
 
@@ -117,7 +126,16 @@ export class BoardLibrary {
       currentEntry.name = index.boards.find((entry) => entry.id === activeId)!.name;
     };
     const requireBoard = (id: string) => {
-      if (!index.boards.some((entry) => entry.id === id)) throw new Error("Board not found");
+      if (!index.boards.some((entry) => entry.id === id)) {
+        const known = index.boards.map((entry) => `${entry.name} (${entry.id})`).join(", ");
+        throw new BoardValidationError(
+          `No saved board has the id ${JSON.stringify(id)}`,
+          "BOARD_NOT_FOUND",
+          "library.id",
+          "an id from the library index",
+          `Call draw_board with library {type: "list"} to see the ids. Known boards: ${known || "none"}.`,
+        );
+      }
       return safeId(id);
     };
     const switchBoard = async (id: string): Promise<SimpleBoard> => {
@@ -207,10 +225,21 @@ export class BoardLibrary {
     if (action.type === "delete") {
       await saveActive();
       const id = requireBoard(action.id);
-      if (index.boards.length <= 1) throw new Error("Cannot delete the last board");
+      /*
+       * The library always keeps one board, because the MCP session needs an
+       * active board to read and write. Say that, rather than refusing flatly.
+       */
+      const lastBoardError = () => new BoardValidationError(
+        "Cannot delete the only saved board",
+        "LAST_BOARD",
+        "library.id",
+        "a library holding at least two boards",
+        `Create another board first: draw_board with library {type: "create"}. The active board is the one the session reads and writes.`,
+      );
+      if (index.boards.length <= 1) throw lastBoardError();
       if (id === index.activeId) {
         const replacement = index.boards.find((entry) => entry.id !== id);
-        if (!replacement) throw new Error("Cannot delete the last board");
+        if (!replacement) throw lastBoardError();
         await fs.unlink(this.boardFile(id)).catch((error) => { if (!isMissingFile(error)) throw error; });
         const board = await this.readBoard(replacement.id);
         index = makeIndex(replacement.id, index.boards.filter((entry) => entry.id !== id));
