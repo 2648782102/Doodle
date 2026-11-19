@@ -5,7 +5,12 @@ import { fileURLToPath } from "node:url";
 
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
 const failures = [];
-const read = (relative) => fs.readFile(path.join(root, relative), "utf8");
+/*
+ * Normalise line endings: this script matches multi-line source fragments with
+ * `\n` literals, and a Windows checkout with `core.autocrlf=true` writes CRLF,
+ * which made the guard fail locally while passing on Linux CI.
+ */
+const read = async (relative) => (await fs.readFile(path.join(root, relative), "utf8")).replace(/\r\n/g, "\n");
 const exists = async (relative) => {
   try {
     await fs.access(path.join(root, relative));
