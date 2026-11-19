@@ -93,6 +93,37 @@ describe("board HTTP surface", () => {
     expect(snapshot.visualDigest).toMatchObject({ version: 1 });
   });
 
+  it("merges a stale batch that only adds objects", async () => {
+    // The same bug the MCP path had: `touched` is empty for an add-only
+    // request, and treating that as a conflict rejected the commonest
+    // concurrent write — a person and an agent each drawing a new note.
+    const html = await fetch(base).then((response) => response.text());
+    const token = html.match(/const PANEL_TOKEN = "([^"]+)"/)?.[1];
+    const batch = async (body, revision) => {
+      const response = await fetch(`${base}/api/board/batch`, {
+        method: "POST",
+        headers: { "content-type": "application/json", "x-ai-draw-token": token, "If-Match-Revision": String(revision) },
+        body: JSON.stringify({ confirmedBy: "human", ...body }),
+      });
+      return { status: response.status, body: await response.json().catch(() => ({})) };
+    };
+
+    const first = await fetch(`${base}/api/board`).then((response) => response.json());
+    const pinned = first.revision;
+
+    // Someone else writes, so the pinned revision goes stale...
+    const then = await batch({ items: [{ type: "note", x: 0, y: 0, w: 160, h: 90, text: "someone else" }] }, pinned);
+    expect(then.status).toBe(200);
+
+    // ...and an add-only write against the stale revision still lands.
+    const mine = await batch({ items: [{ type: "note", x: 300, y: 0, w: 160, h: 90, text: "mine" }] }, pinned);
+    expect(mine.status).toBe(200);
+    expect(mine.body.mergedFrom).toBe(pinned);
+    const items = mine.body.board.items.map((item) => item.text);
+    expect(items).toContain("someone else");
+    expect(items).toContain("mine");
+  });
+
   it("answers a bad canvas write with 400 and a field, not 500", async () => {
     // `(error as NodeJS.ErrnoException).code` treated `INVALID_COLOR` as a
     // filesystem failure, so the canvas got a 500 "Unable to persist board

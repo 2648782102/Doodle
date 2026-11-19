@@ -94,6 +94,10 @@ export class BoardHttpServer {
 
     this.app.get("/api/board", async (_req, res) => {
       const current = await this.board.snapshot();
+      // Remember what a browser just read: the canvas pins this revision and
+      // sends it back as If-Match-Revision, and merge needs the board as that
+      // caller saw it. Without this, every racing canvas edit was a 409.
+      this.revisions?.remember(current);
       const index = (await this.library.apply({ type: "list" }, current)).index;
       res.json({ ...canvasSnapshot(current), library: index });
     });
@@ -157,6 +161,12 @@ export class BoardHttpServer {
       change: (board: Awaited<ReturnType<BoardStore["snapshot"]>>) => Awaited<ReturnType<BoardStore["snapshot"]>>,
     ) => {
       let board: Awaited<ReturnType<BoardStore["snapshot"]>>;
+      /** Build the candidate and refuse a suspicious clear, in one place. */
+      const candidateFor = (current: Awaited<ReturnType<BoardStore["snapshot"]>>) => {
+        const candidate = change(current);
+        if (isSuspiciousEmptyWrite(current, candidate)) throw new EmptyWriteRefusedError();
+        return candidate;
+      };
       try {
         const revisionHeader = res.req.header("If-Match-Revision");
         /*
@@ -169,13 +179,7 @@ export class BoardHttpServer {
          * candidate first, refuse a suspicious clear, then persist.
          */
         if (revisionHeader === undefined) {
-          board = await this.board.mutate((current) => {
-            const candidate = change(current);
-            if (isSuspiciousEmptyWrite(current, candidate)) {
-              throw new EmptyWriteRefusedError();
-            }
-            return candidate;
-          });
+          board = await this.board.mutate(candidateFor);
         } else {
           const expectedRevision = Number(revisionHeader);
           if (!Number.isInteger(expectedRevision) || expectedRevision < 0) {
@@ -183,24 +187,17 @@ export class BoardHttpServer {
           }
           const current = await this.board.snapshot();
           if (current.revision === expectedRevision) {
-            const candidate = change(current);
-            // A client bug must not look like a deliberate clear.
-            if (isSuspiciousEmptyWrite(current, candidate)) {
-              throw new EmptyWriteRefusedError();
-            }
-            board = await this.board.replaceIfRevision(candidate, expectedRevision);
+            board = await this.board.replaceIfRevision(candidateFor(current), expectedRevision);
           } else {
             const base = this.revisions?.get(expectedRevision);
             if (!base) throw new BoardRevisionConflictError(expectedRevision, current.revision);
-            const { touched, conflicts } = reportConflicts(base, current, res.req.body);
-            if (touched.size === 0) throw new BoardRevisionConflictError(expectedRevision, current.revision);
+            // `touched` is empty for an add-only request (an added item has no
+            // id), so nothing can collide: merge rather than refuse.
+            const { conflicts } = reportConflicts(base, current, res.req.body);
             if (conflicts.length > 0) {
               return res.status(409).json(conflictPayload(expectedRevision, current.revision, conflicts));
             }
-            // Disjoint: both edits land. Persist against the revision we just read.
-            const merged = change(current);
-            if (isSuspiciousEmptyWrite(current, merged)) throw new EmptyWriteRefusedError();
-            board = await this.board.replaceIfRevision(merged, current.revision);
+            board = await this.board.replaceIfRevision(candidateFor(current), current.revision);
             res.locals.mergedFrom = expectedRevision;
           }
         }

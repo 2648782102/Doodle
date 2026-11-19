@@ -148,9 +148,18 @@ check(excalidrawTemplate.includes('id="doodleWelcome"') && excalidrawApp.include
 check((await read("src/board/viewport-memory.ts")).includes("isViewportNearContent") && excalidrawApp.includes("readStoredViewport"), "the canvas no longer remembers a sane viewport per board");
 check(tools.includes("isSuspiciousEmptyWrite") || http.includes("isSuspiciousEmptyWrite"), "writes are not guarded against accidentally clearing a full board");
 check(
-  (http.match(/isSuspiciousEmptyWrite\(/g) ?? []).length >= 2 &&
-  http.includes("EmptyWriteRefusedError"),
-  "the empty-write guard only runs on the revision-checked path",
+  /*
+   * One guard, reached by every path. This used to require two call sites,
+   * which was checking for duplication rather than coverage: the real property
+   * is that every write builds its candidate through the same check. A single
+   * `candidateFor` helper is stronger than two copies, so assert the helper and
+   * that all three commit branches use it.
+   */
+  http.includes("EmptyWriteRefusedError") &&
+  http.includes("isSuspiciousEmptyWrite(current, candidate)") &&
+  (http.match(/candidateFor\(current\)/g) ?? []).length >= 2 &&
+  http.includes("mutate(candidateFor)"),
+  "a commit path no longer runs the empty-write guard: a stale client could erase a full board",
 );
 check(boardStore.includes("quarantineCorruptState"), "a corrupt board file still prevents startup");
 check(boardTypes.includes("COORDINATE_OUT_OF_RANGE") && !boardTypes.includes("maxWidth, input.w ?? 180") && !boardTypes.includes("Math.min(MAX_SHAPE_WIDTH, input.w ?? 180)"), "drawing input is silently clamped instead of rejected");
