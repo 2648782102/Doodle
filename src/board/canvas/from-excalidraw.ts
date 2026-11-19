@@ -74,6 +74,30 @@ function cloneElement(element: ExcalidrawLikeElement): Record<string, unknown> {
   return clone;
 }
 
+/**
+ * A click that never became a drag leaves Excalidraw holding a zero-size shape.
+ *
+ * The size floor below clamps such an element up to 16x16, which turned a
+ * mis-click into a real board object: invisible at the moment it is created,
+ * impossible to select meaningfully afterwards, and persisted forever. Reported
+ * as a stray 16x16 rectangle appearing during a normal first use, so drop the
+ * element instead of inventing a size for it.
+ *
+ * The test is "has no extent at all", not "is smaller than the floor": a
+ * deliberate 16px square, a perfectly horizontal arrow (`h === 0`) and a thick
+ * short stroke are all legitimate and must survive.
+ */
+function isDegenerate(element: ExcalidrawLikeElement): boolean {
+  const type = elementType(element);
+  if (type === "image") return false;
+  if (type === "stroke") return (element.points?.length ?? 0) < 2;
+  if (type === "line") {
+    const last = elementPoints(element).at(-1);
+    return !last || (Math.abs(last.x) < 1 && Math.abs(last.y) < 1);
+  }
+  return Math.abs(finite(element.width, 0)) < 1 && Math.abs(finite(element.height, 0)) < 1;
+}
+
 export function excalidrawElementsToBoardItems(
   elements: ExcalidrawLikeElement[],
   files: Record<string, ExcalidrawFileData> = {},
@@ -87,7 +111,8 @@ export function excalidrawElementsToBoardItems(
     (element.customData?.doodle as Record<string, unknown> | undefined)?.role === "frame";
   const visible = elements.filter((element) => !element.isDeleted
     && !(element.type === "text" && !element.containerId && !element.text?.trim())
-    && !(element.type === "rectangle" && frameRole(element)));
+    && !(element.type === "rectangle" && frameRole(element))
+    && !isDegenerate(element));
   const frameElements = elements.filter((element) => !element.isDeleted && element.type === "rectangle" && frameRole(element));
   const textByContainer = new Map(visible.filter((element) => element.type === "text" && element.containerId)
     .map((element) => [String(element.containerId), element]));
@@ -169,6 +194,16 @@ export function excalidrawElementsToBoardItems(
     };
     return item;
   });
+  /*
+   * A dropped degenerate element can still be an arrow endpoint. Leaving the
+   * binding behind fails the whole board on the connector check, so strip only
+   * the dangling endpoint and keep the arrow itself.
+   */
+  const keptIds = new Set(items.map((item) => item.id));
+  for (const item of items) {
+    if (item.startItemId && !keptIds.has(item.startItemId)) delete item.startItemId;
+    if (item.endItemId && !keptIds.has(item.endItemId)) delete item.endItemId;
+  }
   for (const frame of frameElements) {
     const previous = bySceneId.get(frame.id) ?? byId.get(frame.id);
     if (!previous) continue;

@@ -32,6 +32,11 @@ export class BoardStore {
   private board: SimpleBoard;
   private revision: number;
   private file: string;
+
+  /** State file path, for watchers that need to notice writes from other processes. */
+  get statePath(): string {
+    return this.file;
+  }
   private legacyFile: string;
   private readonly imagesDir: string;
   private readonly mutex: AsyncMutex;
@@ -179,7 +184,12 @@ export class BoardStore {
      * half-written file renamed into place by someone else.
      */
     const temp = `${this.file}.${process.pid}-${randomUUID()}.tmp`;
-    const serialized = JSON.stringify(stored, null, 2);
+    /*
+     * Compact, not pretty. Every mutation rewrites the whole document, and
+     * two-space indentation was 46% of a 29-object board. The file is machine
+     * state that is ignored by Git; `get_board` is the readable view.
+     */
+    const serialized = JSON.stringify(stored);
     try {
       await fs.writeFile(temp, serialized, "utf-8");
       await renameWithRetry(temp, this.file);

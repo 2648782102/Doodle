@@ -28,6 +28,7 @@ import { BoardRevisionConflictError, BoardValidationError, EmptyWriteRefusedErro
 import { BoardLibrary, boardLibraryIndexText, type BoardLibraryAction } from "./library.js";
 import type { BoardRevisionCache } from "./revision-cache.js";
 import { isSuspiciousEmptyWrite, type BoardStore } from "./store.js";
+import { watchBoardState, type StateWatch } from "./state-watch.js";
 import { projectSnapshotText, scanProject, type ProjectScanOptions } from "./project-scan.js";
 import { assetCandidates, fillTemplate, findExisting, readTemplate } from "./http/templates.js";
 import { expandRecipe } from "./diagram/recipe.js";
@@ -61,6 +62,9 @@ export class BoardHttpServer {
   private appBundle = "";
   private panelUrlValue: string | null = null;
   private readonly library: BoardLibrary;
+  /** Highest revision this process has announced, so an external write is not announced twice. */
+  private lastBroadcastRevision = -1;
+  private stateWatch: StateWatch | null = null;
 
   constructor(
     private board: BoardStore,
@@ -391,6 +395,18 @@ export class BoardHttpServer {
         const activePort = typeof address === "object" && address ? address.port : this.config.previewPort ?? 0;
         this.panelUrlValue = `http://${this.config.previewHost}:${activePort}/`;
         logger.info(`Board preview at ${this.panelUrlValue}`);
+        /*
+         * Another process can own the same board file — `npm run preview:board`
+         * beside an MCP host is documented — and its writes never reached these
+         * sockets. Skip revisions this process wrote itself: they were already
+         * announced by `broadcast`, and re-announcing them would cost every open
+         * canvas an extra fetch per edit.
+         */
+        this.stateWatch = watchBoardState(this.board.statePath, (revision) => {
+          if (revision <= this.lastBroadcastRevision) return;
+          logger.debug(`Board state changed outside this process (revision ${revision})`);
+          this.broadcast({ type: "board_updated", revision });
+        });
         resolve();
       });
     });
@@ -401,6 +417,9 @@ export class BoardHttpServer {
   }
 
   broadcast(message: Record<string, unknown>): void {
+    const revision = message.type === "board_updated" && typeof message.revision === "number"
+      ? message.revision : null;
+    if (revision !== null) this.lastBroadcastRevision = Math.max(this.lastBroadcastRevision, revision);
     const data = JSON.stringify(message);
     this.wss?.clients.forEach((client) => {
       if (client.readyState === 1) client.send(data);
@@ -408,6 +427,8 @@ export class BoardHttpServer {
   }
 
   async stop(): Promise<void> {
+    this.stateWatch?.close();
+    this.stateWatch = null;
     this.wss?.close();
     return new Promise((resolve) => this.server?.close(() => resolve()));
   }

@@ -165,3 +165,59 @@ describe("Doodle to Excalidraw adapter", () => {
     expect(() => parseBoard(JSON.parse(JSON.stringify(projected)))).not.toThrow();
   });
 });
+
+describe("degenerate canvas elements", () => {
+  /*
+   * A click without a drag left a zero-size shape, which the stored size floor
+   * clamped to 16x16 and persisted. Reported as a stray small rectangle
+   * appearing during a normal first use.
+   */
+  it("drops a click that never became a drag", () => {
+    const board = boardItemsFromExcalidrawBoard(createEmptyBoard(), [
+      { id: "ghost", type: "rectangle", x: 120, y: 120, width: 0, height: 0 },
+      { id: "real", type: "rectangle", x: 40, y: 40, width: 190, height: 90 },
+    ]);
+    expect(board.items.map((item) => item.id)).toEqual(["real"]);
+  });
+
+  it("keeps shapes whose extent is at or above the floor", () => {
+    const board = boardItemsFromExcalidrawBoard(createEmptyBoard(), [
+      { id: "small", type: "rectangle", x: 10, y: 10, width: 16, height: 16 },
+      { id: "flat", type: "rectangle", x: 10, y: 60, width: 300, height: 1 },
+    ]);
+    expect(board.items.map((item) => item.id)).toEqual(["small", "flat"]);
+  });
+
+  it("keeps a perfectly horizontal or vertical arrow", () => {
+    // `h === 0` is a real horizontal arrow, not a degenerate element.
+    const board = boardItemsFromExcalidrawBoard(createEmptyBoard(), [
+      { id: "h", type: "arrow", x: 0, y: 0, width: 120, height: 0, points: [[0, 0], [120, 0]] },
+      { id: "v", type: "arrow", x: 0, y: 0, width: 0, height: 120, points: [[0, 0], [0, 120]] },
+      { id: "dot", type: "arrow", x: 0, y: 0, width: 0, height: 0, points: [[0, 0], [0, 0]] },
+    ]);
+    expect(board.items.map((item) => item.id)).toEqual(["h", "v"]);
+  });
+
+  it("drops a freedraw that only registered one point", () => {
+    const board = boardItemsFromExcalidrawBoard(createEmptyBoard(), [
+      { id: "tap", type: "freedraw", x: 5, y: 5, width: 0, height: 0, points: [[0, 0]] },
+      { id: "ink", type: "freedraw", x: 5, y: 5, width: 40, height: 10, points: [[0, 0], [20, 5], [40, 10]] },
+    ]);
+    expect(board.items.map((item) => item.id)).toEqual(["ink"]);
+  });
+
+  it("keeps an arrow whose bound shape was dropped, minus the dangling endpoint", () => {
+    const board = boardItemsFromExcalidrawBoard(createEmptyBoard(), [
+      { id: "ghost", type: "rectangle", x: 0, y: 0, width: 0, height: 0 },
+      {
+        id: "arrow", type: "arrow", x: 0, y: 0, width: 80, height: 0, points: [[0, 0], [80, 0]],
+        startBinding: { elementId: "ghost" }, endBinding: { elementId: "ghost" },
+      },
+    ]);
+    expect(board.items).toHaveLength(1);
+    expect(board.items[0].id).toBe("arrow");
+    expect(board.items[0].startItemId).toBeUndefined();
+    expect(board.items[0].endItemId).toBeUndefined();
+    expect(() => parseBoard(JSON.parse(JSON.stringify(board)))).not.toThrow();
+  });
+});
