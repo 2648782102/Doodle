@@ -238,7 +238,7 @@ BoardStore / MCP 工具 / HTTP API / BoardLibrary
 1. **三种外观，一套机制**：`THEMES` 是唯一事实源，id 为 `light` / `dark` / `glass`；类型、持久化校验、切换器都从它派生。加第四种外观 = 一条 `THEMES` 记录 + 一个 token 块，不是一个新 `if (theme === …)`。
 2. **配色与材料分离**：`data-doodle-theme` 选配色，`data-doodle-material` 选构建（浅深为 `paper`，玻璃为 `glass`）。所有材料规则挂在 `data-doodle-material` 上。
 3. **纸是不透明卡纸，不是染色玻璃**：`--glass-lens-scale` / `--glass-lens-blur` / `--glass-frost` 全为 0 时，`liquid-glass.ts` 直接跳过滤镜生成。
-4. **纹理是生成的**：两个各向同性 `feTurbulence`（纤维与纸齿）去饱和后混入纸面；浅色纸相乘，深色纸用 screen，因为往炭色里相乘会把本就稀薄的亮度彻底吃掉。
+4. **材质是被照出来的，不是叠上去的**：`--paper-relief` 把低频纸浆云斑与中频纸齿合成为一个高度场，再用 `feDiffuseLighting` 按左上单一光源打光后相乘进纸面。单纯叠加噪声只会压暗像素、没有法线，纸面仍然是平的；高度场让每个凹陷都有向光面与背光面。浅色纸把光照压在窄带内，深色纸必须用更宽的色调范围——炭色上方没有余量，对比只能来自更深的凹处，用 screen 会整片发灰。
 5. **字必须可读**：界面是中文，纸面用 UI 字体、标题略大，不为"手写感"去拉几百个 `unicode-range` 分片。
 6. **画板颜色是字面的**：Excalidraw 固定浅色主题，切外观不改人物体颜色，也不写画板状态。
 

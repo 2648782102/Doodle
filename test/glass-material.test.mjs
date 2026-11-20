@@ -300,21 +300,42 @@ describe("liquid glass material", () => {
     expect(paperBlock.slice(0, 600)).toContain("backdrop-filter: none");
   });
 
-  it("gives paper an isotropic fibre, not a machined grain", () => {
+  it("builds paper as a lit height field, not a noise overlay", () => {
     /*
-     * An anisotropic baseFrequency (e.g. `0.06 0.9`) renders as wood grain at
-     * 6x: paper has no direction. Both fields must be isotropic, and both must
-     * be generated (`feTurbulence`) rather than shipped as an image asset.
+     * The stock has to be a surface with height, not a grain laid over a
+     * colour. A multiplied noise overlay only darkens pixels and has no normal,
+     * so the sheet stays flat. `feDiffuseLighting` gives each dimple a lit side
+     * and a shaded side, which is what reads as paper.
      */
-    expect(template).toContain("feTurbulence");
-    expect(template).toContain("--paper-fibre:");
-    expect(template).toContain("--paper-tooth:");
-    // One number per baseFrequency means isotropic; two would be directional.
-    const baseFreqs = [...template.matchAll(/baseFrequency='([^']+)'/g)].map((m) => m[1]);
+    expect(template).not.toContain("--paper-fibre:");
+    const relief = template.slice(template.indexOf("--paper-relief:"));
+    const value = relief.slice(0, relief.indexOf(");"));
+    expect(value).toContain("feTurbulence");            // generated, never an asset
+    expect(value).toContain("feDiffuseLighting");       // shaded as a surface
+    expect(value).toContain("feDistantLight");          // one light, not per-field shading
+    // feDiffuseLighting writes its own alpha; without this reset the sheet is
+    // transparent and the whole texture disappears.
+    expect(value).toMatch(/feFuncA type='linear' slope='0' intercept='1'/);
+    // Both fields stay isotropic: an anisotropic baseFrequency read as wood grain.
+    const baseFreqs = [...value.matchAll(/baseFrequency='([^']+)'/g)].map((m) => m[1]);
     expect(baseFreqs.length).toBeGreaterThanOrEqual(2);
-    for (const value of baseFreqs) {
-      expect(value.trim().split(/\s+/), `baseFrequency "${value}" is anisotropic`).toHaveLength(1);
+    for (const freq of baseFreqs) {
+      expect(freq.trim().split(/\s+/), `baseFrequency "${freq}" is anisotropic`).toHaveLength(1);
     }
+  });
+
+  it("keeps one light direction across the relief and the bevels", () => {
+    /*
+     * Every edge in the shell agrees on an upper-left light. The relief's
+     * azimuth is 225° in SVG's clockwise-from-east convention, which points the
+     * light from the upper left, matching `inset 1px 1px` bevels and the
+     * `--paper-light-x/y` tokens.
+     */
+    const azimuths = [...template.matchAll(/feDistantLight azimuth='(\d+)'/g)].map((m) => Number(m[1]));
+    expect(azimuths.length).toBeGreaterThanOrEqual(2); // light paper and night paper
+    for (const azimuth of azimuths) expect(azimuth % 90, "the relief light left the diagonal").toBe(45);
+    expect(template).toMatch(/--paper-light-x:\s*-1/);
+    expect(template).toMatch(/--paper-light-y:\s*-1/);
   });
 
   it("keeps paper layers at distinct heights", () => {
@@ -418,21 +439,35 @@ describe("liquid glass material", () => {
     expect(template).toMatch(/\.excalidraw \.layer-ui__search-header \.ExcTextField__input input::placeholder\s*\{[^}]*color:\s*var\(--doodle-muted\)/);
   });
 
-  it("keeps the dark paper's bevel and fibre visible on charcoal", () => {
+  it("keeps the dark paper's bevel and relief visible on charcoal", () => {
     /*
-     * On the night sheet the multiply-strength cream grain screens back to
-     * almost nothing and a 0.09 bevel highlight is invisible. The dark
-     * appearance raises both so the card still reads as stock, and keeps its
-     * own higher-alpha noise fields.
+     * A 0.09 bevel highlight is invisible on charcoal, so the dark appearance
+     * raises it. The relief is remapped for the same reason: the cream sheet's
+     * lit range sits near 0.87, and multiplying that into charcoal would pull
+     * the whole night stock down. The night token must instead keep its peak at
+     * full brightness and dip only in the valleys — and it needs a much wider
+     * band to do it, because there is no headroom above the charcoal.
      */
     const dark = template.slice(template.indexOf(':root[data-doodle-theme="dark"] {'));
     const bevel = /--paper-bevel-light:\s*rgba\(255,\s*255,\s*255,\s*([\d.]+)\)/.exec(dark.slice(0, 6000));
     expect(bevel).not.toBeNull();
     expect(Number(bevel[1])).toBeGreaterThan(0.12);
-    const darkFibre = template.slice(template.indexOf(':root[data-doodle-material="paper"][data-doodle-theme="dark"] {'));
-    const slopes = [...darkFibre.slice(0, 1500).matchAll(/feFuncA type='linear' slope='([\d.]+)'/g)].map((m) => Number(m[1]));
-    expect(slopes.length).toBeGreaterThanOrEqual(2);
-    expect(Math.min(...slopes)).toBeGreaterThan(0.05);
+    const night = template.slice(template.indexOf(':root[data-doodle-material="paper"][data-doodle-theme="dark"] {'));
+    const relief = night.slice(0, night.indexOf(");"));
+    expect(relief).toContain("feDiffuseLighting");
+    const ramp = /feFuncR type='linear' slope='([\d.]+)' intercept='([\d.]+)'/.exec(relief);
+    expect(ramp, "the night relief lost its tonal ramp").not.toBeNull();
+    const peak = Number(ramp[1]) + Number(ramp[2]);
+    expect(peak, "the night relief darkens the whole sheet instead of its valleys").toBeGreaterThan(0.97);
+    /*
+     * The cream band is narrow on purpose. Reusing it on charcoal squeezed the
+     * whole surface into about one luminance step, which is why the night cards
+     * read as flat; the night band has to be several times wider.
+     */
+    const cream = template.slice(template.indexOf("--paper-relief:"));
+    const creamRamp = /feFuncR type='linear' slope='([\d.]+)' intercept='([\d.]+)'/.exec(cream.slice(0, 2000));
+    expect(creamRamp).not.toBeNull();
+    expect(Number(ramp[1]), "the night relief is as flat as the cream sheet").toBeGreaterThan(Number(creamRamp[1]) * 2);
   });
 
   it("defines theme-independent metrics on every appearance", () => {
@@ -543,23 +578,19 @@ describe("liquid glass material", () => {
       .toBeGreaterThan(template.indexOf(".doodle-welcome h2::after"));
   });
 
-  it("keeps the hand-dotted paper grid at the printed pitch", () => {
+  it("draws the paper grid at one even pitch, with no jitter", () => {
     /*
-     * The second, half-pitch dot layer is a wobble on the printed grid, not a
-     * second grid: painting it at the grid dot's alpha doubled the perceived
-     * density and read as noise. It gets its own much lighter token.
+     * The grid is printed on measured stock, so its dots are evenly spaced. A
+     * second half-pitch layer was tried as a hand-dotted wobble and read as
+     * noise: irregular spacing is not what makes paper feel like paper — the
+     * lit relief below does that.
      */
-    expect(template).toMatch(/--doodle-dot-soft:\s*rgba\([^)]*\)/);
-    // Both paper appearances declare it: an undefined var() would invalidate
-    // the whole background-image and drop the grain along with the dots.
-    const declarations = [...template.matchAll(/--doodle-dot-soft:\s*rgba\(/g)];
-    expect(declarations.length, "the soft dot is missing from one paper theme").toBe(2);
-    const soft = [...template.matchAll(/--doodle-dot-soft:\s*rgba\(\s*\d+,\s*\d+,\s*\d+,\s*([\d.]+)\s*\)/g)];
-    for (const [, alpha] of soft) expect(Number(alpha)).toBeLessThan(0.1);
     const host = template.slice(template.indexOf(':root[data-doodle-material="paper"] .excalidraw-host'));
     const body = host.slice(0, host.indexOf("background-blend-mode"));
-    expect(body).toContain("var(--doodle-dot-soft)");
-    expect(body).toMatch(/background-size:[^;]*22px 22px, 22px 22px/);
+    const layers = body.slice(body.indexOf("background-image:"), body.indexOf("background-size:"));
+    expect((layers.match(/radial-gradient/g) || []).length, "the paper grid has more than one dot layer").toBe(1);
+    expect(body).toMatch(/background-size:[^;]*22px 22px;/);
+    expect(template).not.toContain("--doodle-dot-soft");
   });
 
   it("traces the selected toolbar tool with a second, offset ring", () => {
@@ -585,14 +616,17 @@ describe("liquid glass material", () => {
     expect(appSource).toMatch(/if \(document\.documentElement\.dataset\.doodleTheme === theme\) return;/);
   });
 
-  it("cuts paper corners slightly irregular and lifts cards off the desk", () => {
+  it("keeps paper corners square to the sheet and lifts cards off the desk", () => {
     /*
-     * Paper panes get hand-rounded (non-uniform) radii — the one static doodle
-     * cue in the chrome — while glass keeps exact arcs. A fourth, wider shadow
-     * layer detaches the card from the page (claymorphism's depth signal).
+     * Paper panes are cut, not drawn: all four corners of a sheet share one
+     * radius. Uneven radii were tried as a hand-cut cue and read as jitter,
+     * which is the same fake-irregularity a noisy texture would be — the stock
+     * has to come from the lit relief. A fourth, wider shadow layer detaches
+     * the card from the page (claymorphism's depth signal).
      */
-    expect(template).toMatch(/--paper-radius:\s*\d+px \d+px \d+px \d+px/);
-    expect(template).toMatch(/--paper-radius-lg:\s*\d+px \d+px \d+px \d+px/);
+    expect(template).toMatch(/--paper-radius:\s*\d+px;/);
+    expect(template).toMatch(/--paper-radius-lg:\s*\d+px;/);
+    expect(template, "a paper radius went back to per-corner jitter").not.toMatch(/--paper-radius(-\w+)?:\s*\d+px \d+px/);
     expect(template).toMatch(/:root\[data-doodle-material="paper"\] \.doodle-topbar[\s\S]{0,300}border-radius: var\(--paper-radius\)/);
     expect(template).toMatch(/:root\[data-doodle-material="paper"\] \.doodle-library-panel \{\s*border-radius: var\(--paper-radius-lg\)/);
     const shadows = [...template.matchAll(/--paper-shadow-card:([\s\S]*?);/g)].map((m) => m[1]);

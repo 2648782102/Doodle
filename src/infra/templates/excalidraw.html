@@ -174,9 +174,6 @@
          graphite ink has something to sit on without the page looking dusty. */
       --doodle-canvas-bg: #f8f4ea;
       --doodle-dot: rgba(58, 55, 51, 0.2);
-      /* Half-pitch companion dot. Kept far lighter than the grid dot: it is a
-         wobble on the printed grid, not a second grid at double density. */
-      --doodle-dot-soft: rgba(58, 55, 51, 0.075);
       /*
        * Softer washes than the glass themes. Paper does not carry a colour
        * field; these stay warm and very low so the page reads as stock rather
@@ -312,10 +309,6 @@
       --doodle-danger: #e89288;
       --doodle-canvas-bg: #131a18;
       --doodle-dot: rgba(143, 203, 180, 0.24);
-      /* Night paper gets its own companion dot rather than inheriting the
-         light one — it is light ink on a dark sheet, and the light value would
-         be nearly invisible here. */
-      --doodle-dot-soft: rgba(143, 203, 180, 0.09);
       --doodle-wash-a: rgba(232, 178, 60, 0.18);
       --doodle-wash-b: rgba(143, 203, 180, 0.24);
       --doodle-wash-c: rgba(120, 170, 205, 0.16);
@@ -651,26 +644,23 @@
      * Paper ground.
      *
      * The glass themes need a colour field so the bevel has something to bend.
-     * Paper needs the opposite: a surface with no gradient at all, plus a
-     * texture fine enough that it reads as stock rather than as noise. The
-     * grain is two repeating-linear-gradients at 0.02–0.03 alpha on a 3px and
-     * 7px pitch, which tiles without a visible seam and costs one paint.
+     * Paper needs the opposite: a surface with no gradient at all, plus the
+     * lit relief of real stock. The relief is carried by `--paper-relief`, a
+     * height field shaded by a light from the upper left — see its definition
+     * for why that is a material and not a grain overlay.
      *
-     * The dot grid stays but becomes graphite and slightly irregular in weight,
-     * because a printed grid on paper is what this theme is imitating.
+     * The dot grid stays but becomes graphite, because a printed grid on paper
+     * is what this theme is imitating. It stays at one pitch: measured dots on
+     * paper are evenly spaced, and a second offset layer read as noise.
      */
     :root[data-doodle-material="paper"] .excalidraw-host {
       background-color: var(--doodle-canvas-bg);
       background-image:
-        var(--paper-fibre),
-        var(--paper-tooth),
-        radial-gradient(circle, var(--doodle-dot-soft) 0.7px, transparent 0.7px),
+        var(--paper-relief),
         radial-gradient(circle, var(--doodle-dot) 1px, transparent 1px);
-      background-size: 200px 200px, 96px 96px, 22px 22px, 22px 22px;
-      /* The half-pitch offset tiny dot makes the grid read as hand-dotted
-         rather than machine-printed, without touching the fibre/tooth grain. */
-      background-position: 0 0, 0 0, 0 0, 11px 11px;
-      background-blend-mode: multiply, multiply, normal, normal;
+      background-size: 512px 512px, 22px 22px;
+      background-position: 0 0, 11px 11px;
+      background-blend-mode: multiply, normal;
     }
     .excalidraw .App-menu_top { z-index: 4; }
     /*
@@ -1641,72 +1631,82 @@
      *              hairline ring so the sheet boundary is crisp on a warm ground;
      *   contact    a short, fairly dark shadow. Glass floats; paper rests.
      *
-     * The `::before` sheen is repurposed as a paper grain wash rather than a
-     * specular highlight, and `::after` supplies the top bevel.
+     * The texture itself is the lit relief below; `::after` supplies the top
+     * bevel.
      */
     /*
-     * Paper fibre, generated rather than shipped.
+     * Paper relief, generated rather than shipped.
      *
-     * Two fields at different scales: a low-frequency one gives visible fibres
-     * the way card stock has a grain direction, a high-frequency one supplies
-     * tooth at reading distance. A single field reads as noise; the pair reads
-     * as stock. Both are `feTurbulence` desaturated to alpha only, so the sheet
-     * colour shows through and the texture is colourless by construction.
+     * The stock is not a texture laid over a colour; it is a surface with
+     * height, and the height is what you see. Two `feTurbulence` fields are
+     * summed into one height field: a very low frequency one is the cloudy
+     * mottling of pulp that never dried to a perfectly even tone, and a
+     * mid-frequency one is the tooth that the sheet was pressed with. The
+     * combined field is then run through `feDiffuseLighting` with a distant
+     * light at the same upper-left azimuth as every other edge in the shell,
+     * so the peaks catch light and the valleys fall into shade.
      *
-     * The alpha is deliberately tiny (0.07 / 0.05). At 4x the fibre is clearly
-     * visible; at 1x it registers as "not a flat fill" rather than as a pattern.
+     * That is the difference the eye reads as material. A multiplied noise
+     * overlay only darkens pixels; it has no normal, so the surface stays flat
+     * and the grain reads as dirt on a screen. Lighting a height field gives
+     * each dimple a lit side and a shaded side, which is how paper actually
+     * looks under a desk lamp.
+     *
+     * The lit result is pulled back into a narrow band (slope 0.26 around
+     * 0.80) so the sheet keeps its colour instead of turning white, and the
+     * alpha is reset to opaque — `feDiffuseLighting` writes the lighting
+     * alpha, and a transparent sheet would vanish.
      */
     :root[data-doodle-material="paper"] {
       /*
-       * A cut card is not machine-perfect: each corner differs by a few px,
-       * the way a hand-rounded sheet does. Static geometry only — no hover or
-       * transition touches border-radius, so controls never shift. Glass keeps
-       * its exact arcs; this irregularity belongs to paper.
-       */
-      --paper-radius: 16px 12px 15px 13px;
-      --paper-radius-lg: 20px 16px 19px 21px;
-      /*
-       * A single isotropic frequency pair.
+       * One radius per sheet size, identical on all four corners.
        *
-       * An earlier attempt used `0.06 0.9`, intending "long fibres along x".
-       * At 6x that read as wood grain: paper has no direction, and any
-       * anisotropic field looks like a machined surface instead. The field is
-       * therefore isotropic and sits low — fine enough to be tooth, coarse
-       * enough that it survives the DPR downsample to a 1x screen.
+       * Uneven corners were tried as a "hand-cut" cue and read as jitter: an
+       * outline that wobbles is the same trick as an irregular texture, and the
+       * material is supposed to carry that impression instead. A card cut with
+       * a die is square to itself; the stock comes from the relief, not the
+       * silhouette. Static geometry only — nothing touches border-radius on
+       * hover or transition, so controls never shift.
        */
-      --paper-fibre: url("data:image/svg+xml;utf8,%3Csvg xmlns='http://www.w3.org/2000/svg' width='200' height='200'%3E%3Cfilter id='f' x='0' y='0' width='100%25' height='100%25'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.62' numOctaves='3' seed='19'/%3E%3CfeColorMatrix type='saturate' values='0'/%3E%3CfeComponentTransfer%3E%3CfeFuncA type='linear' slope='0.11'/%3E%3C/feComponentTransfer%3E%3C/filter%3E%3Crect width='200' height='200' filter='url(%23f)'/%3E%3C/svg%3E");
-      --paper-tooth: url("data:image/svg+xml;utf8,%3Csvg xmlns='http://www.w3.org/2000/svg' width='96' height='96'%3E%3Cfilter id='t' x='0' y='0' width='100%25' height='100%25'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.92' numOctaves='3' seed='7'/%3E%3CfeColorMatrix type='saturate' values='0'/%3E%3CfeComponentTransfer%3E%3CfeFuncA type='linear' slope='0.05'/%3E%3C/feComponentTransfer%3E%3C/filter%3E%3Crect width='96' height='96' filter='url(%23t)'/%3E%3C/svg%3E");
+      --paper-radius: 14px;
+      --paper-radius-lg: 18px;
+      /*
+       * Both fields stay isotropic. An anisotropic `baseFrequency` (0.06 0.9)
+       * was tried for "long fibres" and read as wood grain at 6x: paper has no
+       * direction, and direction is the one cue that turns stock into a
+       * machined surface.
+       */
+      --paper-relief: url("data:image/svg+xml;utf8,%3Csvg xmlns='http://www.w3.org/2000/svg' width='512' height='512'%3E%3Cfilter id='r' x='0' y='0' width='100%25' height='100%25'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.012' numOctaves='2' seed='3' stitchTiles='stitch' result='mottling'/%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.6' numOctaves='3' seed='7' stitchTiles='stitch' result='tooth'/%3E%3CfeComposite in='mottling' in2='tooth' operator='arithmetic' k1='0' k2='0.22' k3='0.78' k4='0' result='height'/%3E%3CfeDiffuseLighting in='height' lighting-color='white' surfaceScale='1.5' diffuseConstant='1'%3E%3CfeDistantLight azimuth='225' elevation='50'/%3E%3C/feDiffuseLighting%3E%3CfeComponentTransfer%3E%3CfeFuncR type='linear' slope='0.17' intercept='0.87'/%3E%3CfeFuncG type='linear' slope='0.17' intercept='0.87'/%3E%3CfeFuncB type='linear' slope='0.17' intercept='0.87'/%3E%3CfeFuncA type='linear' slope='0' intercept='1'/%3E%3C/feComponentTransfer%3E%3C/filter%3E%3Crect width='512' height='512' filter='url(%23r)'/%3E%3C/svg%3E");
     }
     /*
-     * On a dark sheet the fibre has to *lighten*, not darken.
+     * On charcoal the same lit relief is mapped differently.
      *
-     * The two noise fields are multiplied into the sheet, which is right on
-     * cream: the grain sits a shade below the stock. Multiplied into charcoal it
-     * is invisible, because there is almost no luminance left to remove. The
-     * dark appearance therefore screens the same fields on, which raises the
-     * grain just above the sheet instead.
-     */
-    :root[data-doodle-material="paper"][data-doodle-theme="dark"] .doodle-glass,
-    :root[data-doodle-material="paper"][data-doodle-theme="dark"] .doodle-library-panel {
-      background-blend-mode: screen, screen;
-    }
-    /*
-     * On charcoal the cream-sheet grain (alpha 0.11 / 0.05) screens back to
-     * almost nothing — there is little luminance for a multiply-strength field
-     * to add. Raise both fields for the dark sheet so the stock keeps visible
-     * tooth under the bevel, without lifting the panel off the page.
+     * The cream sheet runs the lighting around 0.80, which darkens the stock a
+     * little in the valleys — correct on paper, since the grain sits a shade
+     * below white. Multiplied into charcoal that same map would pull the whole
+     * sheet down by a fifth and kill the night stock's value. The night token
+     * therefore hugs 1.0 at the peaks and dips only in the valleys, so the
+     * highlights are where the light catches and the sheet keeps its tone.
+     *
+     * The band is also wider on the night sheet (0.60 ± 0.4 against 0.17 around
+     * 0.87). Screen was tried first, to lift the grain instead of darkening it;
+     * a screen near the sheet's own value washes the whole surface grey and the
+     * panel stops reading as charcoal. Only the valleys can move — up has no
+     * room — so the contrast has to come from a deeper valley, not a brighter
+     * peak. At the cream sheet's narrow band that difference was barely one
+     * step of luminance, which is why the night cards looked flat.
      */
     :root[data-doodle-material="paper"][data-doodle-theme="dark"] {
-      --paper-fibre: url("data:image/svg+xml;utf8,%3Csvg xmlns='http://www.w3.org/2000/svg' width='200' height='200'%3E%3Cfilter id='f' x='0' y='0' width='100%25' height='100%25'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.62' numOctaves='3' seed='19'/%3E%3CfeColorMatrix type='saturate' values='0'/%3E%3CfeComponentTransfer%3E%3CfeFuncA type='linear' slope='0.2'/%3E%3C/feComponentTransfer%3E%3C/filter%3E%3Crect width='200' height='200' filter='url(%23f)'/%3E%3C/svg%3E");
-      --paper-tooth: url("data:image/svg+xml;utf8,%3Csvg xmlns='http://www.w3.org/2000/svg' width='96' height='96'%3E%3Cfilter id='t' x='0' y='0' width='100%25' height='100%25'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.92' numOctaves='3' seed='7'/%3E%3CfeColorMatrix type='saturate' values='0'/%3E%3CfeComponentTransfer%3E%3CfeFuncA type='linear' slope='0.1'/%3E%3C/feComponentTransfer%3E%3C/filter%3E%3Crect width='96' height='96' filter='url(%23t)'/%3E%3C/svg%3E");
+      --paper-relief: url("data:image/svg+xml;utf8,%3Csvg xmlns='http://www.w3.org/2000/svg' width='512' height='512'%3E%3Cfilter id='r' x='0' y='0' width='100%25' height='100%25'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.012' numOctaves='2' seed='3' stitchTiles='stitch' result='mottling'/%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.6' numOctaves='3' seed='7' stitchTiles='stitch' result='tooth'/%3E%3CfeComposite in='mottling' in2='tooth' operator='arithmetic' k1='0' k2='0.22' k3='0.78' k4='0' result='height'/%3E%3CfeDiffuseLighting in='height' lighting-color='white' surfaceScale='1.5' diffuseConstant='1'%3E%3CfeDistantLight azimuth='225' elevation='50'/%3E%3C/feDiffuseLighting%3E%3CfeComponentTransfer%3E%3CfeFuncR type='linear' slope='0.6' intercept='0.4'/%3E%3CfeFuncG type='linear' slope='0.6' intercept='0.4'/%3E%3CfeFuncB type='linear' slope='0.6' intercept='0.4'/%3E%3CfeFuncA type='linear' slope='0' intercept='1'/%3E%3C/feComponentTransfer%3E%3C/filter%3E%3Crect width='512' height='512' filter='url(%23r)'/%3E%3C/svg%3E");
     }
     /*
      * A sheet of card.
      *
      * Four things make it read as stock rather than as a rounded rectangle:
      *
-     *   fibre     two generated noise fields, multiplied so they darken the
-     *             sheet rather than washing it out;
+     *   relief    one generated height field, lit from the upper left and
+     *             multiplied in, so the sheet has a lit side and a shaded side
+     *             rather than a flat wash of grain;
      *   cut edge  a 1px hairline in the stock's own crease colour. Paper edges
      *             are not a drawn border, but at 1x they read the same, and a
      *             hairline keeps the corner radius crisp;
@@ -1719,9 +1719,9 @@
      */
     :root[data-doodle-material="paper"] .doodle-glass {
       background-color: var(--paper-sheet);
-      background-image: var(--paper-fibre), var(--paper-tooth);
-      background-size: 200px 200px, 96px 96px;
-      background-blend-mode: multiply, multiply;
+      background-image: var(--paper-relief);
+      background-size: 512px 512px;
+      background-blend-mode: multiply;
       border: 1px solid var(--paper-crease);
       box-shadow:
         inset 1px 1px 0 0 var(--paper-bevel-light),
@@ -1740,7 +1740,7 @@
      * upper left — the same light direction as the bevel, so the sheet reads as
      * one flat plane catching ambient light rather than as a glossy surface.
      * Opacity stays under 0.35: above that it starts to look like a gradient
-     * fill and the fibre disappears under it.
+     * fill and the relief disappears under it.
      */
     :root[data-doodle-material="paper"] .doodle-glass::before {
       background: linear-gradient(
@@ -1797,9 +1797,9 @@
     :root[data-doodle-material="paper"] .excalidraw .mobile-misc-tools-container,
     :root[data-doodle-material="paper"] .excalidraw .App-bottom-bar > .Island {
       background-color: var(--paper-sheet) !important;
-      background-image: var(--paper-fibre), var(--paper-tooth);
-      background-size: 200px 200px, 96px 96px;
-      background-blend-mode: multiply, multiply;
+      background-image: var(--paper-relief);
+      background-size: 512px 512px;
+      background-blend-mode: multiply;
       border: 1px solid var(--paper-crease);
       box-shadow:
         inset 1px 1px 0 0 var(--paper-bevel-light),
@@ -1813,9 +1813,9 @@
     :root[data-doodle-material="paper"] .excalidraw .dropdown-menu .dropdown-menu-container,
     :root[data-doodle-material="paper"] .excalidraw .dropdown-menu--mobile .dropdown-menu-container {
       background-color: var(--paper-sheet) !important;
-      background-image: var(--paper-fibre), var(--paper-tooth);
-      background-size: 200px 200px, 96px 96px;
-      background-blend-mode: multiply, multiply;
+      background-image: var(--paper-relief);
+      background-size: 512px 512px;
+      background-blend-mode: multiply;
       border: 1px solid var(--paper-crease);
       box-shadow:
         inset 1px 1px 0 0 var(--paper-bevel-light),
@@ -1832,9 +1832,9 @@
      */
     :root[data-doodle-material="paper"] .doodle-library-panel {
       background-color: var(--paper-card);
-      background-image: var(--paper-fibre), var(--paper-tooth);
-      background-size: 200px 200px, 96px 96px;
-      background-blend-mode: multiply, multiply;
+      background-image: var(--paper-relief);
+      background-size: 512px 512px;
+      background-blend-mode: multiply;
       border: 1px solid var(--paper-crease);
       box-shadow:
         inset 1px 1px 0 0 var(--paper-bevel-light),
