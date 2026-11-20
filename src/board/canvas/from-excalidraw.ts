@@ -214,7 +214,18 @@ export function excalidrawElementsToBoardItems(
         : {}),
       scene: {
         element: cloneElement(element),
-        ...(bound ? { boundText: cloneElement(bound) } : {}),
+        /*
+         * `boundText` is deliberately not stored.
+         *
+         * It is a full Excalidraw text element — 475 B on a labelled card,
+         * roughly half the item's scene payload and a third of the whole saved
+         * board at 400 objects — and nothing reads it back:
+         * `boardItemsToExcalidrawSkeleton` rebuilds the label from `title`,
+         * `text`, `style`, and the theme. Storing it made every write, every
+         * read, and the delta projection carry a copy of data the board
+         * already had in `text`. A round trip through the skeleton reproduces
+         * it field for field (verified), so the canvas still renders identically.
+         */
         ...(type === "image" && element.fileId ? { fileId: String(element.fileId) } : {}),
         ...(type === "image" && file ? { fileMime: file.mimeType, fileCreated: file.created } : {}),
       },
