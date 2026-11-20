@@ -2027,6 +2027,20 @@
      */
     @media (min-width: 641px) and (max-width: 900px) {
       .doodle-topbar { top: 72px; left: 12px; }
+      /*
+       * The style panel has to step aside for the capsule.
+       *
+       * Both used to start at `top: 72px; left: 12px` in this band, so the
+       * capsule painted over the panel's first rows — the colour swatches were
+       * hidden behind 图库/浅/深/玻. The capsule wins the z-order, so the panel
+       * moves below it: 72 + 44 capsule + 12 gap. The height budget loses the
+       * same 56px so it still clears the bottom controls, and it stays above the
+       * 641px breakpoint where the panel moves into the mobile bottom bar.
+       */
+      .excalidraw .Island.App-menu__left {
+        top: 128px;
+        max-height: calc(100vh - 204px);
+      }
     }
     @media (max-width: 640px) {
       /*

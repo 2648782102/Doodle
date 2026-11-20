@@ -521,6 +521,26 @@ describe("liquid glass material", () => {
     expect(template).toContain("@media (max-width: 640px)");
   });
 
+  it("keeps the style panel clear of the capsule in the tablet band", () => {
+    /*
+     * Moving the capsule down to 72px put it exactly where the selected-object
+     * style panel starts, and the capsule wins the z-order: at 860px the colour
+     * swatches were painted over by 图库/浅/深/玻. The panel now starts one
+     * capsule plus one gap lower, and its height budget loses the same amount so
+     * it still clears the bottom controls.
+     */
+    const band = template.slice(
+      template.indexOf("@media (min-width: 641px) and (max-width: 900px)"),
+    );
+    const rule = band.slice(0, band.indexOf("}\n    }\n") + 1);
+    expect(rule, "the tablet band does not move the style panel").toContain(".excalidraw .Island.App-menu__left");
+    expect(rule, "the style panel still starts under the capsule").toMatch(/top:\s*128px/);
+    expect(rule, "the style panel's height budget did not lose the capsule").toMatch(/max-height:\s*calc\(100vh - 204px\)/);
+    // 128 = 72 (capsule top) + 44 (capsule) + 12 (gap); 204 = 148 + 56.
+    expect(72 + 44 + 12).toBe(128);
+    expect(148 + 56).toBe(204);
+  });
+
   it("gives paper chrome a raised layer above the desk", () => {
     /*
      * All three --glass-surface-* used to equal --paper-sheet, so the desk,
