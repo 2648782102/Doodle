@@ -206,6 +206,44 @@ describe("board HTTP surface", () => {
     expect(result.board.title).toBe("Library HTTP");
   });
 
+  it("serves a saved board's picture without touching the active board", async () => {
+    /*
+     * Library rows show a picture of each saved board. It is derived on request
+     * from Board v1 geometry — no stored preview, nothing to invalidate — and it
+     * must be a read: rendering twenty rows must not rewrite twenty boards.
+     */
+    const before = await fetch(`${base}/api/board`).then((response) => response.json());
+    const index = await fetch(`${base}/api/board/library`).then((response) => response.json());
+    const other = index.boards.find((entry) => entry.id !== index.activeId) ?? index.boards[0];
+
+    const response = await fetch(`${base}/api/board/library/${other.id}.svg?max=320`);
+    expect(response.status).toBe(200);
+    expect(response.headers.get("content-type")).toContain("image/svg+xml");
+    const svg = await response.text();
+    expect(svg.startsWith("<svg")).toBe(true);
+    // A thumbnail is a small picture; `max` caps the long edge with the padding included.
+    const width = Number(svg.match(/width="(\d+)"/)?.[1]);
+    const height = Number(svg.match(/height="(\d+)"/)?.[1]);
+    expect(Math.max(width, height)).toBeLessThanOrEqual(320);
+    /*
+     * No background rect: twenty white boxes on the panel's own paper would read
+     * as cards on a card.
+     */
+    expect(svg).not.toContain('fill="#ffffff"');
+
+    // The active board may not move because a thumbnail was requested.
+    const after = await fetch(`${base}/api/board`).then((response) => response.json());
+    expect(after.id).toBe(before.id);
+    expect(after.revision).toBe(before.revision);
+
+    /*
+     * An unknown id is a missing picture, not a server fault: the row falls back
+     * to text rather than the whole panel showing an error.
+     */
+    const missing = await fetch(`${base}/api/board/library/board_missing.svg`);
+    expect(missing.status).toBe(404);
+  });
+
   it("generates a semantic diagram through the local HTTP diagram API", async () => {
     const html = await fetch(base).then((response) => response.text());
     const token = html.match(/const PANEL_TOKEN = "([^"]+)"/)?.[1];

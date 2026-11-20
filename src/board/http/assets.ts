@@ -1,9 +1,9 @@
 /**
- * Static delivery for the Excalidraw bundle.
+ * Static delivery: the Excalidraw bundle, and the board-as-picture routes.
  *
  * Kept apart from the route table in `http.ts` for two reasons: the route file
  * is near its line budget, and this is the only place that decides how a build
- * artifact may be cached.
+ * artifact — or a derived SVG — may be cached.
  */
 
 import fs from "node:fs/promises";
@@ -11,6 +11,9 @@ import path from "node:path";
 import type express from "express";
 import type { AppConfig } from "../../infra/config.js";
 import { assetCandidates, findExisting } from "./templates.js";
+import type { BoardLibrary } from "../library.js";
+import type { BoardStore } from "../state/store.js";
+import { boardToSvg } from "../svg/render.js";
 import { assetContentType, isPathWithinRoot } from "./security.js";
 
 /**
@@ -63,4 +66,63 @@ export async function serveAsset(
   } catch {
     next();
   }
+}
+
+export interface SvgRouteDeps {
+  board: BoardStore;
+  library: BoardLibrary;
+}
+
+/**
+ * `/api/board.svg` — the board on screen.
+ *
+ * A README screenshot goes stale the moment the board changes, and a CI job that
+ * wants to attach "what the board looked like" has nowhere else to get it.
+ */
+export function registerActiveBoardSvg(app: express.Express, deps: SvgRouteDeps): void {
+  app.get("/api/board.svg", async (req, res) => {
+    const current = await deps.board.snapshot();
+    const maxSize = Number(req.query.max);
+    const svg = boardToSvg(current, {
+      maxSize: Number.isFinite(maxSize) && maxSize > 0 ? maxSize : undefined,
+      background: req.query.background !== "false",
+    });
+    res.type("image/svg+xml");
+    // The board changes on every edit, so the preview must not be cached
+    // beyond the response like the content-hashed client assets are.
+    res.setHeader("Cache-Control", "no-cache");
+    res.send(svg);
+  });
+}
+
+/**
+ * `/api/board/library/:id.svg` — a saved board's picture, for a library row.
+ *
+ * Rows used to be text only — a name, a count, a time — so picking between
+ * twenty boards meant guessing from names alone. `id` is required: defaulting to
+ * the active board would make a row's picture depend on which row happened to be
+ * active when the request fired, and a `<img>` whose src silently changes meaning
+ * shows the wrong board.
+ */
+export function registerLibrarySvg(app: express.Express, deps: SvgRouteDeps): void {
+  app.get("/api/board/library/:id.svg", async (req, res) => {
+    try {
+      const board = await deps.library.readForPreview(String(req.params.id), await deps.board.snapshot());
+      const maxSize = Number(req.query.max);
+      const svg = boardToSvg(board, {
+        maxSize: Number.isFinite(maxSize) && maxSize > 0 ? maxSize : 320,
+        // A thumbnail sits on the panel's own paper; a white box behind every
+        // small board would read as a card on a card.
+        background: false,
+        padding: 12,
+      });
+      res.type("image/svg+xml");
+      res.setHeader("Cache-Control", "no-cache");
+      res.send(svg);
+    } catch {
+      // An unknown or unreadable board is a missing picture, not a server fault:
+      // the row stays text-only instead of the panel showing an error.
+      res.status(404).json({ error: "Board not found" });
+    }
+  });
 }

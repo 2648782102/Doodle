@@ -18,7 +18,7 @@ import type { BoardRevisionCache } from "../state/revision-cache.js";
 import { isSuspiciousEmptyWrite, type BoardStore } from "../state/store.js";
 import { watchBoardState, type StateWatch } from "../state/state-watch.js";
 import { conflictPayload } from "../write/conflict.js";
-import { boardToSvg } from "../svg/render.js";
+import { registerActiveBoardSvg, registerLibrarySvg } from "./assets.js";
 import { assetContentType, isAllowedHost, isAllowedOrigin, isPathWithinRoot, validationErrorBody } from "./security.js";
 import { commitBoardWrite } from "../write/commit.js";
 import { projectSnapshotText, scanProject, type ProjectScanOptions } from "../project/scan.js";
@@ -76,6 +76,13 @@ export class BoardHttpServer {
   }
 
   private setupRoutes(): void {
+    /*
+     * Board pictures live in their own module: one derived-on-request render of
+     * the active board, and one per saved board for the library rows. Registering
+     * them here keeps the route table a table.
+     */
+    registerActiveBoardSvg(this.app, { board: this.board, library: this.library });
+    registerLibrarySvg(this.app, { board: this.board, library: this.library });
     this.app.use((req, res, next) => {
       if (!isAllowedHost(req.header("host"), this.config.previewHost)) {
         return res.status(403).json({ error: "Forbidden host" });
@@ -102,28 +109,6 @@ export class BoardHttpServer {
       this.revisions?.remember(current);
       const index = (await this.library.apply({ type: "list" }, current)).index;
       res.json({ ...canvasSnapshot(current), library: index });
-    });
-
-    /*
-     * The board as an image, for readers with no browser.
-     *
-     * A README screenshot goes stale the moment the board changes; a CI job that
-     * wants to attach "what the board looked like" has nowhere to get it. This
-     * renders the current board with plain shapes. Read-only: no revision bump,
-     * no write, and `capabilities.svgPreview` tells the agent it exists.
-     */
-    this.app.get("/api/board.svg", async (req, res) => {
-      const current = await this.board.snapshot();
-      const maxSize = Number(req.query.max);
-      const svg = boardToSvg(current, {
-        maxSize: Number.isFinite(maxSize) && maxSize > 0 ? maxSize : undefined,
-        background: req.query.background !== "false",
-      });
-      res.type("image/svg+xml");
-      // The board changes on every edit, so the preview must not be cached
-      // beyond the response like the content-hashed client assets are.
-      res.setHeader("Cache-Control", "no-cache");
-      res.send(svg);
     });
 
     this.app.get("/api/board/library", async (_req, res) => {

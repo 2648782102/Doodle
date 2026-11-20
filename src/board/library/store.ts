@@ -305,6 +305,25 @@ export class BoardLibrary {
   async apply(action: BoardLibraryAction, current: SimpleBoard): Promise<BoardLibraryMutation> {
     return this.mutex.run(() => this.applyAction(action, current));
   }
+
+  /**
+   * One saved board, for a thumbnail. Never writes.
+   *
+   * Deliberately outside `apply`: that path can save the active board as a side
+   * effect (`saveActive`), which a picture must never trigger — a library
+   * thumbnail request is a read. Unknown ids throw the same way `apply` does, so
+   * the caller can turn them into a 404.
+   */
+  async readForPreview(id: string, current: SimpleBoard): Promise<SimpleBoard> {
+    const index = await this.readIndex();
+    if (!index.boards.some((entry) => entry.id === safeId(id))) {
+      throw new Error(`Board ${id} is not in the library`);
+    }
+    // The active board is the caller's in-memory snapshot; reading its file would
+    // lag behind an edit that has not been persisted yet.
+    if (id === index.activeId) return normalizeBoardSnapshot(current);
+    return this.readBoard(id);
+  }
 }
 
 export function boardLibraryIndexText(index: BoardLibraryIndex): string {

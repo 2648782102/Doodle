@@ -111,4 +111,38 @@ describe("local board library", () => {
       await fs.rm(outputDir, { recursive: true, force: true });
     }
   });
+
+  it("reads a board for a thumbnail without writing the active one", async () => {
+    /*
+     * The preview route needs one saved board's geometry, and its picture must
+     * never cause a write. `apply` saves the active board as a side effect, which
+     * is exactly what a thumbnail request must not do: opening the drawer would
+     * rewrite the board and bump the index mtime.
+     */
+    const outputDir = await fs.mkdtemp(path.join(os.tmpdir(), "doodle-preview-"));
+    try {
+      const library = new BoardLibrary(outputDir);
+      const active = touchBoard(addBoardItem(createEmptyBoard(), {
+        type: "note", x: 0, y: 0, text: "active", author: "human",
+      }));
+      let result = await library.apply({ type: "list" }, active);
+      result = await library.apply({ type: "create", name: "第二张", switchTo: true }, result.board);
+      const activeId = result.index.activeId;
+      const firstId = result.index.boards.find((entry) => entry.id !== activeId).id;
+
+      const snapshotPath = path.join(outputDir, ".doodle", "boards", `${activeId}.json`);
+      const before = (await fs.stat(snapshotPath)).mtimeMs;
+
+      const other = await library.readForPreview(firstId, result.board);
+      expect(other.id).toBe(firstId);
+      // The active board comes from the caller's snapshot, not a stale file.
+      const current = await library.readForPreview(activeId, result.board);
+      expect(current.id).toBe(activeId);
+
+      expect((await fs.stat(snapshotPath)).mtimeMs, "a thumbnail request wrote the board").toBe(before);
+      await expect(library.readForPreview("board_missing", result.board)).rejects.toThrow();
+    } finally {
+      await fs.rm(outputDir, { recursive: true, force: true });
+    }
+  });
 });
