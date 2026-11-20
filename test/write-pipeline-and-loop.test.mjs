@@ -115,6 +115,49 @@ describe("unified board write pipeline", () => {
     })).rejects.toThrow(BoardRevisionConflictError);
   });
 
+  it("serializes two simultaneous pinned disjoint writes inside the lock without TOCTOU 409", async () => {
+    const dir = await tempDir("doodle-pipeline-race-");
+    const store = new BoardStore(dir);
+    await store.init();
+    const revisions = new BoardRevisionCache();
+
+    const seeded = await commitBoardWrite({
+      store,
+      revisions,
+      author: "ai",
+      change: (current) => addBoardItems(current, [
+        { type: "rect", x: 0, y: 0, w: 120, h: 60, text: "A", author: "ai" },
+        { type: "rect", x: 200, y: 0, w: 120, h: 60, text: "B", author: "ai" },
+      ]),
+    });
+    const baseRev = seeded.board.revision;
+    const [a, b] = seeded.board.items;
+
+    const [first, second] = await Promise.all([
+      commitBoardWrite({
+        store,
+        revisions,
+        author: "ai",
+        expectedRevision: baseRev,
+        conflictScope: { updates: [{ id: a.id }] },
+        change: (current) => updateBoardItem(current, a.id, { text: "A-race" }, "ai"),
+      }),
+      commitBoardWrite({
+        store,
+        revisions,
+        author: "human",
+        expectedRevision: baseRev,
+        conflictScope: { id: b.id },
+        change: (current) => updateBoardItem(current, b.id, { text: "B-race" }, "human"),
+      }),
+    ]);
+
+    const finalBoard = await store.snapshot();
+    expect(finalBoard.items.find((i) => i.id === a.id).text).toBe("A-race");
+    expect(finalBoard.items.find((i) => i.id === b.id).text).toBe("B-race");
+    expect([first.mergedFrom, second.mergedFrom].filter((v) => v === baseRev)).toHaveLength(1);
+  });
+
   it("enforces empty-write protection unless allowEmpty is explicit, and honors uncachedMode", async () => {
     const dir = await tempDir("doodle-pipeline-empty-");
     const store = new BoardStore(dir);

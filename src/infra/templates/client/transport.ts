@@ -147,6 +147,8 @@ export function createBoardTransport(options: {
     lastPublishedSnapshot = snapshot;
   };
 
+  let refreshNotifyVisibility: (() => void) | null = null;
+
   const initNotifyButton = (getActiveSnapshot: () => BoardSnapshot | null): void => {
     const button = document.querySelector<HTMLButtonElement>("#doodleNotifyAgent");
     if (!button) return;
@@ -154,6 +156,7 @@ export function createBoardTransport(options: {
       const capabilities = hostApp?.getHostCapabilities();
       button.hidden = !capabilities?.updateModelContext?.text || !capabilities?.message?.text;
     };
+    refreshNotifyVisibility = updateVisibility;
     button.addEventListener("click", async () => {
       try {
         const snapshot = getActiveSnapshot() ?? await loadBoard();
@@ -205,6 +208,7 @@ export function createBoardTransport(options: {
       onSnapshot(data);
     };
     await hostApp.connect();
+    refreshNotifyVisibility?.();
     const timer = window.setInterval(async () => {
       if (document.visibilityState === "hidden" || isBusy()) return;
       try {

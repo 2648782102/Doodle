@@ -84,13 +84,18 @@ export async function commitBoardWrite(options: CommitBoardWriteOptions): Promis
     if (!Number.isInteger(expectedRevision) || expectedRevision < 0) {
       throw new BoardRevisionConflictError(-1, expectedRevision);
     }
-    const current = await store.snapshot();
-    before = current;
-    if (current.revision === expectedRevision) {
-      board = await store.replaceIfRevision(candidateFor(current), expectedRevision);
-    } else if (wholeBoard) {
-      throw new BoardRevisionConflictError(expectedRevision, current.revision);
-    } else {
+    /*
+     * Perform snapshot, conflict check, rebase, and persist inside a single
+     * mutex acquisition so another writer cannot slip in between snapshot and
+     * replaceIfRevision (eliminating the TOCTOU window).
+     */
+    const locked = await store.runLockedWrite((current) => {
+      if (current.revision === expectedRevision) {
+        return { next: candidateFor(current), expectedRevision };
+      }
+      if (wholeBoard) {
+        throw new BoardRevisionConflictError(expectedRevision, current.revision);
+      }
       const base = revisions?.get(expectedRevision);
       if (!base || base.id !== current.id) {
         if (uncachedMode === "validation-error") {
@@ -108,9 +113,11 @@ export async function commitBoardWrite(options: CommitBoardWriteOptions): Promis
       if (conflicts.length > 0) {
         throw new ObjectConflictError(expectedRevision, current.revision, conflicts);
       }
-      board = await store.replaceIfRevision(candidateFor(current), current.revision);
       mergedFrom = expectedRevision;
-    }
+      return { next: candidateFor(current), expectedRevision: current.revision };
+    });
+    before = locked.before;
+    board = locked.board;
   }
 
   revisions?.remember(board);

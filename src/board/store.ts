@@ -133,6 +133,29 @@ export class BoardStore {
     });
   }
 
+  /**
+   * Run a read-validate-persist transaction under the board's cross-process lock
+   * so conflict detection and merging cannot race a concurrent writer between
+   * snapshot and persist.
+   */
+  async runLockedWrite(
+    resolve: (current: SimpleBoard) => { next: SimpleBoard; expectedRevision: number },
+  ): Promise<{ before: SimpleBoard; board: SimpleBoard }> {
+    return this.mutex.run(async () => {
+      const current = await this.readState();
+      const { next, expectedRevision } = resolve(current);
+      if (current.revision !== expectedRevision) {
+        throw new BoardRevisionConflictError(expectedRevision, current.revision);
+      }
+      const parsed = parseBoard(next);
+      if (parsed.revision <= expectedRevision) {
+        throw new BoardRevisionConflictError(expectedRevision, parsed.revision);
+      }
+      const persisted = await this.persist(parsed);
+      return { before: current, board: persisted };
+    });
+  }
+
   private assign(board: SimpleBoard): void {
     this.board = board;
     this.revision = board.revision;
