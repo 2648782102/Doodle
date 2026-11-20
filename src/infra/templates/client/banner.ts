@@ -94,3 +94,58 @@ export function initWelcome(snapshot: BoardSnapshot): void {
   dismiss.addEventListener("click", hide);
   card.hidden = false;
 }
+
+export interface ConflictAction {
+  label: string;
+  /** `primary` is the safe choice; `danger` overwrites the other writer. */
+  tone?: "primary" | "danger";
+  run: () => void | Promise<void>;
+}
+
+/**
+ * A rejected write that a person can actually resolve.
+ *
+ * A transient toast was the wrong shape for this: the change is still unsaved,
+ * so the notice must stay until the person decides, and it must name the objects
+ * that collided instead of asking them to guess. Two explicit choices — take the
+ * server's version, or keep mine — beat an automatic overwrite in either
+ * direction, because both writers are people-or-agents who meant their edit.
+ */
+export function showConflictNotice(message: string, actions: ConflictAction[]): void {
+  const bar = document.querySelector<HTMLElement>("#doodleConflictNotice");
+  const text = bar?.querySelector<HTMLElement>("[data-conflict-message]");
+  const list = bar?.querySelector<HTMLElement>("[data-conflict-actions]");
+  if (!bar || !text || !list) {
+    showError(new Error(message));
+    return;
+  }
+  text.textContent = message;
+  list.replaceChildren();
+  for (const action of actions) {
+    const button = document.createElement("button");
+    button.type = "button";
+    button.textContent = action.label;
+    if (action.tone === "danger") button.dataset.tone = "danger";
+    if (action.tone === "primary") button.dataset.tone = "primary";
+    button.addEventListener("click", async () => {
+      button.disabled = true;
+      try {
+        await action.run();
+      } finally {
+        button.disabled = false;
+      }
+    });
+    list.append(button);
+  }
+  bar.hidden = false;
+}
+
+export function clearConflictNotice(): void {
+  const bar = document.querySelector<HTMLElement>("#doodleConflictNotice");
+  if (bar) bar.hidden = true;
+}
+
+export function conflictNoticeVisible(): boolean {
+  const bar = document.querySelector<HTMLElement>("#doodleConflictNotice");
+  return Boolean(bar && !bar.hidden);
+}

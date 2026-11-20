@@ -34,7 +34,10 @@ const excalidrawApp = (await Promise.all([
   read("src/infra/templates/client/banner.ts"),
   read("src/infra/templates/client/transport.ts"),
   read("src/infra/templates/client/library-ui.ts"),
+  read("src/infra/templates/client/sync-state.ts"),
+  read("src/infra/templates/client/canvas-sync.ts"),
 ])).join("\n");
+const canvasTransport = await read("src/infra/templates/client/transport.ts");
 const writePipeline = await read("src/board/write-pipeline.ts");
 const boardIndex = await read("src/board/index.ts");
 /*
@@ -171,8 +174,15 @@ check(
   "the canvas silently reconnects again, so a dead connection looks like a working board",
 );
 check(
-  excalidrawApp.includes("function toolErrorMessage(")
-    && (excalidrawApp.match(/throw new Error\(toolErrorMessage\(result\)\)/g) ?? []).length >= 2,
+  /*
+   * A rejected write must keep its reason *and* its machine-readable code.
+   *
+   * `Error(message)` was enough for a toast, but conflict recovery needs
+   * `REVISION_CONFLICT_OBJECTS` and the object ids to offer "载入最新 / 保留我的".
+   */
+  excalidrawApp.includes("function toolErrorPayload(")
+    && (excalidrawApp.match(/throw new BoardWriteError\(/g) ?? []).length >= 2
+    && excalidrawApp.includes("payload.code"),
   "the canvas discards the rejection reason again, so a failed save shows a message that names nothing",
 );
 check(excalidrawTemplate.includes('id="doodleWelcome"') && excalidrawApp.includes("WELCOME_STORAGE_KEY") && excalidrawApp.includes("initWelcome"), "the first-run board guidance is missing or not dismissible");
@@ -558,6 +568,44 @@ check(
   excalidrawApp.includes("if (elements.length === 0) return;") &&
   !excalidrawApp.includes("elements.length < activeSnapshot.items.length"),
   "canvas can write an empty mount-time scene over a loaded board, or rejects real edits by comparing element counts",
+);
+/*
+ * A debounced write must survive a remote write landing in its window.
+ *
+ * The canvas used to `return` when `activeSnapshot` had moved, so a drag that
+ * raced an agent write vanished with no banner: the person saw a board that
+ * looked saved. Re-basing has two halves that fail separately — dropping the
+ * gesture, and resurrecting an object the other writer deleted — so both are
+ * asserted, together with the event stream a person reads.
+ */
+check(
+  excalidrawApp.includes("createCanvasSync") && excalidrawApp.includes("rebaseScene") && excalidrawApp.includes("getSceneBase"),
+  "canvas writes lost the rebasing pipeline: a gesture that races a remote write can be dropped or can resurrect a deleted object",
+);
+check(
+  !/if \(!base \|\| activeSnapshot !== base\) return;/.test(excalidrawApp),
+  "the debounced canvas write silently returns when a remote write lands in its window, so the person's change disappears",
+);
+check(
+  excalidrawTemplate.includes('id="doodleSyncState"') &&
+  excalidrawTemplate.includes("data-sync-label") &&
+  excalidrawApp.includes("createSyncChip") &&
+  excalidrawApp.includes("awaiting-agent"),
+  "the canvas no longer states its sync phase, so a person has to guess whether a change was saved or reached the agent",
+);
+check(
+  excalidrawTemplate.includes('id="doodleConflictNotice"') &&
+  excalidrawApp.includes("showConflictNotice") &&
+  excalidrawApp.includes("REVISION_CONFLICT_OBJECTS"),
+  "a write conflict is back to a disappearing toast with no object-level summary and no recovery choice",
+);
+check(
+  excalidrawApp.includes('status.send("published")') && canvasTransport.includes("Promise<boolean>"),
+  "host context sync reports success it cannot observe: only a real publish may claim the board reached the model context",
+);
+check(
+  !excalidrawApp.includes("applyRemoteSnapshot(pendingRemote.current))"),
+  "a remote write that lands mid-gesture repaints over the gesture the person just finished",
 );
 check(boardTypes.includes("createStarterBoard") && boardTypes.includes("createEmptyBoard"), "board types lost the compatibility starter or empty board");
 check(boardStore.includes("createEmptyBoard") && !boardStore.includes("createStarterBoard()"), "new board state is not empty-first");

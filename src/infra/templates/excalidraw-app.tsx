@@ -1,6 +1,7 @@
 /**
  * Excalidraw canvas entrypoint: wires the split client modules (`transport`,
- * `theme`, `link-policy`, `banner`, `library-ui`) and mounts the React canvas.
+ * `theme`, `link-policy`, `banner`, `library-ui`, `sync-state`, `canvas-sync`)
+ * and mounts the React canvas.
  */
 
 import React, { useCallback, useEffect, useMemo, useState } from "react";
@@ -19,9 +20,17 @@ import {
   readStoredViewport,
 } from "../../board/viewport-memory.js";
 import { initLiquidGlass, type LiquidGlassController } from "./liquid-glass.js";
-import { clearError, initWelcome, showError } from "./client/banner.js";
+import {
+  clearConflictNotice,
+  clearError,
+  initWelcome,
+  showConflictNotice,
+  showError,
+} from "./client/banner.js";
+import { createCanvasSync, type CanvasSync, type CanvasSyncOutcome, type SceneElement } from "./client/canvas-sync.js";
 import { initLibraryUi, initSnapshotExports } from "./client/library-ui.js";
 import { initExternalLinkPolicy, isDoodleProjectLink } from "./client/link-policy.js";
+import { createSyncChip } from "./client/sync-state.js";
 import {
   EXCALIDRAW_THEME,
   canvasColors,
@@ -31,7 +40,7 @@ import {
   readTheme,
   type DoodleTheme,
 } from "./client/theme.js";
-import { createBoardTransport } from "./client/transport.js";
+import { BoardWriteError, createBoardTransport } from "./client/transport.js";
 import {
   boardBounds,
   isEditing,
@@ -56,15 +65,26 @@ const transport = createBoardTransport({
   embedded,
   panelToken: window.DOODLE_EXCALIDRAW_TOKEN ?? "",
 });
+/** The one visible answer to "is this saved, and did the agent see it?". */
+const status = createSyncChip(transport.channel);
 
 let glassController: LiquidGlassController | null = null;
 let activeSnapshot: BoardSnapshot | null = null;
+/**
+ * The board the live scene was painted from.
+ *
+ * Not the same thing as `activeSnapshot`: when a remote write arrives between a
+ * gesture and its debounced save, the newer board becomes the write target while
+ * the scene is still the older one. Rebasing needs both.
+ */
+let sceneBase: BoardSnapshot | null = null;
+/** A remote board was adopted without repainting; converge after the next write. */
+const pendingRepaint = { current: false };
 const apiRef: { current: ExcalidrawAPI | null } = { current: null };
 const applyingRemote = { current: false };
 const currentFiles: { current: Record<string, ExcalidrawFileData> } = { current: {} };
 const currentAppState: { current: ExcalidrawAppState } = { current: {} };
 const pendingRemote: { current: BoardSnapshot | null } = { current: null };
-const pendingTimer: { current: number | null } = { current: null };
 /**
  * Excalidraw fires `onChange` while it is still mounting, before the scene we
  * passed in has been applied. Wait for the first non-empty scene before
@@ -91,34 +111,115 @@ function toFiles(snapshot: BoardSnapshot): ExcalidrawFileData[] {
   return Object.values(boardToExcalidrawFiles(snapshot as never));
 }
 
-function applyRemoteSnapshot(data: BoardSnapshot, refreshFiles = true): void {
+/** Paint the scene from `activeSnapshot`, and remember that this is its provenance. */
+function repaintFromActive(): void {
+  const snapshot = activeSnapshot;
+  if (!snapshot || isEditing(currentAppState.current)) return;
+  sceneBase = snapshot;
+  pendingRepaint.current = false;
+  applyingRemote.current = true;
+  sceneReady.current = true;
+  const files = toFiles(snapshot);
+  currentFiles.current = Object.fromEntries(files.map((file) => [file.id, file]));
+  apiRef.current?.addFiles(files);
+  apiRef.current?.updateScene({ elements: toElements(snapshot), captureUpdate: "NEVER" });
+  window.setTimeout(() => { applyingRemote.current = false; }, 0);
+}
+
+function publishToHost(snapshot: BoardSnapshot): void {
+  void transport.publishContext(snapshot)
+    .then((published) => { if (published) status.send("published"); })
+    .catch(() => {});
+}
+
+/**
+ * Adopt a board that arrived from somewhere else.
+ *
+ * `repaint: false` is the interesting case: the person has just finished a
+ * gesture and someone else wrote meanwhile. Repainting there is what used to
+ * erase the gesture, so the newer board only becomes the write target and the
+ * scene is reconciled by the rebase in `canvas-sync`.
+ */
+function applyRemoteSnapshot(data: BoardSnapshot, options: { repaint?: boolean } = {}): void {
   if (!data || !Array.isArray(data.items) || typeof data.revision !== "number") return;
   if (activeSnapshot && data.revision <= activeSnapshot.revision && data.id === activeSnapshot.id) return;
+  if (options.repaint === false) {
+    activeSnapshot = data;
+    pendingRepaint.current = true;
+    return;
+  }
   if (isEditing(currentAppState.current)) {
     pendingRemote.current = data;
     return;
   }
-  if (pendingTimer.current !== null) {
-    window.clearTimeout(pendingTimer.current);
-    pendingTimer.current = null;
-  }
   activeSnapshot = data;
-  applyingRemote.current = true;
-  sceneReady.current = true;
-  const files = refreshFiles ? toFiles(data) : [];
-  if (refreshFiles) {
-    currentFiles.current = Object.fromEntries(files.map((file) => [file.id, file]));
-    apiRef.current?.addFiles(files);
+  repaintFromActive();
+  publishToHost(data);
+}
+
+/** A rejected write, with the recovery path the person actually needs. */
+function handleWriteError(error: unknown, retry: () => Promise<CanvasSyncOutcome>): void {
+  const conflict = error instanceof BoardWriteError && error.code === "REVISION_CONFLICT_OBJECTS"
+    ? error
+    : null;
+  const ids = conflict?.conflicts ?? [];
+  if (!conflict) {
+    status.send("local-edit");
+    showError(error);
+    return;
   }
-  apiRef.current?.updateScene({ elements: toElements(data), captureUpdate: "NEVER" });
-  window.setTimeout(() => { applyingRemote.current = false; }, 0);
-  void transport.publishContext(data).catch(() => {});
+  status.send("conflict");
+  const named = ids.slice(0, 3).join("、");
+  showConflictNotice(
+    ids.length
+      ? `有 ${ids.length} 个对象在此同时被别处改动：${named}${ids.length > 3 ? " 等" : ""}。这次改动还没保存。`
+      : "有对象在此同时被别处改动，这次改动还没保存。",
+    [
+      {
+        label: "载入最新",
+        tone: "primary",
+        run: async () => {
+          const latest = await transport.loadBoard().catch(() => null);
+          if (latest) applyRemoteSnapshot(latest);
+          clearConflictNotice();
+          status.send("saved");
+        },
+      },
+      { label: "保留我的", tone: "danger", run: async () => { await retry(); } },
+    ],
+  );
 }
 
 function CanvasApp({ initial }: { initial: BoardSnapshot }) {
   const [snapshot, setSnapshot] = useState(initial);
   const [api, setApi] = useState<ExcalidrawAPI | null>(null);
   const [theme, setTheme] = useState<DoodleTheme>(readTheme());
+
+  const sync = useMemo<CanvasSync>(() => createCanvasSync({
+    transport,
+    getSnapshot: () => activeSnapshot,
+    getSceneBase: () => sceneBase ?? activeSnapshot,
+    project: (base, elements, files) => boardItemsFromExcalidrawBoard(
+      base as never,
+      elements as never,
+      files as never,
+    ) as unknown as BoardSnapshot,
+    applySaved: (updated, info) => {
+      activeSnapshot = updated;
+      setSnapshot(updated);
+      clearError();
+      clearConflictNotice();
+      publishToHost(updated);
+      // A rebase means the person's scene is missing whatever landed meanwhile;
+      // converge once the write is safely in, never mid-gesture.
+      if ((info.rebased || info.dropped > 0 || pendingRepaint.current) && !isEditing(currentAppState.current)) {
+        repaintFromActive();
+      }
+    },
+    report: (event) => { status.send(event); },
+    onError: (error, retry) => handleWriteError(error, retry),
+    debounceMs: 450,
+  }), []);
 
   const initialData = useMemo(() => {
     const files = toFiles(initial);
@@ -196,37 +297,31 @@ function CanvasApp({ initial }: { initial: BoardSnapshot }) {
       sceneReady.current = true;
     }
     if (isEditing(appState)) return;
+    /*
+     * A write that landed mid-gesture becomes the new baseline without a
+     * repaint. The gesture the person just finished stays on screen and in the
+     * scene, and `schedule` writes it against the newer board.
+     */
     if (pendingRemote.current) {
-      applyRemoteSnapshot(pendingRemote.current);
+      applyRemoteSnapshot(pendingRemote.current, { repaint: false });
       pendingRemote.current = null;
-      return;
     }
     const projected = boardItemsFromExcalidrawBoard(
       activeSnapshot as never,
       elements,
       currentFiles.current,
     );
-    if (JSON.stringify(projected.items) === JSON.stringify(activeSnapshot.items)) return;
-    const base = activeSnapshot;
-    if (pendingTimer.current !== null) window.clearTimeout(pendingTimer.current);
-    pendingTimer.current = window.setTimeout(async () => {
-      pendingTimer.current = null;
-      if (!base || activeSnapshot !== base) return;
-      try {
-        const updated = await transport.syncBoard(projected.items as unknown[], base);
-        clearError();
-        activeSnapshot = updated;
-        setSnapshot(updated);
-        void transport.publishContext(updated).catch(() => {});
-      } catch (error) {
-        // Never repaint from the server on error: keep the person's drawing,
-        // refresh only the revision so a retry can land, and explain why.
-        const latest = await transport.loadBoard().catch(() => null);
-        if (latest) activeSnapshot = { ...activeSnapshot, revision: latest.revision };
-        showError(error);
-      }
-    }, 450);
-  }, [api]);
+    if (JSON.stringify(projected.items) === JSON.stringify(activeSnapshot.items)) {
+      /*
+       * Nothing of the person's to write. If a remote board was only adopted as
+       * the baseline (no repaint), the scene is still showing the older one, so
+       * this is the last chance to converge without waiting for another edit.
+       */
+      if (pendingRepaint.current) repaintFromActive();
+      return;
+    }
+    sync.schedule(elements as SceneElement[], currentFiles.current);
+  }, [api, sync]);
 
   return React.createElement(
     "div",
@@ -265,6 +360,7 @@ function renderCanvas(initial: BoardSnapshot): void {
   if (!root) return;
   if (!rootInstance) rootInstance = createRoot(root);
   activeSnapshot = initial;
+  sceneBase = initial;
   rootInstance.render(React.createElement(CanvasApp, { initial }));
 }
 
@@ -273,12 +369,14 @@ async function start(): Promise<void> {
   if (!root || embedded || rootInstance) return;
   const initial = await transport.loadBoard();
   renderCanvas(initial);
+  status.send("loaded");
   if (!embedded) initWelcome(initial);
 }
 
 window.DoodleExcalidrawInit = (snapshot, mcpApp) => {
   transport.setFallbackMcpApp(mcpApp as McpAppFallback | null);
   renderCanvas(snapshot);
+  status.send("loaded");
 };
 
 if (document.querySelector("#excalidrawRoot")) {
@@ -299,6 +397,7 @@ if (document.querySelector("#excalidrawRoot")) {
   void transport.startLiveUpdates({
     isBusy: () => applyingRemote.current || isEditing(currentAppState.current),
     onSnapshot: (data) => applyRemoteSnapshot(data),
+    onOfflineChange: (offline) => status.send(offline ? "offline" : "online"),
   }).catch(() => {});
   void start().catch((error) => showError(error));
 }
