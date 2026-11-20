@@ -302,3 +302,46 @@ describe("furniture that a real model produces", () => {
     expect(result.checks.find((check) => check.name === "no_overlap").ok).toBe(true);
   });
 });
+
+describe("a node named outside its box", () => {
+  /*
+   * Some models draw a layer as a blank card with its name placed on top, which
+   * reads identically to a person. Excluding every `role: label` text scored
+   * such a diagram zero on all its nodes — a correct three-layer architecture
+   * drawing graded as if nothing had been drawn.
+   */
+  const box = (id, x, y, w, h) => ({
+    id, type: "rect", x, y, w, h, text: "", color: "#dbeafe", author: "ai",
+    role: "step", createdAt: "2026-01-01T00:00:00.000Z", updatedAt: "2026-01-01T00:00:00.000Z",
+  });
+  const caption = (id, value, x, y, w, h, role = "label") => ({
+    id, type: "text", x, y, w, h, text: value, color: "#1e1e1e", role,
+    author: "ai", createdAt: "2026-01-01T00:00:00.000Z", updatedAt: "2026-01-01T00:00:00.000Z",
+  });
+
+  const subject = () => touchBoard({ ...createEmptyBoard(), items: [
+    box("b1", 150, 85, 500, 140), box("b2", 150, 305, 500, 140), box("b3", 150, 525, 500, 140),
+    caption("l1", "接入层", 170, 104, 460, 42),
+    caption("l2", "服务层", 170, 324, 460, 42),
+    caption("l3", "存储层", 170, 544, 460, 42),
+  ] });
+
+  it("counts labels sitting on a card as that card's name", () => {
+    const result = gradeBoard(subject(), { kind: "tree", nodes: ["接入层", "服务层", "存储层"] });
+    expect(result.structure.nodes.recall).toBe(1);
+    expect(result.structure.nodes.precision).toBe(1);
+  });
+
+  it("does not mistake a wide flat heading for a card name", () => {
+    /*
+     * A title can overlap several cards. It is wide and thin, while a card name
+     * is contained by one card — that ratio is what keeps the heading out.
+     */
+    const board = touchBoard({ ...createEmptyBoard(), items: [
+      box("b1", 0, 0, 200, 100), box("b2", 300, 0, 200, 100),
+      caption("t", "整体架构", 0, 0, 500, 24),
+    ] });
+    const result = gradeBoard(board, { kind: "tree", nodes: ["A", "B"] });
+    expect(result.structure.nodes.extra).toEqual([]);
+  });
+});
