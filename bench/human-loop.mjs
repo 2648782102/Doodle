@@ -11,25 +11,20 @@
  * truth: the test asks whether the model's own words agree with it.
  */
 
-/*
- * Loaded lazily, not at module scope.
+/**
+ * The handoff implementation is injected, not imported.
  *
- * `npm test` runs before `npm run build` on CI, so a static import of `dist/`
- * fails there while working locally where a build exists. Every bench module
- * that needs the compiled server therefore imports it inside the call.
+ * Importing `dist/board/handoff.js` from here looked obvious and cost three CI
+ * rounds: `dist` is build output, the test runner rewrites a dynamic import into
+ * a path from the filesystem root, and the resulting failure was hidden behind
+ * an unrelated reporter crash (`Map.groupBy` on Node 20). Injection removes the
+ * whole class of problem — the runner supplies the real implementation, tests
+ * supply a stand-in, and neither depends on build order or module rewriting.
  */
-let handoffModule;
-async function handoff() {
-  /*
-   * Absolute URL, built from this module's own location.
-   *
-   * A bare `import("../dist/…")` inside a dynamic import is rewritten by the
-   * test runner's SSR transform into `/dist/…` — an absolute filesystem path at
-   * the repo root, which is where `dist` is *not*. The static form was fine
-   * locally only because the path resolved before any rewriting.
-   */
-  handoffModule ??= await import(new URL("../dist/board/handoff.js", import.meta.url).href);
-  return handoffModule;
+let describeHandoffImpl;
+
+export function setHandoffImplementation(implementation) {
+  describeHandoffImpl = implementation;
 }
 
 /**
@@ -57,9 +52,11 @@ export function applyHumanEdit(board, edit) {
 }
 
 /** What the board itself says the person did — the ground truth for grading. */
-export async function expectedHandoff(before, after) {
-  const { describeHandoff } = await handoff();
-  return describeHandoff(after, before);
+export function expectedHandoff(before, after) {
+  if (!describeHandoffImpl) {
+    throw new Error("handoff implementation not injected; call setHandoffImplementation first");
+  }
+  return describeHandoffImpl(after, before);
 }
 
 /**

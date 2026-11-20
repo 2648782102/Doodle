@@ -18,10 +18,19 @@ import os from "node:os";
 import path from "node:path";
 import { spawn } from "node:child_process";
 import { codexBinary, modelConfig, repoRoot } from "./executor.mjs";
-import { applyHumanEdit, expectedHandoff, gradeHumanReport } from "./human-loop.mjs";
+import { applyHumanEdit, expectedHandoff, gradeHumanReport, setHandoffImplementation } from "./human-loop.mjs";
 
 const { createEmptyBoard, diagramToBoardItems, touchBoard } = await import(path.join(repoRoot, "dist/board/types.js"));
 const { expandRecipe } = await import(path.join(repoRoot, "dist/board/diagram/recipe.js"));
+/*
+ * The real handoff, injected.
+ *
+ * This file runs under plain Node (not the test runner), so it can import the
+ * build output directly — the loader problem that forced injection only exists
+ * inside vitest. Injection keeps one code path for both.
+ */
+const { describeHandoff } = await import(path.join(repoRoot, "dist/board/handoff.js"));
+setHandoffImplementation(describeHandoff);
 
 const STEPS = ["计划", "执行", "复盘"];
 
