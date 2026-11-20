@@ -140,31 +140,68 @@ describe("human canvas contract", () => {
       if (dismiss instanceof HTMLElement) dismiss.click();
       document.querySelector("#doodleWelcome")?.remove();
     });
+    /*
+     * Poll the server instead of sleeping a fixed time.
+     *
+     * The write is debounced 450 ms and then round-trips through the MCP tool,
+     * so a fixed delay passes alone and fails when the machine is busy — a
+     * flaky contract test is worse than none, because it teaches people to
+     * rerun CI.
+     */
+    const waitForBoard = async (predicate, what) => {
+      const deadline = Date.now() + 15_000;
+      let last;
+      while (Date.now() < deadline) {
+        last = (await server.callTool({ name: "get_board", arguments: { include_guide: false } })).structuredContent;
+        if (predicate(last)) return last;
+        await page.waitForTimeout(250);
+      }
+      throw new Error(`timed out waiting for ${what}; board has ${last?.itemCount} objects`);
+    };
+
     await page.mouse.dblclick(900, 600);
     await page.waitForTimeout(600);
     await page.keyboard.type("contract card");
     await page.keyboard.press("Escape");
-    await page.waitForTimeout(1200);
 
-    const afterCreate = (await server.callTool({ name: "get_board", arguments: { include_guide: false } }))
-      .structuredContent;
+    const afterCreate = await waitForBoard(
+      (board) => board.items.some((item) => item.text === "contract card"),
+      "the typed note to reach the board",
+    );
     const card = afterCreate.items.find((item) => item.text === "contract card");
     expect(card, "the typed note reached the board").toBeTruthy();
 
     // Drag it, then edit again.
-    await page.mouse.move(900, 600);
+    /*
+     * Drag from the card's centre, not the point it was created at.
+     *
+     * Double-click places a text element with `(900, 600)` as its top-left and
+     * measures it from the content — a single line comes out about 134×25, so
+     * pressing at exactly (900, 600) lands on the corner and the drag misses.
+     * The stored box is the source of truth for where the middle is.
+     */
+    const centre = { x: card.x + card.w / 2, y: card.y + card.h / 2 };
+    await page.mouse.click(centre.x, centre.y);
+    await page.waitForTimeout(400);
+    await page.mouse.move(centre.x, centre.y);
     await page.mouse.down();
-    await page.mouse.move(1000, 660, { steps: 10 });
+    for (const step of [0.2, 0.4, 0.6, 0.8, 1]) {
+      await page.mouse.move(centre.x + 100 * step, centre.y + 60 * step, { steps: 3 });
+    }
     await page.mouse.up();
-    await page.waitForTimeout(1200);
-    await page.mouse.dblclick(1000, 660);
+    // The move must persist before the second edit, or the edit races it.
+    await waitForBoard((board) => {
+      const moved = board.items.find((item) => item.id === card.id);
+      return moved && (moved.x !== card.x || moved.y !== card.y);
+    }, "the drag to persist");
+    await page.mouse.dblclick(centre.x + 100, centre.y + 60);
     await page.waitForTimeout(400);
     await page.keyboard.type(" edited");
     await page.keyboard.press("Escape");
-    await page.waitForTimeout(1500);
-
-    const afterEdit = (await server.callTool({ name: "get_board", arguments: { include_guide: false } }))
-      .structuredContent;
+    const afterEdit = await waitForBoard(
+      (board) => board.items.some((item) => item.id === card.id && item.text.includes("edited")),
+      "the second edit to persist",
+    );
     const same = afterEdit.items.find((item) => item.id === card.id);
     expect(same, "the same id still exists after a move and a second edit").toBeTruthy();
     expect(same.text).toContain("edited");
