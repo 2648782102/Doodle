@@ -25,6 +25,14 @@ export function normalizeLabel(value) {
  * True when two labels name the same thing for grading purposes.
  *
  * Empty labels never match: a blank card is not a node the case asked for.
+ *
+ * Matching is bidirectional and containment-based, because a correct drawing
+ * routinely expands the prompt: asked for "注册", a model writes
+ * "1 注册 / 登录：创建账号，完成身份验证". Prefix-only matching called that a
+ * missing node — a false negative that made a good drawing score zero. The
+ * guard is length: a one-character needle would match almost anything
+ * ("会" inside "会议"), so a substring match needs at least two characters on
+ * the shorter side.
  */
 export function labelsMatch(left, right) {
   const a = normalizeLabel(left);
@@ -32,6 +40,12 @@ export function labelsMatch(left, right) {
   if (!a || !b) return false;
   if (a === b) return true;
   const [shorter, longer] = a.length <= b.length ? [a, b] : [b, a];
-  // A one-character prefix is too weak ("会" would match "会议").
-  return shorter.length >= 2 && longer.startsWith(shorter);
+  if (shorter.length < 2) return false;
+  /*
+   * Containment, not prefix. "确认发货" contains "发货" and is a different step,
+   * which is the cost of this rule — but the alternative rejected every drawing
+   * that numbered its steps or added a one-line explanation, and that failure
+   * was far more common in the live runs than a wrong-node collision.
+   */
+  return longer.includes(shorter);
 }

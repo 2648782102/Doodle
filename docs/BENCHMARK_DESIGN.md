@@ -325,3 +325,308 @@ bench/graders/graders.test.mjs 17 条测试
 
 剩下的是 `4.2` 执行器和 `4.3` trace。执行器需要 API key 和成本预算，
 建议先用手工 trace 回放验证报告链路，再接真实模型。
+
+## 10. 第二、三步已落地：trace、报告、执行器
+
+### trace 与报告（无成本，可重复）
+
+```
+bench/trace.mjs         trace 形状 + 校验 + 稳定的短哈希
+bench/report.mjs        判分汇总、失败聚类、两次运行对比
+bench/run-report.mjs    CLI：trace 目录 → Markdown / JSON 报告
+bench/cases/core.json   3 个真实 case
+bench/fixtures/         3 份示例 trace（由真实生成器造板，不调用模型）
+```
+
+报告的样子（对着 fixture 跑出来的真实输出）：
+
+```
+Cases: 3 · pass 33% · mean score 0.83
+
+## Failure clusters
+- edge_f1 — 2/3 cases (sequence 2)
+- node_recall — 1/3 cases (sequence 1)
+- sequence — 1/3 cases (sequence 1)
+
+## Repair behaviour
+1/3 cases saw at least one rejected call and continued.
+These are repair successes, not failures.
+```
+
+「2/3 卡在 edge_f1」直接指向连接线生成，比「平均 0.83」有用得多。
+
+两个刻意的保护：
+
+- **trace 缺 `final_board` 直接报错**，不判成空板。"模型没画"和"记录器丢了板"
+  是两种完全不同的结论，混在一起会污染均值。
+- **prompt 或工具描述变了就拒绝给 delta**，并说明"这应当视为新基线"。
+  否则会打印一个看着很确定、实际不可比的数字。
+
+`1/3 需要重试` 被单独统计为**修复成功率**，不计入失败——模型看到 `ERROR_JSON`
+改对，正是 Doodle 设计目标在起作用。
+
+### 执行器（需要真实模型）
+
+```
+bench/executor.mjs      spawn `codex exec`、解析 JSONL 事件、写 trace
+bench/run-cases.mjs     CLI：跑 case → traces/
+```
+
+执行器本身很薄，但做了三处隔离，每一处都是实测踩出来的：
+
+1. **用临时空目录当工作区**。仓库自己的 `AGENTS.md` 有 48 KB，超过 Codex 的
+   32 KB 项目指令预算，模型会收到截断版并花一个回合去注意这件事——那测的是
+   仓库，不是绘图。
+2. **`--ignore-user-config`**。本机装了一个无关的 doodle 插件，模型会先去读它的
+   skill 文件再调工具。基准必须只看到被测的那个 server。
+3. **每个 case 独立 `OUTPUT_DIR`**，否则 library 的种子板会串味。
+
+### 一个值得记下来的坑
+
+第一次跑批，trace 里 0 次工具调用、0 token，耗时 126 秒。看起来像"模型拒绝作画"。
+
+实际原因是 `codex exec` 会等 stdin EOF 才发 prompt，而 `spawn` 用了
+`stdio: "ignore"`，描述符永远不到 EOF，于是挂到超时。
+
+修法是把 stdin 改成 `pipe` 然后立即 `end()`。同时加了一条守卫：
+**没有工具调用且没有 usage 的 session 一律判为失败并说明原因**，
+因为它只可能意味着请求没到达模型（网络/鉴权），而不是模型什么都没画。
+这条守卫让"环境坏了"和"模型不行"在报告里永远不会混为一谈。
+
+### 当前状态
+
+`bench/graders` 17 条 + `bench/report` 15 条 + `bench/executor` 7 条测试，
+共 39 条，全部不需要模型。真实跑批需要能访问模型的网络环境：
+
+```
+node bench/run-cases.mjs                 # 跑全部 case
+node bench/run-report.mjs bench/runs/<时间戳>
+```
+
+## 11. 已接入真实模型，并跑出第一份基线
+
+### 接入方式：magpie 网关
+
+本机直连模型厂商被阻断（`api.openai.com` 超时），但 magpie 的本地网关
+`127.0.0.1:3425` 可用。执行器因此固定走：
+
+```
+-c model_provider="magpie"
+-c model_providers.magpie.base_url="http://127.0.0.1:3425/v1"
+model = workbuddy/blind-model-c   （「测试模型 C」）
+```
+
+`--ignore-user-config` 会把用户配置里的 provider 一并去掉，所以网关配置必须在
+命令行里重述一遍；`name` 字段不能省，否则 CLI 直接拒绝整个配置。
+
+### 一个拦路的坑：破坏性工具需要审批
+
+第一次真跑，3 个 case 全部「成功但板是空的」。模型确实调了 `get_board`，
+但 `draw_board` 被宿主拒绝：
+
+```
+MCP tool call requires approval, but approval policy is never
+```
+
+`draw_board` 声明为破坏性工具，`--sandbox read-only` 下审批策略是 never。
+改用 `--dangerously-bypass-approvals-and-sandbox` 后正常——进程本就跑在临时目录、
+只连本地 stdio server、提示词禁止碰文件，隔离是够的。
+
+### 第一份真实基线（10 个 case，模型 C）
+
+修完判分器后：
+
+```
+Cases: 10 · pass 100% · mean score 1.00
+
+| category   | n | score | pass | node recall | edge F1 |
+| sequence   | 8 | 1.00  | 100% | 1.00        | 1.00    |
+| tree       | 1 | 1.00  | 100% | 1.00        | 1.00    |
+| comparison | 1 | 1.00  | 100% | 1.00        | 1.00    |
+```
+
+**这个结果本身说明下一件事：case 太容易了。** 满分不是好消息，
+它说明当前这 10 个 case 无法区分模型好坏。真实的待办是加难度，
+而不是庆祝。
+
+### 判分器被真实数据修正了四次
+
+这是先做判分器、再接模型的价值——每一次都是**判分器错，模型对**：
+
+1. `precision 0.6`：生成器自带的 frame / title / subtitle 被当成节点。
+2. `recall 0`：模型写「1 注册 / 登录：创建账号…」，而期望是「注册」，
+   前缀匹配判为缺失。
+3. `edge_f1 0`：对比类图没有边，却被按「缺 4 条边」计分。
+4. `extra: ['六个阶段按顺序流转']`：副标题没逗号，逃过了标点规则。
+
+每一条都补了测试。**判分器的假阳性/假阴性比模型分数更危险**，
+因为它会把方向错误包装成数字。
+
+### 人机回环（双向性）
+
+```
+bench/human-loop.mjs       脚本化的人：移动 / 改名 / 删除
+bench/run-human-loop.mjs   真跑：AI 画 → 人改 → AI 读回
+```
+
+判分不看措辞，看两件事：**有没有指出被改的那个对象**，以及
+**有没有编造板上不存在的对象**（后者比漏掉更严重——模型会对着不存在的东西画）。
+
+第一次真跑（模型 C）：
+
+```
+board : 计划 → 执行 → 复盘
+人   : 把「执行」移动 (260, 140)
+HANDOFF: 人改动了 1 处：新增 0 · 修改 1 · 删除 0
+模型 : 他们改动了「执行」卡片，把它从原位置向下拖到了 (560, 260)，移到「复盘」下方。
+判分 : PASS（识别 1，遗漏 0，编造 0）
+```
+
+这是 Doodle 相对一次性图表生成器的核心差异，之前完全没有测试覆盖。
+
+## 12. 加难度、多模型并行、人机回环扩全
+
+### 难度：从 100% 降到 88%
+
+上一轮 10 个 case 全部满分，说明**区分度为零**。新增 7 个更难的 case
+（`bench/cases/hard.json`）：分支汇合、三层依赖、带环回退、十步长链、
+带约束标注、两组对比、密集状态机。
+
+同一模型（C）在 17 个 case 上的结果：
+
+```
+pass 88% · mean score 0.96
+```
+
+唯一的失败是 `flow/onboarding`：模型画了「完善资料」，而 case 期望「验证」。
+这是**真实的内容差异**，不是测量噪声——基准的价值就在这里。
+
+### 多模型并行
+
+```
+node bench/run-matrix.mjs --models m1,m2,m3 --concurrency 3
+node bench/run-report.mjs bench/runs/<dir> --per-model
+```
+
+两个维度的并行：**模型之间**并行（一次比较等于最慢模型的时间），
+**模型内部**按 `--concurrency` 控制并发。安全性来自既有的隔离——
+每个 run 有独立临时目录和独立 `OUTPUT_DIR`，两个模型同时画也不会串。
+
+报告新增：
+
+```
+## By model
+| model | cases | score | pass | node recall | edge F1 | ... |
+
+### Per case
+| case | model-a | model-b | model-c |
+```
+
+逐 case 矩阵是必要的：模型级均值会掩盖差异的形状——一个模型可能全错难题、
+另一个全错长链，均值一样。
+
+### 上游繁忙：必须重试，不能记为失败
+
+真跑时模型 A 和 B 全部失败，初看像「这两个模型不会画」。实际是上游返回：
+
+```
+WorkBuddy: the model provider is temporarily unavailable (busy: you can retry)
+```
+
+第一次的重试判断只匹配抛出的 message，而「busy」在 stderr 里，所以没触发，
+13 个不可用的 run 被记成 13 张画坏的图。现在识别 provider-busy 并以递增退避
+重试三次。
+
+**并行会放大这个问题**：并发越高越容易撞上繁忙。这条不是可选项。
+
+### 人机回环扩到三种编辑
+
+```
+node bench/run-human-loop.mjs --edit move|relabel|delete
+```
+
+| 编辑 | 难度 | 实测 |
+|---|---|---|
+| move | 最易，HANDOFF 直接点名 | PASS |
+| relabel | 位置不变、只有含义变了 | PASS |
+| delete | 对象已消失，无处引用 | PASS |
+
+删除相关的两个 bug 都是 harness 的，不是模型的：
+
+1. **删节点没删连线**：残留的 line 指向已删除的 id，`parseBoard` 判定整板损坏，
+   服务端隔离文件并从空板启动。模型如实说「板上有零个对象」，判分器却记成
+   「没理解删除」。人删卡片时连线也会一起消失，所以修法同时也更真实。
+2. **判分器只在 `after` 里找标签**：被删对象已经不存在，正确答案永远无法被
+   识别。改为回退到 `before`，并让「编造」检查接受两侧的标签。
+
+### 判分器又被修正了六次
+
+加难度会立刻暴露判分器的粗糙之处。这一轮的六处，全部是「正确的图被判错」：
+
+| 现象 | 原因 |
+|---|---|
+| `score 1.00` 但 `pass false` | 重叠检测有自己的节点过滤，把标题算进去 |
+| 多余节点「方案对比」「决策与约束」 | 短标题被当成内容 |
+| 多余节点「选择上线」「选择暂缓」 | `role: annotation` 是连线标签，不是节点 |
+| 多余节点「从需求发布到新员工入职的完整链路」 | 副标题太长，长度/关键字规则都漏 |
+| 注释类内容被判多余 | case 需要能声明 `expect.allow` |
+| 一条无关节点的自由文本被静默吞掉 | 副标题规则太宽，把真实内容也排除了 |
+
+最后两条方向相反，说明**判分器不能只朝一个方向收紧**：排得太狠会吞掉真实内容，
+放得太松会把装饰算成内容。所以每一处都补了一对测试（该排除的排除、该计入的计入）。
+
+## 13. 五个测试模型跑出真实区分度
+
+magpie 上有 9 个测试模型，探测后 5 个可用（A/B/D/G 上游繁忙，I 参数被拒过一次）。
+
+```
+node bench/run-matrix.mjs --models workbuddy/blind-model-c,e,f,h,i --concurrency 4
+```
+
+5 模型 × 17 case = 85 次运行，并发 4，**约 5.5 分钟**。
+
+### 结果
+
+| 模型 | score | pass | node recall | edge F1 | median ms |
+|---|---|---|---|---|---|
+| E | 1.00 | **100%** | 1.00 | 1.00 | 33.5s |
+| H | 0.96 | 82% | 0.97 | 0.95 | 28.3s |
+| C | 0.95 | 88% | 0.99 | 0.93 | 29.5s |
+| F | 0.94 | 76% | 0.88 | 0.93 | 48.9s |
+| I | 0.84 | 71% | 0.84 | 0.82 | 77.9s |
+
+**这是基准第一次具备真实区分度**：通过率跨度 71%–100%，且排序稳定。
+注意 E 的 `edge F1` 也到了 1.00，而 I 慢了 2.3 倍——速度差异同样可测。
+
+### 逐 case 矩阵揭示的差异形状
+
+只看均值会得出「H 和 C 差不多」的结论（82% vs 88%），但矩阵显示：
+
+- E 在 `hard/constraint-labels` 全对，C/H/F 都错
+- I 在 `flow/onboarding` 和 `flow/review-loop` 全错，其他模型全对
+- F 在 `compare/two-options` 和 `hard/two-groups-contrast` 都错
+
+三个模型各有自己的弱项，修同一处不会改善另外两个。这正是逐 case 矩阵的价值。
+
+### 判分器又被修正了五次
+
+难 case 暴露的仍是「正确的图被判错」，且这次都来自**不同模型的画法差异**：
+
+| 现象 | 模型做法 | 修正 |
+|---|---|---|
+| 三层架构 recall=0 | 空白卡片 + 卡片外的 `label` 写层名 | 与卡片重叠的 `label` 算卡片名 |
+| 对比图缺「现状/目标」 | 分组标题放在 column 容器顶部 | 容器顶部的短文本是组名，不是大标题 |
+| 多余节点「依赖」「通过」 | 连线旁放独立文本当边标签 | 距连线 48px 内的短文本是边标签 |
+| 多余节点「连接：是 · 否」 | 把边标签罗列成图例 | 图例匹配时把边标签也算进去 |
+| `branch-merge` 多一条边 | 用中间节点「汇合」代替直连 | case 声明 `allow`，边结构容差由 case 决定 |
+
+第五条值得单独说：**没有一种画法是错的**。直连两个分支汇合，和画一个汇合节点，
+语义相同。基准不能替人决定审美，所以允许 case 声明可接受的额外结构。
+
+### 当前状态
+
+```
+pass 82% · mean score 0.93 · 5 models · 84 graded runs
+```
+
+剩余失败经逐条核对，全部是真实内容差异（例如模型画「完善资料」而 case 要「验证」）。

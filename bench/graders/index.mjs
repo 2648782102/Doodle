@@ -12,7 +12,7 @@
  * that as a hard failure would make the benchmark noisy.
  */
 
-import { gradeEdges, gradeNodes, gradeSequence, gradeTree } from "./structure.mjs";
+import { gradeEdges, gradeNodes, gradeSequence, gradeTree, nodesOf } from "./structure.mjs";
 import { gradeGeometry } from "./geometry.mjs";
 
 export const DEFAULT_WEIGHTS = {
@@ -103,8 +103,15 @@ function clamp01(value) {
 }
 
 function countOverlappingNodes(board) {
-  const nodes = board.items.filter((item) => item.type !== "line"
-    && item.type !== "stroke" && item.role !== "frame" && item.role !== "label");
+  /*
+   * Use the same node set the structure grader uses.
+   *
+   * This had its own filter, which kept the generator's frame, title, and
+   * subtitle. A correct branch diagram then "overlapped" because its legend sat
+   * on top of a card — the score said 1.00 and the case still failed, which is
+   * the most confusing possible output.
+   */
+  const nodes = nodesOf(board);
   const padding = 2;
   let count = 0;
   for (let i = 0; i < nodes.length; i += 1) {
