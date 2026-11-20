@@ -49,15 +49,17 @@ describe("handoff describes who changed what", () => {
     expect(handoff.humanEdits[0].now.text).toBe("从需求开始");
   });
 
-  it("reports objects the human added and removed", () => {
-    const previous = board(1, [item({ id: "a" })]);
-    const current = board(2, [item({ id: "a" }), item({ id: "b", author: "human", text: "人的补充" })]);
+  it("reports objects the human added and removed, including removed AI objects", () => {
+    const previous = board(1, [item({ id: "a", author: "ai", text: "AI 草图" })]);
+    const current = board(2, [item({ id: "a", author: "ai", text: "AI 草图" }), item({ id: "b", author: "human", text: "人的补充" })]);
     const added = describeHandoff(current, previous);
 
     expect(added.humanEdits.map((entry) => [entry.id, entry.change])).toContainEqual(["b", "added"]);
 
     const removed = describeHandoff(board(3, []), current);
+    expect(removed.humanEdits.map((entry) => [entry.id, entry.change])).toContainEqual(["a", "removed"]);
     expect(removed.humanEdits.map((entry) => [entry.id, entry.change])).toContainEqual(["b", "removed"]);
+    expect(removed.needsAttention).toBe(true);
   });
 
   it("ignores AI-only changes so the agent is not told to review itself", () => {

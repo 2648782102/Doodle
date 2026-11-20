@@ -239,7 +239,7 @@ export function describeHandoff(
     }
   }
   for (const [id, old] of before) {
-    if (!after.has(id) && old.author === "human") {
+    if (!after.has(id)) {
       edits.push({ id, change: "removed", author: "human", fields: [] });
       readings.push({
         id,

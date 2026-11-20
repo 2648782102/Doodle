@@ -89,25 +89,38 @@ export class AsyncMutex {
   }
 
   private async removeStaleLock(): Promise<"reclaimed" | "blocked" | "held"> {
+    let stats: Awaited<ReturnType<typeof fs.stat>>;
+    let raw: string;
     try {
-      const [stats, raw] = await Promise.all([
+      [stats, raw] = await Promise.all([
         fs.stat(this.lockFile),
         fs.readFile(this.lockFile, "utf8"),
       ]);
+    } catch (error) {
+      if (isNodeError(error) && error.code === "ENOENT") return "reclaimed";
       /*
-       * A lock file naming this instance while we are between runs is our own
-       * leftover, not a holder: `localTail` serialises runs inside an instance,
-       * so nothing here can be holding it. Reclaim immediately instead of
-       * waiting out LOCK_STALE_MS on every write.
+       * A transient read/stat error (EBUSY/EACCES/EPERM on Windows while
+       * another process is creating or releasing the lock) means the lock is
+       * actively contended, NOT that unlinking our own leftover is blocked.
+       * Treat it as held so the caller retries instead of dropping exclusion.
        */
-      const abandoned = raw.trim() === this.owner;
-      if (!abandoned && Date.now() - stats.mtimeMs < LOCK_STALE_MS) return "held";
+      return "held";
+    }
+    /*
+     * A lock file naming this instance while we are between runs is our own
+     * leftover, not a holder: `localTail` serialises runs inside an instance,
+     * so nothing here can be holding it. Reclaim immediately instead of
+     * waiting out LOCK_STALE_MS on every write.
+     */
+    const abandoned = raw.trim() === this.owner;
+    if (!abandoned && Date.now() - stats.mtimeMs < LOCK_STALE_MS) return "held";
+    try {
       await fs.unlink(this.lockFile);
       return "reclaimed";
     } catch (error) {
       if (isNodeError(error) && error.code === "ENOENT") return "reclaimed";
-      // Reported by the caller: the holder is gone but the file cannot be
-      // deleted, which is an environment restriction rather than a lock error.
+      // Only fall back to blocked when we know the lock is our own leftover or
+      // past LOCK_STALE_MS and the environment refuses to delete it.
       return "blocked";
     }
   }

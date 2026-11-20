@@ -131,30 +131,37 @@ export function excalidrawElementsToBoardItems(
     const bound = textByContainer.get(element.id);
     const labels = itemText(bound ?? element);
     const previous = bySceneId.get(element.id) ?? byId.get(element.id);
+    const id = previous?.id ?? element.id;
     /*
-     * A text box must not shrink to its glyphs.
+     * A text box must not shrink to its glyphs, yet the person must still be
+     * able to drag an existing text horizontally.
      *
-     * Excalidraw recomputes a text element's width from its content, so a
-     * centred caption stored at the card's width came back as the width of the
-     * two characters. `textAlign: center` then centred the caption inside those
-     * 24px instead of under the 190px card, and every label drifted left while
-     * the positions still "matched" the data. Keep the stored box for text and
-     * let the canvas render inside it; only other shapes take the reported
-     * width.
+     * Excalidraw re-measures text from its content and nudges `x` by the shrink
+     * delta (left-aligned stays at `previous.x`, centred shifts toward
+     * `previous.x + (previous.w - element.width) / 2`, right-aligned shifts by
+     * `previous.w - element.width`). Only when the element sits at that
+     * expected re-measured anchor (within a small tolerance) do we keep
+     * `previous.x`; any larger shift is a real horizontal drag and moves the
+     * box by the exact delta.
      */
+    const elementWidth = finite(element.width, 1);
     const reportedWidth = type === "text" && previous
-      ? Math.max(finite(element.width, 1), previous.w)
-      : finite(element.width, 1);
-    /*
-     * The x of a text box follows its box, not its glyphs.
-     *
-     * Excalidraw nudges a text element's x when it re-measures the content, so a
-     * caption centred under a card came back 24px to the left of where it was
-     * drawn. Keeping the previously stored x for text keeps a centred caption
-     * centred; the canvas still owns the visual result because the box and the
-     * alignment are unchanged.
-     */
-    const reportedX = type === "text" && previous ? previous.x : finite(element.x);
+      ? Math.max(elementWidth, previous.w)
+      : elementWidth;
+    const reportedX = (() => {
+      const currentX = finite(element.x);
+      if (type !== "text" || !previous) return currentX;
+      const previousSceneX = finite(previous.scene?.element?.x, NaN);
+      if (Number.isFinite(previousSceneX)) {
+        return previous.x + (currentX - previousSceneX);
+      }
+      const align = (element.textAlign ?? previous.style?.textAlign ?? "left") as string;
+      const shrink = Math.max(0, previous.w - elementWidth);
+      const expectedMin = previous.x - shrink;
+      const expectedMax = align === "left" ? previous.x : previous.x + shrink;
+      if (currentX >= expectedMin - 2 && currentX <= expectedMax + 2) return previous.x;
+      return currentX;
+    })();
     // Text and thin lines can legitimately be shorter than the stored minimum;
     // clamp rather than emit a board the server will reject wholesale.
     const width = Math.max(MIN_STORED_SIZE, reportedWidth);
@@ -162,7 +169,7 @@ export function excalidrawElementsToBoardItems(
     const points = elementPoints(element);
     const file = element.fileId ? files[element.fileId] : undefined;
     const item: BoardItem = {
-      id: element.id,
+      id,
       type,
       x: round(reportedX),
       y: round(finite(element.y)),
@@ -221,9 +228,17 @@ export function excalidrawElementsToBoardItems(
    * the dangling endpoint and keep the arrow itself.
    */
   const keptIds = new Set(items.map((item) => item.id));
+  const sceneToBoardId = new Map(items.flatMap((item) => item.scene?.element?.id
+    ? [[String(item.scene.element.id), item.id] as [string, string]] : []));
   for (const item of items) {
-    if (item.startItemId && !keptIds.has(item.startItemId)) delete item.startItemId;
-    if (item.endItemId && !keptIds.has(item.endItemId)) delete item.endItemId;
+    if (item.startItemId) {
+      item.startItemId = sceneToBoardId.get(item.startItemId) ?? item.startItemId;
+      if (!keptIds.has(item.startItemId)) delete item.startItemId;
+    }
+    if (item.endItemId) {
+      item.endItemId = sceneToBoardId.get(item.endItemId) ?? item.endItemId;
+      if (!keptIds.has(item.endItemId)) delete item.endItemId;
+    }
   }
   for (const frame of frameElements) {
     const previous = bySceneId.get(frame.id) ?? byId.get(frame.id);

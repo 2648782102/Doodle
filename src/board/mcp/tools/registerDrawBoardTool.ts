@@ -295,6 +295,8 @@ server.registerTool(
         if (initial.revision === expected_revision) {
           assertRevision(initial);
           board = await commit(change(initial), initial);
+        } else if (replace_board !== undefined) {
+          throw new BoardRevisionConflictError(expected_revision, initial.revision);
         } else {
           /*
            * A pinned write that lost the race is not automatically a conflict.
@@ -329,6 +331,7 @@ server.registerTool(
           const { touched, conflicts } = reportConflicts(base, initial, {
             updates: cleanUpdates,
             remove_ids,
+            layout,
           });
           /*
            * Nothing named, nothing to collide with.

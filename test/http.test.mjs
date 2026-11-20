@@ -485,5 +485,116 @@ describe("object-level conflict handling", () => {
     expect(body.code).toBe("REVISION_CONFLICT_OBJECTS");
     expect(body.conflicts).toEqual([a.id]);
     expect(body.expectedRevision).toBe(afterMerge.revision);
+
+    // Single-item PATCH/DELETE and whole-board replace must not bypass conflict checks.
+    const stalePatch = await fetch(`${base}/api/board/items/${a.id}`, {
+      method: "PATCH",
+      headers: {
+        "Content-Type": "application/json",
+        "X-AI-Draw-Token": token,
+        "If-Match-Revision": String(rev1),
+      },
+      body: JSON.stringify({ confirmedBy: "human", patch: { x: 777 } }),
+    });
+    expect(stalePatch.status).toBe(409);
+    expect((await stalePatch.json()).conflicts).toEqual([a.id]);
+
+    const staleReplace = await post("/api/board/replace", {
+      confirmedBy: "human",
+      board: { ...afterMerge, revision: rev1 + 1 },
+    }, rev1, token);
+    expect(staleReplace.status).toBe(409);
+  });
+
+  it("allows deleting the very last object via DELETE and batch remove_ids", async () => {
+    const isolatedDir = await fs.mkdtemp(path.join(os.tmpdir(), "doodle-last-delete-"));
+    const isolatedPort = await freePort();
+    const isolatedBase = `http://127.0.0.1:${isolatedPort}`;
+    const isolatedBoard = new BoardStore(path.join(isolatedDir, "output"));
+    await isolatedBoard.init();
+    const isolatedServer = new BoardHttpServer(isolatedBoard, {
+      previewHost: "127.0.0.1",
+      previewPort: isolatedPort,
+      outputDir: path.join(isolatedDir, "output"),
+      workspaceRoot: isolatedDir,
+      cwd: isolatedDir,
+    }, new BoardRevisionCache());
+    await isolatedServer.start();
+    try {
+      const html = await fetch(isolatedBase).then((r) => r.text());
+      const token = html.match(/const PANEL_TOKEN = "([^"]+)"/)?.[1];
+      const one = await fetch(`${isolatedBase}/api/board/items`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json", "X-AI-Draw-Token": token },
+        body: JSON.stringify({ confirmedBy: "human", item: { type: "note", x: 0, y: 0, text: "only" } }),
+      }).then((r) => r.json());
+      const lastId = one.board.items[0].id;
+
+      const delLast = await fetch(`${isolatedBase}/api/board/items/${lastId}`, {
+        method: "DELETE",
+        headers: { "Content-Type": "application/json", "X-AI-Draw-Token": token },
+        body: JSON.stringify({ confirmedBy: "human" }),
+      });
+      expect(delLast.status).toBe(200);
+      expect((await delLast.json()).board.items).toHaveLength(0);
+
+      const again = await fetch(`${isolatedBase}/api/board/items`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json", "X-AI-Draw-Token": token },
+        body: JSON.stringify({ confirmedBy: "human", item: { type: "note", x: 0, y: 0, text: "only-2" } }),
+      }).then((r) => r.json());
+      const batchDel = await fetch(`${isolatedBase}/api/board/batch`, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          "X-AI-Draw-Token": token,
+          "If-Match-Revision": String(again.board.revision),
+        },
+        body: JSON.stringify({ confirmedBy: "human", remove_ids: [again.board.items[0].id] }),
+      });
+      expect(batchDel.status).toBe(200);
+      expect((await batchDel.json()).board.items).toHaveLength(0);
+    } finally {
+      await isolatedServer.stop();
+      await fs.rm(isolatedDir, { recursive: true, force: true });
+    }
+  });
+});
+
+describe("HTTP and WebSocket security boundaries", () => {
+  it("returns structured 400 on invalid project scan bounds", async () => {
+    const response = await fetch(`${base}/api/board/project?max_depth=99`);
+    expect(response.status).toBe(400);
+    const body = await response.json();
+    expect(body.code).toBe("SCAN_RANGE_OUT_OF_RANGE");
+    expect(body.path).toBe("max_depth");
+  });
+
+  it("rejects sibling-prefix path traversal and cross-origin writes or WebSockets", async () => {
+    const { isPathWithinRoot } = await import("../dist/board/http/security.js");
+    expect(isPathWithinRoot("/tmp/templates/excalidraw", "/tmp/templates/excalidraw/index.css")).toBe(true);
+    expect(isPathWithinRoot("/tmp/templates/excalidraw", "/tmp/templates/excalidraw.html")).toBe(false);
+    expect(isPathWithinRoot("/tmp/templates/excalidraw", "/tmp/templates/excalidraw-app.tsx")).toBe(false);
+
+    const html = await fetch(base).then((r) => r.text());
+    const token = html.match(/const PANEL_TOKEN = "([^"]+)"/)?.[1];
+    const crossOriginWrite = await fetch(`${base}/api/board/items`, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        "X-AI-Draw-Token": token,
+        Origin: "https://evil.example",
+      },
+      body: JSON.stringify({ confirmedBy: "human", item: { type: "note", x: 0, y: 0, text: "x" } }),
+    });
+    expect(crossOriginWrite.status).toBe(403);
+
+    const wsRejected = await new Promise((resolve) => {
+      const ws = new WebSocket(`ws://127.0.0.1:${port}/ws`, { headers: { Origin: "https://evil.example" } });
+      ws.once("unexpected-response", (_req, res) => resolve(res.statusCode));
+      ws.once("open", () => { ws.close(); resolve(101); });
+      ws.once("error", () => resolve(403));
+    });
+    expect(wsRejected).not.toBe(101);
   });
 });

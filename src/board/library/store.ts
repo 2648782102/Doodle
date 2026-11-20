@@ -127,7 +127,12 @@ export class BoardLibrary {
     const currentEntry = index.boards.find((entry) => entry.id === activeId);
     if (!currentEntry) throw new Error("Active board is missing");
 
+    const activeSnapshotInSync = current.id === activeId
+      && currentEntry.revision === current.revision
+      && currentEntry.itemCount === current.items.length
+      && currentEntry.updatedAt === current.updatedAt;
     const saveActive = async () => {
+      if (activeSnapshotInSync) return;
       index = await this.upsert(index, current, currentEntry.name);
       currentEntry.name = index.boards.find((entry) => entry.id === activeId)!.name;
     };
@@ -153,15 +158,19 @@ export class BoardLibrary {
     };
 
     if (action.type === "list") {
-      await saveActive();
-      await this.writeIndex(index);
+      if (!activeSnapshotInSync) {
+        await saveActive();
+        await this.writeIndex(index);
+      }
       return { index, board: { ...normalizeBoardSnapshot(current), title: currentEntry.name } };
     }
     if (action.type === "get" || action.type === "export") {
-      await saveActive();
+      if (!activeSnapshotInSync) {
+        await saveActive();
+        await this.writeIndex(index);
+      }
       const id = action.id ? requireBoard(action.id) : activeId;
       const board = id === activeId ? normalizeBoardSnapshot(current) : await this.readBoard(id);
-      await this.writeIndex(index);
       return { index, board: id === activeId ? { ...board, title: currentEntry.name } : board };
     }
     if (action.type === "save") {
