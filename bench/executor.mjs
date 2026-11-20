@@ -159,6 +159,41 @@ export function parseEvents(stdout) {
  */
 export async function runCase(testCase, options = {}) {
   const timeoutMs = options.timeoutMs ?? 180_000;
+  /*
+   * Provider-busy retries.
+   *
+   * A parallel matrix multiplies concurrent requests, so a "busy, retry later"
+   * answer from one provider is expected rather than exceptional. Recording it
+   * as a failed case would make the model look worse than it is; retrying keeps
+   * the comparison about drawing ability. Only provider-busy is retried —
+   * a model that genuinely called no tool is a finding, not a flake.
+   */
+  const attempts = options.attempts ?? 3;
+  let lastError;
+  for (let attempt = 1; attempt <= attempts; attempt += 1) {
+    try {
+      return await runCaseOnce(testCase, options);
+    } catch (error) {
+      lastError = error;
+      /*
+       * The provider's "busy" text arrives in stderr, not in the thrown
+       * message, so matching only the message never triggered a retry — the
+       * matrix recorded thirteen unavailable models as thirteen bad drawings.
+       */
+      if (!/was busy|busy|temporarily unavailable|overloaded|rate.?limit/i.test(String(error?.message ?? ""))) {
+        throw error;
+      }
+      if (attempt === attempts) break;
+      const backoffMs = 5_000 * attempt;
+      process.stderr.write(`    provider busy, retry ${attempt + 1}/${attempts} in ${backoffMs / 1000}s\n`);
+      await new Promise((resolve) => setTimeout(resolve, backoffMs));
+    }
+  }
+  throw lastError;
+}
+
+async function runCaseOnce(testCase, options = {}) {
+  const timeoutMs = options.timeoutMs ?? 180_000;
   const workDir = options.workDir ?? await fs.mkdtemp(path.join(os.tmpdir(), "doodle-bench-run-"));
   const stateDir = path.join(workDir, "state");
   await fs.mkdir(stateDir, { recursive: true });
@@ -228,9 +263,11 @@ export async function runCase(testCase, options = {}) {
    * invisible in an average. Fail the case instead, with the reason.
    */
   if (turns.length === 0 && !usage) {
-    const hint = /timed out|disconnected|ECONN|ENOTFOUND|Reconnecting/i.test(stderr)
-      ? "the request never reached the model (network or auth)"
-      : "the model ran but called no tool";
+    const hint = /temporarily unavailable|busy|rate.?limit|overloaded/i.test(stderr)
+      ? "the model provider was busy — retry or use another model"
+      : /timed out|disconnected|ECONN|ENOTFOUND|Reconnecting/i.test(stderr)
+        ? "the request never reached the model (network or auth)"
+        : "the model ran but called no tool";
     throw new Error(`no tool calls recorded — ${hint}; stderr: ${stderr.slice(-400)}`);
   }
 

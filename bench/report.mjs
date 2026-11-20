@@ -78,6 +78,33 @@ export function summarizeByKind(rows) {
 }
 
 /**
+ * Aggregate rows per model, so a comparison is one table instead of two reports
+ * a person has to line up by hand.
+ */
+export function summarizeByModel(rows) {
+  const groups = new Map();
+  for (const row of rows) {
+    const list = groups.get(row.model) ?? [];
+    list.push(row);
+    groups.set(row.model, list);
+  }
+  return [...groups.entries()]
+    .map(([model, list]) => ({
+      model,
+      count: list.length,
+      score: mean(list.map((row) => row.score)),
+      passRate: mean(list.map((row) => (row.pass ? 1 : 0))),
+      nodeRecall: mean(list.map((row) => row.structure.nodes.recall)),
+      edgeF1: mean(list.map((row) => row.structure.edges.f1)),
+      crossings: mean(list.map((row) => row.geometry.crossings)),
+      medianMs: median(list.map((row) => row.durationMs ?? 0)),
+      calls: mean(list.map((row) => row.turns)),
+      retries: list.reduce((sum, row) => sum + row.retries, 0),
+    }))
+    .sort((left, right) => right.score - left.score);
+}
+
+/**
  * Which checks fail most often, and where.
  *
  * This is the actionable part: "edge_f1 failed in 5 of 12 sequence cases" tells
@@ -146,7 +173,7 @@ export function compareRuns(baselineRows, currentRows) {
 }
 
 /** The Markdown report. */
-export function renderMarkdown({ rows, unknown, comparison }) {
+export function renderMarkdown({ rows, unknown, comparison, perModel = false }) {
   const lines = [];
   lines.push("# Doodle drawing benchmark");
   lines.push("");
@@ -157,8 +184,43 @@ export function renderMarkdown({ rows, unknown, comparison }) {
 
   const total = rows.length;
   const passRate = mean(rows.map((row) => (row.pass ? 1 : 0)));
-  lines.push(`Cases: ${total} · pass ${formatPercent(passRate)} · mean score ${mean(rows.map((row) => row.score)).toFixed(2)}`);
+  const models = [...new Set(rows.map((row) => row.model))];
+  lines.push(`Cases: ${total} · pass ${formatPercent(passRate)} · mean score ${mean(rows.map((row) => row.score)).toFixed(2)}`
+    + (models.length > 1 ? ` · models: ${models.length}` : ""));
   lines.push("");
+
+  if (perModel || models.length > 1) {
+    lines.push("## By model");
+    lines.push("");
+    lines.push("| model | cases | score | pass | node recall | edge F1 | crossings | median ms | calls | retries |");
+    lines.push("|---|---|---|---|---|---|---|---|---|---|");
+    for (const group of summarizeByModel(rows)) {
+      lines.push(`| ${group.model} | ${group.count} | ${group.score.toFixed(2)} | ${formatPercent(group.passRate)} `
+        + `| ${group.nodeRecall.toFixed(2)} | ${group.edgeF1.toFixed(2)} | ${group.crossings.toFixed(1)} `
+        + `| ${group.medianMs} | ${group.calls.toFixed(1)} | ${group.retries} |`);
+    }
+    lines.push("");
+
+    /*
+     * Per-case matrix. A model-level average hides the shape of a difference:
+     * one model may fail all the hard cases while another fails all the long
+     * ones, and both average the same.
+     */
+    const caseIds = [...new Set(rows.map((row) => row.case))];
+    lines.push("### Per case");
+    lines.push("");
+    lines.push(`| case | ${models.join(" | ")} |`);
+    lines.push(`|---|${models.map(() => "---").join("|")}|`);
+    for (const caseId of caseIds) {
+      const cells = models.map((model) => {
+        const row = rows.find((candidate) => candidate.case === caseId && candidate.model === model);
+        if (!row) return "—";
+        return `${row.pass ? "✅" : "❌"} ${row.score.toFixed(2)}`;
+      });
+      lines.push(`| ${caseId} | ${cells.join(" | ")} |`);
+    }
+    lines.push("");
+  }
 
   lines.push("## By category");
   lines.push("");

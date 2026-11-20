@@ -10,7 +10,14 @@
  * question is not "did the model sound plausible" but "did it read the board
  * the same way the board reads itself".
  *
- * Usage: node bench/run-human-loop.mjs [--out <dir>] [--label <object label>]
+ * Usage: node bench/run-human-loop.mjs [--out <dir>] [--label <object label>] [--edit move|relabel|delete]
+ *
+ * Each edit kind exercises a different reading. A move is the easiest — the
+ * board's own handoff names it plainly. A relabel is harder, because the object
+ * keeps its position and only its meaning changed. A delete is the hardest: the
+ * object is gone, so nothing on the board can be quoted, and a model that
+ * describes "the card that used to say X" is doing real reading rather than
+ * pattern-matching an id.
  */
 
 import fs from "node:fs/promises";
@@ -29,8 +36,25 @@ const { expandRecipe } = await import(path.join(repoRoot, "dist/board/diagram/re
  * build output directly — the loader problem that forced injection only exists
  * inside vitest. Injection keeps one code path for both.
  */
-const { describeHandoff } = await import(path.join(repoRoot, "dist/board/handoff.js"));
-setHandoffImplementation(describeHandoff);
+/*
+ * The handoff module has moved once already (`board/handoff.ts` →
+ * `board/view/handoff.ts`), so the loader tries both rather than depending on
+ * the current layout. A benchmark that breaks whenever source is reorganised is
+ * a benchmark nobody runs.
+ */
+async function loadDescribeHandoff() {
+  const candidates = ["dist/board/view/handoff.js", "dist/board/handoff.js"];
+  for (const candidate of candidates) {
+    try {
+      const module = await import(path.join(repoRoot, candidate));
+      if (typeof module.describeHandoff === "function") return module.describeHandoff;
+    } catch {
+      // Try the next layout.
+    }
+  }
+  throw new Error(`handoff module not found at ${candidates.join(" or ")}; run \`npm run build\``);
+}
+setHandoffImplementation(await loadDescribeHandoff());
 
 const STEPS = ["计划", "执行", "复盘"];
 
@@ -77,8 +101,10 @@ async function main() {
   const args = process.argv.slice(2);
   const outIndex = args.indexOf("--out");
   const labelIndex = args.indexOf("--label");
+  const editIndex = args.indexOf("--edit");
   const outDir = path.resolve(outIndex >= 0 ? args[outIndex + 1] : path.join(repoRoot, "bench", "runs", `human-${Date.now()}`));
   const movedLabel = labelIndex >= 0 ? args[labelIndex + 1] : "执行";
+  const editKind = editIndex >= 0 ? args[editIndex + 1] : "move";
   await fs.mkdir(outDir, { recursive: true });
 
   const workDir = await fs.mkdtemp(path.join(os.tmpdir(), "doodle-human-"));
@@ -108,10 +134,15 @@ async function main() {
 
   // Step 2: a scripted person moves one card.
   const before = JSON.parse(await fs.readFile(boardFile, "utf8"));
-  const after = applyHumanEdit(before, { type: "move", label: movedLabel, dx: 260, dy: 140 });
+  const edit = editKind === "relabel"
+    ? { type: "relabel", label: movedLabel, to: `${movedLabel}（已调整）` }
+    : editKind === "delete"
+      ? { type: "delete", label: movedLabel }
+      : { type: "move", label: movedLabel, dx: 260, dy: 140 };
+  const after = applyHumanEdit(before, edit);
   await fs.writeFile(boardFile, JSON.stringify(after), "utf8");
   const handoff = expectedHandoff(before, after);
-  process.stderr.write(`  person moved 「${movedLabel}」 by (260, 140)\n`);
+  process.stderr.write(`  person ${editKind} 「${movedLabel}」\n`);
 
   // Step 3: ask the model what changed.
   const prompt = [
@@ -133,17 +164,18 @@ async function main() {
     generated_at: new Date().toISOString(),
     model: modelConfig().model,
     moved: movedLabel,
+    edit: editKind,
     handoff: { summary: handoff.summary, kinds: handoff.readings.map((reading) => reading.kind) },
     answer,
     grade: result,
   };
-  await fs.writeFile(path.join(outDir, "human-loop.json"), `${JSON.stringify(record, null, 2)}\n`, "utf8");
+  await fs.writeFile(path.join(outDir, `human-loop-${editKind}.json`), `${JSON.stringify(record, null, 2)}\n`, "utf8");
 
   process.stderr.write(`\n  HANDOFF: ${handoff.summary}\n`);
   process.stderr.write(`  answer : ${answer}\n`);
   process.stderr.write(`  grade  : ${result.ok ? "PASS" : "FAIL"} `
     + `(detected ${result.detected}, missed ${result.missed.length}, invented ${result.invented.length})\n`);
-  process.stderr.write(`\nwrote ${path.relative(repoRoot, path.join(outDir, "human-loop.json"))}\n`);
+  process.stderr.write(`\nwrote ${path.relative(repoRoot, path.join(outDir, `human-loop-${editKind}.json`))}\n`);
 
   if (!result.ok) process.exitCode = 1;
 }

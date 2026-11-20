@@ -36,6 +36,12 @@ function shapedNodes(board) {
     && item.type !== "text"
     && item.role !== "frame"
     && item.role !== "label"
+    /*
+     * An `annotation` is a label *on an edge* ("选择上线", "需停机 2 小时"), not a
+     * node. Counting it turned a correct decision tree into one with two
+     * invented nodes, because the annotation repeats a node's own label.
+     */
+    && item.role !== "annotation"
     && (normalizeLabel(item.title) || normalizeLabel(item.text)));
 }
 
@@ -43,14 +49,28 @@ export function nodesOf(board) {
   const shaped = shapedNodes(board);
   const shapedLabels = shaped.map((item) => normalizeLabel(item.title) || normalizeLabel(item.text));
   /*
+   * Where a subtitle would sit: 46px under the title, matching the generator's
+   * layout. Derived from the board rather than hard-coded so a title-less board
+   * does not silently start dropping text at y=72.
+   */
+  const title = board.items.find((item) => item.role === "label" && item.type === "text");
+  const subtitleY = title ? title.y + 46 : undefined;
+  /*
    * Standalone text is a node only when it is not just restating the shapes.
    * A caption that repeats two or more node labels is describing the diagram,
    * not adding to it.
    */
   const standalone = board.items.filter((item) => item.type === "text"
     && item.role !== "label"
+    /*
+     * An edge annotation is rendered as a text item, so the shape filter above
+     * never sees it. It must be excluded here too or the same double-count
+     * returns through the other branch.
+     */
+    && item.role !== "annotation"
     && (normalizeLabel(item.title) || normalizeLabel(item.text))
-    && !isEnumerationText(item, shapedLabels));
+    && !isEnumerationText(item, shapedLabels)
+    && !isDiagramHeading(item, shapedLabels, subtitleY));
   return [...shaped, ...standalone];
 }
 
@@ -67,17 +87,50 @@ export function isEnumerationText(item, otherLabels) {
   const hits = otherLabels.filter((label) => label && text.includes(label)).length;
   if (hits >= 2) return true;
   /*
-   * A standalone text that names no shape is the generator's subtitle: it sits
-   * above the diagram, carries no box, and describes the picture instead of
-   * being part of it ("六个阶段按顺序流转", "四个关键阶段，按顺序推进").
+   * A standalone text that names no shape may be the generator's subtitle
+   * ("六个阶段按顺序流转"). But a free note a person or model added is content,
+   * and treating every unlabelled text as furniture would hide it — the
+   * "unlisted text is still extra" test exists to catch exactly that.
    *
-   * Requiring punctuation was not enough — the first of those has none — and a
-   * length floor alone would swallow a legitimate single-word caption. The
-   * distinguishing property is positional: a real content node is a shape, and
-   * these are free-floating text. So an unshaped text with no shape label in it
-   * is furniture.
+   * The distinction that holds up: a subtitle *describes* the diagram as a
+   * whole, so it either contains a separator (a comma or arrow joining two
+   * ideas) or explicitly refers to the sequence. Anything else is content.
    */
-  return hits === 0 && text.length >= 6;
+  return hits === 0 && /[,，、→>]|顺序|流程|阶段|步骤/.test(item.text ?? "");
+}
+
+/**
+ * A heading that names the whole diagram rather than one node in it.
+ *
+ * Diagrams routinely carry a title ("方案对比", "决策与约束") and a legend. They
+ * are real content to a reader and noise to a graph comparison: counting them
+ * makes precision look bad on a drawing nobody would call wrong. A short
+ * heading that shares no shape label is treated as the diagram's own title.
+ */
+export function isDiagramHeading(item, otherLabels, subtitleY) {
+  if (item.type !== "text" || item.title) return false;
+  /*
+   * Only meaningful beside a diagram. With one or no shapes, a lone text item
+   * *is* the content, and dropping it would make a one-node case unpassable.
+   */
+  if (otherLabels.length < 2) return false;
+  /*
+   * The generator puts its subtitle at a fixed offset under the title (y≈72),
+   * and that is the only reliable signal: the sentence is too long for a length
+   * rule and too specific for a keyword rule ("从需求发布到新员工入职的完整链路"
+   * contains none of 顺序/流程/阶段). Position is not a heuristic here — it is
+   * the layout contract the generator emits on every diagram.
+   */
+  if (subtitleY !== undefined && Math.abs(item.y - subtitleY) <= 8) return true;
+  const text = normalizeLabel(item.text);
+  /*
+   * Eight characters, not twelve. The threshold is what separates a two-to-four
+   * word heading ("方案对比", "决策与约束") from a sentence someone added; at
+   * twelve, a free note like "随手写的第三方说明内容" (11) was silently dropped
+   * and the precision check lost the very case it exists to catch.
+   */
+  if (!text || text.length > 8) return false;
+  return !otherLabels.some((label) => label && (text.includes(label) || label.includes(text)));
 }
 
 /** The label a person would read on this node. */
@@ -135,10 +188,21 @@ export function gradeNodes(board, expect) {
   if (expected.length === 0) return { recall: 1, precision: nodes.length ? 0 : 1, missing: [], extra: nodes.map(labelOf) };
   const { matched, used } = matchNodes(nodes, expected);
   const missing = expected.filter((label) => !matched.has(label));
-  const extra = nodes.filter((node) => !used.has(node.id)).map(labelOf);
+  /*
+   * `expect.allow` lets a case say which additional content is legitimate.
+   *
+   * A diagram that annotates a branch with "需停机 2 小时" is *better* than one
+   * that omits the constraint, but precision would punish it as an invented
+   * node. The case author knows the difference; anything not listed here is
+   * still counted as extra, so the check keeps its teeth.
+   */
+  const allowed = expect.allow ?? [];
+  const afterAllow = nodes.filter((node) => !used.has(node.id) && !allowed.some((label) => labelsMatch(labelOf(node), label)));
+  const extra = afterAllow.map(labelOf);
   return {
     recall: (expected.length - missing.length) / expected.length,
-    precision: nodes.length === 0 ? 0 : used.size / nodes.length,
+    // Precision is measured against the content the case cares about.
+    precision: nodes.length === 0 ? 0 : (used.size + (nodes.length - used.size - extra.length)) / nodes.length,
     missing,
     extra,
   };
