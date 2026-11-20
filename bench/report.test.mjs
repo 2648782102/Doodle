@@ -8,7 +8,7 @@ import { describe, expect, it } from "vitest";
 import { createEmptyBoard, diagramToBoardItems, touchBoard } from "../dist/board/types.js";
 import { expandRecipe } from "../dist/board/diagram/recipe.js";
 import { assertTrace, makeTrace, shortHash } from "./trace.mjs";
-import { clusterFailures, compareRuns, gradeTraces, renderMarkdown, summarizeByKind } from "./report.mjs";
+import { clusterFailures, compareRuns, gradeTraces, renderMarkdown, summarizeByKind, summarizeByModel } from "./report.mjs";
 
 function flowBoard(steps) {
   return touchBoard({ ...createEmptyBoard(), items: diagramToBoardItems(expandRecipe({ recipe: "flow", steps }), "ai") });
@@ -161,5 +161,44 @@ describe("markdown report", () => {
     expect(groups).toHaveLength(1);
     expect(groups[0]).toMatchObject({ kind: "sequence", count: 2 });
     expect(groups[0].passRate).toBe(0.5);
+  });
+});
+
+describe("multi-model comparison", () => {
+  /*
+   * A model-level average hides the shape of a difference: one model can fail
+   * every hard case while another fails every long one, and both average the
+   * same. The per-case matrix is what makes the comparison actionable, so it is
+   * asserted separately from the summary.
+   */
+  const rows = [
+    { case: "a", kind: "sequence", model: "m1", score: 1, pass: true, failed: [],
+      structure: { nodes: { recall: 1 }, edges: { f1: 1 } }, geometry: { crossings: 0 },
+      budget: {}, durationMs: 1000, turns: 2, retries: 0, promptHash: "p", toolDescHash: "t" },
+    { case: "b", kind: "tree", model: "m1", score: 0.5, pass: false, failed: ["edge_f1"],
+      structure: { nodes: { recall: 1 }, edges: { f1: 0.5 } }, geometry: { crossings: 1 },
+      budget: {}, durationMs: 3000, turns: 3, retries: 0, promptHash: "p", toolDescHash: "t" },
+    { case: "a", kind: "sequence", model: "m2", score: 1, pass: true, failed: [],
+      structure: { nodes: { recall: 1 }, edges: { f1: 1 } }, geometry: { crossings: 0 },
+      budget: {}, durationMs: 2000, turns: 2, retries: 0, promptHash: "p", toolDescHash: "t" },
+    { case: "b", kind: "tree", model: "m2", score: 1, pass: true, failed: [],
+      structure: { nodes: { recall: 1 }, edges: { f1: 1 } }, geometry: { crossings: 0 },
+      budget: {}, durationMs: 2000, turns: 2, retries: 0, promptHash: "p", toolDescHash: "t" },
+  ];
+
+  it("ranks models by score", () => {
+    const summary = summarizeByModel(rows);
+    expect(summary.map((entry) => entry.model)).toEqual(["m2", "m1"]);
+    expect(summary[0].passRate).toBe(1);
+    expect(summary[1].passRate).toBe(0.5);
+  });
+
+  it("prints a per-case matrix, not only the average", () => {
+    const markdown = renderMarkdown({ rows, unknown: [] });
+    expect(markdown).toContain("## By model");
+    expect(markdown).toContain("### Per case");
+    // m1 fails case b while passing a — the matrix must show both.
+    expect(markdown).toMatch(/\| b \|.*✅ 1\.00.*\|/);
+    expect(markdown).toMatch(/\| b \|.*❌ 0\.50.*\|/);
   });
 });
