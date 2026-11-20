@@ -129,6 +129,50 @@ describe("simple shared board", () => {
     expect(updateBoardItems(current, [{ id, patch: { x: 11 } }], "human").revision).toBe(current.revision + 1);
   });
 
+  it("accepts a no-op write through the store instead of reporting a conflict", async () => {
+    /*
+     * `updateBoardItems` returns its input untouched for a patch that only
+     * restates stored values. The commit paths then compared revisions and
+     * threw `expected 2, found 2` — a conflict whose two numbers are equal,
+     * telling the caller to reload a board that never moved. Any surface that
+     * sends a full-item patch (the canvas, `draw_board`, `If-Match-Revision`)
+     * could hit it. A no-op is a success: no write, no revision bump, no error.
+     */
+    const outputDir = await fs.mkdtemp(path.join(os.tmpdir(), "doodle-noop-write-"));
+    try {
+      const store = new BoardStore(outputDir);
+      await store.init();
+      const seeded = touchBoard(addBoardItem(createEmptyBoard(), {
+        type: "rect", x: 10, y: 20, w: 100, h: 60, text: "same", author: "human",
+      }));
+      await store.replace({ ...seeded, revision: store.get().revision + 1 }, store.get().revision);
+      const current = await store.snapshot();
+      const { id, createdAt: _createdAt, ...patch } = current.items[0];
+      const reordered = Object.fromEntries(Object.entries(patch).reverse());
+      const noop = (board) => updateBoardItems(board, [{ id, patch: reordered }], "human");
+      const boardPath = path.join(outputDir, ".doodle", "board.json");
+      const before = await fs.stat(boardPath);
+
+      const viaMutate = await store.mutate(noop);
+      expect(viaMutate.revision).toBe(current.revision);
+      const viaPinned = await store.replaceIfRevision(noop(current), current.revision);
+      expect(viaPinned.revision).toBe(current.revision);
+      const viaLocked = await store.runLockedWrite((board) => ({
+        next: noop(board),
+        expectedRevision: board.revision,
+      }));
+      expect(viaLocked.board.revision).toBe(current.revision);
+
+      const after = await fs.stat(boardPath);
+      expect(after.mtimeMs).toBe(before.mtimeMs);
+      // A real edit still persists through the same path.
+      const edited = await store.mutate((board) => updateBoardItems(board, [{ id, patch: { x: 11 } }], "human"));
+      expect(edited.revision).toBe(current.revision + 1);
+    } finally {
+      await fs.rm(outputDir, { recursive: true, force: true });
+    }
+  });
+
   it("keeps visual-expression fields, connected lines, and deterministic layout modes", () => {
     let board = createEmptyBoard();
     board = addBoardItems(board, [

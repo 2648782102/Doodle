@@ -32,3 +32,21 @@ export function stableItemFingerprint(item: unknown): string {
   const { updatedAt: _updatedAt, ...rest } = record ?? {};
   return stableStringify(rest);
 }
+
+/**
+ * True when two boards hold the same content, ignoring timestamps.
+ *
+ * The commit paths need this instead of a reference check: a caller's transform
+ * may return a freshly parsed copy of the same data (`replace_board` round-trips
+ * through `parseBoard`), and identity would call that a change and demand a
+ * revision bump. Comparing content is what "nothing to save" actually means.
+ */
+export function sameBoardContent(left: unknown, right: unknown): boolean {
+  const strip = (board: unknown): unknown => {
+    const record = board as Record<string, unknown> | undefined;
+    if (!record) return record;
+    const { updatedAt: _updatedAt, ...rest } = record;
+    return rest;
+  };
+  return stableStringify(strip(left)) === stableStringify(strip(right));
+}
