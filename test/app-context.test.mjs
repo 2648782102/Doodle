@@ -2,7 +2,7 @@ import { describe, expect, it } from "vitest";
 import {
   buildBoardModelContext,
   diffBoardStates,
-} from "../dist/board/app-context.js";
+} from "../dist/board/view/app-context.js";
 
 function item(overrides = {}) {
   return {

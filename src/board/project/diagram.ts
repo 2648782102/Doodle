@@ -7,7 +7,7 @@
  * through, adjust labels, or ignore it. It is a suggestion, never applied.
  */
 
-import type { DiagramEdgeInput, DiagramMode, DiagramNodeInput } from "./types.js";
+import type { DiagramEdgeInput, DiagramMode, DiagramNodeInput } from "../types.js";
 
 const NODE_LIMIT = 12;
 

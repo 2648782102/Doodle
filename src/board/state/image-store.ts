@@ -10,9 +10,9 @@
 import fs from "node:fs/promises";
 import path from "node:path";
 import crypto from "node:crypto";
-import { logger } from "../infra/logger.js";
-import { renameWithRetry } from "../infra/atomic-write.js";
-import type { SimpleBoard } from "./types.js";
+import { logger } from "../../infra/logger.js";
+import { renameWithRetry } from "../../infra/atomic-write.js";
+import type { SimpleBoard } from "../types.js";
 
 const REF_PREFIX = "doodle-image:";
 const HASH_LENGTH = 24;

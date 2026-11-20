@@ -3,7 +3,7 @@ import {
   isViewportNearContent,
   readStoredViewport,
   writeStoredViewport,
-} from "../dist/board/viewport-memory.js";
+} from "../dist/board/client/viewport-memory.js";
 
 function storage(initial = {}) {
   const data = new Map(Object.entries(initial));

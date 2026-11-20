@@ -20,9 +20,9 @@ import {
   replaceBoardContent,
   touchBoard,
 } from "../dist/board/types.js";
-import { BoardStore } from "../dist/board/store.js";
+import { BoardStore } from "../dist/board/state/store.js";
 import { BoardRevisionConflictError } from "../dist/board/errors.js";
-import { scanProject } from "../dist/board/project-scan.js";
+import { scanProject } from "../dist/board/project/scan.js";
 
 describe("simple shared board", () => {
   it("keeps a bounded version 1 canvas independent of project state", () => {

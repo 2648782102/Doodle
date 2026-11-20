@@ -7,8 +7,8 @@
  * pure: the persisted board is never mutated.
  */
 
-import type { BoardItem, SimpleBoard } from "./types.js";
-import { stableStringify } from "./model/fingerprint.js";
+import type { BoardItem, SimpleBoard } from "../types.js";
+import { stableStringify } from "../model/fingerprint.js";
 
 /**
  * One item as the agent sees it: no canvas-fidelity payload, just a marker.

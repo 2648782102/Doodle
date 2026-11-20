@@ -7,7 +7,7 @@
  * to disk: a miss simply falls back to a full read.
  */
 
-import type { BoardAuthor, SimpleBoard } from "./types.js";
+import type { BoardAuthor, SimpleBoard } from "../types.js";
 
 const DEFAULT_LIMIT = 8;
 

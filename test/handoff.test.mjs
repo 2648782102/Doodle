@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { describeHandoff, handoffNextStep } from "../dist/board/handoff.js";
+import { describeHandoff, handoffNextStep } from "../dist/board/view/handoff.js";
 
 function item(overrides = {}) {
   return {

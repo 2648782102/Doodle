@@ -4,9 +4,9 @@ import os from "node:os";
 import path from "node:path";
 import WebSocket from "ws";
 import { describe, expect, it } from "vitest";
-import { watchBoardState } from "../dist/board/state-watch.js";
-import { BoardHttpServer } from "../dist/board/http.js";
-import { BoardStore } from "../dist/board/store.js";
+import { watchBoardState } from "../dist/board/state/state-watch.js";
+import { BoardHttpServer } from "../dist/board/http/server.js";
+import { BoardStore } from "../dist/board/state/store.js";
 
 function freePort() {
   return new Promise((resolve, reject) => {

@@ -9,8 +9,8 @@ import type { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { z } from "zod";
 import { READ_ONLY_LOCAL_ANNOTATIONS, type BoardToolContext } from "../context.js";
 import { errorResult } from "../presentation.js";
-import { scanProject } from "../../project-scan.js";
-import { projectDiagramDraft } from "../../project-diagram.js";
+import { scanProject } from "../../project/scan.js";
+import { projectDiagramDraft } from "../../project/diagram.js";
 
 export function registerScanProjectTool(server: McpServer, ctx: BoardToolContext): void {
 server.registerTool(

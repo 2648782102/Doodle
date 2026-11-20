@@ -11,8 +11,8 @@ import { spawn } from "node:child_process";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { ensureOutputDirWritable, loadRuntimeConfig } from "../dist/infra/config.js";
-import { BoardHttpServer } from "../dist/board/http.js";
-import { BoardStore } from "../dist/board/store.js";
+import { BoardHttpServer } from "../dist/board/http/server.js";
+import { BoardStore } from "../dist/board/state/store.js";
 import { logger } from "../dist/infra/logger.js";
 
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");

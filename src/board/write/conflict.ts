@@ -7,7 +7,7 @@
  * request touch anything that moved since the revision its author saw?
  */
 import type { SimpleBoard } from "../types.js";
-import { changedIds } from "../item-diff.js";
+import { changedIds } from "../model/diff.js";
 
 /**
  * Ids a request targets.

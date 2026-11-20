@@ -1,7 +1,7 @@
 import fs from "node:fs/promises";
 import path from "node:path";
 import { randomUUID } from "node:crypto";
-import { logger } from "../infra/logger.js";
+import { logger } from "../../infra/logger.js";
 
 const LOCK_TIMEOUT_MS = 15000;
 const LOCK_STALE_MS = 10000;

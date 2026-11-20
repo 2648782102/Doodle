@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { projectDiagramDraft } from "../dist/board/project-diagram.js";
+import { projectDiagramDraft } from "../dist/board/project/diagram.js";
 
 function snapshot(files) {
   return {

@@ -7,7 +7,7 @@
  * and the structured snapshot cannot disagree.
  */
 
-import { boardAgentDelta, summarizeAgentBoard } from "../agent-view.js";
+import { boardAgentDelta, summarizeAgentBoard } from "../view/agent-view.js";
 import type { SimpleBoard } from "../types.js";
 
 function short(item: { id: string; type: string; text?: string; title?: string }): string {

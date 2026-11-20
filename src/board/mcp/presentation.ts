@@ -9,7 +9,7 @@
 
 import type { CallToolResult } from "@modelcontextprotocol/sdk/types.js";
 import { logger } from "../../infra/logger.js";
-import { boardAgentView } from "../agent-view.js";
+import { boardAgentView } from "../view/agent-view.js";
 import { boardCopyText, boardVisualDigest, diagnoseBoard, type SimpleBoard } from "../types.js";
 import { BoardValidationError } from "../errors.js";
 import {

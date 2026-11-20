@@ -18,7 +18,7 @@ import {
   browserViewportStorage,
   isViewportNearContent,
   readStoredViewport,
-} from "../../../board/viewport-memory.js";
+} from "../../../board/client/viewport-memory.js";
 import { canvasThemeFor, type DoodleTheme } from "./theme.js";
 import { boardBounds, type BoardSnapshot, type ExcalidrawAPI } from "./types.js";
 

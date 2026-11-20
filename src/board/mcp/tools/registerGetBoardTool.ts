@@ -18,9 +18,9 @@ import {
   errorResult,
   viewPayload,
 } from "../presentation.js";
-import { boardAgentDelta, summarizeAgentBoard } from "../../agent-view.js";
+import { boardAgentDelta, summarizeAgentBoard } from "../../view/agent-view.js";
 import { BoardValidationError } from "../../errors.js";
-import { describeHandoff, handoffNextStep } from "../../handoff.js";
+import { describeHandoff, handoffNextStep } from "../../view/handoff.js";
 
 export function registerGetBoardTool(
   server: McpServer,

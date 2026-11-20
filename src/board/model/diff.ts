@@ -9,8 +9,8 @@
  *
  * Pure: no I/O, no clock, no ids minted here.
  */
-import type { BoardItem, BoardItemInput } from "./model/types.js";
-import { stableItemFingerprint } from "./model/fingerprint.js";
+import type { BoardItem, BoardItemInput } from "./types.js";
+import { stableItemFingerprint } from "./fingerprint.js";
 
 /*
  * Change detection compares values, not key order.
@@ -20,7 +20,7 @@ import { stableItemFingerprint } from "./model/fingerprint.js";
  * `JSON.stringify` reports identical objects as different. See
  * `model/fingerprint.ts` for the failure that produced.
  */
-export { stableStringify } from "./model/fingerprint.js";
+export { stableStringify } from "./fingerprint.js";
 
 export interface BoardItemsDiff {
   added: BoardItemInput[];

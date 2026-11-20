@@ -1,12 +1,12 @@
 import fs from "node:fs/promises";
 import path from "node:path";
 import { randomUUID } from "node:crypto";
-import { BoardRevisionConflictError } from "./errors.js";
+import { BoardRevisionConflictError } from "../errors.js";
 import { AsyncMutex } from "./mutex.js";
-import { logger } from "../infra/logger.js";
-import { renameWithRetry } from "../infra/atomic-write.js";
-import { createEmptyBoard, parseBoard, touchBoard, type SimpleBoard } from "./types.js";
-import { sameBoardContent } from "./model/fingerprint.js";
+import { logger } from "../../infra/logger.js";
+import { renameWithRetry } from "../../infra/atomic-write.js";
+import { createEmptyBoard, parseBoard, touchBoard, type SimpleBoard } from "../types.js";
+import { sameBoardContent } from "../model/fingerprint.js";
 import {
   collectRefsFromBoards, externalizeImages, hydrateImages, imageRefsOf, pruneOrphanImages,
 } from "./image-store.js";

@@ -14,11 +14,11 @@ import {
   BoardValidationError,
   EmptyWriteRefusedError,
   ObjectConflictError,
-} from "./errors.js";
-import { reportConflicts } from "./http/conflict.js";
-import type { BoardRevisionCache } from "./revision-cache.js";
-import { isSuspiciousEmptyWrite, type BoardStore } from "./store.js";
-import type { BoardAuthor, SimpleBoard } from "./types.js";
+} from "../errors.js";
+import { reportConflicts } from "./conflict.js";
+import type { BoardRevisionCache } from "../state/revision-cache.js";
+import { isSuspiciousEmptyWrite, type BoardStore } from "../state/store.js";
+import type { BoardAuthor, SimpleBoard } from "../types.js";
 
 export interface CommitBoardWriteOptions {
   store: BoardStore;

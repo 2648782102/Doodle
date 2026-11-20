@@ -3,8 +3,8 @@ import {
   boardAgentView,
   boardAgentDelta,
   stripCanvasFidelity,
-} from "../dist/board/agent-view.js";
-import { BoardRevisionCache } from "../dist/board/revision-cache.js";
+} from "../dist/board/view/agent-view.js";
+import { BoardRevisionCache } from "../dist/board/state/revision-cache.js";
 
 function scene(overrides = {}) {
   return {

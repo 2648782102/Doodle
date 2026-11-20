@@ -4,8 +4,8 @@ import os from "node:os";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { afterAll, describe, expect, it } from "vitest";
-import { BoardHttpServer } from "../dist/board/http.js";
-import { BoardStore } from "../dist/board/store.js";
+import { BoardHttpServer } from "../dist/board/http/server.js";
+import { BoardStore } from "../dist/board/state/store.js";
 
 /**
  * First-paint budgets.
@@ -55,7 +55,7 @@ let revisions = null;
 if (hasTemplate) {
   store = new BoardStore(path.join(tempDir, "output"));
   await store.init();
-  const { BoardRevisionCache } = await import("../dist/board/revision-cache.js");
+  const { BoardRevisionCache } = await import("../dist/board/state/revision-cache.js");
   revisions = new BoardRevisionCache();
   preview = new BoardHttpServer(store, {
     previewHost: "127.0.0.1",

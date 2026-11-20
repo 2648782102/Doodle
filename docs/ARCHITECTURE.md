@@ -9,51 +9,67 @@ src/
 ├── index.ts                    MCP stdio and HTTP lifecycle
 ├── server.ts                   composition root; four tools
 ├── board/
-│   ├── model/                  Board v1, no I/O and no transport
+│   ├── model/                  ring 0 — Board v1, no I/O and no transport
 │   │   ├── types.ts            persisted shapes and tool inputs (types only)
 │   │   ├── limits.ts           bounded limits and enum members
 │   │   ├── size.ts             geometry bounds shared by writes and persisted state
 │   │   ├── validate.ts         parseBoard, normalizeItem, strict predicates
 │   │   ├── board.ts            construction and item-level mutation
 │   │   ├── digest.ts           deterministic visual summary for agents
+│   │   ├── fingerprint.ts      value-ordered, key-ordered stable serialisation
+│   │   ├── diff.ts             object-level diff between two boards
+│   │   ├── diagnose.ts         isolated/overlapping object diagnosis
 │   │   └── clock.ts            time and identity generation
-│   ├── diagram/
+│   ├── errors.ts               ring 0 — validation, revision, and empty-write errors
+│   ├── diagram/                ring 1 — deterministic diagram authoring
 │   │   ├── recipe.ts           expand high-level intent into nodes and edges
 │   │   ├── layout.ts           deterministic placement for flow/timeline/compare/matrix
 │   │   └── generate.ts         materialise a diagram into Board v1 items
-│   ├── layout/arrange.ts       arrange existing objects, including architecture layers
-│   ├── canvas/                 Excalidraw projection, split by direction
+│   ├── layout/arrange.ts       ring 1 — arrange existing objects, including architecture layers
+│   ├── canvas/                 ring 1 — Excalidraw projection, split by direction
 │   │   ├── types.ts            structural Excalidraw shapes
 │   │   ├── theme.ts            per-theme ink and fill decisions
 │   │   ├── primitives.ts       shared numeric/text helpers
+│   │   ├── engine.ts           CanvasEngine seam; insurance, not a plan
 │   │   ├── to-excalidraw.ts    Board v1 → scene
 │   │   └── from-excalidraw.ts  scene → Board v1
-│   ├── mcp/                    tool surface
+│   ├── svg/render.ts           ring 1 — board → standalone SVG snapshot
+│   ├── view/                   ring 1 — pure agent-facing projections
+│   │   ├── agent-view.ts       agent payload without canvas fidelity
+│   │   ├── app-context.ts      final-state delta and bounded model context
+│   │   └── handoff.ts          human-attributed share of a delta
+│   ├── client/viewport-memory.ts  ring 1 — per-board camera in browser storage
+│   ├── state/                  ring 2 — disk and process memory
+│   │   ├── store.ts            atomic board.json persistence and revision sync
+│   │   ├── mutex.ts            cross-process board write lock
+│   │   ├── image-store.ts      image bytes externalised out of board JSON
+│   │   ├── revision-cache.ts   bounded recent boards for delta reads
+│   │   └── state-watch.ts      re-broadcast writes made by another process
+│   ├── library/                ring 2 — named board snapshots
+│   │   ├── schema.ts           index shape and strict validation
+│   │   └── store.ts            atomic persistence under a mutex
+│   ├── project/                ring 2 — read-only project context
+│   │   ├── scan.ts             bounded workspace path/evidence scan
+│   │   └── diagram.ts          ready-to-draw draft from a scan
+│   ├── write/                  ring 3 — the one write pipeline
+│   │   ├── commit.ts           shared MCP/HTTP commit, merge, and guard
+│   │   └── conflict.ts         object-level conflict resolution and 409 payload
+│   ├── mcp/                    ring 4 — tool surface
 │   │   ├── context.ts          what a tool receives from the running server
+│   │   ├── instructions.ts     MCP initialization guidance for agents
 │   │   ├── schemas.ts          input schemas for the four tools
 │   │   ├── presentation.ts     response projection and agent payloads
 │   │   ├── tools.ts            composition only
 │   │   └── tools/              one module per tool
-│   ├── http/                   local API surface
-│   │   ├── conflict.ts         object-level conflict detection and 409 payload
+│   ├── http/                   ring 4 — local API surface
+│   │   ├── server.ts           local board API, HTML, and WebSocket updates
 │   │   ├── security.ts         loopback Host/Origin and asset path boundary guards
 │   │   ├── templates.ts        canvas template lookup, caching, and token substitution
 │   │   └── assets.ts           Excalidraw bundle delivery and cache policy
-│   ├── library/                named board snapshots
-│   │   ├── schema.ts           index shape and strict validation
-│   │   └── store.ts            atomic persistence under a mutex
-│   ├── types.ts                public barrel over model/diagram/layout
+│   ├── types.ts                public barrel over kernel + derive
 │   ├── excalidraw-adapter.ts   public barrel over canvas/
 │   ├── library.ts              public barrel over library/
-│   ├── store.ts                atomic board.json persistence and revision sync
-│   ├── write-pipeline.ts       shared MCP/HTTP write commit, merge, and guard pipeline
-│   ├── errors.ts               revision-conflict and empty-write errors
-│   ├── mutex.ts                cross-process board write lock
-│   ├── project-scan.ts         bounded read-only workspace path/evidence scan
-│   ├── http.ts                 local board API, HTML and WebSocket updates
-│   ├── app-context.ts          final-state delta and bounded model context projection
-│   ├── instructions.ts         MCP initialization guidance for agents
-│   └── index.ts                board module entrypoint
+│   └── index.ts                board module entrypoint (composition surface)
 ├── infra/
 │   ├── config.ts               PREVIEW_HOST / PREVIEW_PORT / OUTPUT_DIR / workspace
 │   ├── logger.ts               stderr-only logger
@@ -78,26 +94,45 @@ There is no `src/domain/` workbench model, Mermaid renderer, session store, prop
 
 ## Layering rules
 
-Dependencies point inward. `model/` imports nothing from `diagram/`, `layout/`,
-`canvas/`, `mcp/`, or `http/`; it has no filesystem, network, or Express
-knowledge. `diagram/` and `layout/` may read `model/`. Transport layers (`mcp/`,
-`http/`) may read everything but are never imported by `model/`.
+Dependencies point inward, and the rule is enforced as a *direction*, not a file
+tree. `src/board` is arranged in five rings; a module may import from its own
+ring or an inner one, never outward. `scripts/repo-check.mjs` walks the real
+import graph and fails on the first outward edge.
 
-Three barrels (`types.ts`, `excalidraw-adapter.ts`, `library.ts`) keep the
-historical import paths working. They are re-export lists, not implementation;
-`scripts/repo-check.mjs` fails if a barrel grows past 120 lines or if the
-deleted `tools.ts` monolith returns.
+| Ring | Directories | May import | Owns |
+|---|---|---|---|
+| 0 kernel | `model/`, `errors.ts` | kernel | Board v1 shapes, limits, validation, pure mutation, fingerprinting, diffing |
+| 1 derive | `diagram/`, `layout/`, `canvas/`, `svg/`, `view/`, `client/` | kernel, derive | Pure projections of a board: placement, Excalidraw/SVG rendering, agent/handoff views, browser viewport memory |
+| 2 state | `state/`, `library/`, `project/` | kernel, derive, state | Anything that touches disk or process memory: store, mutex, image files, revision cache, file watcher, saved-board library, read-only project scan |
+| 3 app | `write/` | rings 0–2 | The one write pipeline and object-level conflict resolution shared by every entry point |
+| 4 transport | `mcp/`, `http/` | rings 0–3 | The two front doors: the MCP tool surface and the local HTTP + WebSocket canvas |
+
+Two invariants used to be violated and are now guarded:
+
+- **Conflict resolution is write-path logic, not HTTP.** `reportConflicts` and
+  the 409 payload live in `write/conflict.ts`, because the MCP tool path needs
+  exactly the same merge decision the browser path does. They previously sat in
+  `http/`, so `write/commit.ts` had to import *outward* into transport.
+- **The MCP layer declares the canvas port it consumes.** `mcp/context.ts` used
+  to import the concrete `BoardHttpServer`. It now declares a `BoardPreviewPort`
+  (`broadcast`, `panelUrl`, `getAppHtml`) and `BoardHttpServer` satisfies it
+  structurally, so the tool surface names no transport.
+
+`types.ts`, `index.ts`, `excalidraw-adapter.ts`, and `library.ts` are the public
+entry points. They re-export across rings by design and are exempt from the ring
+check; they remain re-export lists, not implementation, and `scripts/repo-check.mjs`
+fails if one grows past 120 lines.
 
 No TypeScript module under `src/` (including `src/board/` and `src/infra/templates/`) may exceed 450 lines. `test/cleanup.test.mjs` reports the offending file so a growing module is a review signal rather than something to discover later.
 
 ## Request flows
 
-Three entry points converge on the same write pipeline (`src/board/write-pipeline.ts`), model, and store:
+Three entry points converge on the same write pipeline (`src/board/write/commit.ts`), model, and store:
 
 ```text
-MCP tool call      → mcp/tools/*          → write-pipeline → model/* → BoardStore → board.json
-browser canvas     → http.ts routes       → write-pipeline → model/* → BoardStore → board.json
-standalone preview → http.ts routes       → write-pipeline → model/* → BoardStore → board.json
+MCP tool call      → mcp/tools/*          → write/commit → model/* → BoardStore → board.json
+browser canvas     → http/server.ts routes       → write/commit → model/* → BoardStore → board.json
+standalone preview → http/server.ts routes       → write/commit → model/* → BoardStore → board.json
                                 ↓
                         revision cache ──→ get_board(since_revision) delta
                         WebSocket      ──→ canvas reload
@@ -145,7 +180,7 @@ The optional canvas resource uses `text/html;profile=mcp-app` and is attached to
 
 ### Host model context bridge
 
-After `app.connect()` inside `src/infra/templates/excalidraw-app.tsx`, the embedded canvas reads `getHostCapabilities()`. When `updateModelContext.text` is available, every newly observed board revision produces one context update. `src/board/app-context.ts` compares the current snapshot with the last successfully published snapshot by object ID and stable object fields; its `added`, `updated`, and `removed` arrays contain final object values or removed IDs, never click, drag, or edit events. Because `updateModelContext` overwrites prior context, the request also carries the complete current structured snapshot. The text content is a bounded Chinese projection; `structuredContent` preserves the untruncated final state and fixed read-only safety flags. A failed update is not marked as published, so the next refresh retries the latest delta.
+After `app.connect()` inside `src/infra/templates/excalidraw-app.tsx`, the embedded canvas reads `getHostCapabilities()`. When `updateModelContext.text` is available, every newly observed board revision produces one context update. `src/board/view/app-context.ts` compares the current snapshot with the last successfully published snapshot by object ID and stable object fields; its `added`, `updated`, and `removed` arrays contain final object values or removed IDs, never click, drag, or edit events. Because `updateModelContext` overwrites prior context, the request also carries the complete current structured snapshot. The text content is a bounded Chinese projection; `structuredContent` preserves the untruncated final state and fixed read-only safety flags. A failed update is not marked as published, so the next refresh retries the latest delta.
 
 Context updates do not trigger a model turn. If `message.text` is also available, the embedded toolbar shows `通知 Agent`; its click handler ensures the latest context has been published, then sends exactly `我改了 Doodle 画板，你看下图。` through `app.sendMessage({ role: "user" })`. The button is hidden in the standalone fallback and in hosts lacking either capability. `get_board` remains the authoritative reread path, especially for standalone `PANEL_URL` pages that have no bridge to the current host session.
 
@@ -188,7 +223,7 @@ The canvas supports click-to-place defaults, drag-to-size shapes, directional dr
 
 `src/board/library.ts` stores snapshots in `OUTPUT_DIR/.doodle/boards/` with a separate lock and atomic JSON writes. The active `.doodle/board.json` remains authoritative. `get_board` and HTTP `GET /api/board` include the library index; `draw_board.library` and `POST /api/board/library` apply the same action vocabulary. Switching a board writes the selected version 1 snapshot into the active state with a higher revision and broadcasts the change so the canvas and embedded App reopen the new active board.
 
-`src/board/agent-view.ts` separates what the agent needs from what only the canvas needs: board items keep `scene` fidelity on disk, while agent payloads replace it with a `canvasFidelity` marker and add a stable summary. `src/board/revision-cache.ts` keeps the last few boards in memory so `get_board.since_revision` can answer with a delta; `src/board/handoff.ts` attributes the human share of that delta (`added`, `edited`, `removed`) so the agent never reviews its own writes. `src/board/types.ts` derives `boardVisualDigest()` from final board objects: bounded reading order, group counts, connection labels/endpoints, focus markers, freehand/image counts. `get_board`, `show_board`, and HTTP `GET /api/board` also return `capabilities` and recipe names. These are deterministic visual summaries for agents, not operation logs, interpretations, or project-write authority. `resolveDiagramLayout()` is the shared deterministic source for semantic diagrams and `diagramToBoardItems()` writes ordinary version 1 objects; no native Excalidraw scene is persisted alongside the board.
+`src/board/view/agent-view.ts` separates what the agent needs from what only the canvas needs: board items keep `scene` fidelity on disk, while agent payloads replace it with a `canvasFidelity` marker and add a stable summary. `src/board/state/revision-cache.ts` keeps the last few boards in memory so `get_board.since_revision` can answer with a delta; `src/board/view/handoff.ts` attributes the human share of that delta (`added`, `edited`, `removed`) so the agent never reviews its own writes. `src/board/types.ts` derives `boardVisualDigest()` from final board objects: bounded reading order, group counts, connection labels/endpoints, focus markers, freehand/image counts. `get_board`, `show_board`, and HTTP `GET /api/board` also return `capabilities` and recipe names. These are deterministic visual summaries for agents, not operation logs, interpretations, or project-write authority. `resolveDiagramLayout()` is the shared deterministic source for semantic diagrams and `diagramToBoardItems()` writes ordinary version 1 objects; no native Excalidraw scene is persisted alongside the board.
 
 Project scanning does not modify the board. If the AI wants to show structure, it calls `draw_board` with a layout derived from the scan result.
 
