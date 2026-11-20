@@ -1,0 +1,36 @@
+[
+  {
+    "id": "flow/order-fulfilment",
+    "prompt": "把订单履约流程画出来：下单 → 校验 → 拣货 → 发货 → 签收",
+    "expect": {
+      "kind": "sequence",
+      "ordered": true,
+      "nodes": ["下单", "校验", "拣货", "发货", "签收"],
+      "max_crossings": 0,
+      "forbid": ["overlap", "through_node"]
+    },
+    "budget": { "max_tool_calls": 4, "max_seconds": 90, "max_bytes": 120000 }
+  },
+  {
+    "id": "flow/review-loop",
+    "prompt": "画一个评审流程：草稿 → 反馈 → 修改",
+    "expect": {
+      "kind": "sequence",
+      "ordered": true,
+      "nodes": ["草稿", "反馈", "修改"],
+      "forbid": ["overlap"]
+    },
+    "budget": { "max_tool_calls": 3, "max_seconds": 60, "max_bytes": 80000 }
+  },
+  {
+    "id": "flow/onboarding",
+    "prompt": "新用户注册到首次使用的四个阶段，按顺序画出来",
+    "expect": {
+      "kind": "sequence",
+      "ordered": true,
+      "nodes": ["注册", "验证", "引导", "首次使用"],
+      "forbid": ["overlap", "through_node"]
+    },
+    "budget": { "max_tool_calls": 4, "max_seconds": 90, "max_bytes": 100000 }
+  }
+]
