@@ -291,6 +291,45 @@ check(ci.includes("npm run build:submission"), "CI does not build the submission
 check(ci.includes("resolveDiagramLayout") && ci.includes("diagramToBoardItems"), "CI does not verify deterministic semantic diagrams");
 check(ci.includes("BoardLibrary") && ci.includes("type: \"create\""), "CI does not verify the local board library");
 check(ci.includes("Verify final-state board context projection") && ci.includes("buildBoardModelContext") && ci.includes("doodle_board_context"), "CI does not verify the final-state context projection");
+/*
+ * Every `dist/` path a workflow or script imports must exist after a build.
+ *
+ * Moving `app-context.ts` into `view/` left two `import ... from
+ * "./dist/board/app-context.js"` lines in the CI workflow. `npm run check`
+ * never runs those inline scripts, and the repo guard only inspected *source*
+ * paths, so the failure surfaced for the first time in CI. This walks the
+ * workflow heredocs and the repo scripts, and asserts each referenced compiled
+ * module resolves to a real source file — so a move that forgets a consumer
+ * fails locally instead of on the next push.
+ */
+const workflowFiles = (await fs.readdir(path.join(root, ".github", "workflows")))
+  .filter((name) => name.endsWith(".yml") || name.endsWith(".yaml"));
+const compiledRefs = new Set();
+/*
+ * A workflow heredoc runs from the repository root, so its `./dist/...` paths
+ * are root-relative. A module script resolves relative to its own directory.
+ */
+const compiledConsumers = [
+  ...workflowFiles.map((file) => ({ name: `.github/workflows/${file}`, fromRoot: true })),
+  ...["scripts/open-board.mjs", "scripts/preview-board.mjs", "examples/board-client.mjs"].map((name) => ({ name, fromRoot: false })),
+];
+for (const { name, fromRoot } of compiledConsumers) {
+  const text = await read(name);
+  for (const match of text.matchAll(/["'](\.{1,2}\/[^"']*dist\/[\w./-]+\.js)["']/g)) {
+    const base = fromRoot ? "" : path.posix.dirname(name);
+    compiledRefs.add(path.posix.normalize(path.posix.join(base, match[1])));
+  }
+}
+const brokenCompiledRefs = [];
+for (const reference of compiledRefs) {
+  const sourcePath = reference.replace(/^dist\//, "src/").replace(/\.js$/, ".ts");
+  const exists = await fs.access(path.join(root, sourcePath)).then(() => true, () => false);
+  if (!exists) brokenCompiledRefs.push(`${reference} (no ${sourcePath})`);
+}
+check(
+  brokenCompiledRefs.length === 0,
+  `a workflow or script imports a compiled module that no longer exists: ${brokenCompiledRefs.join(", ")}`,
+);
 check(publishWorkflow.includes("contents: write") && publishWorkflow.includes("gh release create"), "publish workflow cannot create a release");
 check(publishWorkflow.includes("npm run check") && publishWorkflow.includes("--notes-file"), "publish workflow does not verify the package or use changelog notes");
 check(publishWorkflow.includes('git tag -a "$tag"') && publishWorkflow.includes('git push origin "$tag"') && publishWorkflow.includes('--target "$GITHUB_SHA"'), "publish workflow does not create the matching tag before verifying it");

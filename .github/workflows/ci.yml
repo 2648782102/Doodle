@@ -30,7 +30,7 @@ jobs:
       - name: Verify final-state board context projection
         run: |
           node --input-type=module <<'NODE'
-          import { buildBoardModelContext } from "./dist/board/app-context.js";
+          import { buildBoardModelContext } from "./dist/board/view/app-context.js";
           const board = {
             version: 1,
             id: "ci",
@@ -69,7 +69,7 @@ jobs:
         run: |
           node --input-type=module <<'NODE'
           import { createEmptyBoard, addBoardItems, boardVisualDigest } from "./dist/board/types.js";
-          import { buildBoardModelContext } from "./dist/board/app-context.js";
+          import { buildBoardModelContext } from "./dist/board/view/app-context.js";
           const board = addBoardItems(createEmptyBoard(), [
             { type: "rect", x: 0, y: 0, w: 120, h: 80, text: "A", role: "step", author: "ai" },
             { type: "rect", x: 200, y: 0, w: 120, h: 80, text: "B", role: "step", author: "ai" },
