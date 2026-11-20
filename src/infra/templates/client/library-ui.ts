@@ -131,7 +131,7 @@ export function initLibraryUi(deps: LibraryUiDeps): void {
     if (action.type === "export" || action.type === "get") {
       const exportBoard = (result.exportBoard as BoardSnapshot | undefined) ?? board;
       const blob = new Blob([JSON.stringify(exportBoard, null, 2)], { type: "application/json" });
-      downloadBlob(blob, `${safeFilename(board.title)}.doodle.json`);
+      downloadBlob(blob, `${safeFilename(exportBoard.title)}.doodle.json`);
     }
     await refreshLibraryUi().catch(() => {});
   };
