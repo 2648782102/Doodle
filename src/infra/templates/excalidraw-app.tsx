@@ -22,6 +22,7 @@ import {
   showError,
 } from "./client/banner.js";
 import { createCanvasSync, type CanvasSync, type CanvasSyncOutcome, type SceneElement } from "./client/canvas-sync.js";
+import { initShortcutPanel } from "./client/shortcuts.js";
 import { stableStringify } from "../../board/model/fingerprint.js";
 import { initLibraryUi, initSnapshotExports } from "./client/library-ui.js";
 import { initExternalLinkPolicy, isDoodleProjectLink } from "./client/link-policy.js";
@@ -416,6 +417,7 @@ window.DoodleExcalidrawInit = (snapshot, mcpApp) => {
 if (document.querySelector("#excalidrawRoot")) {
   initThemeToggle(() => glassController);
   initExternalLinkPolicy();
+  initShortcutPanel();
   initLibraryUi({
     transport,
     getActiveSnapshot: () => activeSnapshot,
