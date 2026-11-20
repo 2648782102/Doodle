@@ -17,7 +17,7 @@ import {
   type BoardLibraryAction,
 } from "../../library.js";
 import { BoardRevisionConflictError, BoardValidationError } from "../../errors.js";
-import { commitBoardWrite } from "../../write-pipeline.js";
+import { commitBoardWrite } from "../../write/commit.js";
 import { expandRecipe } from "../../diagram/recipe.js";
 import { changeReport, changeReportText } from "../change-report.js";
 import {

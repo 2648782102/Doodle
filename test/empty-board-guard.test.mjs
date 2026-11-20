@@ -2,8 +2,8 @@ import { describe, expect, it } from "vitest";
 import { mkdtemp, readdir, readFile, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import path from "node:path";
-import { isSuspiciousEmptyWrite } from "../dist/board/store.js";
-import { BoardStore } from "../dist/board/store.js";
+import { isSuspiciousEmptyWrite } from "../dist/board/state/store.js";
+import { BoardStore } from "../dist/board/state/store.js";
 
 function board(items) {
   return {

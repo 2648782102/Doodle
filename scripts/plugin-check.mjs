@@ -25,7 +25,7 @@ const buildScript = await read("scripts/build-plugin.mjs");
 const pluginCheckScript = await read("scripts/plugin-check.mjs");
 const appBundle = await read(".doodle-plugin/doodle/server/infra/templates/excalidraw/excalidraw-app.js");
 const excalidrawTemplate = await read(".doodle-plugin/doodle/server/infra/templates/excalidraw.html");
-const httpSource = await read("src/board/http.ts");
+const httpSource = await read("src/board/http/server.ts");
 const httpTemplates = await read("src/board/http/templates.ts");
 /*
  * Tool surface is one module per tool after the refactor. Read them together so
@@ -44,7 +44,7 @@ const toolsSource = (await Promise.all([
 const configSource = await read("src/infra/config.ts");
 const versionSource = await read("src/infra/version.ts");
 const indexSource = await read("src/index.ts");
-const instructions = await read("src/board/instructions.ts");
+const instructions = await read("src/board/mcp/instructions.ts");
 const ci = await read(".github/workflows/ci.yml");
 const gitignore = await read(".gitignore");
 const goals = await read("docs/GOALS.md");

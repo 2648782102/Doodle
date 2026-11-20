@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { changedIds, diffBoardItems, isEmptyDiff, touchedIds } from "../dist/board/item-diff.js";
+import { changedIds, diffBoardItems, isEmptyDiff, touchedIds } from "../dist/board/model/diff.js";
 
 const item = (id, overrides = {}) => ({
   id,

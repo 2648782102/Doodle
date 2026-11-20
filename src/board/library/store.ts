@@ -10,8 +10,8 @@
 import fs from "node:fs/promises";
 import path from "node:path";
 import { randomUUID } from "node:crypto";
-import { AsyncMutex } from "../mutex.js";
-import { externalizeImages, hydrateImages } from "../image-store.js";
+import { AsyncMutex } from "../state/mutex.js";
+import { externalizeImages, hydrateImages } from "../state/image-store.js";
 import { BoardValidationError } from "../errors.js";
 import { renameWithRetry } from "../../infra/atomic-write.js";
 import { touchBoard, type SimpleBoard } from "../types.js";

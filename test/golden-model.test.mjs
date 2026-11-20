@@ -22,7 +22,7 @@ import {
   diagramToBoardItems,
   layoutBoardItems,
 } from "../dist/board/types.js";
-import { boardAgentView } from "../dist/board/agent-view.js";
+import { boardAgentView } from "../dist/board/view/agent-view.js";
 import {
   boardItemsFromExcalidrawBoard,
   boardItemsToExcalidrawSkeleton,

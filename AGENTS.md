@@ -63,23 +63,24 @@ src/
 ├── index.ts                    MCP stdio and HTTP lifecycle
 ├── server.ts                   composition root; registers four tools
 ├── board/
-│   ├── model/                  Board v1 only: types, limits, validate, board, digest, clock
-│   ├── diagram/                deterministic diagram layout and generation
-│   ├── layout/arrange.ts       arranging existing objects, including architecture layers
-│   ├── canvas/                 Excalidraw projection split by direction
-│   ├── mcp/                    context, schemas, presentation, tools composition
+│   ├── model/                  ring 0: Board v1 types, limits, validate, board, digest, diff, clock
+│   ├── errors.ts               ring 0: validation, revision-conflict, empty-write errors
+│   ├── diagram/                ring 1: deterministic diagram layout and generation
+│   ├── layout/arrange.ts       ring 1: arranging existing objects, including architecture layers
+│   ├── canvas/                 ring 1: Excalidraw projection split by direction
+│   ├── svg/render.ts           ring 1: board → standalone SVG snapshot
+│   ├── view/                   ring 1: agent view, handoff, app-context projections
+│   ├── client/viewport-memory.ts  ring 1: per-board camera in browser storage
+│   ├── state/                  ring 2: store, mutex, image-store, revision-cache, state-watch
+│   ├── library/                ring 2: schema and atomic snapshot persistence
+│   ├── project/                ring 2: bounded read-only scan and draft diagram
+│   ├── write/                  ring 3: shared commit pipeline and object-level conflict resolution
+│   ├── mcp/                    ring 4: context, instructions, schemas, presentation, tools composition
 │   ├── mcp/tools/              one module per MCP tool
-│   ├── http/templates.ts       canvas template lookup, caching, and token substitution
-│   ├── http/assets.ts          Excalidraw bundle delivery and cache policy
-│   ├── library/                schema and atomic snapshot persistence
-│   ├── types.ts                public barrel over model/diagram/layout
-│   ├── store.ts                locked atomic board.json persistence and revision sync
-│   ├── project-scan.ts         bounded read-only workspace scan
-│   ├── http.ts                 local board API, HTML, and WebSocket updates
+│   ├── http/                   ring 4: server, templates, assets, security
+│   ├── types.ts                public barrel over kernel + derive
 │   ├── excalidraw-adapter.ts   public barrel over canvas/
 │   ├── library.ts              public barrel over library/
-│   ├── app-context.ts          final-state board delta and model context projection
-│   ├── instructions.ts         MCP initialization instructions
 │   └── index.ts                board module entrypoint
 ├── infra/
 │   ├── config.ts               environment configuration
@@ -108,10 +109,17 @@ docs/                           product, architecture, decisions, and maintenanc
 - `CanvasEngine` (`canvas/engine.ts`) is the named seam between Board v1 and whichever canvas draws it. `excalidrawEngine` is the only implementation and must stay that way — a second engine means two maintenance paths, which 0.8.0 already rejected. The interface exists so a future swap is a new implementation rather than a client rewrite.
 - `boardToSvg` (`svg/render.ts`) is a read-only projection, exposed at `GET /api/board.svg` and advertised as `capabilities.svgPreview`. It never persists, never bumps a revision, and is not a fifth output format: Board v1 stays authoritative. Connector labels paint a plate behind themselves, or the arrow cuts through the text.
 - `DOODLE_CANVAS_FONTS=system` (or `npm run build:system-fonts`) drops Xiaolai, taking `dist` from ~19 MB to ~6.8 MB with Chinese falling back to the system font. Nothing in Board v1 changes. The default keeps the handwriting face, because a local board fetches only the unicode-ranges it needs over loopback.
-- Dependencies point inward: `model/` knows nothing about `diagram/`, `layout/`, `canvas/`, `mcp/`, `http/`, filesystem, or Express. Transport layers may read `model/`; `model/` must never import them. Add code to the layer that owns the concern rather than to whichever file is convenient.
-- `types.ts`, `excalidraw-adapter.ts`, and `library.ts` are barrels for compatibility, not implementation. Put new code in `model/`, `canvas/`, or `library/` and re-export only what other packages need. `scripts/repo-check.mjs` fails if a barrel exceeds 120 lines or if `src/board/tools.ts` returns.
+- `src/board` has five rings and a module may import only from its own ring or inward, never outward. `scripts/repo-check.mjs` walks the real import graph and fails on the first outward edge.
+  - ring 0 kernel: `model/`, `errors.ts` — Board v1 shapes, limits, validation, pure mutation, fingerprinting, diffing.
+  - ring 1 derive: `diagram/`, `layout/`, `canvas/`, `svg/`, `view/`, `client/` — pure projections of a board.
+  - ring 2 state: `state/`, `library/`, `project/` — anything that touches disk or process memory.
+  - ring 3 app: `write/` — the shared write pipeline and object-level conflict resolution.
+  - ring 4 transport: `mcp/`, `http/` — the MCP tool surface and the local HTTP + WebSocket canvas.
+  Add code to the ring that owns the concern rather than to whichever file is convenient. The two edges this rule caught before the restructure were `write/` importing `http/conflict.ts` and `mcp/context.ts` importing the concrete `BoardHttpServer`; both are now impossible to reintroduce without failing the guard.
+- Object-level conflict resolution belongs in `write/conflict.ts`, not `http/`: the MCP tool path and the browser path make the same merge decision, so it is write-path logic, not transport. The MCP layer names only its own `BoardPreviewPort` (`broadcast` / `panelUrl` / `getAppHtml`); `BoardHttpServer` satisfies it structurally, so the tool surface names no transport type.
+- `types.ts`, `index.ts`, `excalidraw-adapter.ts`, and `library.ts` are public entry points and barrels, not implementation. They re-export across rings by design and are exempt from the ring check; put new code in the owning ring and re-export only what other packages need. `scripts/repo-check.mjs` fails if a barrel exceeds 120 lines or if `src/board/tools.ts` returns.
 - No TypeScript module under `src/` (including `src/board/` and `src/infra/templates/`) may exceed 450 lines; `test/cleanup.test.mjs` reports the offending file. Splitting by direction or responsibility is preferred over growing a file, and the split must keep the golden model snapshot unchanged unless the new behaviour is intentional.
-- MCP and HTTP writes share one commit pipeline (`src/board/write-pipeline.ts`: `commitBoardWrite`). Keep empty-write protection, optimistic conflict checks, cross-board base checks, and revision-cache recording inside that module instead of duplicating them per transport.
+- MCP and HTTP writes share one commit pipeline (`src/board/write/commit.ts`: `commitBoardWrite`). Keep empty-write protection, optimistic conflict checks, cross-board base checks, and revision-cache recording inside that module instead of duplicating them per transport.
 - `test/golden-model.test.mjs` freezes the model contract: projections, every layout mode, every diagram mode, and the long-flow property. A refactor that changes output must update the snapshot in the same commit so the diff documents it.
 - stdout is reserved for MCP JSON-RPC. All logs and diagnostics go to stderr.
 - Tool names are `snake_case`; TypeScript files are `kebab-case`; registration functions are `registerXxx`.

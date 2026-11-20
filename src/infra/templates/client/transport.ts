@@ -8,8 +8,8 @@
  */
 
 import { App } from "@modelcontextprotocol/ext-apps";
-import { buildBoardModelContext } from "../../../board/app-context.js";
-import { diffBoardItems, isEmptyDiff } from "../../../board/item-diff.js";
+import { buildBoardModelContext } from "../../../board/view/app-context.js";
+import { diffBoardItems, isEmptyDiff } from "../../../board/model/diff.js";
 import { showConnectedNotice, showConnectionNotice, showError } from "./banner.js";
 import type { SyncChannel } from "./sync-state.js";
 import type { BoardSnapshot, McpAppFallback } from "./types.js";

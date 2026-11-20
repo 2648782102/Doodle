@@ -25,8 +25,8 @@ const packageJson = JSON.parse(await read("package.json"));
 const serverJson = JSON.parse(await read("server.json"));
 const server = await read("src/server.ts");
 const buildScript = await read("scripts/build.mjs");
-const instructions = await read("src/board/instructions.ts");
-const appContext = await read("src/board/app-context.ts");
+const instructions = await read("src/board/mcp/instructions.ts");
+const appContext = await read("src/board/view/app-context.ts");
 const excalidrawApp = (await Promise.all([
   read("src/infra/templates/excalidraw-app.tsx"),
   read("src/infra/templates/client/types.ts"),
@@ -40,7 +40,7 @@ const excalidrawApp = (await Promise.all([
   read("src/infra/templates/client/canvas-sync.ts"),
 ])).join("\n");
 const canvasTransport = await read("src/infra/templates/client/transport.ts");
-const writePipeline = await read("src/board/write-pipeline.ts");
+const writePipeline = await read("src/board/write/commit.ts");
 const boardIndex = await read("src/board/index.ts");
 /*
  * Tools are registered from one module per tool. Read them together so guards
@@ -93,10 +93,10 @@ const liquidGlass = [
   await read("src/infra/templates/liquid-glass.ts"),
   await read("src/infra/templates/liquid-glass-maps.ts"),
 ].join("\n");
-const http = await read("src/board/http.ts");
-const scanner = await read("src/board/project-scan.ts");
-const boardStore = await read("src/board/store.ts");
-const mutex = await read("src/board/mutex.ts");
+const http = await read("src/board/http/server.ts");
+const scanner = await read("src/board/project/scan.ts");
+const boardStore = await read("src/board/state/store.ts");
+const mutex = await read("src/board/state/mutex.ts");
 const launchKit = await read("docs/LAUNCH_KIT.md");
 const readme = await read("README.md");
 const readmeEn = await read("README.en.md");
@@ -129,7 +129,7 @@ const config = await read("src/infra/config.ts");
 const projectWorkspace = await read("src/infra/project-workspace.ts");
 const version = await read("src/infra/version.ts");
 const setupScript = await read("scripts/setup-codex.mjs");
-const store = await read("src/board/store.ts");
+const store = await read("src/board/state/store.ts");
 const stdioExample = JSON.parse(await read("examples/mcp-config/stdio.json"));
 const cursorExample = JSON.parse(await read("examples/mcp-config/cursor.json"));
 const codexExample = await read("examples/mcp-config/codex.toml");
@@ -243,7 +243,7 @@ check(excalidrawTemplate.includes('id="doodleWelcome"') && excalidrawApp.include
  * at `excalidraw-app.tsx` and started failing on a working board. What matters
  * is that something calls the guard before trusting a stored viewport.
  */
-const canvasView = await read("src/board/viewport-memory.ts");
+const canvasView = await read("src/board/client/viewport-memory.ts");
 const canvasViewCaller = [
   excalidrawApp,
   await read("src/infra/templates/client/canvas-view.ts"),
@@ -291,6 +291,45 @@ check(ci.includes("npm run build:submission"), "CI does not build the submission
 check(ci.includes("resolveDiagramLayout") && ci.includes("diagramToBoardItems"), "CI does not verify deterministic semantic diagrams");
 check(ci.includes("BoardLibrary") && ci.includes("type: \"create\""), "CI does not verify the local board library");
 check(ci.includes("Verify final-state board context projection") && ci.includes("buildBoardModelContext") && ci.includes("doodle_board_context"), "CI does not verify the final-state context projection");
+/*
+ * Every `dist/` path a workflow or script imports must exist after a build.
+ *
+ * Moving `app-context.ts` into `view/` left two `import ... from
+ * "./dist/board/app-context.js"` lines in the CI workflow. `npm run check`
+ * never runs those inline scripts, and the repo guard only inspected *source*
+ * paths, so the failure surfaced for the first time in CI. This walks the
+ * workflow heredocs and the repo scripts, and asserts each referenced compiled
+ * module resolves to a real source file — so a move that forgets a consumer
+ * fails locally instead of on the next push.
+ */
+const workflowFiles = (await fs.readdir(path.join(root, ".github", "workflows")))
+  .filter((name) => name.endsWith(".yml") || name.endsWith(".yaml"));
+const compiledRefs = new Set();
+/*
+ * A workflow heredoc runs from the repository root, so its `./dist/...` paths
+ * are root-relative. A module script resolves relative to its own directory.
+ */
+const compiledConsumers = [
+  ...workflowFiles.map((file) => ({ name: `.github/workflows/${file}`, fromRoot: true })),
+  ...["scripts/open-board.mjs", "scripts/preview-board.mjs", "examples/board-client.mjs"].map((name) => ({ name, fromRoot: false })),
+];
+for (const { name, fromRoot } of compiledConsumers) {
+  const text = await read(name);
+  for (const match of text.matchAll(/["'](\.{1,2}\/[^"']*dist\/[\w./-]+\.js)["']/g)) {
+    const base = fromRoot ? "" : path.posix.dirname(name);
+    compiledRefs.add(path.posix.normalize(path.posix.join(base, match[1])));
+  }
+}
+const brokenCompiledRefs = [];
+for (const reference of compiledRefs) {
+  const sourcePath = reference.replace(/^dist\//, "src/").replace(/\.js$/, ".ts");
+  const exists = await fs.access(path.join(root, sourcePath)).then(() => true, () => false);
+  if (!exists) brokenCompiledRefs.push(`${reference} (no ${sourcePath})`);
+}
+check(
+  brokenCompiledRefs.length === 0,
+  `a workflow or script imports a compiled module that no longer exists: ${brokenCompiledRefs.join(", ")}`,
+);
 check(publishWorkflow.includes("contents: write") && publishWorkflow.includes("gh release create"), "publish workflow cannot create a release");
 check(publishWorkflow.includes("npm run check") && publishWorkflow.includes("--notes-file"), "publish workflow does not verify the package or use changelog notes");
 check(publishWorkflow.includes('git tag -a "$tag"') && publishWorkflow.includes('git push origin "$tag"') && publishWorkflow.includes('--target "$GITHUB_SHA"'), "publish workflow does not create the matching tag before verifying it");
@@ -352,12 +391,67 @@ check(instructions.includes("draw_board.diagram") && instructions.includes("neve
  * each concern has a home, no module regrows into a monolith, and the public
  * barrels stay thin.
  */
-for (const group of ["model", "diagram", "layout", "mcp", "canvas", "http"]) {
+for (const group of ["model", "diagram", "layout", "mcp", "canvas", "http", "state", "write", "view", "project", "client"]) {
   check(
     sourceFiles.some((name) => name.startsWith(`${group}${path.sep}`) || name.startsWith(`${group}/`)),
     `src/board is missing the ${group} module group`,
   );
 }
+/*
+ * Layering is a direction, not a file tree.
+ *
+ * The rule that was actually violated before the restructure: the core write
+ * path imported `http/conflict.ts`, and the MCP tool surface imported the
+ * concrete `BoardHttpServer`. Both put transport knowledge in a layer that must
+ * not have any. This walks the real import graph and fails on the first edge
+ * that points outward — a module may import from its own ring or inward,
+ * never outward. Barrels (`types.ts`, `index.ts`, `library.ts`,
+ * `excalidraw-adapter.ts`) re-export from anywhere and are exempt.
+ */
+const RINGS = [
+  [/^errors\.ts$/, 0], [/^model\//, 0],
+  [/^diagram\//, 1], [/^layout\//, 1], [/^canvas\//, 1], [/^svg\//, 1],
+  [/^view\//, 1], [/^client\//, 1],
+  [/^state\//, 2], [/^library\//, 2], [/^project\//, 2],
+  [/^write\//, 3],
+  [/^mcp\//, 4], [/^http\//, 4],
+];
+const BARRELS = new Set(["types.ts", "index.ts", "library.ts", "excalidraw-adapter.ts"]);
+const RING_NAMES = ["kernel", "derive", "state", "app", "transport"];
+const ringOf = (relative) => {
+  for (const [pattern, ring] of RINGS) if (pattern.test(relative)) return ring;
+  return -1;
+};
+const boardDir = path.join(root, "src", "board");
+const outward = [];
+for (const relative of sourceFiles) {
+  const readable = relative.split(path.sep).join("/");
+  if (BARRELS.has(readable)) continue;
+  const fromRing = ringOf(readable);
+  if (fromRing < 0) continue;
+  const text = await fs.readFile(path.join(boardDir, relative), "utf8");
+  for (const match of text.matchAll(/from\s+"(\.[^"]+)"/g)) {
+    const target = path.normalize(path.join(path.dirname(relative), match[1]));
+    const toRelative = target.split(path.sep).join("/").replace(/\.js$/, ".ts");
+    if (BARRELS.has(toRelative)) continue;
+    const toRing = ringOf(toRelative);
+    if (toRing > fromRing) {
+      outward.push(`${readable} (${RING_NAMES[fromRing]}) -> ${toRelative} (${RING_NAMES[toRing]})`);
+    }
+  }
+}
+check(outward.length === 0, `a layer imports outward, which is forbidden: ${outward.join("; ")}`);
+check(
+  !(await fs.access(path.join(root, "src", "board", "http", "conflict.ts")).then(() => true, () => false))
+    && (await read("src/board/write/conflict.ts")).includes("reportConflicts"),
+  "object-level conflict resolution moved back under http/; it is write-path logic, not transport",
+);
+check(
+  // Match a type/import, not the comment that explains why the type is absent.
+  !/import\s+type\s*\{[^}]*BoardHttpServer/.test(await read("src/board/mcp/context.ts"))
+    && !/preview:\s*BoardHttpServer/.test(await read("src/board/mcp/context.ts")),
+  "the MCP tool context depends on the concrete HTTP server again instead of its own preview port",
+);
 for (const barrel of ["types.ts", "tools.ts", "library.ts"]) {
   const file = path.join(root, "src", "board", barrel);
   const lines = await fs.readFile(file, "utf8").then((text) => text.split("\n").length, () => 0);
@@ -505,8 +599,8 @@ check(
   "an empty diagram rejects with bare prose again instead of naming both routes forward",
 );
 check(
-  (await read("src/board/project-scan.ts")).includes("SCAN_RANGE_OUT_OF_RANGE")
-    && !/Math\.max\(minimum, Math\.min\(maximum/.test(await read("src/board/project-scan.ts")),
+  (await read("src/board/project/scan.ts")).includes("SCAN_RANGE_OUT_OF_RANGE")
+    && !/Math\.max\(minimum, Math\.min\(maximum/.test(await read("src/board/project/scan.ts")),
   "scan_project clamps its range bounds again instead of rejecting an explicit out-of-range value",
 );
 check(
@@ -582,7 +676,7 @@ check(
 check(tools.includes("since_revision") && tools.includes("boardAgentDelta") && tools.includes("BoardRevisionCache"), "incremental rereads or their revision cache are missing");
 check(tools.includes("include_canvas_fidelity") && excalidrawApp.includes("include_canvas_fidelity: true"), "the canvas cannot request the fidelity that agent reads omit");
 check(tools.includes("describeHandoff") && tools.includes("handoff") && tools.includes("needsAttention"), "delta reads do not attribute human edits");
-check((await read("src/board/handoff.ts")).includes("HANDOFF_READINGS") === false && (await read("src/board/handoff.ts")).includes("readings") && tools.includes("HANDOFF_READINGS"), "handoff no longer explains what the human change means");
+check((await read("src/board/view/handoff.ts")).includes("HANDOFF_READINGS") === false && (await read("src/board/view/handoff.ts")).includes("readings") && tools.includes("HANDOFF_READINGS"), "handoff no longer explains what the human change means");
 check(buildScript.includes("excalidraw-app.tsx"), "build is missing the canvas client");
 check(tools.includes("guideSent") && tools.includes("include_guide"), "the guide is not sent once with an explicit opt-in");
 check(tools.includes("boardCapabilities()") && tools.includes("visualDigest: boardVisualDigest(board)") && tools.includes("boardRecipes()"), "board tools lost AI visual language");

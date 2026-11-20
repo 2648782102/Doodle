@@ -166,7 +166,7 @@ describe("post-cleanup repository shape", () => {
     const strictFiles = [
       "AGENTS.md", "CONTRIBUTING.md",
       "SECURITY.md", "ROADMAP.md", "docs/PRODUCT_DIRECTION.md",
-      "docs/DECISIONS.md", "docs/GOALS.md", "src/board/instructions.ts", "src/server.ts",
+      "docs/DECISIONS.md", "docs/GOALS.md", "src/board/mcp/instructions.ts", "src/server.ts",
     ];
     for (const relative of strictFiles) {
       const text = await fs.readFile(path.join(root, relative), "utf8");
@@ -192,6 +192,31 @@ describe("post-cleanup repository shape", () => {
     const stdioExample = JSON.parse(await fs.readFile(path.join(root, "examples", "mcp-config", "stdio.json"), "utf8"));
     expect(stdioExample.command).toBe("npx");
     expect(stdioExample.args).toEqual(["-y", "doodle-mcp"]);
+  });
+
+  /*
+   * The documented source tree must be the real one.
+   *
+   * The architecture doc carries a hand-maintained tree and a hand-maintained
+   * ring table. Both are the map an agent reads before adding a file, so a path
+   * that moved without the doc moving is worse than no doc: it teaches the
+   * wrong home. Rather than assert the whole tree — which would fail on every
+   * new file — assert that every `src/board` path the doc names actually exists.
+   */
+  it("keeps every src/board path named in the architecture doc real", async () => {
+    const architecture = await fs.readFile(path.join(root, "docs", "ARCHITECTURE.md"), "utf8");
+    const named = new Set();
+    for (const match of architecture.matchAll(/(?:^|[\s`(])((?:src\/)?board\/[\w./-]+\.(?:ts|tsx))/g)) {
+      named.add(match[1].replace(/^board\//, "src/board/"));
+    }
+    const missing = [];
+    for (const namedPath of named) {
+      if (!namedPath.startsWith("src/board/")) continue;
+      const exists = await fs.access(path.join(root, namedPath)).then(() => true, () => false);
+      if (!exists) missing.push(namedPath);
+    }
+    expect(named.size, "the architecture doc names no src/board source path").toBeGreaterThan(0);
+    expect(missing, `the architecture doc names src/board paths that do not exist: ${missing.join(", ")}`).toEqual([]);
   });
 
   it("links only existing current documentation targets", async () => {

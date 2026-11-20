@@ -7,7 +7,7 @@
  * agent can answer "you moved this" instead of redrawing the whole board.
  */
 
-import type { BoardAuthor, BoardItem, SimpleBoard } from "./types.js";
+import type { BoardAuthor, BoardItem, SimpleBoard } from "../types.js";
 
 const EDIT_LIMIT = 12;
 const TEXT_LIMIT = 60;

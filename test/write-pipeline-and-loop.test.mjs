@@ -14,9 +14,9 @@ import {
   removeBoardItem,
   updateBoardItem,
 } from "../dist/board/index.js";
-import { diffBoardItems } from "../dist/board/item-diff.js";
-import { describeHandoff } from "../dist/board/handoff.js";
-import { buildBoardModelContext } from "../dist/board/app-context.js";
+import { diffBoardItems } from "../dist/board/model/diff.js";
+import { describeHandoff } from "../dist/board/view/handoff.js";
+import { buildBoardModelContext } from "../dist/board/view/app-context.js";
 import {
   BoardRevisionConflictError,
   BoardValidationError,

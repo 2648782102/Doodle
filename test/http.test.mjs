@@ -4,9 +4,9 @@ import os from "node:os";
 import path from "node:path";
 import WebSocket from "ws";
 import { afterAll, describe, expect, it } from "vitest";
-import { BoardHttpServer } from "../dist/board/http.js";
-import { BoardRevisionCache } from "../dist/board/revision-cache.js";
-import { BoardStore } from "../dist/board/store.js";
+import { BoardHttpServer } from "../dist/board/http/server.js";
+import { BoardRevisionCache } from "../dist/board/state/revision-cache.js";
+import { BoardStore } from "../dist/board/state/store.js";
 import { addBoardItem } from "../dist/board/types.js";
 
 function freePort() {

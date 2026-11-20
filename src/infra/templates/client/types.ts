@@ -3,7 +3,7 @@
  */
 
 import type { ExcalidrawFileData, ExcalidrawLikeElement } from "../../../board/excalidraw-adapter.js";
-import { browserViewportStorage, writeStoredViewport } from "../../../board/viewport-memory.js";
+import { browserViewportStorage, writeStoredViewport } from "../../../board/client/viewport-memory.js";
 
 export type BoardSnapshot = {
   version: 1;

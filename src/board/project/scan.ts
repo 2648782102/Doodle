@@ -1,6 +1,6 @@
 import fs from "node:fs/promises";
 import path from "node:path";
-import { BoardValidationError } from "./errors.js";
+import { BoardValidationError } from "../errors.js";
 
 const DEFAULT_MAX_FILES = 80;
 const DEFAULT_MAX_DEPTH = 3;

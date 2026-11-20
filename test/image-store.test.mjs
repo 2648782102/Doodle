@@ -4,8 +4,8 @@ import path from "node:path";
 import { afterEach, describe, expect, it } from "vitest";
 import {
   externalizeImages, hydrateImages, pruneOrphanImages,
-} from "../dist/board/image-store.js";
-import { BoardStore } from "../dist/board/store.js";
+} from "../dist/board/state/image-store.js";
+import { BoardStore } from "../dist/board/state/store.js";
 import { BoardLibrary } from "../dist/board/library.js";
 import { addBoardItem, createEmptyBoard, parseBoard, touchBoard } from "../dist/board/types.js";
 

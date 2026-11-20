@@ -4,27 +4,27 @@ import fs from "node:fs/promises";
 import http from "node:http";
 import path from "node:path";
 import { WebSocketServer } from "ws";
-import type { AppConfig } from "../infra/config.js";
-import { logger } from "../infra/logger.js";
+import type { AppConfig } from "../../infra/config.js";
+import { logger } from "../../infra/logger.js";
 import {
   addBoardItem, addBoardItems, boardVisualDigest, diagramToBoardItems, layoutBoardItems,
   parseBoard, removeBoardItem, removeBoardItems, replaceBoardContent, touchBoard,
   updateBoardItem, updateBoardItems,
   type BoardItemInput, type BoardLayoutInput, type DiagramInput, type SimpleBoard,
-} from "./types.js";
-import { BoardRevisionConflictError, BoardValidationError, EmptyWriteRefusedError, ObjectConflictError } from "./errors.js";
-import { BoardLibrary, boardLibraryIndexText, type BoardLibraryAction } from "./library.js";
-import type { BoardRevisionCache } from "./revision-cache.js";
-import { isSuspiciousEmptyWrite, type BoardStore } from "./store.js";
-import { watchBoardState, type StateWatch } from "./state-watch.js";
-import { conflictPayload } from "./http/conflict.js";
-import { boardToSvg } from "./svg/render.js";
-import { assetContentType, isAllowedHost, isAllowedOrigin, isPathWithinRoot, validationErrorBody } from "./http/security.js";
-import { commitBoardWrite } from "./write-pipeline.js";
-import { projectSnapshotText, scanProject, type ProjectScanOptions } from "./project-scan.js";
-import { fillTemplate, readTemplate } from "./http/templates.js";
-import { serveAsset } from "./http/assets.js";
-import { expandRecipe } from "./diagram/recipe.js";
+} from "../types.js";
+import { BoardRevisionConflictError, BoardValidationError, EmptyWriteRefusedError, ObjectConflictError } from "../errors.js";
+import { BoardLibrary, boardLibraryIndexText, type BoardLibraryAction } from "../library.js";
+import type { BoardRevisionCache } from "../state/revision-cache.js";
+import { isSuspiciousEmptyWrite, type BoardStore } from "../state/store.js";
+import { watchBoardState, type StateWatch } from "../state/state-watch.js";
+import { conflictPayload } from "../write/conflict.js";
+import { boardToSvg } from "../svg/render.js";
+import { assetContentType, isAllowedHost, isAllowedOrigin, isPathWithinRoot, validationErrorBody } from "./security.js";
+import { commitBoardWrite } from "../write/commit.js";
+import { projectSnapshotText, scanProject, type ProjectScanOptions } from "../project/scan.js";
+import { fillTemplate, readTemplate } from "./templates.js";
+import { serveAsset } from "./assets.js";
+import { expandRecipe } from "../diagram/recipe.js";
 
 function canvasSnapshot(board: SimpleBoard) {
   const { notes: _legacyNotes, ...snapshot } = board;

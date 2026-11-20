@@ -1,4 +1,4 @@
-import type { BoardItem } from "./types.js";
+import type { BoardItem } from "../types.js";
 
 export interface BoardContextSnapshot {
   version: 1;
