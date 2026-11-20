@@ -22,6 +22,7 @@ const exists = async (relative) => {
 const check = (condition, message) => { if (!condition) failures.push(message); };
 
 const packageJson = JSON.parse(await read("package.json"));
+const serverJson = JSON.parse(await read("server.json"));
 const server = await read("src/server.ts");
 const buildScript = await read("scripts/build.mjs");
 const instructions = await read("src/board/instructions.ts");
@@ -252,6 +253,9 @@ check(
 check(version.includes("__DOODLE_PLUGIN_VERSION__"), "bundled server cannot report the injected version");
 check(projectWorkspace.includes("CODEX_PROJECT_ROOT"), "plugin-safe workspace resolution is missing");
 check(packageJson.name === "doodle-mcp", "npm package name is not doodle-mcp");
+check(packageJson.mcpName === serverJson.name && serverJson.name === "io.github.2648782102/doodle-mcp", "package.json mcpName and server.json name do not match");
+check(serverJson.version === packageJson.version && serverJson.packages?.[0]?.version === packageJson.version && serverJson.packages?.[0]?.identifier === packageJson.name, "server.json version or package identifier is out of sync with package.json");
+check(serverJson.description.length <= 100, "server.json description exceeds 100-character MCP Registry limit");
 check(packageJson.repository.url.includes("/Doodle.git") && packageJson.homepage.includes("/Doodle#readme"), "repository URLs do not use the Doodle project name");
 check(packageJson.bin["doodle-mcp"] === "dist/index.js", "doodle-mcp CLI entrypoint is missing");
 check(packageJson.description === canonicalDescription, "package description does not match the canonical Doodle description");
