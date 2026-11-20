@@ -5,6 +5,7 @@
 import { exportToBlob, exportToSvg } from "@excalidraw/excalidraw";
 import type { ExcalidrawFileData } from "../../../board/excalidraw-adapter.js";
 import { showError } from "./banner.js";
+import { orderLibrary, renderBoardRows, type LibraryEntry, type LibraryOrder } from "./library-list.js";
 import { canvasColors, readTheme } from "./theme.js";
 import type { BoardTransport } from "./transport.js";
 import type { BoardSnapshot, ExcalidrawAPI } from "./types.js";
@@ -45,11 +46,38 @@ export function initLibraryUi(deps: LibraryUiDeps): void {
   if (!toggle || !panel || !close || !file) return;
 
   const status = document.querySelector<HTMLElement>("#doodleLibraryStatus");
+  const search = document.querySelector<HTMLInputElement>("#doodleLibrarySearch");
+  const sortToggle = document.querySelector<HTMLButtonElement>("#doodleLibrarySort");
+  const empty = document.querySelector<HTMLElement>("#doodleLibraryEmpty");
+  /** Restored when an action reports back, so the status row never stays stale. */
+  let statusTimer: number | null = null;
   const showStatus = (message: string, isError = false) => {
     if (!status) return;
+    if (statusTimer !== null) window.clearTimeout(statusTimer);
     status.textContent = message;
     status.style.color = isError ? "#b91c1c" : "#6b7280";
+    /*
+     * "已完成" used to sit in the panel forever, so a later action that failed
+     * to report anything looked like it had succeeded. Clear it after a moment;
+     * errors stay until the next action replaces them.
+     */
+    if (message && !isError) {
+      statusTimer = window.setTimeout(() => {
+        statusTimer = null;
+        if (status.textContent === message) status.textContent = "";
+      }, 4000);
+    }
   };
+
+  /*
+   * Search and sort survive a refresh of the list.
+   *
+   * `refreshLibraryUi` re-renders after every action, so reading the controls
+   * from the DOM each time is what keeps a filter from snapping back when a
+   * board is renamed underneath it.
+   */
+  let order: LibraryOrder = "recent";
+  sortToggle?.setAttribute("aria-pressed", "false");
 
   const refreshLibraryUi = async () => {
     const list = document.querySelector<HTMLElement>("#doodleLibraryList");
@@ -57,49 +85,30 @@ export function initLibraryUi(deps: LibraryUiDeps): void {
     const name = document.querySelector<HTMLInputElement>("#doodleLibraryName");
     if (panel.hidden || !list || !current) return;
     const board = await deps.transport.loadBoard();
-    const index = board.library as {
-      activeId?: string;
-      boards?: Array<{ id: string; name: string; revision: number; itemCount: number }>;
-    } | undefined;
-    const boards = index?.boards ?? [];
-    current.textContent = `当前：${boards.find((entry) => entry.id === index?.activeId)?.name ?? "—"} · ${board.items.length} 个对象`;
+    const index = board.library as { activeId?: string; boards?: LibraryEntry[] } | undefined;
+    const boards = (index?.boards ?? []).map((entry) => ({
+      ...entry,
+      active: entry.id === index?.activeId,
+    }));
+    current.textContent = `当前：${boards.find((entry) => entry.active)?.name ?? "—"} · ${board.items.length} 个对象`;
     if (name && document.activeElement !== name) {
-      name.value = boards.find((entry) => entry.id === index?.activeId)?.name ?? "";
+      name.value = boards.find((entry) => entry.active)?.name ?? "";
     }
-    list.replaceChildren();
-    for (const entry of boards) {
-      const row = document.createElement("div");
-      row.className = "doodle-library-entry";
-      row.classList.toggle("active", entry.id === index?.activeId);
-      const button = document.createElement("button");
-      button.className = "doodle-library-entry-main";
-      button.textContent = entry.name;
-      const meta = document.createElement("small");
-      meta.textContent = `${entry.itemCount} 个对象 · rev ${entry.revision}`;
-      button.append(meta);
-      button.addEventListener("click", () => void runLibraryAction({ type: "switch", id: entry.id }));
-
-      const actions = document.createElement("div");
-      actions.className = "doodle-library-entry-actions";
-      const exportButton = document.createElement("button");
-      exportButton.textContent = "导出";
-      exportButton.title = "导出这个画板的 JSON";
-      exportButton.addEventListener("click", (event) => {
-        event.stopPropagation();
-        void runLibraryAction({ type: "export", id: entry.id });
-      });
-      const deleteButton = document.createElement("button");
-      deleteButton.textContent = "删除";
-      deleteButton.className = "doodle-library-entry-delete";
-      deleteButton.title = "删除这个画板";
-      deleteButton.addEventListener("click", (event) => {
-        event.stopPropagation();
-        if (!window.confirm(`删除画板「${entry.name}」？此操作不可撤销。`)) return;
-        void runLibraryAction({ type: "delete", id: entry.id });
-      });
-      actions.append(exportButton, deleteButton);
-      row.append(button, actions);
-      list.append(row);
+    // Filter and order live in `library-list` so the rule can be tested without a DOM.
+    const visible = orderLibrary(boards, search?.value ?? "", order);
+    renderBoardRows(list, visible, {
+      switchTo: (entry) => void runLibraryAction({ type: "switch", id: entry.id }),
+      rename: (entry, next) => renameBoard(entry.id, next),
+      exportJson: (entry) => void runLibraryAction({ type: "export", id: entry.id }),
+      delete: (entry) => void runLibraryAction({ type: "delete", id: entry.id }),
+      refresh: () => void refreshLibraryUi().catch(() => {}),
+    });
+    if (empty) {
+      const filtering = (search?.value ?? "").trim().length > 0;
+      empty.hidden = visible.length > 0;
+      empty.textContent = filtering
+        ? `没有匹配「${search?.value.trim()}」的画板。`
+        : "还没有画板。点「新建」创建一张。";
     }
 
     const renameButton = document.querySelector<HTMLButtonElement>("#doodleLibraryRename");
@@ -107,7 +116,7 @@ export function initLibraryUi(deps: LibraryUiDeps): void {
     const renameActive = () => {
       const active = deps.getActiveSnapshot();
       if (!active) return;
-      void runLibraryAction({ type: "rename", id: active.id });
+      void renameBoard(active.id, renameTarget?.value ?? "");
     };
     if (renameButton) renameButton.onclick = renameActive;
     if (renameTarget) {
@@ -129,11 +138,32 @@ export function initLibraryUi(deps: LibraryUiDeps): void {
     if (["switch", "create", "save", "duplicate", "import"].includes(String(action.type))) {
       await deps.flushPendingWrites?.().catch(() => {});
     }
-    const name = document.querySelector<HTMLInputElement>("#doodleLibraryName")?.value.trim();
+    /*
+     * An explicit name wins over the field at the top.
+     *
+     * The field exists for renaming the active board. When a row renames itself,
+     * its own value is the name — reading the top field instead sent the old
+     * name and quietly renamed the board to itself.
+     */
+    const explicitName = typeof action.name === "string" ? action.name.trim() : "";
+    const name = explicitName || document.querySelector<HTMLInputElement>("#doodleLibraryName")?.value.trim();
     const activeSnapshot = deps.getActiveSnapshot();
     let request: Record<string, unknown> = action;
-    if (action.type === "duplicate") {
-      request = { type: "duplicate", id: activeSnapshot?.id, name: name || undefined };
+    if (action.type === "switch") {
+      /*
+       * Switching is a canvas action, and the swipe of the name field is not a
+       * rename of the board being left. Without this, the pre-filled field rode
+       * along on every switch and renamed whichever board happened to be active.
+       */
+      request = { type: "switch", id: action.id };
+    } else if (action.type === "duplicate") {
+      /*
+       * "另存一份" duplicates the *active* board. A name typed into the field is
+       * not necessarily about this board, so it is only sent when it differs
+       * from the active board's own name.
+       */
+      const named = name && name !== activeSnapshot?.title ? name : undefined;
+      request = { type: "duplicate", id: activeSnapshot?.id, ...(named ? { name: named } : {}) };
     } else {
       /*
        * "新建" must not inherit the current board's name.
@@ -163,6 +193,34 @@ export function initLibraryUi(deps: LibraryUiDeps): void {
       downloadBlob(blob, `${safeFilename(exportBoard.title)}.doodle.json`);
     }
     await refreshLibraryUi().catch(() => {});
+    /*
+     * A board switch is finished when the board is on screen.
+     *
+     * The drawer used to stay open with a scrim over the canvas, so choosing a
+     * board looked like nothing happened: the panel still listed the old active
+     * row for a frame, and the result was behind the dimmer. Close it and let the
+     * person see what they picked. Renames and exports stay put — those are
+     * library housekeeping, not navigation.
+     */
+    if (["switch", "create", "import"].includes(String(action.type)) && action.switchTo !== false) {
+      closePanel();
+    }
+  };
+
+  /*
+   * One place that decides whether a typed name is worth sending.
+   *
+   * A blank field used to travel as-is and the server stored "未命名画板", which
+   * looks like a successful rename to a name nobody asked for. Saying so is
+   * better than quietly inventing one.
+   */
+  const renameBoard = async (id: string | undefined, raw: string): Promise<void> => {
+    const next = raw.trim();
+    if (!next) {
+      showStatus("画板名称不能为空", true);
+      return;
+    }
+    await runLibraryAction({ type: "rename", id, name: next });
   };
 
   const scrim = document.querySelector<HTMLElement>("#doodleDrawerScrim");
@@ -266,6 +324,15 @@ export function initLibraryUi(deps: LibraryUiDeps): void {
     })());
   }
   document.querySelector<HTMLButtonElement>("#doodleLibraryImport")?.addEventListener("click", () => file.click());
+  search?.addEventListener("input", () => { void refreshLibraryUi().catch(() => {}); });
+  sortToggle?.addEventListener("click", () => {
+    order = order === "recent" ? "name" : "recent";
+    const byName = order === "name";
+    sortToggle.textContent = byName ? "名称" : "最近";
+    sortToggle.setAttribute("aria-pressed", byName ? "true" : "false");
+    sortToggle.title = byName ? "按名称排序" : "按最近修改排序";
+    void refreshLibraryUi().catch(() => {});
+  });
   file.addEventListener("change", async () => {
     const imported = file.files?.[0];
     if (!imported) return;

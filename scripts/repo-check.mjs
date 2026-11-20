@@ -35,6 +35,7 @@ const excalidrawApp = (await Promise.all([
   read("src/infra/templates/client/banner.ts"),
   read("src/infra/templates/client/transport.ts"),
   read("src/infra/templates/client/library-ui.ts"),
+  read("src/infra/templates/client/library-list.ts"),
   read("src/infra/templates/client/sync-state.ts"),
   read("src/infra/templates/client/canvas-sync.ts"),
 ])).join("\n");
@@ -757,6 +758,31 @@ check(excalidrawTemplate.includes("--doodle-drawer-width") && excalidrawTemplate
 check(excalidrawTemplate.includes("body.doodle-drawer-open .doodle-topbar") && !excalidrawTemplate.includes("body.doodle-drawer-open .excalidraw-host > .excalidraw"), "library drawer squeezes or collides with the canvas toolbar");
 check(excalidrawTemplate.includes("body:has(.excalidraw .dropdown-menu) .doodle-topbar") && excalidrawTemplate.includes("body:has(.excalidraw .Modal) .doodle-topbar"), "Doodle toolbar does not yield to Excalidraw menus and modal overlays");
 check(excalidrawTemplate.includes(".doodle-library-section--boards") && excalidrawTemplate.includes(".doodle-library-section--shares") && excalidrawTemplate.indexOf(".doodle-library-section--boards") < excalidrawTemplate.indexOf('data-library-action="duplicate"'), "library drawer does not separate its scrollable list from fixed actions");
+/*
+ * The library has to stay findable as it grows.
+ *
+ * Twenty boards that share a generated name could only be told apart by reading
+ * `rev 586`, and the only way to rename one was to load it into the canvas
+ * first. Search, in-place rename, and an inline delete confirmation are what
+ * keep the drawer a library rather than a list. `window.confirm` in particular
+ * must not come back: it is a page-blocking system alert inside a styled pane.
+ */
+check(
+  excalidrawTemplate.includes('id="doodleLibrarySearch"') &&
+    excalidrawTemplate.includes('id="doodleLibrarySort"') &&
+    excalidrawTemplate.includes(".doodle-library-entry-confirm") &&
+    excalidrawApp.includes("orderLibrary") &&
+    excalidrawApp.includes("renderBoardRows"),
+  "the library lost search, ordering, or its inline row actions",
+);
+/*
+ * Match the call, not the prose: the comment explaining why `window.confirm`
+ * was removed must not trip the guard that keeps it removed.
+ */
+check(
+  !/^\s*(?:if\s*\([^)]*\)\s*)?window\.confirm\(/m.test(excalidrawApp) && !/rev \$\{entry\.revision\}/.test(excalidrawApp),
+  "the library still asks with a system dialog or exposes the raw revision counter",
+);
 check(hoverGeometry.length === 0, `hover or active feedback changes layout geometry: ${hoverGeometry.join(", ")}`);
 check(excalidrawApp.includes("scrim.hidden = false") && excalidrawApp.includes("scrim?.addEventListener(\"click\", closePanel)") && excalidrawApp.includes("event.key === \"Escape\""), "library drawer lost its scrim, outside-click, or Escape dismissal");
 check(excalidrawApp.includes("https://github.com/2648782102/Doodle") && excalidrawApp.includes("isDoodleProjectLink") && excalidrawApp.includes("group.querySelector(\"a[href]\")"), "canvas link policy no longer allows only the Doodle repository or hides upstream link groups");

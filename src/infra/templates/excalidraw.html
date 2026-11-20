@@ -1582,6 +1582,51 @@
     .doodle-library-entry-actions button { min-width: 0; padding: 4px 6px; border: 0; border-radius: 6px; background: transparent; color: var(--doodle-muted); cursor: pointer; font-size: 11px; white-space: nowrap; transition: background-color var(--doodle-duration) var(--doodle-ease), color var(--doodle-duration) var(--doodle-ease); }
     .doodle-library-entry-actions button:hover { background: var(--doodle-surface-solid); color: var(--doodle-ink); }
     .doodle-library-entry-actions .doodle-library-entry-delete:hover { color: var(--doodle-danger); }
+    /*
+     * Search and sort.
+     *
+     * The field is the same height and radius as the rename field above it, so
+     * the two read as the panel's two input rows rather than two unrelated
+     * controls. The sort button states its current mode, not the mode it would
+     * switch to, because a toggle that relabels itself is a guessing game.
+     */
+    .doodle-library-tools { display: flex; flex: none; align-items: center; gap: 6px; margin-bottom: 8px; }
+    .doodle-library-search { flex: 1 1 auto; min-width: 0; height: 30px; padding: 0 9px; border: 1px solid var(--doodle-border); border-radius: var(--doodle-radius-sm); background: var(--doodle-surface-solid); color: var(--doodle-ink); font-size: 11px; -webkit-appearance: none; appearance: none; }
+    .doodle-library-search::placeholder { color: var(--doodle-muted); }
+    .doodle-library-search:hover { border-color: var(--doodle-border-strong); }
+    .doodle-library-search:focus { border-color: var(--doodle-accent); outline: none; }
+    .doodle-library-search::-webkit-search-cancel-button { -webkit-appearance: none; appearance: none; }
+    .doodle-library-sort { flex: none; height: 30px; padding: 0 9px; border: 1px solid var(--doodle-border); border-radius: var(--doodle-radius-sm); background: var(--doodle-surface-solid); color: var(--doodle-muted); font-size: 11px; cursor: pointer; white-space: nowrap; }
+    .doodle-library-sort:hover { border-color: var(--doodle-accent); color: var(--doodle-ink); }
+    .doodle-library-sort[aria-pressed="true"] { border-color: var(--doodle-accent); background: var(--doodle-accent-soft); color: var(--doodle-ink); }
+    .doodle-library-empty { margin: 6px 2px 0; color: var(--doodle-muted); font-size: 11px; line-height: 1.6; }
+    .doodle-library-empty[hidden] { display: none; }
+    /*
+     * "Just now" is information; `rev 586` is not.
+     *
+     * Board rows used to expose the raw revision counter and item count. The
+     * counter tells a person nothing, and the count is already visible on the
+     * canvas. Relative time answers the question a library actually gets asked:
+     * which of these is the one I was drawing on?
+     */
+    .doodle-library-entry-when { color: var(--doodle-muted); }
+    /*
+     * A rename happens inside the row.
+     *
+     * `window.confirm` was the only confirmation in the panel, which is both a
+     * modal interruption and a browser-shaped one: it cannot be styled, it
+     * blocks the page, and on a phone it appears as a system alert. The row now
+     * asks in place, next to the thing it is about to delete, and the focus ring
+     * follows the safe choice.
+     */
+    .doodle-library-entry-confirm { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; padding: 2px; }
+    .doodle-library-entry-confirm p { flex: 1 1 100%; margin: 0 0 2px; color: var(--doodle-ink); font-size: 11px; line-height: 1.5; }
+    .doodle-library-entry-confirm button { height: 26px; padding: 0 9px; border: 1px solid var(--doodle-border-strong); border-radius: 6px; background: var(--doodle-surface-solid); color: var(--doodle-ink); font-size: 11px; cursor: pointer; }
+    .doodle-library-entry-confirm button:hover { border-color: var(--doodle-accent); background: var(--doodle-accent-soft); }
+    .doodle-library-entry-confirm button[data-tone="danger"] { border-color: var(--doodle-danger); color: var(--doodle-danger); }
+    .doodle-library-entry-confirm button[data-tone="danger"]:hover { background: color-mix(in srgb, var(--doodle-danger) 12%, transparent); }
+    .doodle-library-entry.is-confirming { border-color: var(--doodle-danger); background: var(--doodle-surface-solid); }
+    .doodle-library-entry.is-confirming .doodle-library-entry-actions { display: none; }
     .excalidraw .HelpDialog__header { display: none; }
     .excalidraw .dropdown-menu .dropdown-menu-group[data-doodle-hidden="true"] { display: none; }
     .excalidraw [data-doodle-hidden="true"] { display: none !important; }
@@ -2134,7 +2179,20 @@
           <button data-library-action="duplicate">另存一份</button>
         </div>
       </div>
+      <!--
+        Find a board, and know what "recent" means.
+
+        A library of twenty boards all called the same thing could only be
+        scanned by reading `rev 586` and guessing. Search filters by name, and
+        the sort toggle answers "which one was I just drawing on?" — recent
+        first is the default, because that is the board a person is returning to.
+      -->
+      <div class="doodle-library-tools">
+        <input class="doodle-library-search" id="doodleLibrarySearch" type="search" placeholder="搜索画板" aria-label="搜索画板" autocomplete="off">
+        <button class="doodle-library-sort" id="doodleLibrarySort" type="button" aria-pressed="false" title="按最近修改排序">最近</button>
+      </div>
       <div class="doodle-library-list" id="doodleLibraryList"></div>
+      <p class="doodle-library-empty" id="doodleLibraryEmpty" hidden></p>
     </div>
     <div class="doodle-library-section doodle-library-section--shares"><strong>分享快照</strong><div class="doodle-library-shares" aria-label="分享快照格式">
       <button data-snapshot-export="png">导出 PNG</button>

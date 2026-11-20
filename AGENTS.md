@@ -52,6 +52,7 @@ Drawing contract:
 - `stroke.points` are local to the object bounds; `image.src` is a bounded `data:image/*;base64` source. `title`, `emphasis: focus`, and `groupId` are optional version 1 fields; old boards remain valid.
 - `variant`, `role`, `z`, `style`, `startItemId`, and `endItemId` are optional version 1 visual-expression fields. `get_board` returns `capabilities`, `visualDigest`, and recipe guidance; read them before drawing or interpreting a board.
 - In the human canvas, click to place a default-sized object or drag to size shapes, sketch strokes, and draw arrows in any direction. Double-click empty canvas creates a note; dragging on empty canvas marquee-selects; selected objects support batch move/delete/group/layout, undo/redo, arrow-key nudging, and alignment snapping. The `图库` drawer overlays the canvas without resizing it, hides its launcher while open, keeps its board list independently scrollable, and pins its action rows. The Doodle top bar yields to Excalidraw dropdown menus and modal overlays instead of stacking above them. `Ctrl/⌘+V` pastes a bounded local image. Space-drag or middle-drag pans; the wheel pans and Ctrl/Command-wheel zooms.
+- The library is a modal surface, not a slide-out. It takes focus when it opens, traps Tab at both edges, closes on Escape or the scrim, and returns focus to `#doodleLibraryToggle`. Page notices (the first-use card, the error banner, the notify button) hide while it is open; the conflict bar stays above it, because an unsaved change waiting on a decision must remain reachable. Switching, creating, or importing a board closes the drawer so the result is visible; renames and exports keep it open, since they are housekeeping rather than navigation. See `client/library-list.ts` for the rules behind the list (search, ordering, relative time, inline rename and delete confirmation) and `client/library-ui.ts` for the modal behaviour.
 - Do not fake connectors with text or decorative horizontal lines.
 - Normal tool calls never open a browser, IDE, or editor, and never write project files.
 
@@ -91,7 +92,7 @@ src/
 │       ├── excalidraw.html     Excalidraw-only standalone and embedded canvas
 │       ├── excalidraw-app.tsx  canvas entrypoint wiring the React canvas
 │       ├── client/             split client modules (transport, theme, link-policy, banner, library-ui,
-│       │                       sync-state, canvas-sync, types)
+│       │                       library-list, canvas-view, sync-state, canvas-sync, types)
 │       └── liquid-glass.ts     per-pane SVG refraction filters for the chrome
 plugins/doodle/                 installable Codex plugin source: compatibility manifest, MCP config, skill, assets
 .agents/plugins/                repository-scoped plugin marketplace catalog
