@@ -11,7 +11,18 @@
  * truth: the test asks whether the model's own words agree with it.
  */
 
-import { describeHandoff } from "../dist/board/handoff.js";
+/*
+ * Loaded lazily, not at module scope.
+ *
+ * `npm test` runs before `npm run build` on CI, so a static import of `dist/`
+ * fails there while working locally where a build exists. Every bench module
+ * that needs the compiled server therefore imports it inside the call.
+ */
+let handoffModule;
+async function handoff() {
+  handoffModule ??= await import("../dist/board/handoff.js");
+  return handoffModule;
+}
 
 /**
  * A scripted edit a person could make.
@@ -38,7 +49,8 @@ export function applyHumanEdit(board, edit) {
 }
 
 /** What the board itself says the person did — the ground truth for grading. */
-export function expectedHandoff(before, after) {
+export async function expectedHandoff(before, after) {
+  const { describeHandoff } = await handoff();
   return describeHandoff(after, before);
 }
 

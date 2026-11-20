@@ -3,18 +3,33 @@
  * HANDOFF the server computed. That means the grader must be right about what
  * the server says before it can judge a model.
  */
-import { describe, expect, it } from "vitest";
-import { createEmptyBoard, diagramToBoardItems, touchBoard } from "../dist/board/types.js";
-import { expandRecipe } from "../dist/board/diagram/recipe.js";
+import { beforeAll, describe, expect, it } from "vitest";
 import { applyHumanEdit, expectedHandoff, gradeHumanReport } from "./human-loop.mjs";
 
-function flowBoard(steps) {
+/*
+ * `dist/` is not built when CI runs `npm test`, so the compiled modules are
+ * loaded inside the test body rather than at import time — the same reason
+ * `human-loop.mjs` defers its own import.
+ */
+async function server() {
+  const types = await import("../dist/board/types.js");
+  const recipe = await import("../dist/board/diagram/recipe.js");
+  return {
+    createEmptyBoard: types.createEmptyBoard,
+    diagramToBoardItems: types.diagramToBoardItems,
+    touchBoard: types.touchBoard,
+    expandRecipe: recipe.expandRecipe,
+  };
+}
+
+async function flowBoard(steps) {
+  const { createEmptyBoard, diagramToBoardItems, touchBoard, expandRecipe } = await server();
   return touchBoard({ ...createEmptyBoard(), items: diagramToBoardItems(expandRecipe({ recipe: "flow", steps }), "ai") });
 }
 
 describe("scripted human edits", () => {
-  it("moves the named object and marks it human", () => {
-    const before = flowBoard(["A", "B"]);
+  it("moves the named object and marks it human", async () => {
+    const before = await flowBoard(["A", "B"]);
     const after = applyHumanEdit(before, { type: "move", label: "B", dx: 120, dy: 0 });
     const moved = after.items.find((item) => (item.title || item.text) === "B");
     const original = before.items.find((item) => (item.title || item.text) === "B");
@@ -23,8 +38,8 @@ describe("scripted human edits", () => {
     expect(after.revision).toBe(before.revision + 1);
   });
 
-  it("leaves every other object untouched", () => {
-    const before = flowBoard(["A", "B"]);
+  it("leaves every other object untouched", async () => {
+    const before = await flowBoard(["A", "B"]);
     const after = applyHumanEdit(before, { type: "move", label: "B", dx: 50 });
     const a = after.items.find((item) => (item.title || item.text) === "A");
     const aBefore = before.items.find((item) => (item.title || item.text) === "A");
@@ -33,27 +48,37 @@ describe("scripted human edits", () => {
 });
 
 describe("the handoff the server computes", () => {
-  it("reports a move, attributed to the person", () => {
-    const before = flowBoard(["A", "B"]);
+  it("reports a move, attributed to the person", async () => {
+    const before = await flowBoard(["A", "B"]);
     const after = applyHumanEdit(before, { type: "move", label: "B", dx: 120 });
-    const handoff = expectedHandoff(before, after);
+    const handoff = await expectedHandoff(before, after);
     expect(handoff.needsAttention).toBe(true);
     expect(handoff.humanEdits).toHaveLength(1);
     expect(handoff.readings[0].kind).toBe("move");
   });
 
-  it("says nothing when the AI's own write is the only change", () => {
+  it("says nothing when the AI's own write is the only change", async () => {
     // Telling the agent to review itself is pure noise.
-    const before = flowBoard(["A", "B"]);
+    const before = await flowBoard(["A", "B"]);
+    const { touchBoard } = await server();
     const aiOnly = touchBoard({ ...before, items: before.items.map((item) => ({ ...item, x: item.x + 5 })) });
-    expect(expectedHandoff(before, aiOnly).needsAttention).toBe(false);
+    expect((await expectedHandoff(before, aiOnly)).needsAttention).toBe(false);
   });
 });
 
 describe("grading what the model understood", () => {
-  const before = flowBoard(["A", "B"]);
-  const after = applyHumanEdit(before, { type: "move", label: "B", dx: 120 });
-  const handoff = expectedHandoff(before, after);
+  let before;
+  let after;
+  let handoff;
+  /*
+   * `beforeAll` rather than module scope: the compiled board modules are
+   * async-loaded, so nothing here may run at describe time.
+   */
+  beforeAll(async () => {
+    before = await flowBoard(["A", "B"]);
+    after = applyHumanEdit(before, { type: "move", label: "B", dx: 120 });
+    handoff = await expectedHandoff(before, after);
+  });
 
   it("passes an answer that names the object and the kind of change", () => {
     const result = gradeHumanReport({
