@@ -1,6 +1,12 @@
 import { describe, expect, it } from "vitest";
 import { createCanvasSync, rebaseScene } from "../dist/infra/templates/client/canvas-sync.js";
 import { channelLabel, syncPhaseAfter, syncPhaseView } from "../dist/infra/templates/client/sync-state.js";
+import { readFileSync } from "node:fs";
+import { fileURLToPath } from "node:url";
+import path from "node:path";
+
+const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
+const read = (relative) => readFileSync(path.join(root, relative), "utf8");
 
 /** A board with `items`, each `{ id, x }`, at `revision`. */
 function snapshot(revision, items) {
@@ -230,5 +236,60 @@ describe("canvas write rebasing", () => {
     h.sync.schedule(scene("item_a"), { positions: { item_a: 10 } });
     await h.sync.flush();
     expect(h.events).toEqual(["local-edit", "saving", "saved"]);
+  });
+});
+
+describe("changing the active board mid-write", () => {
+  /*
+   * A person draws, then opens the library and picks another board inside the
+   * 450 ms debounce. The pending frame is rebased onto whichever board is
+   * active when the timer fires, so without a flush the stroke is projected
+   * against the *new* board: it lands there and the board it was drawn on stays
+   * empty. Switching a board is not a rebase; nothing about the old scene is
+   * meaningful on a different board.
+   */
+  const appSource = read("src/infra/templates/excalidraw-app.tsx");
+  const librarySource = read("src/infra/templates/client/library-ui.ts");
+
+  it("flushes the pending canvas write before switching boards", () => {
+    const body = librarySource.slice(librarySource.indexOf("const runLibraryAction = async"));
+    const guard = body.slice(0, body.indexOf("const name ="));
+    for (const action of ["switch", "create", "duplicate", "import"]) {
+      expect(guard, `"${action}" would change boards without flushing`).toContain(`"${action}"`);
+    }
+    expect(guard).toContain("flushPendingWrites");
+    // Reads and renames never move the canvas, so they must not pay for a write.
+    expect(guard, "an export now waits on a canvas write").not.toContain('"export"');
+    expect(guard, "a rename now waits on a canvas write").not.toContain('"rename"');
+  });
+
+  it("never adopts a different board without repainting", () => {
+    /*
+     * `repaint: false` keeps the old scene on screen and lets the rebase
+     * reconcile it — correct for a newer revision of the same board, wrong
+     * across boards. The guard has to compare ids, not just the option.
+     */
+    const body = appSource.slice(appSource.indexOf("function applyRemoteSnapshot"));
+    const silent = body.slice(0, body.indexOf("if (isEditing("));
+    expect(silent).toMatch(/options\.repaint === false && activeSnapshot && data\.id === activeSnapshot\.id/);
+  });
+
+  it("drops the outgoing board's queued write when the board actually changes", () => {
+    const body = appSource.slice(appSource.indexOf("function applyRemoteSnapshot"));
+    const change = body.slice(body.indexOf("data.id !== activeSnapshot.id"));
+    expect(change, "the outgoing board's pending write was kept").toContain("canvasSync.current?.cancel()");
+  });
+
+  it("keys the remembered camera by the board the scene shows", () => {
+    /*
+     * After a switch, `activeSnapshot` is already the new board while the scene
+     * still paints the old one. Saving the camera under the active id wrote the
+     * old board's pan and zoom into the new board's entry, and both boards then
+     * opened in the same wrong place.
+     */
+    const onChange = appSource.slice(appSource.indexOf("const onChange = useCallback"));
+    const camera = onChange.slice(0, onChange.indexOf("stableStringify"));
+    expect(camera, "the camera is keyed by the active board again").toContain("paintedBoardId.current");
+    expect(camera).not.toContain("rememberViewport(activeSnapshot?.id");
   });
 });

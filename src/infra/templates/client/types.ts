@@ -41,6 +41,8 @@ export type McpAppFallback = {
 };
 
 let viewportSaveTimer: number | null = null;
+/** The newest camera waiting to be written, and the board it belongs to. */
+let pendingViewport: { boardId: string; viewport: { scrollX: number; scrollY: number; zoom: number } } | null = null;
 
 /** Bounding box of the board's objects, used to judge a remembered camera. */
 export function boardBounds(items: unknown[]): { minX: number; minY: number; maxX: number; maxY: number } | undefined {
@@ -68,10 +70,28 @@ export function rememberViewport(boardId: string | undefined, appState: Excalidr
   if (typeof appState.scrollX !== "number" || typeof appState.scrollY !== "number" || typeof zoom !== "number") return;
   const storage = browserViewportStorage();
   if (!storage) return;
+  /*
+   * Snapshot the values, not the app state object, and coalesce instead of
+   * dropping.
+   *
+   * The timer used to read `appState` when it fired, 600 ms later. Switching
+   * boards inside that window rewrote the new board's entry with the camera of
+   * the board being left — both boards then remembered the wrong place. Capturing
+   * now ties the values to the id that was active when they were observed.
+   *
+   * It also returned early while a write was pending, so the *latest* camera in
+   * a burst was the one that got lost. That mattered beyond throttling: the
+   * camera restored on a board switch arrived while a stale entry was still
+   * queued, was discarded, and the board kept the outgoing camera.
+   */
+  const viewport = { scrollX: appState.scrollX!, scrollY: appState.scrollY!, zoom };
+  pendingViewport = { boardId, viewport };
   if (viewportSaveTimer !== null) return;
   viewportSaveTimer = window.setTimeout(() => {
     viewportSaveTimer = null;
-    writeStoredViewport(storage, boardId, { scrollX: appState.scrollX!, scrollY: appState.scrollY!, zoom });
+    const pending = pendingViewport;
+    pendingViewport = null;
+    if (pending) writeStoredViewport(storage, pending.boardId, pending.viewport);
   }, 600);
 }
 

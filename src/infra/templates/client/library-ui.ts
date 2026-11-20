@@ -26,6 +26,15 @@ export interface LibraryUiDeps {
   transport: BoardTransport;
   getActiveSnapshot: () => BoardSnapshot | null;
   applyRemoteSnapshot: (snapshot: BoardSnapshot, options?: { repaint?: boolean }) => void;
+  /**
+   * Write any debounced canvas edit before the active board changes.
+   *
+   * Without this, a person who draws and then immediately picks another board
+   * loses the stroke in the worst possible way: the pending frame is rebased
+   * onto whichever board is active when the timer fires, so the rectangle lands
+   * on the *new* board and the board it was drawn on stays empty.
+   */
+  flushPendingWrites?: () => Promise<unknown>;
 }
 
 export function initLibraryUi(deps: LibraryUiDeps): void {
@@ -112,15 +121,35 @@ export function initLibraryUi(deps: LibraryUiDeps): void {
   };
 
   const runLibraryAction = async (action: Record<string, unknown>) => {
+    /*
+     * Flush first, and only for actions that can change the active board. An
+     * export or a rename does not move the canvas, so making them wait on a
+     * write would only add latency.
+     */
+    if (["switch", "create", "save", "duplicate", "import"].includes(String(action.type))) {
+      await deps.flushPendingWrites?.().catch(() => {});
+    }
     const name = document.querySelector<HTMLInputElement>("#doodleLibraryName")?.value.trim();
     const activeSnapshot = deps.getActiveSnapshot();
     let request: Record<string, unknown> = action;
     if (action.type === "duplicate") {
       request = { type: "duplicate", id: activeSnapshot?.id, name: name || undefined };
     } else {
+      /*
+       * "新建" must not inherit the current board's name.
+       *
+       * The field is pre-filled with the active board so "重命名" reads what is
+       * on screen, but sending it to `create` named every new board after the one
+       * it came from: a library of eleven boards all called "和 AI 一起画", which
+       * a person cannot tell apart. Only an edited field counts as a name here,
+       * and the server already generates "画板 N" when none is given.
+       */
+      const editedName = name && name !== activeSnapshot?.title ? name : undefined;
+      const takesName = ["save", "rename", "duplicate"].includes(String(action.type));
       request = {
         ...action,
-        ...(name && ["save", "create", "rename", "duplicate"].includes(String(action.type)) ? { name } : {}),
+        ...(name && takesName ? { name } : {}),
+        ...(action.type === "create" && editedName ? { name: editedName } : {}),
       };
     }
     const result = await deps.transport.libraryRequest(request, activeSnapshot?.revision ?? 0);
@@ -138,22 +167,80 @@ export function initLibraryUi(deps: LibraryUiDeps): void {
 
   const scrim = document.querySelector<HTMLElement>("#doodleDrawerScrim");
   let closeTimer: number | null = null;
+  /** Where focus goes when the drawer closes, so a keyboard user is not dropped at the top. */
+  let returnFocus: HTMLElement | null = null;
+
+  /*
+   * The drawer is a modal surface, and it has to behave like one.
+   *
+   * It used to only animate: focus stayed on `<body>`, Tab walked straight out
+   * into the Excalidraw canvas behind the scrim, and closing dropped focus back
+   * at `body`. A person navigating by keyboard could not reach the panel at all
+   * without tabbing through the whole canvas toolbar first, and once inside
+   * they could tab straight back out to controls the scrim was covering.
+   */
+  const focusable = (): HTMLElement[] => [...panel.querySelectorAll<HTMLElement>(
+    'button:not([disabled]), [href], input:not([disabled]):not([type="hidden"]), select, textarea, [tabindex]:not([tabindex="-1"])',
+  )].filter((element) => element.offsetParent !== null || element === document.activeElement);
+
+  const onPanelKeydown = (event: KeyboardEvent) => {
+    if (event.key !== "Tab") return;
+    const items = focusable();
+    if (items.length === 0) return;
+    const first = items[0];
+    const last = items[items.length - 1];
+    const active = document.activeElement as HTMLElement | null;
+    /*
+     * Focus starts on the panel itself (see `openPanel`), which is outside that
+     * list: Tab from there has to enter at the top rather than escape to the
+     * canvas, so both edges are handled explicitly.
+     */
+    if (!active || active === panel || !panel.contains(active)) {
+      event.preventDefault();
+      (event.shiftKey ? last : first).focus();
+      return;
+    }
+    if (event.shiftKey && active === first) {
+      event.preventDefault();
+      last.focus();
+    } else if (!event.shiftKey && active === last) {
+      event.preventDefault();
+      first.focus();
+    }
+  };
+
   const openPanel = () => {
     if (closeTimer !== null) window.clearTimeout(closeTimer);
     closeTimer = null;
+    const active = document.activeElement as HTMLElement | null;
+    returnFocus = active && active !== document.body ? active : toggle;
     panel.hidden = false;
     if (scrim) scrim.hidden = false;
     document.body.classList.add("doodle-drawer-open");
     toggle.setAttribute("aria-expanded", "true");
+    panel.setAttribute("aria-modal", "true");
     void panel.offsetWidth;
     panel.classList.add("is-open");
+    document.addEventListener("keydown", onPanelKeydown);
+    /*
+     * Focus the panel, not its first button: a dialog should announce its own
+     * label before its controls, and the name field would otherwise open with
+     * the board name pre-selected for accidental overwrite.
+     */
+    panel.focus({ preventScroll: true });
     void refreshLibraryUi().catch(() => {});
   };
   const closePanel = () => {
     if (closeTimer !== null) window.clearTimeout(closeTimer);
+    document.removeEventListener("keydown", onPanelKeydown);
+    panel.removeAttribute("aria-modal");
     panel.classList.remove("is-open");
     document.body.classList.remove("doodle-drawer-open");
     toggle.setAttribute("aria-expanded", "false");
+    const target = returnFocus && document.contains(returnFocus) ? returnFocus : toggle;
+    returnFocus = null;
+    // After the slide-out, so the focus ring is not drawn on a moving panel.
+    target.focus({ preventScroll: true });
     closeTimer = window.setTimeout(() => {
       panel.hidden = true;
       if (scrim) scrim.hidden = true;

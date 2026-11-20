@@ -6,19 +6,13 @@
 
 import React, { useCallback, useEffect, useMemo, useState } from "react";
 import { createRoot } from "react-dom/client";
-import { Excalidraw, convertToExcalidrawElements } from "@excalidraw/excalidraw";
+import { Excalidraw } from "@excalidraw/excalidraw";
 import {
-  boardToExcalidrawFiles,
   boardItemsFromExcalidrawBoard,
-  boardItemsToExcalidrawSkeleton,
   type ExcalidrawFileData,
   type ExcalidrawLikeElement,
 } from "../../board/excalidraw-adapter.js";
-import {
-  browserViewportStorage,
-  isViewportNearContent,
-  readStoredViewport,
-} from "../../board/viewport-memory.js";
+import { frameNewBoard, remeasureTextAfterFonts, toElements, toFiles, usableViewport } from "./client/canvas-view.js";
 import { initLiquidGlass, type LiquidGlassController } from "./liquid-glass.js";
 import {
   clearConflictNotice,
@@ -35,7 +29,6 @@ import { createSyncChip } from "./client/sync-state.js";
 import {
   EXCALIDRAW_THEME,
   canvasColors,
-  canvasThemeFor,
   initThemeToggle,
   isDoodleTheme,
   readTheme,
@@ -43,7 +36,6 @@ import {
 } from "./client/theme.js";
 import { BoardWriteError, createBoardTransport } from "./client/transport.js";
 import {
-  boardBounds,
   isEditing,
   rememberViewport,
   type BoardSnapshot,
@@ -86,6 +78,10 @@ const applyingRemote = { current: false };
 const currentFiles: { current: Record<string, ExcalidrawFileData> } = { current: {} };
 const currentAppState: { current: ExcalidrawAppState } = { current: {} };
 const pendingRemote: { current: BoardSnapshot | null } = { current: null };
+/** The live canvas' write queue, so a board switch can drop what it would have written. */
+const canvasSync: { current: CanvasSync | null } = { current: null };
+/** Which board the live scene currently shows, so a repaint can tell a switch from a rebase. */
+const paintedBoardId: { current: string | null } = { current: null };
 /**
  * Excalidraw fires `onChange` while it is still mounting, before the scene we
  * passed in has been applied. Wait for the first non-empty scene before
@@ -93,38 +89,32 @@ const pendingRemote: { current: BoardSnapshot | null } = { current: null };
  */
 const sceneReady = { current: false };
 
-function toElements(snapshot: BoardSnapshot, theme: DoodleTheme = readTheme()) {
-  const skeletons = boardItemsToExcalidrawSkeleton(snapshot.items as never[], canvasThemeFor(theme));
-  return convertToExcalidrawElements(skeletons as never[], { regenerateIds: false })
-    .sort((left: ExcalidrawLikeElement, right: ExcalidrawLikeElement) => {
-      const leftMeta = (left.customData?.doodle as { z?: number; role?: string; variant?: string } | undefined) ?? {};
-      const rightMeta = (right.customData?.doodle as { z?: number; role?: string; variant?: string } | undefined) ?? {};
-      const z = (leftMeta.z ?? 0) - (rightMeta.z ?? 0);
-      if (z !== 0) return z;
-      // A frame or column is a backdrop; drawing it last would cover its
-      // contents, so equal z orders it behind everything else.
-      const isBackdrop = (role?: string, variant?: string) => role === "frame" || role === "column" || variant === "frame";
-      return Number(isBackdrop(rightMeta.role, rightMeta.variant)) - Number(isBackdrop(leftMeta.role, leftMeta.variant));
-    });
-}
-
-function toFiles(snapshot: BoardSnapshot): ExcalidrawFileData[] {
-  return Object.values(boardToExcalidrawFiles(snapshot as never));
-}
-
 /** Paint the scene from `activeSnapshot`, and remember that this is its provenance. */
 function repaintFromActive(): void {
   const snapshot = activeSnapshot;
   if (!snapshot || isEditing(currentAppState.current)) return;
+  const switched = paintedBoardId.current !== snapshot.id;
   sceneBase = snapshot;
+  paintedBoardId.current = snapshot.id;
   pendingRepaint.current = false;
   applyingRemote.current = true;
   sceneReady.current = true;
   const files = toFiles(snapshot);
   currentFiles.current = Object.fromEntries(files.map((file) => [file.id, file]));
   apiRef.current?.addFiles(files);
-  apiRef.current?.updateScene({ elements: toElements(snapshot), captureUpdate: "NEVER" });
+  apiRef.current?.updateScene({ elements: toElements(snapshot, readTheme()), captureUpdate: "NEVER" });
   window.setTimeout(() => { applyingRemote.current = false; }, 0);
+  /*
+   * Switching boards in place keeps the live canvas component, so the saved
+   * camera from `initialData` is never consulted again. Restore it here or every
+   * board opens at wherever the previous one was scrolled to — and a board whose
+   * content sits elsewhere then looks blank.
+   *
+   * Only on a switch: a rebase repaints the same board, and the person may have
+   * panned since their camera was last written to storage, so restoring there
+   * would yank the view out from under them.
+   */
+  if (switched && apiRef.current) frameNewBoard(apiRef.current, snapshot);
 }
 
 function publishToHost(snapshot: BoardSnapshot): void {
@@ -144,7 +134,17 @@ function publishToHost(snapshot: BoardSnapshot): void {
 function applyRemoteSnapshot(data: BoardSnapshot, options: { repaint?: boolean } = {}): void {
   if (!data || !Array.isArray(data.items) || typeof data.revision !== "number") return;
   if (activeSnapshot && data.revision <= activeSnapshot.revision && data.id === activeSnapshot.id) return;
-  if (options.repaint === false) {
+  /*
+   * A different board can never be adopted silently.
+   *
+   * `repaint: false` exists for one case: a newer revision of the *same* board
+   * landing mid-gesture, where the scene still shows the older revision and the
+   * rebase reconciles them on the next write. Carrying that across boards is a
+   * data migration, not a rebase — `sceneBase` would still point at the old
+   * board's items, so the pending projection would copy the person's stroke
+   * onto a board they never drew on and leave the original empty.
+   */
+  if (options.repaint === false && activeSnapshot && data.id === activeSnapshot.id) {
     activeSnapshot = data;
     pendingRepaint.current = true;
     return;
@@ -152,6 +152,18 @@ function applyRemoteSnapshot(data: BoardSnapshot, options: { repaint?: boolean }
   if (isEditing(currentAppState.current)) {
     pendingRemote.current = data;
     return;
+  }
+  /*
+   * Switching boards abandons whatever the previous board's scene was about to
+   * write. `runLibraryAction` flushes first, so a pending frame is already gone;
+   * this covers the remaining window where the flush failed and the timer is
+   * still armed. The board we are leaving keeps its stored state instead of
+   * receiving a projection of a scene that belongs to another board.
+   */
+  if (activeSnapshot && data.id !== activeSnapshot.id) {
+    canvasSync.current?.cancel();
+    pendingRemote.current = null;
+    pendingRepaint.current = false;
   }
   activeSnapshot = data;
   repaintFromActive();
@@ -221,16 +233,12 @@ function CanvasApp({ initial }: { initial: BoardSnapshot }) {
     onError: (error, retry) => handleWriteError(error, retry),
     debounceMs: 450,
   }), []);
+  canvasSync.current = sync;
 
   const initialData = useMemo(() => {
     const files = toFiles(initial);
     currentFiles.current = Object.fromEntries(files.map((file) => [file.id, file]));
-    const stored = initial.items.length > 0 && browserViewportStorage()
-      ? readStoredViewport(browserViewportStorage()!, initial.id)
-      : undefined;
-    const remembered = stored && isViewportNearContent(stored, boardBounds(initial.items))
-      ? stored
-      : undefined;
+    const remembered = initial.items.length > 0 ? usableViewport(initial) : undefined;
     return {
       elements: toElements(initial, theme),
       files: currentFiles.current,
@@ -270,41 +278,15 @@ function CanvasApp({ initial }: { initial: BoardSnapshot }) {
     }
   }, [api, theme]);
 
-  /*
-   * Captions were measured before the self-hosted fonts arrived.
-   *
-   * The board is projected once at mount, and Excalidraw sizes a text element
-   * from the face available at that moment. On a cold load the self-hosted
-   * Cascadia face is only fetched the first time something draws text, so every
-   * caption is measured against a fallback and then clipped by the box it was
-   * given: "you edit" painted as "ou edit". Reloading the page fixed it, which
-   * is the tell — the second load measures with the cached face.
-   *
-   * `document.fonts.status` is not a usable signal here: it reads "loaded" when
-   * nothing is loading, including when the face has never been requested. The
-   * faces are loaded explicitly instead, then only the text elements are
-   * re-measured, so a stroke the person already started is never replaced.
-   */
   useEffect(() => {
-    if (!api || typeof document === "undefined" || !document.fonts) return;
-    let cancelled = false;
-    const faces = ["16px Cascadia", "20px Cascadia", "16px Assistant", "16px Excalifont"];
-    void Promise.all(faces.map((face) => document.fonts.load(face).catch(() => {})))
-      .then(() => document.fonts.ready)
-      .then(() => {
-        if (cancelled || !activeSnapshot) return;
-        const projected = new Map(
-          toElements(activeSnapshot, theme).map((element: ExcalidrawLikeElement) => [element.id, element]),
-        );
-        const patched = api.getSceneElements().map((element: ExcalidrawLikeElement) => (
-          element.type === "text" && projected.has(element.id) ? projected.get(element.id) as never : element
-        ));
-        applyingRemote.current = true;
-        api.updateScene({ elements: patched, captureUpdate: "NEVER" });
-        window.setTimeout(() => { applyingRemote.current = false; }, 0);
-      })
-      .catch(() => {});
-    return () => { cancelled = true; };
+    if (!api) return;
+    return remeasureTextAfterFonts(
+      api,
+      () => activeSnapshot,
+      theme,
+      () => { applyingRemote.current = true; },
+      () => { window.setTimeout(() => { applyingRemote.current = false; }, 0); },
+    );
   }, [api, theme]);
 
   useEffect(() => {
@@ -328,7 +310,15 @@ function CanvasApp({ initial }: { initial: BoardSnapshot }) {
   ) => {
     currentAppState.current = appState;
     Object.assign(currentFiles.current, files);
-    rememberViewport(activeSnapshot?.id, appState);
+    /*
+     * Key the camera by the board the scene is showing, not the active one.
+     *
+     * Right after a switch, `activeSnapshot` is already the new board while the
+     * scene still paints the old one until the repaint lands. Saving under the
+     * active id there writes the old board's camera into the new board's entry,
+     * and both boards then open in the wrong place.
+     */
+    rememberViewport(paintedBoardId.current ?? activeSnapshot?.id, appState);
     if (!api || applyingRemote.current || !activeSnapshot) return;
     if (!sceneReady.current) {
       if (elements.length === 0) return;
@@ -404,6 +394,7 @@ function renderCanvas(initial: BoardSnapshot): void {
   if (!rootInstance) rootInstance = createRoot(root);
   activeSnapshot = initial;
   sceneBase = initial;
+  paintedBoardId.current = initial.id;
   rootInstance.render(React.createElement(CanvasApp, { initial }));
 }
 
@@ -429,6 +420,7 @@ if (document.querySelector("#excalidrawRoot")) {
     transport,
     getActiveSnapshot: () => activeSnapshot,
     applyRemoteSnapshot,
+    flushPendingWrites: () => canvasSync.current?.flush() ?? Promise.resolve("idle"),
   });
   initSnapshotExports({
     transport,

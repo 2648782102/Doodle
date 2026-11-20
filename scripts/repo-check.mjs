@@ -235,7 +235,22 @@ check(
   "the canvas discards the rejection reason again, so a failed save shows a message that names nothing",
 );
 check(excalidrawTemplate.includes('id="doodleWelcome"') && excalidrawApp.includes("WELCOME_STORAGE_KEY") && excalidrawApp.includes("initWelcome"), "the first-run board guidance is missing or not dismissible");
-check((await read("src/board/viewport-memory.ts")).includes("isViewportNearContent") && excalidrawApp.includes("readStoredViewport"), "the canvas no longer remembers a sane viewport per board");
+/*
+ * Assert the behaviour, not the file it lives in.
+ *
+ * The canvas client was split into `client/` modules; this check kept pointing
+ * at `excalidraw-app.tsx` and started failing on a working board. What matters
+ * is that something calls the guard before trusting a stored viewport.
+ */
+const canvasView = await read("src/board/viewport-memory.ts");
+const canvasViewCaller = [
+  excalidrawApp,
+  await read("src/infra/templates/client/canvas-view.ts"),
+].join("\n");
+check(
+  canvasView.includes("isViewportNearContent") && canvasViewCaller.includes("readStoredViewport"),
+  "the canvas no longer remembers a sane viewport per board",
+);
 check(tools.includes("isSuspiciousEmptyWrite") || http.includes("guardEmptyWrite: true"), "writes are not guarded against accidentally clearing a full board");
 check(
   /*

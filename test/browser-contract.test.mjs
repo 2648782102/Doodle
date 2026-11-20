@@ -248,4 +248,67 @@ describe("human canvas contract", () => {
       await mobilePage.close();
     }
   }, 60_000);
+
+  it("keeps the library drawer keyboard-contained", async () => {
+    /*
+     * The drawer used to only animate. Focus stayed on `<body>`, Tab walked out
+     * into the canvas behind the scrim, and closing dropped focus at the top of
+     * the page — so a keyboard user could not reach the panel without tabbing
+     * through the whole toolbar, and could not leave it once inside.
+     */
+    await page.evaluate(() => document.querySelector("#doodleLibraryToggle")?.click());
+    await page.waitForSelector("#doodleLibraryPanel[aria-modal='true']", { timeout: 10_000 });
+    const opened = await page.evaluate(() => document.activeElement?.id);
+    expect(opened, "opening the drawer must move focus into it").toBe("doodleLibraryPanel");
+
+    const escaped = [];
+    for (let step = 0; step < 30; step += 1) {
+      await page.keyboard.press("Tab");
+      const outside = await page.evaluate(() => {
+        const panel = document.querySelector("#doodleLibraryPanel");
+        const active = document.activeElement;
+        return !active || !panel?.contains(active);
+      });
+      if (outside) {
+        escaped.push(await page.evaluate(() => document.activeElement?.id || document.activeElement?.tagName));
+        break;
+      }
+    }
+    expect(escaped, "Tab escaped the open drawer").toEqual([]);
+
+    await page.keyboard.press("Escape");
+    await page.waitForFunction(() => document.querySelector("#doodleLibraryPanel")?.hidden === true, { timeout: 10_000 });
+    const restored = await page.evaluate(() => document.activeElement?.id);
+    expect(restored, "closing must return focus to the control that opened it").toBe("doodleLibraryToggle");
+  }, 60_000);
+
+  it("hides page notices behind the open drawer", async () => {
+    /*
+     * The welcome card and the error banner sit above the drawer in the z-order.
+     * On a phone the drawer is the whole window, so the card landed in the middle
+     * of the board list. The conflict bar is the exception: it is an unsaved
+     * change waiting on a decision, so it stays above the panel.
+     */
+    await page.evaluate(() => {
+      for (const selector of ["#doodleWelcome", "#doodleSyncBanner"]) {
+        const element = document.querySelector(selector);
+        if (element instanceof HTMLElement) {
+          element.hidden = false;
+          element.dataset.visible = "true";
+        }
+      }
+      document.querySelector("#doodleLibraryToggle")?.click();
+    });
+    await page.waitForSelector("#doodleLibraryPanel[aria-modal='true']", { timeout: 10_000 });
+
+    const state = await page.evaluate(() => {
+      const visibility = (selector) => {
+        const element = document.querySelector(selector);
+        return element ? getComputedStyle(element).visibility : "missing";
+      };
+      return { welcome: visibility("#doodleWelcome"), banner: visibility("#doodleSyncBanner") };
+    });
+    expect(state.welcome, "the welcome card still paints over the open drawer").toBe("hidden");
+    expect(state.banner, "the error banner still paints over the open drawer").toBe("hidden");
+  }, 60_000);
 });

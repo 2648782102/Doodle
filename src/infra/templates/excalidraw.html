@@ -1313,6 +1313,13 @@
     .doodle-tool:active { background: var(--doodle-accent-soft); box-shadow: inset 0 1px 2px rgba(0, 0, 0, 0.08); }
     .doodle-tool:hover { border-color: var(--doodle-border); color: var(--doodle-ink); background: var(--doodle-accent-soft); }
     .doodle-tool[aria-expanded="true"] { color: var(--doodle-ink); background: var(--doodle-accent-soft); }
+    /*
+     * The collapsed capsule keeps its buttons in the tab order only while it is
+     * on screen. `visibility: hidden` already removes it from tab order, but the
+     * canvas shortcuts behind the drawer are a separate surface: the drawer traps
+     * Tab inside itself (see `library-ui.ts`) so neither can be reached.
+     */
+    .doodle-library-panel:focus { outline: none; }
     .doodle-tool-primary { background: var(--doodle-accent); color: var(--doodle-accent-ink); border-color: transparent; }
     .doodle-tool-primary:hover { color: var(--doodle-accent-ink); filter: brightness(1.05); }
     .doodle-tool-icon { width: 30px; padding: 0; font-size: 14px; }
@@ -1461,6 +1468,30 @@
     .doodle-conflict-actions button[data-tone="danger"] { border-color: var(--doodle-danger); color: var(--doodle-danger); }
     .doodle-conflict-actions button:disabled { opacity: 0.55; cursor: default; }
     @media (max-width: 700px) { .doodle-conflict { bottom: 8px; } }
+    /*
+     * Everything the drawer covers goes away while it is open.
+     *
+     * These are page-level notices, not board state, and they sat above the
+     * drawer's 22: the 24 welcome card and the 40 error banner painted on top of
+     * an open panel. On a 390px screen the drawer is the whole window, so the
+     * welcome card landed in the middle of the board list. Hiding them is more
+     * honest than raising the drawer over them: the person asked to see the
+     * library, and a half-covered first-use card is not something they can read
+     * or dismiss anyway.
+     */
+    body.doodle-drawer-open .doodle-welcome,
+    body.doodle-drawer-open .doodle-notify-agent,
+    body.doodle-drawer-open .doodle-sync-banner {
+      opacity: 0;
+      visibility: hidden;
+      pointer-events: none;
+    }
+    /*
+     * A conflict is the one notice the drawer must not bury: the change is still
+     * unsaved and only the person can decide whose version wins, so it stays on
+     * top of the open panel instead.
+     */
+    body.doodle-drawer-open .doodle-conflict { z-index: 26; }
     /*
      * Save failures have to be visible. A rejected write used to be a console
      * message while the canvas silently reverted, so content appeared to
@@ -2078,7 +2109,7 @@
     <div class="doodle-welcome-actions"><button id="doodleWelcomeDismiss" type="button">开始画</button></div>
   </section>
   <div class="doodle-drawer-scrim" id="doodleDrawerScrim" hidden></div>
-  <section class="doodle-library-panel" id="doodleLibraryPanel" hidden aria-label="画板图库">
+  <section class="doodle-library-panel" id="doodleLibraryPanel" hidden tabindex="-1" role="dialog" aria-label="画板图库">
     <div class="doodle-library-head"><strong>画板图库</strong><button id="doodleLibraryClose" aria-label="关闭图库">×</button></div>
     <div id="doodleLibraryCurrent" class="doodle-library-kicker">当前：—</div>
     <div id="doodleLibraryStatus" class="doodle-library-kicker" role="status" aria-live="polite"></div>
