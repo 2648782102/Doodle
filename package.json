@@ -38,6 +38,7 @@
     "setup:codex": "node scripts/setup-codex.mjs",
     "lint": "tsc --noEmit",
     "test": "vitest run",
+    "test:browser": "vitest run --config vitest.browser.config.ts",
     "check": "npm run lint && npm run build && npm test && npm run test:examples && npm run repo:check && npm run repo:plugin-check && npm run setup:codex -- --dry-run && npm run build:submission && npm run doctor && npm pack --dry-run",
     "test:examples": "node --check examples/board-client.mjs",
     "repo:plugin-check": "node scripts/plugin-check.mjs",
@@ -80,6 +81,7 @@
     "@types/react-dom": "18.3.1",
     "@types/ws": "^8.18.2",
     "esbuild": "^0.28.2",
+    "playwright": "^1.65.1",
     "tsx": "^4.23.15",
     "typescript": "^7.0.2",
     "vitest": "^5.1.0"
