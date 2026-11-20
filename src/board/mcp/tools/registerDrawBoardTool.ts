@@ -16,8 +16,8 @@ import {
   boardLibraryIndexText,
   type BoardLibraryAction,
 } from "../../library.js";
-import { BoardRevisionConflictError, BoardValidationError, ObjectConflictError } from "../../errors.js";
-import { reportConflicts } from "../../http/conflict.js";
+import { BoardRevisionConflictError, BoardValidationError } from "../../errors.js";
+import { commitBoardWrite } from "../../write-pipeline.js";
 import { expandRecipe } from "../../diagram/recipe.js";
 import { changeReport, changeReportText } from "../change-report.js";
 import {
@@ -272,83 +272,16 @@ server.registerTool(
         if (layout) next = layoutBoardItems(next, layout as BoardLayoutInput, author ?? "ai");
         return next;
       };
-      /*
-       * An unpinned write is an append, so it belongs inside the lock.
-       *
-       * Reading outside the lock and then persisting with that revision made two
-       * simultaneous agents fail each other with `expected N, found N+1` even
-       * though neither had asked for an optimistic check. `store.mutate`
-       * re-reads inside the lock, which is what an unpinned write means. A
-       * caller that *did* pin a revision keeps the strict check: that number is
-       * a claim about what they last saw, and rebasing it onto a newer board
-       * would overwrite whoever got there first.
-       */
-      let board: SimpleBoard;
-      let initial: SimpleBoard;
-      /** Set when a pinned write was rebased onto a newer board. */
-      let mergedFromRevision: number | undefined;
-      if (expected_revision === undefined) {
-        initial = await ctx.board.snapshot();
-        board = await ctx.board.mutate((current) => change(current));
-        ctx.revisions?.remember(board, writeAuthor);
-      } else {
-        initial = await ctx.board.snapshot();
-        if (initial.revision === expected_revision) {
-          assertRevision(initial);
-          board = await commit(change(initial), initial);
-        } else if (replace_board !== undefined) {
-          throw new BoardRevisionConflictError(expected_revision, initial.revision);
-        } else {
-          /*
-           * A pinned write that lost the race is not automatically a conflict.
-           *
-           * The revision is board-wide, so an agent drawing a new note was
-           * rejected because a person had meanwhile nudged an unrelated card.
-           * The HTTP surface already answers the only question that matters —
-           * does this request touch anything that moved? — and merges when it
-           * does not. The MCP path never did, so a model was told to "reload
-           * and retry" for an edit that could simply have landed.
-           *
-           * A real overlap still refuses, and now names the objects instead of
-           * leaving the model to diff two board states itself.
-           */
-          const base = ctx.revisions?.get(expected_revision);
-          /*
-           * The cache is per process, so a write from a *different* MCP server
-           * (another agent, or the same person in another host) always misses
-           * here. Merging needs the board as the caller saw it, and the store
-           * keeps only the current one — so this is a real "re-read" case, not
-           * a bug. Say so, and give the revision to retry against.
-           */
-          if (!base || base.id !== initial.id) {
-            throw new BoardValidationError(
-              `Revision ${expected_revision} is not this session's; the board is now at ${initial.revision}`,
-              "REVISION_NOT_CACHED",
-              "expected_revision",
-              `expected_revision: ${initial.revision}`,
-              `Call get_board to read the current board and re-send your change with the new revision. A revision is only known to the process that wrote it.`,
-            );
-          }
-          const { touched, conflicts } = reportConflicts(base, initial, {
-            updates: cleanUpdates,
-            remove_ids,
-            layout,
-          });
-          /*
-           * Nothing named, nothing to collide with.
-           *
-           * `touched` is empty when the request only adds objects: an added
-           * item has no id yet, so it cannot overlap an edit someone else made.
-           * Treating that as a conflict rejected the most common concurrent
-           * write — two agents each drawing a new note — and the loser was told
-           * "reload and retry" for a change that never needed to wait.
-           */
-          if (conflicts.length) throw new ObjectConflictError(expected_revision, initial.revision, conflicts);
-          board = await ctx.board.replaceIfRevision(change(initial), initial.revision);
-          ctx.revisions?.remember(board, writeAuthor);
-          mergedFromRevision = expected_revision;
-        }
-      }
+      const { before: initial, board, mergedFrom: mergedFromRevision } = await commitBoardWrite({
+        store: ctx.board,
+        revisions: ctx.revisions,
+        author: writeAuthor,
+        expectedRevision: expected_revision,
+        wholeBoard: replace_board !== undefined,
+        conflictScope: { updates: cleanUpdates, remove_ids, layout },
+        uncachedMode: "validation-error",
+        change,
+      });
       ctx.preview.broadcast({ type: "board_updated", revision: board.revision });
       const libraryIndex = (await ctx.library.apply({ type: "list" }, board)).index;
       return {

@@ -12,13 +12,14 @@ import {
   updateBoardItem, updateBoardItems,
   type BoardItemInput, type BoardLayoutInput, type DiagramInput, type SimpleBoard,
 } from "./types.js";
-import { BoardRevisionConflictError, BoardValidationError, EmptyWriteRefusedError } from "./errors.js";
+import { BoardRevisionConflictError, BoardValidationError, EmptyWriteRefusedError, ObjectConflictError } from "./errors.js";
 import { BoardLibrary, boardLibraryIndexText, type BoardLibraryAction } from "./library.js";
 import type { BoardRevisionCache } from "./revision-cache.js";
 import { isSuspiciousEmptyWrite, type BoardStore } from "./store.js";
 import { watchBoardState, type StateWatch } from "./state-watch.js";
-import { conflictPayload, reportConflicts } from "./http/conflict.js";
+import { conflictPayload } from "./http/conflict.js";
 import { assetContentType, isAllowedHost, isAllowedOrigin, isPathWithinRoot, validationErrorBody } from "./http/security.js";
+import { commitBoardWrite } from "./write-pipeline.js";
 import { projectSnapshotText, scanProject, type ProjectScanOptions } from "./project-scan.js";
 import { assetCandidates, fillTemplate, findExisting, readTemplate } from "./http/templates.js";
 import { expandRecipe } from "./diagram/recipe.js";
@@ -153,52 +154,30 @@ export class BoardHttpServer {
       options: { allowEmpty?: boolean; wholeBoard?: boolean; conflictScope?: unknown } = {},
     ) => {
       let board: Awaited<ReturnType<BoardStore["snapshot"]>>;
-      /** Build the candidate and refuse a suspicious clear, in one place. */
-      const candidateFor = (current: Awaited<ReturnType<BoardStore["snapshot"]>>) => {
-        const candidate = change(current);
-        if (!options.allowEmpty && isSuspiciousEmptyWrite(current, candidate)) throw new EmptyWriteRefusedError();
-        return candidate;
-      };
+      let mergedFrom: number | undefined;
       try {
         const revisionHeader = res.req.header("If-Match-Revision");
-        /*
-         * The empty-write guard must not depend on an optional header.
-         *
-         * The guarded path only ran when `If-Match-Revision` was present, so a
-         * client that omitted the header (every caller that does not track
-         * revisions, including a stale canvas after a reload) could replace a
-         * full board with zero items and erase it. Both paths now compute the
-         * candidate first, refuse a suspicious clear, then persist.
-         */
-        if (revisionHeader === undefined) {
-          board = await this.board.mutate(candidateFor);
-        } else {
-          const expectedRevision = Number(revisionHeader);
-          if (!Number.isInteger(expectedRevision) || expectedRevision < 0) {
-            throw new BoardRevisionConflictError(-1, expectedRevision);
-          }
-          const current = await this.board.snapshot();
-          if (current.revision === expectedRevision) {
-            board = await this.board.replaceIfRevision(candidateFor(current), expectedRevision);
-          } else if (options.wholeBoard) {
-            throw new BoardRevisionConflictError(expectedRevision, current.revision);
-          } else {
-            const base = this.revisions?.get(expectedRevision);
-            if (!base || base.id !== current.id) throw new BoardRevisionConflictError(expectedRevision, current.revision);
-            // `touched` is empty for an add-only request (an added item has no
-            // id), so nothing can collide: merge rather than refuse.
-            const { conflicts } = reportConflicts(base, current, options.conflictScope ?? res.req.body);
-            if (conflicts.length > 0) {
-              return res.status(409).json(conflictPayload(expectedRevision, current.revision, conflicts));
-            }
-            board = await this.board.replaceIfRevision(candidateFor(current), current.revision);
-            res.locals.mergedFrom = expectedRevision;
-          }
-        }
+        const committed = await commitBoardWrite({
+          store: this.board,
+          revisions: this.revisions,
+          author: "human",
+          expectedRevision: revisionHeader === undefined ? undefined : Number(revisionHeader),
+          guardEmptyWrite: true,
+          allowEmpty: options.allowEmpty,
+          wholeBoard: options.wholeBoard,
+          conflictScope: options.conflictScope ?? res.req.body,
+          uncachedMode: "conflict-error",
+          change,
+        });
+        board = committed.board;
+        mergedFrom = committed.mergedFrom;
       } catch (error) {
         const message = error instanceof Error ? error.message : String(error);
         if (error instanceof EmptyWriteRefusedError) {
           return res.status(409).json({ error: "Refusing to clear every object from the board; send an explicit delete instead" });
+        }
+        if (error instanceof ObjectConflictError) {
+          return res.status(409).json(conflictPayload(error.baseRevision, error.currentRevision, error.conflicts));
         }
         if (error instanceof BoardRevisionConflictError) return res.status(409).json({ error: message });
         if (message.toLowerCase().includes("timed out waiting")) return res.status(503).json({ error: message });
@@ -219,9 +198,6 @@ export class BoardHttpServer {
         return res.status(400).json({ error: message });
       }
       this.broadcast({ type: "board_updated", revision: board.revision });
-      this.revisions?.remember(board);
-      this.revisions?.markWriter(board.revision, "human");
-      const mergedFrom = res.locals.mergedFrom;
       return res.json({ ok: true, board: canvasSnapshot(board), ...(typeof mergedFrom === "number" ? { mergedFrom } : {}) });
     };
 

@@ -74,9 +74,10 @@ describe("post-cleanup repository shape", () => {
     ]) {
       expect(tsFiles.some((name) => name.startsWith(directory)), `missing module group ${directory}`).toBe(true);
     }
-    // No single board module may grow back into a 1000-line dump.
+    // No single board or template module may grow back into a 1000-line dump.
+    const checkedModules = source.filter((name) => name.endsWith(".ts") || name.endsWith(".tsx"));
     const oversized = [];
-    for (const name of tsFiles) {
+    for (const name of checkedModules) {
       const { size } = await fs.stat(path.join(root, name));
       const lines = (await fs.readFile(path.join(root, name), "utf8")).split("\n").length;
       if (lines > 450) oversized.push(`${name} (${lines} lines, ${size} bytes)`);
@@ -221,13 +222,12 @@ describe("post-cleanup repository shape", () => {
 /**
  * Budgets, not measurements.
  *
- * The Excalidraw engine dominates every artifact: 9 MB of bundled canvas in
- * dist, the same again inside the plugin package. That is an accepted cost, but
- * it is the kind of cost that silently doubles — one duplicate copy of the
- * engine or the locale tree and the plugin ships twice the bytes for no feature.
- * These ceilings allow normal growth and fail on that class of regression.
+ * The Excalidraw engine and fonts dominate every artifact. Now that unused
+ * Mermaid/locale chunks are stubbed and the plugin ships a single copy of the
+ * template assets under `server/infra/templates/`, these tighter ceilings fail
+ * immediately if a duplicate copy or the Mermaid/locale tree creeps back in.
  */
-const ARTIFACT_BUDGETS_MB = { dist: 24, plugin: 48, submissionZip: 32 };
+const ARTIFACT_BUDGETS_MB = { dist: 18, plugin: 22, submissionZip: 16 };
 
 async function directorySize(dir) {
   let total = 0;

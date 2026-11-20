@@ -9,5 +9,6 @@ export * from "./instructions.js";
 export * from "./mcp/tools.js";
 export * from "./agent-view.js";
 export * from "./revision-cache.js";
+export * from "./write-pipeline.js";
 export * from "./viewport-memory.js";
 export { BoardHttpServer } from "./http.js";

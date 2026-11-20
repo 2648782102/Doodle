@@ -146,16 +146,13 @@ const generatedFiles = [
   ".doodle-plugin/doodle/server/infra/templates/excalidraw.html",
   ".doodle-plugin/doodle/server/infra/templates/excalidraw/index.css",
   ".doodle-plugin/doodle/server/infra/templates/excalidraw/excalidraw-app.js",
-  ".doodle-plugin/doodle/infra/templates/board.html",
-  ".doodle-plugin/doodle/infra/templates/excalidraw.html",
-  ".doodle-plugin/doodle/infra/templates/excalidraw/index.css",
-  ".doodle-plugin/doodle/infra/templates/excalidraw/excalidraw-app.js",
 ];
 for (const relative of generatedFiles) {
   check(await exists(relative), `generated plugin file is missing: ${relative}`);
 }
+check(!await exists(".doodle-plugin/doodle/infra/templates"), "duplicate root infra/templates tree bloats the plugin package");
 check(await exists(".doodle-plugin/doodle/server/index.mjs") && await sizeOf(".doodle-plugin/doodle/server/index.mjs") > 100_000, "generated plugin server is unexpectedly small");
-check(await exists(".doodle-plugin/doodle/infra/templates/excalidraw/excalidraw-app.js") && await sizeOf(".doodle-plugin/doodle/infra/templates/excalidraw/excalidraw-app.js") > 1_000, "generated Excalidraw bundle is unexpectedly small");
+check(await exists(".doodle-plugin/doodle/server/infra/templates/excalidraw/excalidraw-app.js") && await sizeOf(".doodle-plugin/doodle/server/infra/templates/excalidraw/excalidraw-app.js") > 1_000, "generated Excalidraw bundle is unexpectedly small");
 
 if (failures.length) {
   console.error("❌ Plugin checks failed:");

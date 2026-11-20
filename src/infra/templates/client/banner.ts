@@ -1,0 +1,96 @@
+/**
+ * Page-level sync/connection status banner and first-run empty-board card.
+ * Neither lives in board state.
+ */
+
+import type { BoardSnapshot } from "./types.js";
+
+export const WELCOME_STORAGE_KEY = "doodle-welcome-dismissed";
+
+let errorTimer: number | null = null;
+let connectionNoticeVisible = false;
+
+/** The one page-level banner, created on first use. Not board state. */
+export function ensureSyncBanner(): HTMLElement {
+  const existing = document.querySelector<HTMLElement>("#doodleSyncBanner");
+  if (existing) return existing;
+  const banner = document.createElement("div");
+  banner.id = "doodleSyncBanner";
+  banner.className = "doodle-sync-banner doodle-glass";
+  banner.setAttribute("role", "status");
+  banner.setAttribute("aria-live", "polite");
+  document.body.append(banner);
+  return banner;
+}
+
+/**
+ * Say when the canvas is no longer talking to the server.
+ * Sticky notices have no timeout and outlive an unrelated `clearError()`.
+ */
+export function showConnectionNotice(message: string): void {
+  connectionNoticeVisible = true;
+  const banner = ensureSyncBanner();
+  banner.textContent = message;
+  banner.dataset.visible = "true";
+  banner.dataset.sticky = "true";
+  if (errorTimer !== null) {
+    window.clearTimeout(errorTimer);
+    errorTimer = null;
+  }
+}
+
+export function showConnectedNotice(): void {
+  if (!connectionNoticeVisible) return;
+  connectionNoticeVisible = false;
+  const banner = document.querySelector<HTMLElement>("#doodleSyncBanner");
+  if (banner) {
+    banner.removeAttribute("data-sticky");
+    banner.removeAttribute("data-visible");
+  }
+}
+
+/** Tell the person when a save was rejected, without reloading over their drawing. */
+export function showError(error: unknown): void {
+  console.warn("Doodle board sync skipped", error);
+  const message = error instanceof Error ? error.message : String(error);
+  const banner = ensureSyncBanner();
+  banner.removeAttribute("data-sticky");
+  banner.textContent = `这次改动没有保存：${message}`;
+  banner.dataset.visible = "true";
+  if (errorTimer !== null) window.clearTimeout(errorTimer);
+  errorTimer = window.setTimeout(() => {
+    errorTimer = null;
+    banner?.removeAttribute("data-visible");
+  }, 8000);
+}
+
+export function clearError(): void {
+  if (errorTimer !== null) {
+    window.clearTimeout(errorTimer);
+    errorTimer = null;
+  }
+  const banner = document.querySelector<HTMLElement>("#doodleSyncBanner");
+  // A sticky banner belongs to the connection state, not to a save result.
+  if (banner?.dataset.sticky === "true") return;
+  banner?.removeAttribute("data-visible");
+}
+
+/** Teach the first empty board once. */
+export function initWelcome(snapshot: BoardSnapshot): void {
+  const card = document.querySelector<HTMLElement>("#doodleWelcome");
+  const dismiss = document.querySelector<HTMLButtonElement>("#doodleWelcomeDismiss");
+  if (!card || !dismiss) return;
+  let dismissed = false;
+  try {
+    dismissed = localStorage.getItem(WELCOME_STORAGE_KEY) === "1";
+  } catch {}
+  if (dismissed || snapshot.items.length > 0) return;
+  const hide = () => {
+    card.hidden = true;
+    try {
+      localStorage.setItem(WELCOME_STORAGE_KEY, "1");
+    } catch {}
+  };
+  dismiss.addEventListener("click", hide);
+  card.hidden = false;
+}

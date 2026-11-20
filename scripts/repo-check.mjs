@@ -26,7 +26,16 @@ const server = await read("src/server.ts");
 const buildScript = await read("scripts/build.mjs");
 const instructions = await read("src/board/instructions.ts");
 const appContext = await read("src/board/app-context.ts");
-const excalidrawApp = await read("src/infra/templates/excalidraw-app.tsx");
+const excalidrawApp = (await Promise.all([
+  read("src/infra/templates/excalidraw-app.tsx"),
+  read("src/infra/templates/client/types.ts"),
+  read("src/infra/templates/client/theme.ts"),
+  read("src/infra/templates/client/link-policy.ts"),
+  read("src/infra/templates/client/banner.ts"),
+  read("src/infra/templates/client/transport.ts"),
+  read("src/infra/templates/client/library-ui.ts"),
+])).join("\n");
+const writePipeline = await read("src/board/write-pipeline.ts");
 const boardIndex = await read("src/board/index.ts");
 /*
  * Tools are registered from one module per tool. Read them together so guards
@@ -168,19 +177,16 @@ check(
 );
 check(excalidrawTemplate.includes('id="doodleWelcome"') && excalidrawApp.includes("WELCOME_STORAGE_KEY") && excalidrawApp.includes("initWelcome"), "the first-run board guidance is missing or not dismissible");
 check((await read("src/board/viewport-memory.ts")).includes("isViewportNearContent") && excalidrawApp.includes("readStoredViewport"), "the canvas no longer remembers a sane viewport per board");
-check(tools.includes("isSuspiciousEmptyWrite") || http.includes("isSuspiciousEmptyWrite"), "writes are not guarded against accidentally clearing a full board");
+check(tools.includes("isSuspiciousEmptyWrite") || http.includes("guardEmptyWrite: true"), "writes are not guarded against accidentally clearing a full board");
 check(
   /*
-   * One guard, reached by every path. This used to require two call sites,
-   * which was checking for duplication rather than coverage: the real property
-   * is that every write builds its candidate through the same check. A single
-   * `candidateFor` helper is stronger than two copies, so assert the helper and
-   * that all three commit branches use it.
+   * One guard, reached by every path through the shared write pipeline.
    */
   http.includes("EmptyWriteRefusedError") &&
-  http.includes("isSuspiciousEmptyWrite(current, candidate)") &&
-  (http.match(/candidateFor\(current\)/g) ?? []).length >= 2 &&
-  http.includes("mutate(candidateFor)"),
+  http.includes("commitBoardWrite") &&
+  http.includes("guardEmptyWrite: true") &&
+  writePipeline.includes("isSuspiciousEmptyWrite(current, candidate)") &&
+  (writePipeline.match(/candidateFor\(current\)/g) ?? []).length >= 3,
   "a commit path no longer runs the empty-write guard: a stale client could erase a full board",
 );
 check(boardStore.includes("quarantineCorruptState"), "a corrupt board file still prevents startup");
@@ -197,7 +203,11 @@ check(
   (await read("src/board/diagram/recipe.ts")).includes("edges: diagram.edges ?? []"),
   "diagram edges are not normalised: an omitted `edges` field crashes the generator",
 );
-check(http.includes("this.revisions?.remember(board)") && (await read("src/server.ts")).includes("new BoardHttpServer(board, config, revisions)"), "browser writes are not recorded in the shared revision cache");
+check(
+  (writePipeline.includes("revisions?.remember(board)") && http.includes("commitBoardWrite"))
+    && (await read("src/server.ts")).includes("new BoardHttpServer(board, config, revisions)"),
+  "browser writes are not recorded in the shared revision cache",
+);
 check(troubleshooting.includes("npm run preview:board") && troubleshooting.includes("current MCP server process"), "troubleshooting does not explain PANEL_URL lifetime");
 check(packageJson.scripts.check.includes("setup:codex -- --dry-run"), "npm check does not dry-run the Codex setup");
 check(ci.includes("npm run repo:plugin-check"), "CI does not run the plugin guard");
@@ -325,7 +335,7 @@ check(
   "diagram layout rejects input with bare prose instead of a repairable error",
 );
 check(
-  tools.includes("ctx.board.mutate((current) => change(current))"),
+  tools.includes("commitBoardWrite") && writePipeline.includes("store.mutate("),
   "an unpinned draw_board write is back to snapshot-then-replace, so two simultaneous agents fail each other",
 );
 check(
@@ -398,11 +408,14 @@ check(
 check(
   /*
    * A board-wide revision must not reject a write that touches nothing another
-   * writer moved. The HTTP surface answered that question from the start; the
-   * MCP path did not until `reportConflicts` was wired in, so two agents each
-   * adding a note failed each other with "reload and retry".
+   * writer moved. Both MCP and HTTP now share `commitBoardWrite`, which runs
+   * `reportConflicts`, raises `ObjectConflictError` on overlap, and answers
+   * `REVISION_NOT_CACHED` when the base revision is outside this process.
    */
-  tools.includes("reportConflicts") && tools.includes("ObjectConflictError") && tools.includes("REVISION_NOT_CACHED"),
+  tools.includes("commitBoardWrite")
+    && writePipeline.includes("reportConflicts")
+    && writePipeline.includes("ObjectConflictError")
+    && writePipeline.includes("REVISION_NOT_CACHED"),
   "a pinned MCP write is back to rejecting every stale revision instead of merging disjoint edits and naming an overlap",
 );
 check(
@@ -606,6 +619,11 @@ check(excalidrawTemplate.indexOf('href="/excalidraw/index.css"') < excalidrawTem
 check(!await exists("src/infra/templates/board.html") && !await exists("src/infra/templates/board-app.js"), "legacy DOM canvas template or bundle still exists");
 check(!tools.includes("engine=dom") && !http.includes("engine=dom"), "legacy DOM engine fallback still exists");
 check(buildScript.includes("excalidraw-app.tsx") && buildScript.includes("minify: true"), "build does not bundle the Excalidraw canvas client");
+check(
+  buildScript.includes("doodle-prune-unused-excalidraw-chunks")
+    && buildScript.includes("@excalidraw\\/mermaid-to-excalidraw"),
+  "build no longer strips unused Mermaid/locale chunks from the browser bundle",
+);
 check(excalidrawApp.includes("buildBoardModelContext") && appContext.includes("finalStateNotOperationLog"), "Excalidraw MCP App context is not a final-state delta");
 check(excalidrawApp.includes("sendMessage") && excalidrawTemplate.includes('id="doodleNotifyAgent"'), "embedded Excalidraw canvas lost the host notification button");
 check(appContext.includes("structuredContent") && !appContext.includes("operationLog"), "board model context lost its complete structured snapshot or added an operation log");

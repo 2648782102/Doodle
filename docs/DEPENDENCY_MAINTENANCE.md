@@ -12,7 +12,17 @@ The `0.5.0` cleanup removed Mermaid CLI, Mermaid, sharp, open, nanoid, and the V
 
 ## Current audit note
 
-`npm audit` may report two moderate advisories in Vitest 3's mock runner. Vitest 5 requires Node.js 22.12+, while this package supports Node.js 20; upgrading would break the supported runtime. Other transitive advisories are constrained with npm `overrides` without raising the Node.js floor. Review this note when the minimum Node.js version changes.
+`npm audit` reports transitive advisories along Excalidraw's optional Mermaid import chain:
+
+- `@excalidraw/excalidraw` → `@excalidraw/mermaid-to-excalidraw` → `@mermaid-js/parser` / `mermaid` → `langium` → `chevrotain` → `lodash-es` (8 high) and `katex` (low).
+
+**Runtime reachability**: **Not reachable in shipped Doodle artifacts.**
+
+1. Doodle hides Excalidraw's Mermaid/AI generation entries in the UI (`aiEnabled: false`, extra-tools Mermaid entries stripped).
+2. `scripts/build.mjs` stubs `@excalidraw/mermaid-to-excalidraw` and unused locale chunks (keeping `zh-CN` and `en`) during the esbuild browser bundle, so neither Mermaid, `@mermaid-js/parser`, Chevrotain, `lodash-es`, nor KaTeX is bundled into `dist/infra/templates/excalidraw/` or `.doodle-plugin/doodle/`.
+3. The server-side Node bundle (`dist/index.js` and `.doodle-plugin/doodle/server/index.mjs`) never imports `@excalidraw/excalidraw`.
+
+Other transitive advisories are constrained with npm `overrides` without raising the Node.js floor (`>=20.0.0`). Re-evaluate whenever `@excalidraw/excalidraw` releases a version that moves Mermaid to an optional peer dependency or upgrades `chevrotain` / `lodash-es`.
 
 The npm package name is `doodle-mcp`; the bare `doodle` name on npm belongs to another project and is not used here.
 
