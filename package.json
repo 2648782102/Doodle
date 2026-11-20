@@ -29,6 +29,7 @@
   },
   "scripts": {
     "build": "tsc && node scripts/build.mjs && node scripts/build-plugin.mjs",
+    "build:system-fonts": "DOODLE_CANVAS_FONTS=system npm run build",
     "build:plugin": "node scripts/build-plugin.mjs",
     "build:submission": "npm run build:plugin && node scripts/build-submission.mjs",
     "prepublishOnly": "npm run build",

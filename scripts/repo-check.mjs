@@ -158,6 +158,26 @@ check(packageJson.scripts["preview:board"] === "node scripts/preview-board.mjs",
 check(await exists("scripts/preview-board.mjs"), "local preview script is missing");
 check(await exists("scripts/open-board.mjs") && packageJson.scripts.doodle === "node scripts/open-board.mjs", "the one-action board open command is missing");
 /*
+ * Every Excalidraw internal Doodle styles must be declared in
+ * `upstream-contract.ts`. The table is what makes the dependency auditable: an
+ * upgrade that renames `.App-toolbar` can be triaged from 24 entries instead of
+ * 110 KB of CSS. A new undeclared selector is a new dependency nobody agreed to.
+ */
+const upstream = await import("../dist/infra/templates/upstream-contract.js");
+const declaredUpstream = upstream.UPSTREAM_DEPENDENCIES.map((entry) => entry.selector);
+const usedUpstream = upstream.upstreamSelectorsUsed(excalidrawTemplate);
+const undeclaredUpstream = usedUpstream.filter((selector) => !declaredUpstream.includes(selector));
+const staleUpstream = declaredUpstream.filter((selector) => !usedUpstream.includes(selector));
+check(
+  undeclaredUpstream.length === 0,
+  `excalidraw.html styles undeclared Excalidraw internals: ${undeclaredUpstream.join(", ")}. Add them to src/infra/templates/upstream-contract.ts with what they are used for.`,
+);
+check(
+  staleUpstream.length === 0,
+  `upstream-contract.ts declares internals the stylesheet no longer uses: ${staleUpstream.join(", ")}. Remove them so the table stays honest.`,
+);
+
+/*
  * A rejected save must tell the person why.
  *
  * The canvas threw a bare "Board update failed" and discarded the

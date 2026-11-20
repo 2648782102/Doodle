@@ -18,6 +18,7 @@ import type { BoardRevisionCache } from "./revision-cache.js";
 import { isSuspiciousEmptyWrite, type BoardStore } from "./store.js";
 import { watchBoardState, type StateWatch } from "./state-watch.js";
 import { conflictPayload } from "./http/conflict.js";
+import { boardToSvg } from "./svg/render.js";
 import { assetContentType, isAllowedHost, isAllowedOrigin, isPathWithinRoot, validationErrorBody } from "./http/security.js";
 import { commitBoardWrite } from "./write-pipeline.js";
 import { projectSnapshotText, scanProject, type ProjectScanOptions } from "./project-scan.js";
@@ -101,6 +102,28 @@ export class BoardHttpServer {
       this.revisions?.remember(current);
       const index = (await this.library.apply({ type: "list" }, current)).index;
       res.json({ ...canvasSnapshot(current), library: index });
+    });
+
+    /*
+     * The board as an image, for readers with no browser.
+     *
+     * A README screenshot goes stale the moment the board changes; a CI job that
+     * wants to attach "what the board looked like" has nowhere to get it. This
+     * renders the current board with plain shapes. Read-only: no revision bump,
+     * no write, and `capabilities.svgPreview` tells the agent it exists.
+     */
+    this.app.get("/api/board.svg", async (req, res) => {
+      const current = await this.board.snapshot();
+      const maxSize = Number(req.query.max);
+      const svg = boardToSvg(current, {
+        maxSize: Number.isFinite(maxSize) && maxSize > 0 ? maxSize : undefined,
+        background: req.query.background !== "false",
+      });
+      res.type("image/svg+xml");
+      // The board changes on every edit, so the preview must not be cached
+      // beyond the response like the content-hashed client assets are.
+      res.setHeader("Cache-Control", "no-cache");
+      res.send(svg);
     });
 
     this.app.get("/api/board/library", async (_req, res) => {

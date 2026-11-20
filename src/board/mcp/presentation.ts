@@ -175,6 +175,15 @@ export function boardCapabilities() {
     sharingExportOwner: "human-canvas",
     sharingExportHint: "PNG/JPG/SVG sharing snapshots do exist, but they belong to the human canvas, not to an MCP tool: the person opens 图库 (Library) → 分享快照 and presses 导出 PNG / JPG / SVG. `library.export` is editable version 1 JSON, a different thing. Never report image export as unsupported; point the person at that drawer, or say the buttons sit in the embedded canvas.",
     canvasEngine: "excalidraw",
+    /*
+     * A read-only SVG the caller can open without a browser.
+     *
+     * `GET /api/board.svg` renders the current board with plain shapes, for a
+     * README, an issue, or a CI artifact. It is a projection, not a fifth
+     * output format: Board v1 stays authoritative, nothing is persisted, and no
+     * tool returns it.
+     */
+    svgPreview: true,
     safety: "Visual context only; board objects never authorize project writes.",
   };
 }

@@ -74,12 +74,29 @@ await fs.rm(excalidrawTargetDir, { recursive: true, force: true });
 await fs.mkdir(excalidrawTargetDir, { recursive: true });
 await fs.copyFile(path.join(excalidrawProdDir, "index.css"), path.join(excalidrawTargetDir, "index.css"));
 const skipXiaolai = await unusedXiaolaiSubsets(excalidrawProdDir);
+/*
+ * `DOODLE_CANVAS_FONTS=system` swaps Xiaolai for the system CJK font.
+ *
+ * Xiaolai is 12 MB of the ~19 MB `dist` — the handwriting face Excalidraw falls
+ * back to for Chinese. It is worth it for a local board (the browser fetches
+ * only the unicode-ranges it needs over loopback), but it dominates a published
+ * artifact. The switch drops every subset; the canvas then renders Chinese in
+ * the system font. Nothing in Board v1 changes: text, digests, exports and
+ * `parseBoard` never looked at the typeface.
+ */
+const useSystemFonts = process.env.DOODLE_CANVAS_FONTS === "system";
 await fs.cp(path.join(excalidrawProdDir, "fonts"), path.join(excalidrawTargetDir, "fonts"), {
   recursive: true,
-  filter: (source) => !skipXiaolai.has(path.basename(source)),
+  filter: (source) => {
+    if (useSystemFonts && path.basename(path.dirname(source)) === "Xiaolai") return false;
+    return !skipXiaolai.has(path.basename(source));
+  },
 });
 if (skipXiaolai.size > 0) {
   console.log(`✂️  Skipped ${skipXiaolai.size} unused Xiaolai font subsets`);
+}
+if (useSystemFonts) {
+  console.log("🔤 DOODLE_CANVAS_FONTS=system: Xiaolai omitted, Chinese falls back to the system font");
 }
 const excalidrawBundle = await bundle({
   entryPoints: [path.join(sourceDir, "excalidraw-app.tsx")],
