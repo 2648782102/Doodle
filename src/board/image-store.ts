@@ -11,18 +11,26 @@ import fs from "node:fs/promises";
 import path from "node:path";
 import crypto from "node:crypto";
 import { logger } from "../infra/logger.js";
+import { renameWithRetry } from "../infra/atomic-write.js";
 import type { SimpleBoard } from "./types.js";
 
 const REF_PREFIX = "doodle-image:";
 const HASH_LENGTH = 24;
+const DEFAULT_STALE_TMP_MS = 60_000;
 
 const EXT_BY_MIME: Record<string, string> = {
   png: "png", jpeg: "jpg", jpg: "jpg", gif: "gif", webp: "webp",
   bmp: "bmp", avif: "avif", "svg+xml": "svg",
 };
-const MIME_BY_EXT: Record<string, string> = Object.fromEntries(
-  Object.entries(EXT_BY_MIME).map(([mime, ext]) => [ext, `image/${mime}`]),
-);
+const MIME_BY_EXT: Record<string, string> = {
+  png: "image/png",
+  jpg: "image/jpeg",
+  gif: "image/gif",
+  webp: "image/webp",
+  bmp: "image/bmp",
+  avif: "image/avif",
+  svg: "image/svg+xml",
+};
 const VALID_EXT = [...new Set(Object.values(EXT_BY_MIME))];
 const FILE_NAME = new RegExp(`^[0-9a-f]{${HASH_LENGTH}}\\.(?:${VALID_EXT.join("|")})$`);
 
@@ -97,8 +105,13 @@ export async function externalizeImages(board: SimpleBoard, imagesDir: string): 
     }
     const { base64 } = parseDataUrl(src)!;
     const temp = `${target}.tmp-${process.pid}-${crypto.randomUUID()}`;
-    await fs.writeFile(temp, Buffer.from(base64, "base64"));
-    await fs.rename(temp, target);
+    try {
+      await fs.writeFile(temp, Buffer.from(base64, "base64"));
+      await renameWithRetry(temp, target);
+    } catch (error) {
+      await fs.rm(temp, { force: true }).catch(() => {});
+      throw error;
+    }
   }));
 
   return {
@@ -200,7 +213,11 @@ export async function collectRefsFromBoards(boardsDir: string): Promise<Set<stri
  * so writes stay write-only: a deleted image leaves its file until the next
  * launch, which is a safe trade for never racing a concurrent snapshot save.
  */
-export async function pruneOrphanImages(imagesDir: string, referenced: Set<string>): Promise<number> {
+export async function pruneOrphanImages(
+  imagesDir: string,
+  referenced: Set<string>,
+  options: { staleTmpMs?: number } = {},
+): Promise<number> {
   let entries: import("node:fs").Dirent[];
   try {
     entries = await fs.readdir(imagesDir, { withFileTypes: true });
@@ -208,13 +225,26 @@ export async function pruneOrphanImages(imagesDir: string, referenced: Set<strin
     if (isMissingFile(error)) return 0;
     throw error;
   }
+  const staleTmpMs = options.staleTmpMs ?? DEFAULT_STALE_TMP_MS;
   let removed = 0;
   await Promise.all(entries.map(async (entry) => {
-    const orphan = (FILE_NAME.test(entry.name) && !referenced.has(entry.name))
-      || entry.name.includes(".tmp-");
-    if (!entry.isFile() || !orphan) return;
-    await fs.unlink(path.join(imagesDir, entry.name));
-    removed += 1;
+    if (!entry.isFile()) return;
+    const target = path.join(imagesDir, entry.name);
+    if (FILE_NAME.test(entry.name) && !referenced.has(entry.name)) {
+      await fs.unlink(target).catch((error) => { if (!isMissingFile(error)) throw error; });
+      removed += 1;
+      return;
+    }
+    if (entry.name.includes(".tmp-")) {
+      try {
+        const stats = await fs.stat(target);
+        if (staleTmpMs > 0 && Date.now() - stats.mtimeMs < staleTmpMs) return;
+        await fs.unlink(target);
+        removed += 1;
+      } catch (error) {
+        if (!isMissingFile(error)) throw error;
+      }
+    }
   }));
   return removed;
 }

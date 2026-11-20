@@ -88,6 +88,24 @@ describe("simple shared board", () => {
     expect(board.items.some((item) => item.type === "stroke" || item.type === "image")).toBe(false);
   });
 
+  it("detaches line connector bindings when a bound node is removed", () => {
+    let board = addBoardItems(createEmptyBoard(), [
+      { type: "rect", id: "n1", x: 0, y: 0, w: 120, h: 60, text: "A", author: "ai" },
+      { type: "rect", id: "n2", x: 240, y: 0, w: 120, h: 60, text: "B", author: "ai" },
+      { type: "line", id: "e1", x: 120, y: 30, w: 120, h: 0, startItemId: "n1", endItemId: "n2", author: "ai" },
+    ]);
+    const afterSingle = removeBoardItem(board, "n1");
+    expect(() => parseBoard(JSON.parse(JSON.stringify(afterSingle)))).not.toThrow();
+    expect(afterSingle.items.find((item) => item.id === "e1")).toMatchObject({ endItemId: "n2" });
+    expect(afterSingle.items.find((item) => item.id === "e1").startItemId).toBeUndefined();
+
+    const afterBatch = removeBoardItems(board, ["n1", "n2"]);
+    expect(() => parseBoard(JSON.parse(JSON.stringify(afterBatch)))).not.toThrow();
+    expect(afterBatch.items).toHaveLength(1);
+    expect(afterBatch.items[0].startItemId).toBeUndefined();
+    expect(afterBatch.items[0].endItemId).toBeUndefined();
+  });
+
   it("keeps visual-expression fields, connected lines, and deterministic layout modes", () => {
     let board = createEmptyBoard();
     board = addBoardItems(board, [

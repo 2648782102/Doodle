@@ -60,8 +60,14 @@ for (const name of await fs.readdir(excalidrawTargetDir)) {
   await fs.rm(path.join(excalidrawTargetDir, name), { recursive: true, force: true });
 }
 await fs.copyFile(path.join(excalidrawProdDir, "index.css"), path.join(excalidrawTargetDir, "index.css"));
-await fs.cp(path.join(excalidrawProdDir, "fonts"), path.join(excalidrawTargetDir, "fonts"), { recursive: true });
-await pruneUnusedXiaolaiSubsets(excalidrawProdDir, path.join(excalidrawTargetDir, "fonts", "Xiaolai"));
+const skipXiaolai = await unusedXiaolaiSubsets(excalidrawProdDir);
+await fs.cp(path.join(excalidrawProdDir, "fonts"), path.join(excalidrawTargetDir, "fonts"), {
+  recursive: true,
+  filter: (source) => !skipXiaolai.has(path.basename(source)),
+});
+if (skipXiaolai.size > 0) {
+  console.log(`✂️  Skipped ${skipXiaolai.size} unused Xiaolai font subsets`);
+}
 const excalidrawBundle = await bundle({
   entryPoints: [path.join(sourceDir, "excalidraw-app.tsx")],
   bundle: true,
@@ -113,7 +119,7 @@ function subsetNeeded(unicodeRange) {
   return false;
 }
 
-async function pruneUnusedXiaolaiSubsets(prodDir, targetXiaolaiDir) {
+async function unusedXiaolaiSubsets(prodDir) {
   let bundleSource = "";
   for (const name of await fs.readdir(prodDir)) {
     if (!name.endsWith(".js")) continue;
@@ -123,14 +129,14 @@ async function pruneUnusedXiaolaiSubsets(prodDir, targetXiaolaiDir) {
       break;
     }
   }
-  if (!bundleSource) return;
+  if (!bundleSource) return new Set();
 
   // var xx="./fonts/Xiaolai/Xiaolai-Regular-<hash>.woff2"
   const files = new Map(
     [...bundleSource.matchAll(/var (\w+)="\.\/fonts\/Xiaolai\/(Xiaolai-Regular-[0-9a-f]+\.woff2)"/g)]
       .map(([, variable, file]) => [variable, file]),
   );
-  if (files.size === 0) return;
+  if (files.size === 0) return new Set();
 
   // {uri:xx,descriptors:{unicodeRange:"U+..."}} — only Xiaolai vars matter
   const byVariable = new Map(
@@ -139,20 +145,9 @@ async function pruneUnusedXiaolaiSubsets(prodDir, targetXiaolaiDir) {
       .map(([, variable, range]) => [variable, range]),
   );
 
-  let removed = 0;
-  let freed = 0;
+  const unused = new Set();
   for (const [variable, range] of byVariable) {
-    if (subsetNeeded(range)) continue;
-    const file = path.join(targetXiaolaiDir, files.get(variable));
-    try {
-      freed += (await fs.stat(file)).size;
-      await fs.unlink(file);
-      removed += 1;
-    } catch (error) {
-      if (error.code !== "ENOENT") throw error;
-    }
+    if (!subsetNeeded(range)) unused.add(files.get(variable));
   }
-  if (removed > 0) {
-    console.log(`✂️  Pruned ${removed} unused Xiaolai font subsets (${(freed / 1048576).toFixed(1)} MB)`);
-  }
+  return unused;
 }

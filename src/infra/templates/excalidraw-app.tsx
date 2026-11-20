@@ -369,12 +369,16 @@ function applyRemoteSnapshot(data: BoardSnapshot, refreshFiles = true) {
 const embedded = Boolean((window as unknown as { DOODLE_MCP_APP_EMBEDDED?: boolean }).DOODLE_MCP_APP_EMBEDDED);
 const hostApp = embedded ? new App({ name: "Doodle", version: "1.0.0" }, { availableDisplayModes: ["inline", "fullscreen"] }) : null;
 let publishedRevision = -1;
+let lastPublishedSnapshot: BoardSnapshot | null = null;
 
-async function publishContext(snapshot: BoardSnapshot) {
-  if (!hostApp || publishedRevision === snapshot.revision) return;
+async function publishContext(snapshot: BoardSnapshot, force = false) {
+  if (!hostApp || (!force && publishedRevision === snapshot.revision)) return;
   const capabilities = hostApp.getHostCapabilities();
   if (!capabilities?.updateModelContext?.text) return;
-  const context = buildBoardModelContext(snapshot as never, undefined, {
+  const previous = lastPublishedSnapshot && lastPublishedSnapshot.id === snapshot.id
+    ? lastPublishedSnapshot
+    : undefined;
+  const context = buildBoardModelContext(snapshot as never, previous as never, {
     includeStructuredContent: Boolean(capabilities.updateModelContext.structuredContent),
   });
   await hostApp.updateModelContext({
@@ -382,6 +386,7 @@ async function publishContext(snapshot: BoardSnapshot) {
     ...(capabilities.updateModelContext.structuredContent ? { structuredContent: context.structuredContent } : {}),
   });
   publishedRevision = snapshot.revision;
+  lastPublishedSnapshot = snapshot;
 }
 
 async function initHostApp() {
@@ -499,7 +504,7 @@ function toElements(snapshot: BoardSnapshot, theme: DoodleTheme = readTheme()) {
       // A frame or column is a backdrop; drawing it last would cover its
       // contents, so equal z orders it behind everything else.
       const isBackdrop = (role?: string, variant?: string) => role === "frame" || role === "column" || variant === "frame";
-      return Number(isBackdrop(leftMeta.role, leftMeta.variant)) - Number(isBackdrop(rightMeta.role, rightMeta.variant));
+      return Number(isBackdrop(rightMeta.role, rightMeta.variant)) - Number(isBackdrop(leftMeta.role, leftMeta.variant));
     });
 }
 
@@ -508,6 +513,18 @@ function toFiles(snapshot: BoardSnapshot): ExcalidrawFileData[] {
 }
 
 async function loadBoard(): Promise<BoardSnapshot> {
+  if (hostApp) {
+    const result = await hostApp.callServerTool({
+      name: "get_board",
+      arguments: { include_canvas_fidelity: true, include_guide: false },
+    });
+    if (result.isError) throw new Error(toolErrorMessage(result));
+    const data = result.structuredContent as BoardSnapshot | undefined;
+    if (!data || !Array.isArray(data.items) || typeof data.revision !== "number") {
+      throw new Error("Invalid board snapshot from host");
+    }
+    return data;
+  }
   const response = await fetch("/api/board");
   if (!response.ok) throw new Error(`HTTP ${response.status}`);
   return response.json();
@@ -934,8 +951,7 @@ function initNotifyButton() {
   button.addEventListener("click", async () => {
     try {
       const snapshot = activeSnapshot ?? await loadBoard();
-      publishedRevision = -1;
-      await publishContext(snapshot);
+      await publishContext(snapshot, true);
       if (!hostApp) throw new Error("Host bridge is unavailable");
       const result = await hostApp.sendMessage({
         role: "user",
@@ -1069,7 +1085,9 @@ function CanvasApp({ initial }: { initial: BoardSnapshot }) {
       try {
         const updated = await syncBoard(projected.items as unknown[], base);
         clearError();
+        activeSnapshot = updated;
         setSnapshot(updated);
+        void publishContext(updated).catch(() => {});
       } catch (error) {
         /*
          * Never repaint the canvas from the server here.

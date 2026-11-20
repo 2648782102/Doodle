@@ -230,7 +230,18 @@ export function removeBoardItems(board: SimpleBoard, ids: string[]): SimpleBoard
   const removeSet = new Set(ids);
   return touchBoard({
     ...board,
-    items: board.items.filter((item) => !removeSet.has(item.id)),
+    items: board.items
+      .filter((item) => !removeSet.has(item.id))
+      .map((item) => {
+        if (item.type !== "line") return item;
+        const dropStart = Boolean(item.startItemId && removeSet.has(item.startItemId));
+        const dropEnd = Boolean(item.endItemId && removeSet.has(item.endItemId));
+        if (!dropStart && !dropEnd) return item;
+        const next = { ...item };
+        if (dropStart) delete next.startItemId;
+        if (dropEnd) delete next.endItemId;
+        return next;
+      }),
     notes: board.notes.map((note) => note.itemId && removeSet.has(note.itemId) ? { ...note, itemId: undefined } : note),
   });
 }
@@ -253,7 +264,18 @@ export function removeBoardItem(board: SimpleBoard, id: string): SimpleBoard {
   }
   return touchBoard({
     ...board,
-    items: board.items.filter((item) => item.id !== id),
+    items: board.items
+      .filter((item) => item.id !== id)
+      .map((item) => {
+        if (item.type !== "line") return item;
+        const dropStart = item.startItemId === id;
+        const dropEnd = item.endItemId === id;
+        if (!dropStart && !dropEnd) return item;
+        const next = { ...item };
+        if (dropStart) delete next.startItemId;
+        if (dropEnd) delete next.endItemId;
+        return next;
+      }),
     notes: board.notes.map((note) => note.itemId === id ? { ...note, itemId: undefined } : note),
   });
 }

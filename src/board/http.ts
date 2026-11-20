@@ -7,22 +7,10 @@ import { WebSocketServer } from "ws";
 import type { AppConfig } from "../infra/config.js";
 import { logger } from "../infra/logger.js";
 import {
-  addBoardItem,
-  addBoardItems,
-  boardVisualDigest,
-  diagramToBoardItems,
-  layoutBoardItems,
-  parseBoard,
-  removeBoardItem,
-  removeBoardItems,
-  replaceBoardContent,
-  touchBoard,
-  updateBoardItem,
-  updateBoardItems,
-  type BoardItemInput,
-  type BoardLayoutInput,
-  type DiagramInput,
-  type SimpleBoard,
+  addBoardItem, addBoardItems, boardVisualDigest, diagramToBoardItems, layoutBoardItems,
+  parseBoard, removeBoardItem, removeBoardItems, replaceBoardContent, touchBoard,
+  updateBoardItem, updateBoardItems,
+  type BoardItemInput, type BoardLayoutInput, type DiagramInput, type SimpleBoard,
 } from "./types.js";
 import { BoardRevisionConflictError, BoardValidationError, EmptyWriteRefusedError } from "./errors.js";
 import { BoardLibrary, boardLibraryIndexText, type BoardLibraryAction } from "./library.js";
@@ -30,6 +18,7 @@ import type { BoardRevisionCache } from "./revision-cache.js";
 import { isSuspiciousEmptyWrite, type BoardStore } from "./store.js";
 import { watchBoardState, type StateWatch } from "./state-watch.js";
 import { conflictPayload, reportConflicts } from "./http/conflict.js";
+import { assetContentType, isAllowedHost, isAllowedOrigin, isPathWithinRoot, validationErrorBody } from "./http/security.js";
 import { projectSnapshotText, scanProject, type ProjectScanOptions } from "./project-scan.js";
 import { assetCandidates, fillTemplate, findExisting, readTemplate } from "./http/templates.js";
 import { expandRecipe } from "./diagram/recipe.js";
@@ -84,6 +73,16 @@ export class BoardHttpServer {
   }
 
   private setupRoutes(): void {
+    this.app.use((req, res, next) => {
+      if (!isAllowedHost(req.header("host"), this.config.previewHost)) {
+        return res.status(403).json({ error: "Forbidden host" });
+      }
+      if (req.method !== "GET" && !isAllowedOrigin(req.header("origin"), this.config.previewHost)) {
+        return res.status(403).json({ error: "Forbidden origin" });
+      }
+      next();
+    });
+
     this.app.use("/api/board", (req, res, next) => {
       if (req.method === "GET") return next();
       if (req.header("X-AI-Draw-Token") !== this.panelToken) {
@@ -137,15 +136,7 @@ export class BoardHttpServer {
         });
       } catch (error) {
         const message = error instanceof Error ? error.message : String(error);
-        if (error instanceof BoardValidationError) {
-          return res.status(400).json({
-            error: message,
-            code: error.code,
-            path: error.path,
-            expected: error.expected,
-            fix: error.fix,
-          });
-        }
+        if (error instanceof BoardValidationError) return res.status(400).json(validationErrorBody(error));
         if (error instanceof BoardRevisionConflictError) return res.status(409).json({ error: message });
         if (message.toLowerCase().includes("timed out waiting")) return res.status(503).json({ error: message });
         if ((error as NodeJS.ErrnoException).code) {
@@ -159,12 +150,13 @@ export class BoardHttpServer {
     const commit = async (
       res: express.Response,
       change: (board: Awaited<ReturnType<BoardStore["snapshot"]>>) => Awaited<ReturnType<BoardStore["snapshot"]>>,
+      options: { allowEmpty?: boolean; wholeBoard?: boolean; conflictScope?: unknown } = {},
     ) => {
       let board: Awaited<ReturnType<BoardStore["snapshot"]>>;
       /** Build the candidate and refuse a suspicious clear, in one place. */
       const candidateFor = (current: Awaited<ReturnType<BoardStore["snapshot"]>>) => {
         const candidate = change(current);
-        if (isSuspiciousEmptyWrite(current, candidate)) throw new EmptyWriteRefusedError();
+        if (!options.allowEmpty && isSuspiciousEmptyWrite(current, candidate)) throw new EmptyWriteRefusedError();
         return candidate;
       };
       try {
@@ -188,12 +180,14 @@ export class BoardHttpServer {
           const current = await this.board.snapshot();
           if (current.revision === expectedRevision) {
             board = await this.board.replaceIfRevision(candidateFor(current), expectedRevision);
+          } else if (options.wholeBoard) {
+            throw new BoardRevisionConflictError(expectedRevision, current.revision);
           } else {
             const base = this.revisions?.get(expectedRevision);
             if (!base) throw new BoardRevisionConflictError(expectedRevision, current.revision);
             // `touched` is empty for an add-only request (an added item has no
             // id), so nothing can collide: merge rather than refuse.
-            const { conflicts } = reportConflicts(base, current, res.req.body);
+            const { conflicts } = reportConflicts(base, current, options.conflictScope ?? res.req.body);
             if (conflicts.length > 0) {
               return res.status(409).json(conflictPayload(expectedRevision, current.revision, conflicts));
             }
@@ -217,15 +211,7 @@ export class BoardHttpServer {
          * mistake, and no field to fix. Check the class first and return the
          * same structured payload the MCP tools use.
          */
-        if (error instanceof BoardValidationError) {
-          return res.status(400).json({
-            error: message,
-            code: error.code,
-            path: error.path,
-            expected: error.expected,
-            fix: error.fix,
-          });
-        }
+        if (error instanceof BoardValidationError) return res.status(400).json(validationErrorBody(error));
         if ((error as NodeJS.ErrnoException).code) {
           logger.error(`Board persistence failed: ${message}`);
           return res.status(500).json({ error: "Unable to persist board changes" });
@@ -251,14 +237,19 @@ export class BoardHttpServer {
       if (!body || typeof body !== "object") return res.status(400).json({ error: "JSON object is required" });
       if (body.confirmedBy !== "human") return res.status(403).json({ error: "Human confirmation is required" });
       if (!body.patch) return res.status(400).json({ error: "patch is required" });
-      await commit(res, (current) => updateBoardItem(current, req.params.id, body.patch!));
+      await commit(res, (current) => updateBoardItem(current, req.params.id, body.patch!), {
+        conflictScope: { id: req.params.id },
+      });
     });
 
     this.app.delete("/api/board/items/:id", async (req, res) => {
       const body = req.body as { confirmedBy?: string };
       if (!body || typeof body !== "object") return res.status(400).json({ error: "JSON object is required" });
       if (body.confirmedBy !== "human") return res.status(403).json({ error: "Human confirmation is required" });
-      await commit(res, (current) => removeBoardItem(current, req.params.id));
+      await commit(res, (current) => removeBoardItem(current, req.params.id), {
+        allowEmpty: true,
+        conflictScope: { id: req.params.id },
+      });
     });
 
     this.app.post("/api/board/batch", async (req, res) => {
@@ -277,14 +268,14 @@ export class BoardHttpServer {
         if (body.remove_ids?.length) next = removeBoardItems(next, body.remove_ids);
         if (body.layout) next = layoutBoardItems(next, body.layout, "human");
         return next;
-      });
+      }, { allowEmpty: Boolean(body.remove_ids?.length) });
     });
 
     this.app.post("/api/board/replace", async (req, res) => {
       const body = req.body as { confirmedBy?: string; board?: unknown };
       if (body.confirmedBy !== "human") return res.status(403).json({ error: "Human confirmation is required" });
       if (body.board === undefined) return res.status(400).json({ error: "board is required" });
-      await commit(res, (current) => replaceBoardContent(current, body.board));
+      await commit(res, (current) => replaceBoardContent(current, body.board), { wholeBoard: true });
     });
 
     this.app.post("/api/board/diagram", async (req, res) => {
@@ -299,7 +290,11 @@ export class BoardHttpServer {
         return res.status(400).json({ error: error instanceof Error ? error.message : String(error) });
       }
       await commit(res, (current) => {
-        const generated = diagramToBoardItems(expanded!, "human");
+        const generated = diagramToBoardItems(
+          expanded!,
+          "human",
+          body.diagram!.replace ? [] : current.items.map((item) => item.id),
+        );
         const candidate = touchBoard({
           ...current,
           title: expanded!.title ?? current.title,
@@ -307,7 +302,7 @@ export class BoardHttpServer {
         });
         parseBoard(candidate);
         return candidate;
-      });
+      }, { wholeBoard: Boolean(body.diagram.replace) });
     });
 
     this.app.get("/api/board/project", async (req, res) => {
@@ -316,8 +311,13 @@ export class BoardHttpServer {
         maxFiles: req.query.max_files ? Number(req.query.max_files) : undefined,
         includeEvidence: req.query.evidence !== "0",
       };
-      const snapshot = await scanProject(this.config.workspaceRoot, options);
-      res.json(snapshot);
+      try {
+        const snapshot = await scanProject(this.config.workspaceRoot, options);
+        res.json(snapshot);
+      } catch (error) {
+        if (error instanceof BoardValidationError) return res.status(400).json(validationErrorBody(error));
+        throw error;
+      }
     });
 
     this.app.get("/api/board/project/text", async (_req, res) => {
@@ -331,20 +331,11 @@ export class BoardHttpServer {
       if (!assetRoot) return res.status(404).send("Excalidraw assets not found");
       const relative = req.path === "/" ? "index.html" : req.path.replace(/^\/+/, "");
       const target = path.resolve(assetRoot, relative);
-      if (!target.startsWith(assetRoot)) return res.status(403).send("Forbidden");
+      if (!isPathWithinRoot(assetRoot, target)) return res.status(403).send("Forbidden");
       try {
         const data = await fs.readFile(target);
-        const extension = path.extname(target).toLowerCase();
-        const contentType = extension === ".js" || extension === ".mjs" ? "text/javascript; charset=utf-8"
-          : extension === ".css" ? "text/css; charset=utf-8"
-            : extension === ".woff2" ? "font/woff2"
-              : extension === ".html" ? "text/html; charset=utf-8"
-                : extension === ".json" ? "application/json; charset=utf-8"
-                  : extension === ".svg" ? "image/svg+xml"
-                    : extension === ".png" ? "image/png"
-                      : "application/octet-stream";
         res.set("Cache-Control", "no-store, max-age=0");
-        res.type(contentType);
+        res.type(assetContentType(target));
         return res.send(data);
       } catch {
         return next();
@@ -386,7 +377,13 @@ export class BoardHttpServer {
 
   async start(): Promise<void> {
     this.server = http.createServer(this.app);
-    this.wss = new WebSocketServer({ server: this.server, path: "/ws" });
+    this.wss = new WebSocketServer({
+      server: this.server,
+      path: "/ws",
+      verifyClient: ({ req }: { req: http.IncomingMessage }) =>
+        isAllowedHost(req.headers.host, this.config.previewHost)
+        && isAllowedOrigin(req.headers.origin, this.config.previewHost),
+    });
     this.wss.on("connection", (socket) => {
       logger.debug("Board WebSocket client connected");
       socket.on("close", () => logger.debug("Board WebSocket client disconnected"));

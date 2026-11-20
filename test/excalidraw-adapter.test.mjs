@@ -152,6 +152,39 @@ describe("Doodle to Excalidraw adapter", () => {
     expect(caption.x).toBe(40);
   });
 
+  it("allows dragging an existing text element horizontally without snapping back", () => {
+    const board = addBoardItems(createEmptyBoard(), [
+      {
+        type: "text", id: "cap", x: 40, y: 216, w: 190, h: 16, text: "需求冻结", author: "ai",
+        style: { textAlign: "center" },
+        scene: { element: { id: "cap", type: "text", x: 111, y: 216, width: 48, height: 16 } },
+      },
+    ]);
+    const dragged = boardItemsFromExcalidrawBoard(board, [
+      { id: "cap", type: "text", x: 311, y: 216, width: 48, height: 16, text: "需求冻结" },
+    ]);
+    expect(dragged.items[0].x).toBe(240);
+  });
+
+  it("preserves server-assigned item ids via scene.element.id mapping on subsequent edits", () => {
+    const serverBoard = addBoardItems(createEmptyBoard(), [
+      {
+        type: "rect", id: "item_server_1", x: 10, y: 10, w: 120, h: 60, text: "新框", author: "human",
+        scene: { element: { id: "excalidraw_local_1", type: "rectangle", x: 10, y: 10, width: 120, height: 60 } },
+      },
+    ]);
+    const moved = boardItemsFromExcalidrawBoard(serverBoard, [
+      { id: "excalidraw_local_1", type: "rectangle", x: 150, y: 40, width: 120, height: 60 },
+      {
+        id: "excalidraw_arrow_1", type: "arrow", x: 150, y: 70, width: 80, height: 0,
+        points: [[0, 0], [80, 0]], startBinding: { elementId: "excalidraw_local_1" },
+      },
+    ]);
+    expect(moved.items[0].id).toBe("item_server_1");
+    expect(moved.items[0].x).toBe(150);
+    expect(moved.items[1].startItemId).toBe("item_server_1");
+  });
+
   it("produces a board the server accepts after a human edit", () => {
     // End-to-end guard for the "drawing disappears" regression: project a real
     // scene and parse it the way `/api/board/replace` does.

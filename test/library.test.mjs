@@ -70,4 +70,28 @@ describe("local board library", () => {
       await fs.rm(outputDir, { recursive: true, force: true });
     }
   });
+
+  it("does not rewrite index or snapshot files when listing an unchanged active board", async () => {
+    const outputDir = await fs.mkdtemp(path.join(os.tmpdir(), "doodle-library-readonly-"));
+    try {
+      const library = new BoardLibrary(outputDir);
+      const current = touchBoard(addBoardItem(createEmptyBoard(), {
+        type: "note", x: 10, y: 20, text: "steady", author: "human",
+      }));
+      await library.apply({ type: "list" }, current);
+      const indexPath = path.join(outputDir, ".doodle", "boards", "index.json");
+      const snapshotPath = path.join(outputDir, ".doodle", "boards", `${current.id}.json`);
+      const past = new Date(Date.now() - 60_000);
+      await fs.utimes(indexPath, past, past);
+      await fs.utimes(snapshotPath, past, past);
+      const beforeIndexMtime = (await fs.stat(indexPath)).mtimeMs;
+      const beforeSnapshotMtime = (await fs.stat(snapshotPath)).mtimeMs;
+
+      await library.apply({ type: "list" }, current);
+      expect((await fs.stat(indexPath)).mtimeMs).toBe(beforeIndexMtime);
+      expect((await fs.stat(snapshotPath)).mtimeMs).toBe(beforeSnapshotMtime);
+    } finally {
+      await fs.rm(outputDir, { recursive: true, force: true });
+    }
+  });
 });

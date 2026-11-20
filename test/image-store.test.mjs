@@ -145,7 +145,7 @@ describe("external image storage", () => {
     expect(exported.board.items[0].src).toBe(PNG);
   });
 
-  it("prunes unreferenced image files", async () => {
+  it("prunes unreferenced image files and stale temp files while sparing fresh temp files", async () => {
     const output = await tempDir();
     const store = new BoardStore(output);
     await store.init();
@@ -153,8 +153,25 @@ describe("external image storage", () => {
 
     const imagesDir = path.join(output, ".doodle", "images");
     const [name] = await fs.readdir(imagesDir);
-    await fs.writeFile(path.join(imagesDir, "stray.tmp-123"), "junk");
+    const staleTmp = path.join(imagesDir, "stale.tmp-123");
+    const freshTmp = path.join(imagesDir, "fresh.tmp-456");
+    await fs.writeFile(staleTmp, "junk");
+    await fs.writeFile(freshTmp, "in-flight");
+    const oldTime = new Date(Date.now() - 120_000);
+    await fs.utimes(staleTmp, oldTime, oldTime);
+
     expect(await pruneOrphanImages(imagesDir, new Set([name]))).toBe(1);
-    expect(await fs.readdir(imagesDir)).toEqual([name]);
+    expect((await fs.readdir(imagesDir)).sort()).toEqual(["fresh.tmp-456", name].sort());
+  });
+
+  it("preserves standard image/jpeg MIME type on round-trip", async () => {
+    const imagesDir = path.join(await tempDir(), "images");
+    const jpeg = "data:image/jpeg;base64,/9j/4AAQSkZJRgABAQEASABIAAD/2wBDAA==";
+    const board = addBoardItem(createEmptyBoard(), {
+      type: "image", x: 0, y: 0, w: 100, h: 100, src: jpeg, mime: "image/jpeg", author: "human",
+    });
+    const stored = await externalizeImages(board, imagesDir);
+    const restored = parseBoard(await hydrateImages(JSON.parse(JSON.stringify(stored)), imagesDir));
+    expect(restored.items[0].src).toBe(jpeg);
   });
 });
