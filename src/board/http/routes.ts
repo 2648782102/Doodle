@@ -28,7 +28,33 @@ import { projectSnapshotText, scanProject, type ProjectScanOptions } from "../pr
 import { readAsset } from "./templates.js";
 import { serveAsset } from "./assets.js";
 import { expandRecipe } from "../diagram/recipe.js";
-import type { canvasSnapshotOf } from "./snapshot.js";
+import { boardVisualDigest } from "../types.js";
+
+/**
+ * The canvas-facing board projection.
+ *
+ * Lives here rather than in its own module: every caller is a route in this
+ * file, and the shape it returns is the HTTP surface's own contract. A separate
+ * file only added an indirection through the route context.
+ */
+function canvasSnapshot(board: SimpleBoard) {
+  const { notes: _legacyNotes, ...snapshot } = board;
+  return {
+    ...snapshot,
+    visualDigest: boardVisualDigest(board),
+    capabilities: {
+      version: 1,
+      canvasEngine: "excalidraw",
+      layouts: ["grid", "row", "column", "timeline", "cluster", "architecture"],
+      connectors: ["startItemId", "endItemId"],
+      variants: ["plain", "card", "frame", "pill", "diamond", "callout", "heading"],
+      roles: ["normal", "label", "frame", "column", "step", "decision", "annotation"],
+      recipes: ["flow", "compare", "cluster", "emphasis", "image-annotation", "architecture", "diagram"],
+      sharingExports: ["png", "jpg", "svg"],
+      sharingExportOwner: "human-canvas",
+    },
+  };
+}
 
 export interface BoardRoutesContext {
   app: express.Express;
@@ -39,7 +65,6 @@ export interface BoardRoutesContext {
   panelToken: string;
   broadcast(message: Record<string, unknown>): void;
   serveBoard(res: express.Response): void | Promise<void>;
-  snapshot(board: SimpleBoard): ReturnType<typeof canvasSnapshotOf>;
 }
 
   export function registerBoardRoutes(ctx: BoardRoutesContext): void {
@@ -68,7 +93,7 @@ export interface BoardRoutesContext {
       // caller saw it. Without this, every racing canvas edit was a 409.
       ctx.revisions?.remember(current);
       const index = (await ctx.library.apply({ type: "list" }, current)).index;
-      res.json({ ...ctx.snapshot(current), library: index });
+      res.json({ ...canvasSnapshot(current), library: index });
     });
 
     /*
@@ -123,7 +148,7 @@ export interface BoardRoutesContext {
         res.json({
           ok: true,
           index: result.index,
-          board: ctx.snapshot(result.board),
+          board: canvasSnapshot(result.board),
           ...(body.action.type === "export" || body.action.type === "get" ? { exportBoard: result.board } : {}),
         });
       } catch (error) {
@@ -189,7 +214,7 @@ export interface BoardRoutesContext {
         return res.status(400).json({ error: message });
       }
       ctx.broadcast({ type: "board_updated", revision: board.revision });
-      return res.json({ ok: true, board: ctx.snapshot(board), ...(typeof mergedFrom === "number" ? { mergedFrom } : {}) });
+      return res.json({ ok: true, board: canvasSnapshot(board), ...(typeof mergedFrom === "number" ? { mergedFrom } : {}) });
     };
 
     ctx.app.post("/api/board/items", async (req, res) => {

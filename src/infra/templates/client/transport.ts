@@ -313,11 +313,11 @@ export function createBoardTransport(options: {
       onOfflineChange?.(true);
       const delay = RECONNECT_DELAYS_MS[Math.min(attempt, RECONNECT_DELAYS_MS.length - 1)];
       if (attempt >= RECONNECT_DELAYS_MS.length) {
-        showConnectionNotice("画板服务已结束，页面显示的是上次保存的内容；重新打开画板即可继续。");
+        showConnectionNotice("画板服务已结束，页面显示的是上次读到的内容；重新打开画板即可继续。");
         onGaveUp?.();
         return;
       }
-      showConnectionNotice(`画板连接已断开，正在重连（第 ${attempt + 1} 次）…`);
+      showConnectionNotice(`画板连接已断开，正在重连（第 ${attempt + 1} 次）… 这期间的改动不会保存`);
       window.setTimeout(
         () => connectStandaloneUpdates(onSnapshot, onOfflineChange, attempt + 1, onGaveUp),
         delay,

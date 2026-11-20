@@ -10,6 +10,12 @@
  * Watching the state file is the local-first fix: no daemon, no second source of
  * truth, no protocol change. The caller decides what to do with a revision it
  * did not write.
+ *
+ * Still required after the single-instance endpoint record: a process that
+ * *adopted* a sibling's endpoint runs no WebSocket server, so its own MCP
+ * writes broadcast to nobody. This watcher is how the owning process notices
+ * them. It is the one mechanism that keeps "who serves the canvas" and "who
+ * writes the board" from having to be the same process.
  */
 import { readFileSync, watch, type FSWatcher } from "node:fs";
 import fs from "node:fs/promises";

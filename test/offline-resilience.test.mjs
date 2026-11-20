@@ -7,7 +7,6 @@ import os from "node:os";
 import path from "node:path";
 import { describe, expect, it } from "vitest";
 import { createBoardCache, memoryCacheStore } from "../dist/infra/templates/client/board-cache.js";
-import { createOfflineQueue, replayDecision } from "../dist/infra/templates/client/offline-queue.js";
 import { syncPhaseAfter, syncPhaseView } from "../dist/infra/templates/client/sync-state.js";
 import {
   clearLiveEndpoint,
@@ -61,55 +60,6 @@ describe("local board cache", () => {
     await cache.forget("b1");
     expect(await cache.boardIds()).toEqual(["b2"]);
     expect((await cache.readActive())?.id).toBe("b2");
-  });
-});
-
-describe("offline queue", () => {
-  const memory = () => {
-    let value = [];
-    return { get: async () => value, put: async (next) => { value = next; } };
-  };
-
-  it("keeps only the newest change for a board", async () => {
-    const queue = createOfflineQueue(memory());
-    await queue.enqueue({ boardId: "b1", baseRevision: 1, items: [{ id: "old" }] });
-    await queue.enqueue({ boardId: "b1", baseRevision: 2, items: [{ id: "new" }] });
-    const queued = await queue.list();
-    expect(queued).toHaveLength(1);
-    expect(queued[0].baseRevision).toBe(2);
-    expect(queued[0].items[0].id).toBe("new");
-  });
-
-  it("keeps changes for different boards apart", async () => {
-    const queue = createOfflineQueue(memory());
-    await queue.enqueue({ boardId: "b1", baseRevision: 1, items: [] });
-    await queue.enqueue({ boardId: "b2", baseRevision: 1, items: [] });
-    expect((await queue.list()).map((item) => item.boardId).sort()).toEqual(["b1", "b2"]);
-  });
-
-  it("drops one board and clears", async () => {
-    const queue = createOfflineQueue(memory());
-    await queue.enqueue({ boardId: "b1", baseRevision: 1, items: [] });
-    await queue.enqueue({ boardId: "b2", baseRevision: 1, items: [] });
-    await queue.drop("b1");
-    expect((await queue.list()).map((entry) => entry.boardId)).toEqual(["b2"]);
-    await queue.clear();
-    expect(await queue.isEmpty()).toBe(true);
-  });
-
-  it("survives a corrupt stored value instead of throwing", async () => {
-    const queue = createOfflineQueue({ get: async () => "not an array", put: async () => {} });
-    expect(await queue.list()).toEqual([]);
-  });
-
-  it("only replays onto the exact revision it was built against", () => {
-    const change = { boardId: "b1", baseRevision: 4, items: [], queuedAt: "", attempts: 0 };
-    expect(replayDecision(change, { id: "b1", revision: 4 })).toBe("sent");
-    // A board that moved on is never overwritten by a queued projection.
-    expect(replayDecision(change, { id: "b1", revision: 5 })).toBe("stale");
-    // A different board, or no board, cannot receive it either.
-    expect(replayDecision(change, { id: "b2", revision: 4 })).toBe("stale");
-    expect(replayDecision(change, null)).toBe("stale");
   });
 });
 

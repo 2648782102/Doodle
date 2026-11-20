@@ -103,7 +103,6 @@ const liquidGlass = [
 const http = [
   await read("src/board/http/server.ts"),
   await read("src/board/http/routes.ts"),
-  await read("src/board/http/snapshot.ts"),
 ].join("\n");
 const scanner = await read("src/board/project/scan.ts");
 const boardStore = await read("src/board/state/store.ts");
@@ -962,7 +961,15 @@ check(
 );
 check(await exists("plugins/doodle/skills/doodle/SKILL.md") && await exists("scripts/build-plugin.mjs") && await exists("scripts/plugin-check.mjs"), "plugin packaging files are incomplete");
 check(
-  totalSourceFiles.length >= 25 && totalSourceFiles.length <= 95,
+  /*
+   * A ceiling, not a target.
+   *
+   * origin/master ships 79 modules; the offline layer added six (board cache,
+   * boot reconciliation, write recovery, service worker, endpoint record, route
+   * table). 88 leaves room for three more before a reviewer has to justify the
+   * growth. The point is that adding a module is a decision, not a side effect.
+   */
+  totalSourceFiles.length >= 25 && totalSourceFiles.length <= 88,
   `src has ${totalSourceFiles.length} TypeScript modules; expected a modular but bounded tree`,
 );
 check(

@@ -24,7 +24,10 @@ export type SyncPhase =
   | "awaiting-agent"
   /** Some objects collided with a concurrent write and need a decision. */
   | "conflict"
-  /** The live channel is down; edits are held locally and sent on reconnect. */
+  /**
+   * The live channel is down. The canvas keeps showing the last board it read,
+   * but a write cannot land, so this must not imply the edit is safe.
+   */
   | "offline"
   /** The live channel is down for good; edits can no longer be saved. */
   | "detached";
@@ -67,7 +70,16 @@ const PHASE_VIEWS: Record<SyncPhase, SyncPhaseView> = {
   synced: { label: "已同步", detail: "当前画板已同步到宿主对话上下文", tone: "ok" },
   "awaiting-agent": { label: "等 Agent", detail: "已通知 Agent 读取画板", tone: "busy" },
   conflict: { label: "待处理", detail: "部分对象与别处的改动冲突，需要选择保留哪一份", tone: "alert" },
-  offline: { label: "离线", detail: "与画板的连接断开，改动暂存在本机，恢复后自动提交", tone: "warn" },
+  /*
+   * Deliberately says "尚未写入" rather than "已暂存".
+   *
+   * An earlier draft promised the edits were held locally and would be sent on
+   * reconnect. There is no replay queue behind that promise — a failed write
+   * only keeps the most recent frame in memory — so the wording would have been
+   * a lie told at exactly the moment a person needs to know whether to copy
+   * their work somewhere. Stating the truth is the whole point of this chip.
+   */
+  offline: { label: "离线", detail: "与画板的连接断开，改动尚未写入；页面仍显示上次读到的内容", tone: "warn" },
   detached: { label: "已断开", detail: "画板进程已结束，画布显示上次的内容；请重新打开画板以继续保存", tone: "alert" },
 };
 

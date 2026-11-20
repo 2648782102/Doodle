@@ -3,10 +3,14 @@
  *
  * The board's URL used to be private to the process that opened the port. That
  * is why every session started its own server (eight were running during one
- * afternoon of work), why `state-watch.ts` exists — each process had its own
- * broadcast bus and a write from another process never reached the open
- * page — and why the panel link died the moment a session ended even though
- * `board.json` was untouched.
+ * afternoon of work) and why the panel link died the moment a session ended
+ * even though `board.json` was untouched.
+ *
+ * It does **not** make `state-watch.ts` redundant. A second process that adopts
+ * a sibling's endpoint has no WebSocket server of its own, so its `broadcast()`
+ * reaches nobody — the watcher is what lets the *owning* process learn about a
+ * write made through MCP in the adopting one. Removing it would leave the open
+ * canvas showing a board that no longer matches the file.
  *
  * The file is the board directory's own answer to "where is the canvas". It is
  * written after `listen` succeeds, read before deciding to listen, and removed

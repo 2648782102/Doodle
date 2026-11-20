@@ -21,7 +21,6 @@ import { isAllowedHost, isAllowedOrigin } from "./security.js";
 
 import { fillTemplate, readTemplate } from "./templates.js";
 import { registerBoardRoutes } from "./routes.js";
-import { canvasSnapshotOf } from "./snapshot.js";
 
 
 
@@ -66,7 +65,6 @@ export class BoardHttpServer {
       panelToken: this.panelToken,
       broadcast: (message) => this.broadcast(message),
       serveBoard: (res) => this.serveBoard(res),
-      snapshot: canvasSnapshotOf,
     });
   }
 
