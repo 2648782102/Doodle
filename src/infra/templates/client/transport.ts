@@ -88,7 +88,18 @@ export interface BoardTransport {
   libraryRequest(action: Record<string, unknown>, expectedRevision: number): Promise<Record<string, unknown>>;
   /** True when the snapshot reached the host model context. */
   publishContext(snapshot: BoardSnapshot, force?: boolean): Promise<boolean>;
-  initNotifyButton(getActiveSnapshot: () => BoardSnapshot | null): void;
+  /**
+   * `onNotified` fires only after the host accepted the message.
+   *
+   * The button used to be silent on success: a person pressed "通知 Agent" and
+   * the only evidence was that nothing went wrong. The sync chip has had an
+   * `awaiting-agent` phase and a `notified` event for a while — nothing ever
+   * sent it, so the phase was unreachable.
+   */
+  initNotifyButton(
+    getActiveSnapshot: () => BoardSnapshot | null,
+    onNotified?: () => void,
+  ): void;
   setFallbackMcpApp(app: McpAppFallback | null): void;
   startLiveUpdates(options: {
     isBusy: () => boolean;
@@ -213,7 +224,10 @@ export function createBoardTransport(options: {
 
   let refreshNotifyVisibility: (() => void) | null = null;
 
-  const initNotifyButton = (getActiveSnapshot: () => BoardSnapshot | null): void => {
+  const initNotifyButton = (
+    getActiveSnapshot: () => BoardSnapshot | null,
+    onNotified?: () => void,
+  ): void => {
     const button = document.querySelector<HTMLButtonElement>("#doodleNotifyAgent");
     if (!button) return;
     const updateVisibility = () => {
@@ -222,6 +236,9 @@ export function createBoardTransport(options: {
     };
     refreshNotifyVisibility = updateVisibility;
     button.addEventListener("click", async () => {
+      const previousLabel = button.textContent;
+      button.disabled = true;
+      if (previousLabel) button.textContent = "通知中…";
       try {
         const snapshot = getActiveSnapshot() ?? await loadBoard();
         await publishContext(snapshot, true);
@@ -231,8 +248,21 @@ export function createBoardTransport(options: {
           content: [{ type: "text", text: "我改了 Doodle 画板，你看下图。" }],
         });
         if (result.isError) throw new Error("Host rejected the notification");
+        /*
+         * Say it landed. `notified` is the event the chip already understands;
+         * the label change is for the moment the chip is off-screen or the
+         * person is looking at the button they just pressed.
+         */
+        onNotified?.();
+        button.textContent = "已通知 ✓";
+        window.setTimeout(() => {
+          if (button.textContent === "已通知 ✓") button.textContent = previousLabel ?? "通知 Agent";
+        }, 2000);
       } catch (error) {
+        if (previousLabel) button.textContent = previousLabel;
         showError(error);
+      } finally {
+        button.disabled = false;
       }
     });
     updateVisibility();

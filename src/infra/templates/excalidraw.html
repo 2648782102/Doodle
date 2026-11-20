@@ -1455,6 +1455,7 @@
     }
     .doodle-notify-agent { position: fixed; right: 14px; bottom: 14px; z-index: 20; height: 36px; padding: 0 16px; border-radius: var(--doodle-radius-lg); color: var(--doodle-accent-ink); background: var(--doodle-accent); cursor: pointer; font-size: 12px; }
     .doodle-notify-agent:hover { filter: brightness(1.05); }
+    .doodle-notify-agent:disabled { cursor: default; opacity: 0.85; filter: none; }
     .doodle-notify-agent[hidden] { display: none; }
     /*
      * The sync state, stated rather than implied.
@@ -1703,6 +1704,29 @@
     .doodle-library-entry-confirm button[data-tone="danger"]:hover { background: color-mix(in srgb, var(--doodle-danger) 12%, transparent); }
     .doodle-library-entry.is-confirming { border-color: var(--doodle-danger); background: var(--doodle-surface-solid); }
     .doodle-library-entry.is-confirming .doodle-library-entry-actions { display: none; }
+    /*
+     * A thumbnail in its own column.
+     *
+     * The row is a grid; a picture beside the name would take width away from the
+     * name, which is the one thing that must stay readable. It gets a fixed 40px
+     * column and the row keeps its two-column arrangement for everything else.
+     * `contain` keeps an SVG with a huge internal viewBox from painting outside
+     * the box, and `pointer-events: none` makes the whole row still one target.
+     */
+    .doodle-library-entry.has-thumb { grid-template-columns: 40px minmax(0, 1fr) auto; }
+    .doodle-library-thumb {
+      width: 40px;
+      height: 32px;
+      object-fit: contain;
+      pointer-events: none;
+      border-radius: 6px;
+      background: var(--doodle-surface);
+      border: 1px solid var(--doodle-border);
+      overflow: hidden;
+    }
+    .doodle-library-thumb[hidden] { display: none; }
+    .doodle-library-entry.has-thumb:has(.doodle-library-thumb[hidden]) { grid-template-columns: minmax(0, 1fr) auto; }
+    .doodle-library-entry.has-thumb .doodle-library-entry-confirm { grid-column: 1 / -1; }
     .excalidraw .HelpDialog__header { display: none; }
     .excalidraw .dropdown-menu .dropdown-menu-group[data-doodle-hidden="true"] { display: none; }
     .excalidraw [data-doodle-hidden="true"] { display: none !important; }

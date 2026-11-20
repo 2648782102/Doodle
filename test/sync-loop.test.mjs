@@ -292,4 +292,27 @@ describe("changing the active board mid-write", () => {
     expect(camera, "the camera is keyed by the active board again").toContain("paintedBoardId.current");
     expect(camera).not.toContain("rememberViewport(activeSnapshot?.id");
   });
+
+  it("confirms a notification only after the host accepts it", () => {
+    /*
+     * "通知 Agent" was silent on success. The chip has had an `awaiting-agent`
+     * phase and a `notified` event for a while, but nothing ever sent the event,
+     * so the phase could not be reached and a person had no evidence the message
+     * left the page. The confirmation must follow `sendMessage`, not precede it:
+     * a button that says 已通知 for a message the host dropped is a lie.
+     */
+    const transportSource = read("src/infra/templates/client/transport.ts");
+    const notify = transportSource.slice(transportSource.indexOf("const initNotifyButton"));
+    const body = notify.slice(0, notify.indexOf("updateVisibility();"));
+    const sentIndex = body.indexOf("hostApp.sendMessage");
+    const notifiedIndex = body.indexOf("onNotified?.()");
+    expect(sentIndex, "the notify button no longer calls the host").toBeGreaterThan(0);
+    expect(notifiedIndex, "the notify button never reports success").toBeGreaterThan(0);
+    expect(notifiedIndex, "success is reported before the host answered").toBeGreaterThan(sentIndex);
+    expect(body).toContain("result.isError");
+
+    // The entry point has to forward the event into the chip, or the phase stays
+    // unreachable and this whole callback is dead code.
+    expect(appSource).toContain('status.send("notified")');
+  });
 });

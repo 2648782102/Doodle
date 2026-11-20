@@ -429,7 +429,10 @@ if (document.querySelector("#excalidrawRoot")) {
     getApi: () => apiRef.current,
     getFiles: () => currentFiles.current,
   });
-  transport.initNotifyButton(() => activeSnapshot);
+  transport.initNotifyButton(
+    () => activeSnapshot,
+    () => { status.send("notified"); },
+  );
   glassController = initLiquidGlass();
   void transport.startLiveUpdates({
     isBusy: () => applyingRemote.current || isEditing(currentAppState.current),
