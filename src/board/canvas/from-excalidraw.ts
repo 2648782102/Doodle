@@ -157,6 +157,7 @@ export function excalidrawElementsToBoardItems(
       }
       const align = (element.textAlign ?? previous.style?.textAlign ?? "left") as string;
       const shrink = Math.max(0, previous.w - elementWidth);
+      if (shrink === 0) return currentX;
       const expectedMin = previous.x - shrink;
       const expectedMax = align === "left" ? previous.x : previous.x + shrink;
       if (currentX >= expectedMin - 2 && currentX <= expectedMax + 2) return previous.x;

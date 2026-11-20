@@ -210,6 +210,7 @@ function readEdit(before: BoardItem, after: BoardItem): HandoffReading | undefin
 export function describeHandoff(
   current: SimpleBoard,
   previous: SimpleBoard | null | undefined,
+  options: { removedByAi?: boolean } = {},
 ): BoardHandoff {
   const before = new Map((previous?.items ?? []).map((item) => [item.id, item]));
   const after = new Map(current.items.map((item) => [item.id, item]));
@@ -238,15 +239,17 @@ export function describeHandoff(
       if (reading) readings.push(reading);
     }
   }
-  for (const [id, old] of before) {
-    if (!after.has(id)) {
-      edits.push({ id, change: "removed", author: "human", fields: [] });
-      readings.push({
-        id,
-        kind: "remove",
-        reading: `删掉了「${label(old)}」`,
-        suggestion: `接受这个删除，不要把它画回来，除非人明确要求。`,
-      });
+  if (!options.removedByAi) {
+    for (const [id, old] of before) {
+      if (!after.has(id)) {
+        edits.push({ id, change: "removed", author: "human", fields: [] });
+        readings.push({
+          id,
+          kind: "remove",
+          reading: `删掉了「${label(old)}」`,
+          suggestion: `接受这个删除，不要把它画回来，除非人明确要求。`,
+        });
+      }
     }
   }
 

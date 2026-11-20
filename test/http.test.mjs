@@ -504,6 +504,18 @@ describe("object-level conflict handling", () => {
       board: { ...afterMerge, revision: rev1 + 1 },
     }, rev1, token);
     expect(staleReplace.status).toBe(409);
+
+    // Whole-board layout (without layout.ids) must also conflict if an item was added concurrently.
+    const added = await post("/api/board/batch", {
+      confirmedBy: "human",
+      items: [{ type: "rect", x: 300, y: 10, w: 100, h: 60, text: "conflict-c" }],
+    }, afterMerge.revision, token).then((r) => r.json());
+    const staleLayout = await post("/api/board/batch", {
+      confirmedBy: "human",
+      layout: { mode: "grid" },
+    }, afterMerge.revision, token);
+    expect(staleLayout.status).toBe(409);
+    expect((await staleLayout.json()).conflicts).toContain(added.board.items.find((i) => i.text === "conflict-c").id);
   });
 
   it("allows deleting the very last object via DELETE and batch remove_ids", async () => {
