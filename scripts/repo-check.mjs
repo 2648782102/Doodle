@@ -747,6 +747,23 @@ check(cursorExample.mcpServers?.doodle?.command === "npx" && !JSON.stringify(cur
 check(codexExample.includes('args = ["-y", "doodle-mcp"]') && !codexExample.includes("absolute-path"), "Codex stdio example is not zero-configuration");
 check(setupScript.includes('"plugin", "marketplace", "add"') && setupScript.includes('"plugin", "add", "doodle@doodle"') && setupScript.includes("--dry-run"), "setup script does not safely install the local plugin");
 check(setupScript.includes('if (dryRun) return { status: 0 }') || setupScript.includes("if (dryRun) return { status: 0; }"), "setup dry-run can still execute commands");
+/*
+ * The browser contract suite is the only coverage of the page itself. Guard its
+ * existence and its opt-in wiring: it must stay out of the default suite (a
+ * machine without Chromium still has to pass `npm run check`) and keep the
+ * selector list that catches an upstream rename.
+ */
+check(
+  await exists("test/browser-contract.test.mjs")
+    && (await read("package.json")).includes('"test:browser"')
+    && (await read("vitest.config.ts")).includes("test/browser-contract.test.mjs"),
+  "the browser contract suite is missing, or is no longer excluded from the default test run",
+);
+check(
+  (await read("test/browser-contract.test.mjs")).includes('".App-toolbar"')
+    && (await read("test/browser-contract.test.mjs")).includes('".ToolIcon"'),
+  "the browser contract no longer asserts the Excalidraw internals the chrome styles",
+);
 check(await exists("plugins/doodle/skills/doodle/SKILL.md") && await exists("scripts/build-plugin.mjs") && await exists("scripts/plugin-check.mjs"), "plugin packaging files are incomplete");
 check(
   totalSourceFiles.length >= 25 && totalSourceFiles.length <= 80,

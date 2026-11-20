@@ -184,6 +184,10 @@ docs/                           product, architecture, decisions, and maintenanc
 
 ## Validation
 
+`npm run test:browser` runs the canvas contract suite (`test/browser-contract.test.mjs`): four assertions that need a real page — the Doodle top bar clears Excalidraw's toolbar, a card's id survives create/move/edit, the last object can be deleted, and every Excalidraw internal the chrome styles still exists on desktop and at phone width. It needs a Chromium download, so it is **excluded from `npm test` and `npm run check`** and must be run explicitly; a machine without browser binaries still passes the full gate. The selector list is the point: an upstream rename silently strips the chrome instead of failing, and this is the only place that notices.
+
+
+
 Run `npm run check` before proposing a change. It covers TypeScript, build, plugin build, tests, example syntax, offline repository guards, plugin guards, submission ZIP, doctor, and package contents. CI runs the same plugin guard. Protocol, tool, security, plugin packaging, or product changes must update all of `AGENTS.md`, `README.md`, `README.en.md`, `docs/PRODUCT_DIRECTION.md`, `docs/ARCHITECTURE.md`, `docs/DECISIONS.md`, `docs/GOALS.md`, `docs/EXPERIENCE_AUDIT.md`, `CHANGELOG.md`, `PRIVACY.md`, tests, examples, `.github/workflows/ci.yml`, `scripts/repo-check.mjs`, and `scripts/plugin-check.mjs` together.
 
 Keep the product small. Historical ADRs under `docs/archive/adr-legacy/` are read-only history, not current contracts.
