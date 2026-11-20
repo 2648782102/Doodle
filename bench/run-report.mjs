@@ -15,7 +15,7 @@ import fs from "node:fs/promises";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { assertTrace } from "./trace.mjs";
-import { clusterFailures, compareRuns, gradeTraces, renderMarkdown, summarizeByKind } from "./report.mjs";
+import { clusterFailures, compareRuns, gradeTraces, renderMarkdown, summarizeByKind, summarizeByModel } from "./report.mjs";
 
 const here = path.dirname(fileURLToPath(import.meta.url));
 const repoRoot = path.resolve(here, "..");
@@ -38,14 +38,27 @@ async function loadCases() {
   return new Map(cases.map((item) => [item.id, item]));
 }
 
+/**
+ * Load traces from a directory, or from model subdirectories when the run came
+ * from `run-matrix.mjs`. The layout is discovered rather than configured: a
+ * directory of `.json` files is one run, a directory of directories is a matrix.
+ */
 async function loadTraces(dir) {
-  const files = (await fs.readdir(dir)).filter((name) => name.endsWith(".json"));
-  if (files.length === 0) throw new Error(`no trace files in ${dir}`);
+  const entries = await fs.readdir(dir, { withFileTypes: true });
+  const files = entries.filter((entry) => entry.isFile() && entry.name.endsWith(".json"));
+  const dirs = entries.filter((entry) => entry.isDirectory());
+
   const traces = [];
   for (const file of files) {
-    const trace = assertTrace(await readJson(path.join(dir, file)));
-    traces.push(trace);
+    traces.push(assertTrace(await readJson(path.join(dir, file.name))));
   }
+  for (const sub of dirs) {
+    const inner = (await fs.readdir(path.join(dir, sub.name))).filter((name) => name.endsWith(".json"));
+    for (const name of inner) {
+      traces.push(assertTrace(await readJson(path.join(dir, sub.name, name))));
+    }
+  }
+  if (traces.length === 0) throw new Error(`no trace files in ${dir}, and no model subdirectories with traces`);
   return traces;
 }
 
@@ -60,6 +73,7 @@ async function main() {
   const jsonIndex = rest.indexOf("--json");
   const compareDir = compareIndex >= 0 ? rest[compareIndex + 1] : undefined;
   const jsonOut = jsonIndex >= 0 ? rest[jsonIndex + 1] : undefined;
+  const perModel = rest.includes("--per-model");
 
   const cases = await loadCases();
   const traces = await loadTraces(path.resolve(traceDir));
@@ -71,12 +85,13 @@ async function main() {
     comparison = compareRuns(gradeTraces(baseline, cases).rows, rows);
   }
 
-  process.stdout.write(renderMarkdown({ rows, unknown, comparison }));
+  process.stdout.write(renderMarkdown({ rows, unknown, comparison, perModel }));
 
   if (jsonOut) {
     const payload = {
       generated_at: new Date().toISOString(),
       by_kind: summarizeByKind(rows),
+      by_model: summarizeByModel(rows),
       clusters: clusterFailures(rows),
       rows,
       unknown,

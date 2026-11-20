@@ -224,3 +224,81 @@ describe("budget grading", () => {
     expect(result.calls).toBe(2);
   });
 });
+
+describe("furniture that a real model produces", () => {
+  /*
+   * Every rule below came from a live run where a correct drawing scored wrong.
+   * They are kept together because they are one lesson: the generator and the
+   * model both add things that are not graph nodes, and a grader that counts
+   * them punishes good drawings.
+   */
+  const board = (items) => touchBoard({ ...createEmptyBoard(), items });
+  const text = (id, value, role) => ({
+    id, type: "text", x: 0, y: -60, w: 300, h: 30, text: value, color: "#1e1e1e",
+    author: "ai", createdAt: "2026-01-01T00:00:00.000Z", updatedAt: "2026-01-01T00:00:00.000Z",
+    ...(role ? { role } : {}),
+  });
+  const shape = (id, value, x) => ({
+    id, type: "rect", x, y: 0, w: 180, h: 90, text: value, color: "#dbeafe", author: "ai",
+    createdAt: "2026-01-01T00:00:00.000Z", updatedAt: "2026-01-01T00:00:00.000Z",
+  });
+
+  it("ignores an edge annotation instead of counting it as a node", () => {
+    // "选择上线" labels the arrow to 上线; it repeats a node's own words.
+    const subject = board([
+      shape("a", "是否上线", 0), shape("b", "上线", 300), shape("c", "暂缓", 600),
+      text("t1", "选择上线", "annotation"),
+    ]);
+    const result = gradeBoard(subject, { kind: "tree", nodes: ["是否上线", "上线", "暂缓"] });
+    expect(result.structure.nodes.extra).toEqual([]);
+    expect(result.structure.nodes.precision).toBe(1);
+  });
+
+  it("ignores a short diagram heading that names no node", () => {
+    // "方案对比" is the diagram's title, not content.
+    const subject = board([shape("a", "方案A", 0), shape("b", "方案B", 300), text("t1", "方案对比")]);
+    const result = gradeBoard(subject, { kind: "comparison", nodes: ["方案A", "方案B"] });
+    expect(result.structure.nodes.extra).toEqual([]);
+  });
+
+  it("still counts an unlisted text as extra — the check keeps its teeth", () => {
+    const subject = board([shape("a", "方案A", 0), shape("b", "方案B", 300), text("t1", "随手写的第三方说明内容")]);
+    const result = gradeBoard(subject, { kind: "comparison", nodes: ["方案A", "方案B"] });
+    expect(result.structure.nodes.extra.length).toBe(1);
+  });
+
+  it("accepts content the case explicitly allows", () => {
+    /*
+     * Annotating a branch with "需停机 2 小时" makes the diagram better, but
+     * precision would call it an invented node. The case says it is welcome.
+     */
+    const subject = board([
+      shape("a", "是否迁移", 0), shape("b", "是", 300), shape("c", "否", 600),
+      text("t1", "需停机 2 小时", "annotation"),
+      {
+        id: "n1", type: "note", x: 300, y: 160, w: 160, h: 60, text: "需停机 2 小时",
+        color: "#ffec99", author: "ai",
+        createdAt: "2026-01-01T00:00:00.000Z", updatedAt: "2026-01-01T00:00:00.000Z",
+      },
+    ]);
+    const withoutAllow = gradeBoard(subject, { kind: "tree", nodes: ["是否迁移", "是", "否"] });
+    const withAllow = gradeBoard(subject, { kind: "tree", nodes: ["是否迁移", "是", "否"], allow: ["需停机"] });
+    expect(withoutAllow.structure.nodes.extra.length).toBe(1);
+    expect(withAllow.structure.nodes.extra).toEqual([]);
+    expect(withAllow.structure.nodes.precision).toBe(1);
+  });
+
+  it("does not call a legend overlapping content", () => {
+    /*
+     * The overlap check had its own node filter and kept the title, so a correct
+     * branch diagram scored 1.00 and still failed with "1 overlapping pair".
+     */
+    const subject = board([
+      shape("a", "提交", 0), shape("b", "审批", 300),
+      { ...text("t1", "审批分支流程", "label"), x: 0, y: 0, w: 480, h: 120 },
+    ]);
+    const result = gradeBoard(subject, { kind: "sequence", ordered: true, nodes: ["提交", "审批"], forbid: ["overlap"] });
+    expect(result.geometry.danglingConnectors).toBe(0);
+    expect(result.checks.find((check) => check.name === "no_overlap").ok).toBe(true);
+  });
+});
