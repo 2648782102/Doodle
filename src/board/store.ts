@@ -6,6 +6,7 @@ import { AsyncMutex } from "./mutex.js";
 import { logger } from "../infra/logger.js";
 import { renameWithRetry } from "../infra/atomic-write.js";
 import { createEmptyBoard, parseBoard, touchBoard, type SimpleBoard } from "./types.js";
+import { sameBoardContent } from "./model/fingerprint.js";
 import {
   collectRefsFromBoards, externalizeImages, hydrateImages, imageRefsOf, pruneOrphanImages,
 } from "./image-store.js";
@@ -125,7 +126,19 @@ export class BoardStore {
   async mutate(change: (board: SimpleBoard) => SimpleBoard): Promise<SimpleBoard> {
     return this.mutex.run(async () => {
       const current = await this.readState();
-      const next = parseBoard(change(current));
+      const produced = change(current);
+      /*
+       * A transform that changed nothing is a success, not a conflict.
+       *
+       * `updateBoardItems` returns its input untouched when every patch merely
+       * restates stored values, which is what keeps an idle gesture from
+       * rewriting the file. Comparing revisions then turned that into
+       * `expected 2, found 2`: a conflict whose two numbers are equal, telling
+       * the caller to reload a board that never moved. Returning `current`
+       * keeps the no-op invisible — no write, no revision bump, no error.
+       */
+      if (produced === current || sameBoardContent(produced, current)) return current;
+      const next = parseBoard(produced);
       if (next.revision <= current.revision) {
         throw new BoardRevisionConflictError(current.revision, next.revision);
       }
@@ -147,6 +160,8 @@ export class BoardStore {
       if (current.revision !== expectedRevision) {
         throw new BoardRevisionConflictError(expectedRevision, current.revision);
       }
+      // Same rule as `mutate`: an unchanged transform is a successful no-op.
+      if (next === current || sameBoardContent(next, current)) return { before: current, board: current };
       const parsed = parseBoard(next);
       if (parsed.revision <= expectedRevision) {
         throw new BoardRevisionConflictError(expectedRevision, parsed.revision);
@@ -171,6 +186,7 @@ export class BoardStore {
     if (current.revision !== baseRevision) {
       throw new BoardRevisionConflictError(baseRevision, current.revision);
     }
+    if (board === current || sameBoardContent(board, current)) return current;
     const next = parseBoard(board);
     if (next.revision <= baseRevision) {
       throw new BoardRevisionConflictError(baseRevision, next.revision);
