@@ -107,5 +107,14 @@ export function initShortcutPanel(): void {
    * never again on its own. A shortcut list nobody can find is the same as no
    * shortcut list, and an empty board is exactly when it is useful.
    */
-  if (!welcomeDismissed()) open();
+  /*
+   * Desktop only.
+   *
+   * On a phone this is a bottom sheet that covers roughly half a 390 × 780
+   * screen, and it would open on top of the empty board the person is trying to
+   * see. There is no hover and no room for a second pane, so the panel is
+   * something a phone user opens deliberately — the `?` button is in the capsule,
+   * one tap away.
+   */
+  if (!welcomeDismissed() && window.matchMedia("(min-width: 641px)").matches) open();
 }

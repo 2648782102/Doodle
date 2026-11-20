@@ -73,4 +73,23 @@ describe("keyboard shortcut panel", () => {
     expect(template).toMatch(/\.doodle-shortcuts-group dl \{[^}]*align-items: start/);
     expect(template).toMatch(/\.doodle-shortcuts-body \{[^}]*grid-template-columns: repeat\(3, max-content\)/);
   });
+
+  it("does not cover the phone screen unprompted", () => {
+    /*
+     * Anchored under the capsule, the panel was 366 × 560 on a 390 × 780 screen
+     * — 67% of the viewport, painted over the capsule that opened it and over the
+     * empty board the shortcuts exist to explain. Phones get a bottom sheet above
+     * the toolbar, and it opens only when asked: no hover, and no room for a
+     * second pane next to the canvas.
+     */
+    const phone = template.slice(template.indexOf("  .doodle-shortcuts {\n        top: auto;"));
+    const rule = phone.slice(0, phone.indexOf("}"));
+    expect(rule, "the phone panel is not anchored to the bottom").toContain("bottom: 84px");
+    expect(rule).toContain("top: auto");
+    // Above the 64px bottom bar plus its own margin, and never over it.
+    expect(84).toBeGreaterThan(64);
+
+    const autoOpen = module.slice(module.indexOf("if (!welcomeDismissed()"));
+    expect(autoOpen, "the panel still opens itself on a phone").toContain('matchMedia("(min-width: 641px)")');
+  });
 });

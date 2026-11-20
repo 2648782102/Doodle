@@ -1386,14 +1386,31 @@
     }
     .doodle-shortcuts-group dd { margin: 0; align-self: start; color: var(--doodle-muted); font-size: 11px; line-height: 1.45; }
     @media (max-width: 640px) {
+      /*
+       * On a phone the panel is a bottom sheet, not a dropdown.
+       *
+       * Anchored under the capsule it was 366 × 560 on a 390 × 780 screen: 67%
+       * of the viewport, covering the capsule that opened it and the empty board
+       * the shortcuts are meant to explain. The bottom sheet sits above the
+       * bottom toolbar instead, leaving the canvas and the capsule visible.
+       */
       .doodle-shortcuts {
-        top: 60px;
-        left: 12px;
-        right: 12px;
+        top: auto;
+        left: 8px;
+        right: 8px;
+        bottom: 84px;
         width: auto;
-        max-height: min(72vh, 560px);
+        max-height: min(52vh, 430px);
+        border-radius: 16px;
       }
-      .doodle-shortcuts-body { grid-template-columns: minmax(0, 1fr); }
+      /*
+       * Two columns, not one. In one column the tool list alone is eleven rows
+       * and the sheet covered more than half the screen; two columns halve the
+       * height and still fit the longest label ("按工具栏顺序选工具").
+       */
+      .doodle-shortcuts-body { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 4px 12px; }
+      .doodle-shortcuts-group dl { grid-template-columns: max-content minmax(0, 1fr); gap: 3px 6px; }
+      .doodle-shortcuts-group dd { font-size: 10.5px; }
     }
     .doodle-tool-primary { background: var(--doodle-accent); color: var(--doodle-accent-ink); border-color: transparent; }
     .doodle-tool-primary:hover { color: var(--doodle-accent-ink); filter: brightness(1.05); }
