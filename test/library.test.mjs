@@ -71,7 +71,7 @@ describe("local board library", () => {
     }
   });
 
-  it("does not rewrite index or snapshot files when listing an unchanged active board", async () => {
+  it("answers a list without writing, whether or not the active board changed", async () => {
     const outputDir = await fs.mkdtemp(path.join(os.tmpdir(), "doodle-library-readonly-"));
     try {
       const library = new BoardLibrary(outputDir);
@@ -90,6 +90,23 @@ describe("local board library", () => {
       await library.apply({ type: "list" }, current);
       expect((await fs.stat(indexPath)).mtimeMs).toBe(beforeIndexMtime);
       expect((await fs.stat(snapshotPath)).mtimeMs).toBe(beforeSnapshotMtime);
+      /*
+       * An *advanced* board is the case that used to force a write: the stored
+       * snapshot lagged the live one, so `saveActive()` rewrote both files on
+       * every read. The index must still describe the live board without that
+       * write, because the canvas and `get_board` read revision and item count
+       * off the entry.
+       */
+      const advanced = touchBoard(addBoardItem(current, {
+        type: "note", x: 200, y: 20, text: "drawn without saving", author: "human",
+      }));
+      const listed = await library.apply({ type: "list" }, advanced);
+      expect((await fs.stat(indexPath)).mtimeMs).toBe(beforeIndexMtime);
+      expect((await fs.stat(snapshotPath)).mtimeMs).toBe(beforeSnapshotMtime);
+      const entry = listed.index.boards.find((candidate) => candidate.id === listed.index.activeId);
+      expect(entry.revision).toBe(advanced.revision);
+      expect(entry.itemCount).toBe(advanced.items.length);
+      expect(entry.updatedAt).toBe(advanced.updatedAt);
     } finally {
       await fs.rm(outputDir, { recursive: true, force: true });
     }

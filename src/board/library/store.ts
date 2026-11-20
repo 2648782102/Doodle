@@ -136,6 +136,28 @@ export class BoardLibrary {
       index = await this.upsert(index, current, currentEntry.name);
       currentEntry.name = index.boards.find((entry) => entry.id === activeId)!.name;
     };
+    /*
+     * A `list` is a read, and a read must not write the board file.
+     *
+     * `list` used to call `saveActive()`, which rewrites the active board
+     * snapshot and then the index. It is called on every `get_board`, every
+     * `show_board`, `GET /api/board`, `GET /api/board/library`, and after every
+     * successful write — so a 400-object board paid two whole-file writes
+     * (~537 KB) per read, refreshed the file's mtime, and made the documented
+     * read-only surface write to disk.
+     *
+     * The snapshot it was refreshing only carries what the index displays:
+     * title, revision, itemCount, updatedAt. Those are known from the live
+     * board, so the same index can be derived in memory. Persisting a *new*
+     * board still goes through `save` / `create` / `switch`, which is where a
+     * snapshot actually changes.
+     */
+    const listIndex = (): BoardLibraryIndex => {
+      const entry = entryFromBoard(current, currentEntry.name, true);
+      return makeIndex(activeId, index.boards.map((candidate) => (
+        candidate.id === activeId ? entry : candidate
+      )));
+    };
     const requireBoard = (id: string) => {
       if (!index.boards.some((entry) => entry.id === id)) {
         const known = index.boards.map((entry) => `${entry.name} (${entry.id})`).join(", ");
@@ -158,20 +180,20 @@ export class BoardLibrary {
     };
 
     if (action.type === "list") {
-      if (!activeSnapshotInSync) {
-        await saveActive();
-        await this.writeIndex(index);
-      }
-      return { index, board: { ...normalizeBoardSnapshot(current), title: currentEntry.name } };
+      return { index: listIndex(), board: { ...normalizeBoardSnapshot(current), title: currentEntry.name } };
     }
     if (action.type === "get" || action.type === "export") {
-      if (!activeSnapshotInSync) {
-        await saveActive();
-        await this.writeIndex(index);
-      }
       const id = action.id ? requireBoard(action.id) : activeId;
       const board = id === activeId ? normalizeBoardSnapshot(current) : await this.readBoard(id);
-      return { index, board: id === activeId ? { ...board, title: currentEntry.name } : board };
+      /*
+       * `get` and `export` are reads too. They carry the same index entry as
+       * `list`, so they derive it the same way instead of writing the snapshot
+       * back; exporting another board must not touch the one on disk either.
+       */
+      return {
+        index: activeSnapshotInSync ? index : listIndex(),
+        board: id === activeId ? { ...board, title: currentEntry.name } : board,
+      };
     }
     if (action.type === "save") {
       const id = action.id ? requireBoard(action.id) : activeId;

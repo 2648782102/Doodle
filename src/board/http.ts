@@ -21,7 +21,8 @@ import { conflictPayload } from "./http/conflict.js";
 import { assetContentType, isAllowedHost, isAllowedOrigin, isPathWithinRoot, validationErrorBody } from "./http/security.js";
 import { commitBoardWrite } from "./write-pipeline.js";
 import { projectSnapshotText, scanProject, type ProjectScanOptions } from "./project-scan.js";
-import { assetCandidates, fillTemplate, findExisting, readTemplate } from "./http/templates.js";
+import { fillTemplate, readTemplate } from "./http/templates.js";
+import { serveAsset } from "./http/assets.js";
 import { expandRecipe } from "./diagram/recipe.js";
 
 function canvasSnapshot(board: SimpleBoard) {
@@ -303,21 +304,7 @@ export class BoardHttpServer {
     });
 
     this.app.get("/", (_req, res) => this.serveBoard(res));
-    this.app.use("/excalidraw", async (req, res, next) => {
-      const assetRoot = await findExisting(assetCandidates(this.config));
-      if (!assetRoot) return res.status(404).send("Excalidraw assets not found");
-      const relative = req.path === "/" ? "index.html" : req.path.replace(/^\/+/, "");
-      const target = path.resolve(assetRoot, relative);
-      if (!isPathWithinRoot(assetRoot, target)) return res.status(403).send("Forbidden");
-      try {
-        const data = await fs.readFile(target);
-        res.set("Cache-Control", "no-store, max-age=0");
-        res.type(assetContentType(target));
-        return res.send(data);
-      } catch {
-        return next();
-      }
-    });
+    this.app.use("/excalidraw", (req, res, next) => serveAsset(req, res, next, this.config));
 
     this.app.use((error: unknown, _req: express.Request, res: express.Response, _next: express.NextFunction) => {
       const parserError = (error as { type?: string }).type;

@@ -15,6 +15,7 @@ import type {
 import { MIN_STORED_SIZE } from "./types.js";
 import { finite, round, splitText } from "./primitives.js";
 import { boardItemsToExcalidrawSkeleton, boardToExcalidrawFiles } from "./to-excalidraw.js";
+import { stableItemFingerprint } from "../model/fingerprint.js";
 
 function elementType(element: ExcalidrawLikeElement): BoardItemType {
   if (element.type === "freedraw") return "stroke";
@@ -94,7 +95,16 @@ function cloneElement(element: ExcalidrawLikeElement): Record<string, unknown> {
  * string comparison is enough and cheaper than a deep equal.
  */
 function sameItemApartFromTimestamp(a: BoardItem, b: BoardItem): boolean {
-  return JSON.stringify({ ...a, updatedAt: "" }) === JSON.stringify({ ...b, updatedAt: "" });
+  /*
+   * Key order must not matter.
+   *
+   * `updatedAt` sits before `title` and `scene` in the builder below but after
+   * them in a board that came back through JSON, so spreading it last preserved
+   * whatever order the input had and the two strings rarely matched. The
+   * projection then looked like a change on every call, which is what made a
+   * pan (no object touched) rewrite the board.
+   */
+  return stableItemFingerprint(a) === stableItemFingerprint(b);
 }
 
 function isDegenerate(element: ExcalidrawLikeElement): boolean {  const type = elementType(element);

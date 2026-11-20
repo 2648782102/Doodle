@@ -37,7 +37,8 @@ src/
 │   ├── http/                   local API surface
 │   │   ├── conflict.ts         object-level conflict detection and 409 payload
 │   │   ├── security.ts         loopback Host/Origin and asset path boundary guards
-│   │   └── templates.ts        canvas template lookup and token substitution
+│   │   ├── templates.ts        canvas template lookup, caching, and token substitution
+│   │   └── assets.ts           Excalidraw bundle delivery and cache policy
 │   ├── library/                named board snapshots
 │   │   ├── schema.ts           index shape and strict validation
 │   │   └── store.ts            atomic persistence under a mutex

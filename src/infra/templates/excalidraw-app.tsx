@@ -28,6 +28,7 @@ import {
   showError,
 } from "./client/banner.js";
 import { createCanvasSync, type CanvasSync, type CanvasSyncOutcome, type SceneElement } from "./client/canvas-sync.js";
+import { stableStringify } from "../../board/model/fingerprint.js";
 import { initLibraryUi, initSnapshotExports } from "./client/library-ui.js";
 import { initExternalLinkPolicy, isDoodleProjectLink } from "./client/link-policy.js";
 import { createSyncChip } from "./client/sync-state.js";
@@ -348,7 +349,12 @@ function CanvasApp({ initial }: { initial: BoardSnapshot }) {
       elements,
       currentFiles.current,
     );
-    if (JSON.stringify(projected.items) === JSON.stringify(activeSnapshot.items)) {
+    /*
+     * Values, not key order. The projection rebuilds every item, so its key
+     * order differs from the stored board even when nothing moved; comparing
+     * raw strings made a pan look like an edit and scheduled a write.
+     */
+    if (stableStringify(projected.items) === stableStringify(activeSnapshot.items)) {
       /*
        * Nothing of the person's to write. If a remote board was only adopted as
        * the baseline (no repaint), the scene is still showing the older one, so
