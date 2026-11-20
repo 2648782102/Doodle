@@ -1385,6 +1385,93 @@
     .doodle-notify-agent:hover { filter: brightness(1.05); }
     .doodle-notify-agent[hidden] { display: none; }
     /*
+     * The sync state, stated rather than implied.
+     *
+     * A board that says nothing is a board you have to guess about: "did that
+     * drag save?", "does the agent know?". The chip answers with the five states
+     * a person can act on, plus which path they are on (this page or the host's
+     * embedded canvas). Colour alone is never the signal — the label says it.
+     */
+    .doodle-sync-state {
+      display: inline-flex;
+      align-items: center;
+      gap: 5px;
+      height: 30px;
+      padding: 0 9px 0 7px;
+      border-radius: 999px;
+      border: 1px solid var(--doodle-border);
+      background: var(--doodle-surface);
+      color: var(--doodle-muted);
+      font-size: 11px;
+      line-height: 1;
+      white-space: nowrap;
+      cursor: default;
+    }
+    .doodle-sync-dot {
+      width: 6px;
+      height: 6px;
+      border-radius: 50%;
+      background: var(--doodle-muted);
+      opacity: 0.7;
+      flex: none;
+    }
+    .doodle-sync-label { color: var(--doodle-ink); font-weight: 600; }
+    .doodle-sync-channel { color: var(--doodle-muted); font-size: 10px; }
+    .doodle-sync-channel::before { content: "·"; margin-right: 4px; opacity: 0.6; }
+    .doodle-sync-state[data-phase="dirty"] .doodle-sync-dot,
+    .doodle-sync-state[data-phase="saving"] .doodle-sync-dot { background: var(--doodle-accent); opacity: 1; }
+    .doodle-sync-state[data-phase="saving"] .doodle-sync-dot { animation: doodle-sync-pulse 1.1s var(--doodle-ease) infinite; }
+    .doodle-sync-state[data-phase="saved"] .doodle-sync-dot,
+    .doodle-sync-state[data-phase="synced"] .doodle-sync-dot { background: var(--doodle-accent); opacity: 1; }
+    .doodle-sync-state[data-phase="awaiting-agent"] .doodle-sync-dot { background: var(--doodle-accent); opacity: 1; animation: doodle-sync-pulse 1.6s var(--doodle-ease) infinite; }
+    .doodle-sync-state[data-phase="conflict"] { border-color: var(--doodle-danger); }
+    .doodle-sync-state[data-phase="conflict"] .doodle-sync-dot { background: var(--doodle-danger); opacity: 1; border-radius: 2px; }
+    .doodle-sync-state[data-phase="conflict"] .doodle-sync-label { color: var(--doodle-danger); }
+    .doodle-sync-state[data-phase="offline"] .doodle-sync-dot { background: transparent; border: 1px dashed var(--doodle-danger); opacity: 1; }
+    @keyframes doodle-sync-pulse { 0%, 100% { opacity: 0.35; } 50% { opacity: 1; } }
+    @media (prefers-reduced-motion: reduce) { .doodle-sync-state .doodle-sync-dot { animation: none !important; } }
+    @media (max-width: 700px) { .doodle-sync-channel { display: none; } }
+    /*
+     * A conflict is a decision, not a notification.
+     *
+     * A toast that disappears after eight seconds was the wrong container: the
+     * change is still unsaved, and only the person can say whose version wins.
+     * So it stays, names the objects, and offers exactly two ways out.
+     */
+    .doodle-conflict {
+      position: fixed;
+      left: 50%;
+      bottom: 18px;
+      transform: translateX(-50%);
+      z-index: 24;
+      width: min(560px, calc(100vw - 32px));
+      padding: 12px 14px;
+      border-radius: var(--doodle-radius);
+      border: 1px solid var(--doodle-danger);
+      box-shadow: var(--doodle-shadow);
+      color: var(--doodle-ink);
+      background: var(--doodle-surface-solid);
+      font-size: 12px;
+      line-height: 1.5;
+    }
+    .doodle-conflict[hidden] { display: none; }
+    .doodle-conflict p { margin: 0 0 10px; }
+    .doodle-conflict-actions { display: flex; gap: 8px; justify-content: flex-end; }
+    .doodle-conflict-actions button {
+      height: 30px;
+      padding: 0 12px;
+      border-radius: var(--doodle-radius-sm);
+      border: 1px solid var(--doodle-border-strong);
+      background: var(--doodle-surface);
+      color: var(--doodle-ink);
+      font-size: 12px;
+      cursor: pointer;
+    }
+    .doodle-conflict-actions button[data-tone="primary"] { background: var(--doodle-accent); border-color: var(--doodle-accent); color: var(--doodle-accent-ink); }
+    .doodle-conflict-actions button[data-tone="danger"] { border-color: var(--doodle-danger); color: var(--doodle-danger); }
+    .doodle-conflict-actions button:disabled { opacity: 0.55; cursor: default; }
+    @media (max-width: 700px) { .doodle-conflict { bottom: 8px; } }
+    /*
      * Save failures have to be visible. A rejected write used to be a console
      * message while the canvas silently reverted, so content appeared to
      * disappear for no reason.
@@ -1967,14 +2054,24 @@
       <button class="doodle-theme-option" data-theme-option="dark" aria-pressed="false" title="深色 · 夜纸与浅墨">深</button>
       <button class="doodle-theme-option" data-theme-option="glass" aria-pressed="false" title="液态玻璃 · 暖纸与松绿">玻</button>
     </div>
+    <div class="doodle-sync-state" id="doodleSyncState" data-phase="idle" data-channel="standalone" role="status" aria-live="polite">
+      <span class="doodle-sync-dot" aria-hidden="true"></span>
+      <span class="doodle-sync-label" data-sync-label>就绪</span>
+      <span class="doodle-sync-channel" data-sync-detail>本机页面</span>
+    </div>
   </div>
   <button class="doodle-notify-agent doodle-glass" id="doodleNotifyAgent" hidden>通知 Agent</button>
+  <section class="doodle-conflict doodle-glass" id="doodleConflictNotice" hidden role="alertdialog" aria-live="assertive" aria-label="保存冲突需要选择">
+    <p data-conflict-message></p>
+    <div class="doodle-conflict-actions" data-conflict-actions></div>
+  </section>
   <section class="doodle-welcome doodle-glass" id="doodleWelcome" hidden aria-label="开始使用画板">
     <h2>这是一张空画板</h2>
     <p>不用配置，直接开始画。和 AI 一起用时，它会读写同一张画板。</p>
     <dl>
       <dt>双击空白</dt><dd>新建一张便签</dd>
       <dt>拖拽</dt><dd>画形状、箭头或手写</dd>
+      <dt>点一下（选中形状工具后）</dt><dd>放置默认大小的形状，再直接改字</dd>
       <dt>空格 / 滚轮</dt><dd>平移画板</dd>
       <dt>⌘ / Ctrl + 滚轮</dt><dd>缩放</dd>
     </dl>

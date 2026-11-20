@@ -25,7 +25,7 @@ export function safeFilename(name: string): string {
 export interface LibraryUiDeps {
   transport: BoardTransport;
   getActiveSnapshot: () => BoardSnapshot | null;
-  applyRemoteSnapshot: (snapshot: BoardSnapshot, refreshFiles?: boolean) => void;
+  applyRemoteSnapshot: (snapshot: BoardSnapshot, options?: { repaint?: boolean }) => void;
 }
 
 export function initLibraryUi(deps: LibraryUiDeps): void {

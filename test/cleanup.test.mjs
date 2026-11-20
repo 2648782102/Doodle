@@ -122,6 +122,22 @@ describe("post-cleanup repository shape", () => {
     expect(compiled.some((name) => /^dist\/(domain|tools)\//.test(name))).toBe(false);
     expect(compiled.some((name) => name === "dist/infra/templates/index.html")).toBe(false);
     expect(compiled.some((name) => /^dist\/infra\/(agent-context|ide-opener|preview-server|project-scanner|renderer|session-store|simple-board-store|store|visual-sync-service)\./.test(name))).toBe(false);
+    /*
+     * The compiled canvas client must survive the build.
+     *
+     * `scripts/build.mjs` prunes `dist/infra/templates` by top-level entry name,
+     * and an exact-name check deleted the whole compiled `client/` directory
+     * after `tsc` wrote it. The browser bundle hid that — esbuild reads `src` —
+     * until a test imported a compiled client module and found an empty path.
+     * Skipped when `npm test` runs without a build.
+     */
+    const compiledCanvas = compiled.filter((name) => name.startsWith("dist/infra/templates/"));
+    if (compiledCanvas.length > 0) {
+      for (const module of ["client/canvas-sync.js", "client/sync-state.js", "client/transport.js"]) {
+        expect(compiledCanvas, `build pruned the compiled canvas client: dist/infra/templates/${module}`)
+          .toContain(`dist/infra/templates/${module}`);
+      }
+    }
   });
 
   it("keeps current docs free of deleted tool catalogues and stale active paths", async () => {

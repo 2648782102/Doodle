@@ -62,7 +62,8 @@ src/
 │   └── templates/
 │       ├── excalidraw.html     Excalidraw-only standalone and embedded canvas
 │       ├── excalidraw-app.tsx  canvas entrypoint wiring the React canvas
-│       ├── client/             split client modules (transport, theme, link-policy, banner, library-ui, types)
+│       ├── client/             split client modules (transport, theme, link-policy, banner, library-ui,
+│       │                       sync-state, canvas-sync, types)
 │       └── liquid-glass.ts     per-pane SVG refraction filters for the chrome
 plugins/doodle/                 compatibility manifest, MCP config, skill, assets
 .agents/plugins/                repository-scoped plugin marketplace
@@ -105,6 +106,26 @@ standalone preview → http.ts routes       → write-pipeline → model/* → B
 revision check, so concurrent MCP and HTTP writers cannot interleave. Both
 surfaces record the committed revision in the shared cache, which is what makes
 the delta projection correct regardless of who made the edit.
+
+### Canvas write path
+
+A human gesture does not write immediately: `canvas-sync.ts` holds the finished
+scene for 450 ms so a drag is one write rather than thirty. When the timer fires,
+the frame is projected against the board that exists *then*, not the one that
+existed when the gesture ended, and the diff is computed there. Two failure modes
+have to stay fixed together: dropping the write because someone else landed first
+(the person's drag disappears while the board still looks saved), and re-projecting
+a stale scene (an object the other writer deleted comes back as an addition). The
+provenance board is tracked separately from the newest board for exactly that
+reason — `rebaseScene` drops only the elements that vanished from the newer one,
+and locally created elements are never in the provenance board, so they survive.
+
+`sync-state.ts` turns that into one visible phase — `未保存`, `保存中`, `已保存`,
+`已同步`, `等 Agent`, plus `待处理` and `已断线` — and names the path
+(`本机页面` / `宿主内嵌`). `已同步` is claimed only after `updateModelContext`
+resolves. A rejected write that overlaps another writer raises the conflict
+surface instead of a toast: it names the objects and offers `载入最新` or
+`保留我的`, never an automatic overwrite.
 
 ## MCP surface
 

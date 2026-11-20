@@ -46,8 +46,23 @@ expected.add("infra/templates/excalidraw");
 await fs.mkdir(distDir, { recursive: true });
 await pruneCompiledFiles(distDir, expected);
 await fs.mkdir(targetDir, { recursive: true });
+/*
+ * Prune by *entry*, not by exact file name.
+ *
+ * Compiling `src/infra/templates/client/*.ts` creates a directory in `dist`, and
+ * the previous exact-name check (`expected.has("infra/templates/client")`) was
+ * false, so the whole compiled client tree was deleted after `tsc` produced it.
+ * The browser bundle hid that, because esbuild reads `src`, not `dist` — until a
+ * test imports a compiled client module and finds nothing there. An entry stays
+ * if any expected file lives under it.
+ */
+const expectedEntries = new Set(
+  [...expected]
+    .filter((name) => name.startsWith("infra/templates/"))
+    .map((name) => name.slice("infra/templates/".length).split("/")[0]),
+);
 for (const name of await fs.readdir(targetDir)) {
-  if (!expected.has(`infra/templates/${name}`)) {
+  if (!expectedEntries.has(name)) {
     await fs.rm(path.join(targetDir, name), { recursive: true, force: true });
   }
 }

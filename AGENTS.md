@@ -88,7 +88,8 @@ src/
 │   └── templates/
 │       ├── excalidraw.html     Excalidraw-only standalone and embedded canvas
 │       ├── excalidraw-app.tsx  canvas entrypoint wiring the React canvas
-│       ├── client/             split client modules (transport, theme, link-policy, banner, library-ui, types)
+│       ├── client/             split client modules (transport, theme, link-policy, banner, library-ui,
+│       │                       sync-state, canvas-sync, types)
 │       └── liquid-glass.ts     per-pane SVG refraction filters for the chrome
 plugins/doodle/                 installable Codex plugin source: compatibility manifest, MCP config, skill, assets
 .agents/plugins/                repository-scoped plugin marketplace catalog
