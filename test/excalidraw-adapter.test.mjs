@@ -95,7 +95,18 @@ describe("Doodle to Excalidraw adapter", () => {
     expect(projected.items).toHaveLength(3);
     expect(() => parseBoard(projected)).not.toThrow();
     expect(projected.items[0]).toMatchObject({ id: "ex_rect", title: "标题", text: "正文", groupId: "group_a", role: "step", z: 2 });
-    expect(projected.items[0].scene).toMatchObject({ element: { id: "ex_rect" }, boundText: { id: "ex_rect_text" } });
+    /*
+     * The label is folded into `title`/`text`; the Excalidraw text element is
+     * not stored. It was ~half the item's scene bytes and nothing read it back
+     * — the canvas rebuilds the label from the board object — so keeping it
+     * duplicated data the board already had. Rendering is unchanged, which the
+     * round-trip below pins.
+     */
+    expect(projected.items[0].scene).toMatchObject({ element: { id: "ex_rect" } });
+    expect(projected.items[0].scene).not.toHaveProperty("boundText");
+    const rebuilt = boardItemsToExcalidrawSkeleton(projected.items, "light");
+    const label = rebuilt.find((element) => element.id === "ex_rect_text");
+    expect(label).toMatchObject({ type: "text", containerId: "ex_rect", text: "标题\n正文" });
     expect(projected.items[1]).toMatchObject({ id: "ex_draw", type: "stroke" });
     expect(projected.items[2]).toMatchObject({ id: "ex_arrow", type: "line", startItemId: "ex_rect", endItemId: "ex_draw" });
   });

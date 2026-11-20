@@ -725,7 +725,7 @@ exports[`board model golden contract > produces stable projections for a represe
   "agentView": "3bafedb7fd27a48ced314f5ad3cd6fe96b779fb095248f38bde90414c14e2e65",
   "copyText": "1c918ed0129745903466e65fde42f09a43b28bfa0a65099400f9e6de69f88ac1",
   "digest": "eac531d5d17a650d48a2ca568d4daba29cec1f7a8fa05f434d3915d9dbc4405d",
-  "roundTrip": "ffe273b8063ea36873a4a7aec227c77306496f67d2b7eb754e2d1c35333fd396",
+  "roundTrip": "725dfad40f465e4342d92f3e0a081e3b4dc19890b387ae008a709b8272d0a614",
   "skeleton": "3b6d20617e751f462714b401e81c49ad2c5c8be74ca88dc8aa70ec18b8999bf0",
 }
 `;
