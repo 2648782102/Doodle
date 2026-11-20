@@ -1,0 +1,142 @@
+{
+  "version": 1,
+  "case": "flow/review-loop",
+  "model": "fixture/deterministic",
+  "prompt_hash": "d8d169f7",
+  "tool_desc_hash": "c17ff91a",
+  "started_at": 1795193092636,
+  "duration_ms": 9200,
+  "turns": [
+    {
+      "tool": "get_board",
+      "ok": true,
+      "ms": 10,
+      "bytes": 900
+    },
+    {
+      "tool": "draw_board",
+      "ok": true,
+      "ms": 28,
+      "bytes": 4100
+    }
+  ],
+  "final_board": {
+    "version": 1,
+    "id": "board_mwp7m7ff_9pdstnm4",
+    "title": "和 AI 一起画",
+    "revision": 2,
+    "updatedAt": "2026-11-20T16:44:52.636Z",
+    "items": [
+      {
+        "id": "diagram_frame",
+        "author": "ai",
+        "createdAt": "2026-11-20T16:44:52.635Z",
+        "updatedAt": "2026-11-20T16:44:52.635Z",
+        "type": "rect",
+        "x": 20,
+        "y": 108,
+        "w": 750,
+        "h": 122,
+        "text": "",
+        "color": "#ffffff",
+        "variant": "frame",
+        "role": "frame",
+        "z": 0
+      },
+      {
+        "id": "step_1",
+        "author": "ai",
+        "createdAt": "2026-11-20T16:44:52.635Z",
+        "updatedAt": "2026-11-20T16:44:52.635Z",
+        "type": "rect",
+        "x": 40,
+        "y": 120,
+        "w": 190,
+        "h": 90,
+        "text": "草稿",
+        "color": "#f6d365",
+        "variant": "card",
+        "role": "step",
+        "z": 2,
+        "style": {
+          "fontSize": 15,
+          "textAlign": "center"
+        }
+      },
+      {
+        "id": "step_2",
+        "author": "ai",
+        "createdAt": "2026-11-20T16:44:52.635Z",
+        "updatedAt": "2026-11-20T16:44:52.635Z",
+        "type": "rect",
+        "x": 300,
+        "y": 120,
+        "w": 190,
+        "h": 90,
+        "text": "反馈",
+        "color": "#f6d365",
+        "variant": "card",
+        "role": "step",
+        "z": 2,
+        "style": {
+          "fontSize": 15,
+          "textAlign": "center"
+        }
+      },
+      {
+        "id": "step_3",
+        "author": "ai",
+        "createdAt": "2026-11-20T16:44:52.635Z",
+        "updatedAt": "2026-11-20T16:44:52.635Z",
+        "type": "rect",
+        "x": 560,
+        "y": 120,
+        "w": 190,
+        "h": 90,
+        "text": "修改",
+        "color": "#f6d365",
+        "variant": "card",
+        "role": "step",
+        "z": 2,
+        "style": {
+          "fontSize": 15,
+          "textAlign": "center"
+        }
+      },
+      {
+        "id": "diagram_edge_1",
+        "author": "ai",
+        "createdAt": "2026-11-20T16:44:52.635Z",
+        "updatedAt": "2026-11-20T16:44:52.635Z",
+        "type": "line",
+        "x": 238,
+        "y": 165,
+        "w": 54,
+        "h": 0,
+        "text": "",
+        "color": "#64748b",
+        "shape": "straight",
+        "startItemId": "step_1",
+        "z": 1
+      },
+      {
+        "id": "diagram_edge_2",
+        "author": "ai",
+        "createdAt": "2026-11-20T16:44:52.635Z",
+        "updatedAt": "2026-11-20T16:44:52.635Z",
+        "type": "line",
+        "x": 498,
+        "y": 165,
+        "w": 54,
+        "h": 0,
+        "text": "",
+        "color": "#64748b",
+        "shape": "straight",
+        "startItemId": "step_2",
+        "endItemId": "step_3",
+        "z": 1
+      }
+    ],
+    "notes": []
+  }
+}

@@ -325,3 +325,80 @@ bench/graders/graders.test.mjs 17 条测试
 
 剩下的是 `4.2` 执行器和 `4.3` trace。执行器需要 API key 和成本预算，
 建议先用手工 trace 回放验证报告链路，再接真实模型。
+
+## 10. 第二、三步已落地：trace、报告、执行器
+
+### trace 与报告（无成本，可重复）
+
+```
+bench/trace.mjs         trace 形状 + 校验 + 稳定的短哈希
+bench/report.mjs        判分汇总、失败聚类、两次运行对比
+bench/run-report.mjs    CLI：trace 目录 → Markdown / JSON 报告
+bench/cases/core.json   3 个真实 case
+bench/fixtures/         3 份示例 trace（由真实生成器造板，不调用模型）
+```
+
+报告的样子（对着 fixture 跑出来的真实输出）：
+
+```
+Cases: 3 · pass 33% · mean score 0.83
+
+## Failure clusters
+- edge_f1 — 2/3 cases (sequence 2)
+- node_recall — 1/3 cases (sequence 1)
+- sequence — 1/3 cases (sequence 1)
+
+## Repair behaviour
+1/3 cases saw at least one rejected call and continued.
+These are repair successes, not failures.
+```
+
+「2/3 卡在 edge_f1」直接指向连接线生成，比「平均 0.83」有用得多。
+
+两个刻意的保护：
+
+- **trace 缺 `final_board` 直接报错**，不判成空板。"模型没画"和"记录器丢了板"
+  是两种完全不同的结论，混在一起会污染均值。
+- **prompt 或工具描述变了就拒绝给 delta**，并说明"这应当视为新基线"。
+  否则会打印一个看着很确定、实际不可比的数字。
+
+`1/3 需要重试` 被单独统计为**修复成功率**，不计入失败——模型看到 `ERROR_JSON`
+改对，正是 Doodle 设计目标在起作用。
+
+### 执行器（需要真实模型）
+
+```
+bench/executor.mjs      spawn `codex exec`、解析 JSONL 事件、写 trace
+bench/run-cases.mjs     CLI：跑 case → traces/
+```
+
+执行器本身很薄，但做了三处隔离，每一处都是实测踩出来的：
+
+1. **用临时空目录当工作区**。仓库自己的 `AGENTS.md` 有 48 KB，超过 Codex 的
+   32 KB 项目指令预算，模型会收到截断版并花一个回合去注意这件事——那测的是
+   仓库，不是绘图。
+2. **`--ignore-user-config`**。本机装了一个无关的 doodle 插件，模型会先去读它的
+   skill 文件再调工具。基准必须只看到被测的那个 server。
+3. **每个 case 独立 `OUTPUT_DIR`**，否则 library 的种子板会串味。
+
+### 一个值得记下来的坑
+
+第一次跑批，trace 里 0 次工具调用、0 token，耗时 126 秒。看起来像"模型拒绝作画"。
+
+实际原因是 `codex exec` 会等 stdin EOF 才发 prompt，而 `spawn` 用了
+`stdio: "ignore"`，描述符永远不到 EOF，于是挂到超时。
+
+修法是把 stdin 改成 `pipe` 然后立即 `end()`。同时加了一条守卫：
+**没有工具调用且没有 usage 的 session 一律判为失败并说明原因**，
+因为它只可能意味着请求没到达模型（网络/鉴权），而不是模型什么都没画。
+这条守卫让"环境坏了"和"模型不行"在报告里永远不会混为一谈。
+
+### 当前状态
+
+`bench/graders` 17 条 + `bench/report` 15 条 + `bench/executor` 7 条测试，
+共 39 条，全部不需要模型。真实跑批需要能访问模型的网络环境：
+
+```
+node bench/run-cases.mjs                 # 跑全部 case
+node bench/run-report.mjs bench/runs/<时间戳>
+```

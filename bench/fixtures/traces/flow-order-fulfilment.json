@@ -1,0 +1,233 @@
+{
+  "version": 1,
+  "case": "flow/order-fulfilment",
+  "model": "fixture/deterministic",
+  "prompt_hash": "d8d169f7",
+  "tool_desc_hash": "c17ff91a",
+  "started_at": 1795193092635,
+  "duration_ms": 18400,
+  "turns": [
+    {
+      "tool": "get_board",
+      "ok": true,
+      "ms": 11,
+      "bytes": 1200
+    },
+    {
+      "tool": "draw_board",
+      "ok": false,
+      "ms": 8,
+      "bytes": 340,
+      "error": {
+        "code": "BATCH_TOO_LARGE",
+        "path": "items"
+      }
+    },
+    {
+      "tool": "draw_board",
+      "ok": true,
+      "ms": 34,
+      "bytes": 5200
+    },
+    {
+      "tool": "get_board",
+      "ok": true,
+      "ms": 9,
+      "bytes": 4300
+    }
+  ],
+  "final_board": {
+    "version": 1,
+    "id": "board_mwp7m7fe_scqbsfly",
+    "title": "和 AI 一起画",
+    "revision": 1,
+    "updatedAt": "2026-11-20T16:44:52.635Z",
+    "items": [
+      {
+        "id": "diagram_frame",
+        "author": "ai",
+        "createdAt": "2026-11-20T16:44:52.634Z",
+        "updatedAt": "2026-11-20T16:44:52.634Z",
+        "type": "rect",
+        "x": 20,
+        "y": 108,
+        "w": 1270,
+        "h": 122,
+        "text": "",
+        "color": "#ffffff",
+        "variant": "frame",
+        "role": "frame",
+        "z": 0
+      },
+      {
+        "id": "step_1",
+        "author": "ai",
+        "createdAt": "2026-11-20T16:44:52.634Z",
+        "updatedAt": "2026-11-20T16:44:52.634Z",
+        "type": "rect",
+        "x": 40,
+        "y": 120,
+        "w": 190,
+        "h": 90,
+        "text": "下单",
+        "color": "#f6d365",
+        "variant": "card",
+        "role": "step",
+        "z": 2,
+        "style": {
+          "fontSize": 15,
+          "textAlign": "center"
+        }
+      },
+      {
+        "id": "step_2",
+        "author": "ai",
+        "createdAt": "2026-11-20T16:44:52.634Z",
+        "updatedAt": "2026-11-20T16:44:52.634Z",
+        "type": "rect",
+        "x": 300,
+        "y": 120,
+        "w": 190,
+        "h": 90,
+        "text": "校验",
+        "color": "#f6d365",
+        "variant": "card",
+        "role": "step",
+        "z": 2,
+        "style": {
+          "fontSize": 15,
+          "textAlign": "center"
+        }
+      },
+      {
+        "id": "step_3",
+        "author": "ai",
+        "createdAt": "2026-11-20T16:44:52.634Z",
+        "updatedAt": "2026-11-20T16:44:52.634Z",
+        "type": "rect",
+        "x": 560,
+        "y": 120,
+        "w": 190,
+        "h": 90,
+        "text": "拣货",
+        "color": "#f6d365",
+        "variant": "card",
+        "role": "step",
+        "z": 2,
+        "style": {
+          "fontSize": 15,
+          "textAlign": "center"
+        }
+      },
+      {
+        "id": "step_4",
+        "author": "ai",
+        "createdAt": "2026-11-20T16:44:52.634Z",
+        "updatedAt": "2026-11-20T16:44:52.634Z",
+        "type": "rect",
+        "x": 820,
+        "y": 120,
+        "w": 190,
+        "h": 90,
+        "text": "发货",
+        "color": "#f6d365",
+        "variant": "card",
+        "role": "step",
+        "z": 2,
+        "style": {
+          "fontSize": 15,
+          "textAlign": "center"
+        }
+      },
+      {
+        "id": "step_5",
+        "author": "ai",
+        "createdAt": "2026-11-20T16:44:52.634Z",
+        "updatedAt": "2026-11-20T16:44:52.634Z",
+        "type": "rect",
+        "x": 1080,
+        "y": 120,
+        "w": 190,
+        "h": 90,
+        "text": "签收",
+        "color": "#f6d365",
+        "variant": "card",
+        "role": "step",
+        "z": 2,
+        "style": {
+          "fontSize": 15,
+          "textAlign": "center"
+        }
+      },
+      {
+        "id": "diagram_edge_1",
+        "author": "ai",
+        "createdAt": "2026-11-20T16:44:52.634Z",
+        "updatedAt": "2026-11-20T16:44:52.634Z",
+        "type": "line",
+        "x": 238,
+        "y": 165,
+        "w": 54,
+        "h": 0,
+        "text": "",
+        "color": "#64748b",
+        "shape": "straight",
+        "startItemId": "step_1",
+        "endItemId": "step_2",
+        "z": 1
+      },
+      {
+        "id": "diagram_edge_2",
+        "author": "ai",
+        "createdAt": "2026-11-20T16:44:52.634Z",
+        "updatedAt": "2026-11-20T16:44:52.634Z",
+        "type": "line",
+        "x": 498,
+        "y": 165,
+        "w": 54,
+        "h": 0,
+        "text": "",
+        "color": "#64748b",
+        "shape": "straight",
+        "startItemId": "step_2",
+        "endItemId": "step_3",
+        "z": 1
+      },
+      {
+        "id": "diagram_edge_3",
+        "author": "ai",
+        "createdAt": "2026-11-20T16:44:52.634Z",
+        "updatedAt": "2026-11-20T16:44:52.634Z",
+        "type": "line",
+        "x": 758,
+        "y": 165,
+        "w": 54,
+        "h": 0,
+        "text": "",
+        "color": "#64748b",
+        "shape": "straight",
+        "startItemId": "step_3",
+        "endItemId": "step_4",
+        "z": 1
+      },
+      {
+        "id": "diagram_edge_4",
+        "author": "ai",
+        "createdAt": "2026-11-20T16:44:52.634Z",
+        "updatedAt": "2026-11-20T16:44:52.634Z",
+        "type": "line",
+        "x": 1018,
+        "y": 165,
+        "w": 54,
+        "h": 0,
+        "text": "",
+        "color": "#64748b",
+        "shape": "straight",
+        "startItemId": "step_4",
+        "endItemId": "step_5",
+        "z": 1
+      }
+    ],
+    "notes": []
+  }
+}
