@@ -14,7 +14,10 @@ const glassSource = [
   await readFile(path.join(root, "src", "infra", "templates", "liquid-glass.ts"), "utf8"),
   await readFile(path.join(root, "src", "infra", "templates", "liquid-glass-maps.ts"), "utf8"),
 ].join("\n");
-const appSource = await readFile(path.join(root, "src", "infra", "templates", "excalidraw-app.tsx"), "utf8");
+const appSource = [
+  await readFile(path.join(root, "src", "infra", "templates", "excalidraw-app.tsx"), "utf8"),
+  await readFile(path.join(root, "src", "infra", "templates", "client", "theme.ts"), "utf8"),
+].join("\n");
 
 function alphaOf(token) {
   const match = new RegExp(`--${token}:\\s*rgba\\(\\s*\\d+,\\s*\\d+,\\s*\\d+,\\s*([\\d.]+)\\s*\\)`).exec(template);

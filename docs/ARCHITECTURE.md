@@ -35,6 +35,8 @@ src/
 │   │   ├── tools.ts            composition only
 │   │   └── tools/              one module per tool
 │   ├── http/                   local API surface
+│   │   ├── conflict.ts         object-level conflict detection and 409 payload
+│   │   ├── security.ts         loopback Host/Origin and asset path boundary guards
 │   │   └── templates.ts        canvas template lookup and token substitution
 │   ├── library/                named board snapshots
 │   │   ├── schema.ts           index shape and strict validation
@@ -43,6 +45,7 @@ src/
 │   ├── excalidraw-adapter.ts   public barrel over canvas/
 │   ├── library.ts              public barrel over library/
 │   ├── store.ts                atomic board.json persistence and revision sync
+│   ├── write-pipeline.ts       shared MCP/HTTP write commit, merge, and guard pipeline
 │   ├── errors.ts               revision-conflict and empty-write errors
 │   ├── mutex.ts                cross-process board write lock
 │   ├── project-scan.ts         bounded read-only workspace path/evidence scan
@@ -58,7 +61,8 @@ src/
 │   ├── version.ts              package version read
 │   └── templates/
 │       ├── excalidraw.html     Excalidraw-only standalone and embedded canvas
-│       ├── excalidraw-app.tsx  canvas client: board sync, library, exports, theme
+│       ├── excalidraw-app.tsx  canvas entrypoint wiring the React canvas
+│       ├── client/             split client modules (transport, theme, link-policy, banner, library-ui, types)
 │       └── liquid-glass.ts     per-pane SVG refraction filters for the chrome
 plugins/doodle/                 compatibility manifest, MCP config, skill, assets
 .agents/plugins/                repository-scoped plugin marketplace
@@ -82,20 +86,16 @@ historical import paths working. They are re-export lists, not implementation;
 `scripts/repo-check.mjs` fails if a barrel grows past 120 lines or if the
 deleted `tools.ts` monolith returns.
 
-No `src/board` module may exceed 450 lines. The check reports the offending
-file, so a growing module is a review signal rather than something to discover
-later. The frontend templates under `src/infra/templates/` are outside that
-guard — `excalidraw-app.tsx` is already over 1000 lines — so treat them as the
-known remainder of the same rule rather than as exempt.
+No TypeScript module under `src/` (including `src/board/` and `src/infra/templates/`) may exceed 450 lines. `test/cleanup.test.mjs` reports the offending file so a growing module is a review signal rather than something to discover later.
 
 ## Request flows
 
-Three entry points converge on the same model and store:
+Three entry points converge on the same write pipeline (`src/board/write-pipeline.ts`), model, and store:
 
 ```text
-MCP tool call      → mcp/tools/*          → model/* → BoardStore → board.json
-browser canvas     → http.ts routes       → model/* → BoardStore → board.json
-standalone preview → http.ts routes       → model/* → BoardStore → board.json
+MCP tool call      → mcp/tools/*          → write-pipeline → model/* → BoardStore → board.json
+browser canvas     → http.ts routes       → write-pipeline → model/* → BoardStore → board.json
+standalone preview → http.ts routes       → write-pipeline → model/* → BoardStore → board.json
                                 ↓
                         revision cache ──→ get_board(since_revision) delta
                         WebSocket      ──→ canvas reload

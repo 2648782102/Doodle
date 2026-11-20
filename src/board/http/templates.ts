@@ -18,6 +18,7 @@ export function excalidrawTemplateCandidates(config: AppConfig): string[] {
   return [
     path.resolve(config.cwd, "server", "infra", "templates", "excalidraw.html"),
     path.resolve(config.cwd, "infra", "templates", "excalidraw.html"),
+    path.resolve(sourceDir, "infra", "templates", "excalidraw.html"),
     path.resolve(sourceDir, "../../../../infra/templates/excalidraw.html"),
     path.resolve(sourceDir, "../../../../src/infra/templates/excalidraw.html"),
     path.resolve(sourceDir, "../infra/templates/excalidraw.html"),
@@ -30,6 +31,7 @@ export function assetCandidates(config: AppConfig): string[] {
   return [
     path.resolve(config.cwd, "server", "infra", "templates", "excalidraw"),
     path.resolve(config.cwd, "infra", "templates", "excalidraw"),
+    path.resolve(sourceDir, "infra", "templates", "excalidraw"),
     path.resolve(sourceDir, "../../../../infra/templates/excalidraw"),
     path.resolve(sourceDir, "../../../../src/infra/templates/excalidraw"),
     path.resolve(sourceDir, "../infra/templates/excalidraw"),

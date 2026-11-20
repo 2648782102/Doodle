@@ -55,10 +55,8 @@ for (const name of ["excalidraw.html"]) {
   await fs.copyFile(path.join(sourceDir, name), path.join(targetDir, name));
 }
 await fs.copyFile(path.join(sourceDir, "excalidraw.html"), path.join(targetDir, "board.html"));
+await fs.rm(excalidrawTargetDir, { recursive: true, force: true });
 await fs.mkdir(excalidrawTargetDir, { recursive: true });
-for (const name of await fs.readdir(excalidrawTargetDir)) {
-  await fs.rm(path.join(excalidrawTargetDir, name), { recursive: true, force: true });
-}
 await fs.copyFile(path.join(excalidrawProdDir, "index.css"), path.join(excalidrawTargetDir, "index.css"));
 const skipXiaolai = await unusedXiaolaiSubsets(excalidrawProdDir);
 await fs.cp(path.join(excalidrawProdDir, "fonts"), path.join(excalidrawTargetDir, "fonts"), {
@@ -81,6 +79,36 @@ const excalidrawBundle = await bundle({
   conditions: ["production"],
   write: false,
   define: { "process.env.NODE_ENV": '"production"' },
+  plugins: [{
+    name: "doodle-prune-unused-excalidraw-chunks",
+    setup(build) {
+      /*
+       * Doodle pins `langCode: "zh-CN"` and hides Excalidraw's Mermaid/AI
+       * generation tools (`aiEnabled: false`, Mermaid menu stripped). Stubbing
+       * `@excalidraw/mermaid-to-excalidraw` and unused locale chunks at bundle
+       * time eliminates ~60 unused chunks and cuts the Mermaid/Chevrotain/
+       * lodash-es/KaTeX transitive tree completely out of the shipped browser
+       * bundle, while keeping `zh-CN` and `en` intact.
+       */
+      build.onResolve({ filter: /^@excalidraw\/mermaid-to-excalidraw$/ }, () => ({
+        path: "doodle-stub:mermaid-to-excalidraw",
+        namespace: "doodle-stub",
+      }));
+      build.onLoad({ filter: /^doodle-stub:mermaid-to-excalidraw$/, namespace: "doodle-stub" }, () => ({
+        contents: `export async function parseMermaidToExcalidraw() { throw new Error("Mermaid import is disabled in Doodle"); }`,
+        loader: "js",
+      }));
+      build.onResolve({ filter: /^\.\/locales\/.+\.(?:json|js)$/ }, (args) => {
+        if (!args.importer.includes("@excalidraw")) return null;
+        if (/\/(?:en|zh-CN)(?:-[A-Z0-9]+)?\.(?:json|js)$/i.test(args.path)) return null;
+        return { path: `doodle-stub:${args.path}`, namespace: "doodle-stub" };
+      });
+      build.onLoad({ filter: /^doodle-stub:\.\/locales\//, namespace: "doodle-stub" }, () => ({
+        contents: "export default {};",
+        loader: "js",
+      }));
+    },
+  }],
 });
 for (const file of excalidrawBundle.outputFiles) {
   await fs.writeFile(file.path, file.contents);

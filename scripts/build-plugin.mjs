@@ -8,22 +8,25 @@ const sourceDir = path.join(root, "plugins", "doodle");
 const targetDir = path.join(root, ".doodle-plugin", "doodle");
 const serverDir = path.join(targetDir, "server");
 const serverTemplateDir = path.join(serverDir, "infra", "templates");
-const rootTemplateDir = path.join(targetDir, "infra", "templates");
 const distTemplateDir = path.join(root, "dist", "infra", "templates");
 const packageJson = JSON.parse(await fs.readFile(path.join(root, "package.json"), "utf8"));
 
 await fs.rm(targetDir, { recursive: true, force: true });
 await fs.mkdir(serverTemplateDir, { recursive: true });
-await fs.mkdir(rootTemplateDir, { recursive: true });
 await fs.cp(sourceDir, targetDir, { recursive: true });
 
+/*
+ * Ship one copy of the canvas template and Excalidraw assets under
+ * `server/infra/templates/` next to `server/index.mjs`. Previously the same
+ * ~18.5 MB tree was copied into both `server/infra/templates/` and
+ * `infra/templates/`, doubling the plugin package and submission ZIP for no
+ * runtime benefit (`templates.ts` resolves relative to `server/index.mjs`).
+ */
 for (const name of ["board.html", "excalidraw.html"]) {
   const source = path.join(distTemplateDir, name);
   await fs.copyFile(source, path.join(serverTemplateDir, name));
-  await fs.copyFile(source, path.join(rootTemplateDir, name));
 }
 await fs.cp(path.join(distTemplateDir, "excalidraw"), path.join(serverTemplateDir, "excalidraw"), { recursive: true });
-await fs.cp(path.join(distTemplateDir, "excalidraw"), path.join(rootTemplateDir, "excalidraw"), { recursive: true });
 
 await build({
   entryPoints: [path.join(root, "src", "index.ts")],

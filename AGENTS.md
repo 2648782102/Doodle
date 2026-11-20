@@ -87,7 +87,8 @@ src/
 │   ├── version.ts              package version lookup
 │   └── templates/
 │       ├── excalidraw.html     Excalidraw-only standalone and embedded canvas
-│       ├── excalidraw-app.tsx  canvas client: board sync, library, exports, theme
+│       ├── excalidraw-app.tsx  canvas entrypoint wiring the React canvas
+│       ├── client/             split client modules (transport, theme, link-policy, banner, library-ui, types)
 │       └── liquid-glass.ts     per-pane SVG refraction filters for the chrome
 plugins/doodle/                 installable Codex plugin source: compatibility manifest, MCP config, skill, assets
 .agents/plugins/                repository-scoped plugin marketplace catalog
@@ -102,7 +103,8 @@ docs/                           product, architecture, decisions, and maintenanc
 
 - Dependencies point inward: `model/` knows nothing about `diagram/`, `layout/`, `canvas/`, `mcp/`, `http/`, filesystem, or Express. Transport layers may read `model/`; `model/` must never import them. Add code to the layer that owns the concern rather than to whichever file is convenient.
 - `types.ts`, `excalidraw-adapter.ts`, and `library.ts` are barrels for compatibility, not implementation. Put new code in `model/`, `canvas/`, or `library/` and re-export only what other packages need. `scripts/repo-check.mjs` fails if a barrel exceeds 120 lines or if `src/board/tools.ts` returns.
-- No `src/board` module may exceed 450 lines; `test/cleanup.test.mjs` reports the offending file. The frontend templates under `src/infra/templates/` sit outside that guard (`excalidraw-app.tsx` is already over 1000 lines), so a split there is neither enforced nor blocked — treat it as outstanding work, not permission to grow. Splitting by direction or responsibility is preferred over growing a file, and the split must keep the golden model snapshot unchanged unless the new behaviour is intentional.
+- No TypeScript module under `src/` (including `src/board/` and `src/infra/templates/`) may exceed 450 lines; `test/cleanup.test.mjs` reports the offending file. Splitting by direction or responsibility is preferred over growing a file, and the split must keep the golden model snapshot unchanged unless the new behaviour is intentional.
+- MCP and HTTP writes share one commit pipeline (`src/board/write-pipeline.ts`: `commitBoardWrite`). Keep empty-write protection, optimistic conflict checks, cross-board base checks, and revision-cache recording inside that module instead of duplicating them per transport.
 - `test/golden-model.test.mjs` freezes the model contract: projections, every layout mode, every diagram mode, and the long-flow property. A refactor that changes output must update the snapshot in the same commit so the diff documents it.
 - stdout is reserved for MCP JSON-RPC. All logs and diagnostics go to stderr.
 - Tool names are `snake_case`; TypeScript files are `kebab-case`; registration functions are `registerXxx`.
