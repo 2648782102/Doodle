@@ -109,10 +109,12 @@ describe.skipIf(!hasTemplate)("canvas first paint", () => {
     expect(html).not.toMatch(/id="doodleSyncState"[^>]*hidden/);
     // The two choices are built at runtime; esbuild escapes non-ASCII in the
     // minified chunk, so assert them where they are authored rather than in bytes.
-    const app = await fs.readFile(path.join(root, "src", "infra", "templates", "excalidraw-app.tsx"), "utf8");
-    expect(app).toContain("载入最新");
-    expect(app).toContain("保留我的");
-    expect(app).toContain("REVISION_CONFLICT_OBJECTS");
+    // The two choices moved to `client/write-recovery.ts` when the entrypoint
+    // was split; assert them where they are authored now.
+    const recovery = await fs.readFile(path.join(root, "src", "infra", "templates", "client", "write-recovery.ts"), "utf8");
+    expect(recovery).toContain("载入最新");
+    expect(recovery).toContain("保留我的");
+    expect(recovery).toContain("REVISION_CONFLICT_OBJECTS");
   });
 
   it("serves the same shell to the plugin and the standalone page", async () => {

@@ -61,6 +61,23 @@ export async function readTemplate(config: AppConfig): Promise<string | undefine
   return text;
 }
 
+/**
+ * Read one file that sits beside the canvas template (currently `sw.js`).
+ *
+ * The service worker has to be served from the origin root but has no public/
+ * directory to live in — the plugin bundle ships only `infra/templates`. So it
+ * is resolved against the same candidate roots as the template itself, and
+ * deliberately not cached: a stale worker would pin every future load to old
+ * fetch logic.
+ */
+export async function readAsset(config: AppConfig, name: string): Promise<string | undefined> {
+  const pathname = path.basename(name);
+  const candidates = excalidrawTemplateCandidates(config).map((file) => path.join(path.dirname(file), pathname));
+  const found = await findExisting(candidates);
+  if (!found) return undefined;
+  return fs.readFile(found, "utf8").catch(() => undefined);
+}
+
 interface ResolvedTemplate {
   path: string;
   mtimeMs: number;

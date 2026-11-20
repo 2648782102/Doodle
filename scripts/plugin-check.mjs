@@ -25,7 +25,15 @@ const buildScript = await read("scripts/build-plugin.mjs");
 const pluginCheckScript = await read("scripts/plugin-check.mjs");
 const appBundle = await read(".doodle-plugin/doodle/server/infra/templates/excalidraw/excalidraw-app.js");
 const excalidrawTemplate = await read(".doodle-plugin/doodle/server/infra/templates/excalidraw.html");
-const httpSource = await read("src/board/http/server.ts");
+/*
+ * The HTTP surface is two files: `server.ts` (lifecycle) and `routes.ts` (the
+ * route table). Read them together so a route moving between them cannot make
+ * this guard pass or fail for the wrong reason.
+ */
+const httpSource = [
+  await read("src/board/http/server.ts"),
+  await read("src/board/http/routes.ts"),
+].join("\n");
 const httpTemplates = await read("src/board/http/templates.ts");
 /*
  * Tool surface is one module per tool after the refactor. Read them together so

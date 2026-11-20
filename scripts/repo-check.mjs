@@ -40,6 +40,7 @@ const excalidrawApp = (await Promise.all([
   read("src/infra/templates/client/canvas-sync.ts"),
 ])).join("\n");
 const canvasTransport = await read("src/infra/templates/client/transport.ts");
+const writeRecovery = await read("src/infra/templates/client/write-recovery.ts");
 const writePipeline = await read("src/board/write/commit.ts");
 const boardIndex = await read("src/board/index.ts");
 /*
@@ -93,7 +94,17 @@ const liquidGlass = [
   await read("src/infra/templates/liquid-glass.ts"),
   await read("src/infra/templates/liquid-glass-maps.ts"),
 ].join("\n");
-const http = await read("src/board/http/server.ts");
+/*
+ * The HTTP surface is two files now: `server.ts` owns lifecycle (listen, adopt,
+ * single-instance record) and `http/routes.ts` owns the route table. A guard that
+ * inspected only one of them would pass while the other lost its contract, so
+ * every check below reads both.
+ */
+const http = [
+  await read("src/board/http/server.ts"),
+  await read("src/board/http/routes.ts"),
+  await read("src/board/http/snapshot.ts"),
+].join("\n");
 const scanner = await read("src/board/project/scan.ts");
 const boardStore = await read("src/board/state/store.ts");
 const mutex = await read("src/board/state/mutex.ts");
@@ -757,8 +768,10 @@ check(
 );
 check(
   excalidrawTemplate.includes('id="doodleConflictNotice"') &&
-  excalidrawApp.includes("showConflictNotice") &&
-  excalidrawApp.includes("REVISION_CONFLICT_OBJECTS"),
+  // The recovery surface moved to `client/write-recovery.ts` when the
+  // entrypoint was split; assert it where it is authored now.
+  writeRecovery.includes("showConflictNotice") &&
+  writeRecovery.includes("REVISION_CONFLICT_OBJECTS"),
   "a write conflict is back to a disappearing toast with no object-level summary and no recovery choice",
 );
 check(
@@ -949,7 +962,7 @@ check(
 );
 check(await exists("plugins/doodle/skills/doodle/SKILL.md") && await exists("scripts/build-plugin.mjs") && await exists("scripts/plugin-check.mjs"), "plugin packaging files are incomplete");
 check(
-  totalSourceFiles.length >= 25 && totalSourceFiles.length <= 80,
+  totalSourceFiles.length >= 25 && totalSourceFiles.length <= 95,
   `src has ${totalSourceFiles.length} TypeScript modules; expected a modular but bounded tree`,
 );
 check(

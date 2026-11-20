@@ -24,8 +24,10 @@ export type SyncPhase =
   | "awaiting-agent"
   /** Some objects collided with a concurrent write and need a decision. */
   | "conflict"
-  /** The live channel is down; further changes will not be saved. */
-  | "offline";
+  /** The live channel is down; edits are held locally and sent on reconnect. */
+  | "offline"
+  /** The live channel is down for good; edits can no longer be saved. */
+  | "detached";
 
 export type SyncChannel = "standalone" | "mcp-app";
 
@@ -53,7 +55,9 @@ export type SyncEvent =
   | "notified"
   | "conflict"
   | "offline"
-  | "online";
+  | "online"
+  /** Reconnect attempts are exhausted; the board cannot be written to again. */
+  | "detached";
 
 const PHASE_VIEWS: Record<SyncPhase, SyncPhaseView> = {
   idle: { label: "就绪", detail: "画板已载入", tone: "neutral" },
@@ -63,7 +67,8 @@ const PHASE_VIEWS: Record<SyncPhase, SyncPhaseView> = {
   synced: { label: "已同步", detail: "当前画板已同步到宿主对话上下文", tone: "ok" },
   "awaiting-agent": { label: "等 Agent", detail: "已通知 Agent 读取画板", tone: "busy" },
   conflict: { label: "待处理", detail: "部分对象与别处的改动冲突，需要选择保留哪一份", tone: "alert" },
-  offline: { label: "已断线", detail: "与画板的连接断开，重连前的新改动不会保存", tone: "warn" },
+  offline: { label: "离线", detail: "与画板的连接断开，改动暂存在本机，恢复后自动提交", tone: "warn" },
+  detached: { label: "已断开", detail: "画板进程已结束，画布显示上次的内容；请重新打开画板以继续保存", tone: "alert" },
 };
 
 export function syncPhaseView(phase: SyncPhase): SyncPhaseView {
@@ -97,9 +102,12 @@ export function syncPhaseAfter(phase: SyncPhase, event: SyncEvent): SyncPhase {
     case "conflict":
       return "conflict";
     case "offline":
-      return "offline";
+      // A conflict outranks a disconnect: it still needs a decision.
+      return phase === "conflict" ? "conflict" : "offline";
     case "online":
-      return phase === "offline" ? "saved" : phase;
+      return phase === "offline" || phase === "detached" ? "saved" : phase;
+    case "detached":
+      return "detached";
     default:
       return phase;
   }

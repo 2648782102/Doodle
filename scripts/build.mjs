@@ -148,6 +148,28 @@ for (const file of excalidrawBundle.outputFiles) {
 console.log(`📦 Bundled Excalidraw engine (${excalidrawBundle.outputFiles.reduce((size, file) => size + file.contents.length, 0)} bytes)`);
 console.log("✅ Copied Excalidraw-only board template");
 
+/*
+ * The service worker is bundled, not copied.
+ *
+ * `tsc` emits it under `dist/infra/templates/sw.js`, which is where the server
+ * resolves it from, but a raw tsc emit would keep the `self.addEventListener`
+ * types untranspiled against the DOM lib. One small esbuild pass targets the
+ * worker scope explicitly and gives the server a plain ES2022 script to serve.
+ */
+const serviceWorker = await bundle({
+  entryPoints: [path.join(sourceDir, "sw.ts")],
+  bundle: true,
+  format: "iife",
+  platform: "browser",
+  target: "es2022",
+  minify: true,
+  write: false,
+});
+for (const file of serviceWorker.outputFiles) {
+  await fs.writeFile(path.join(targetDir, "sw.js"), file.contents);
+}
+console.log(`📴 Bundled offline shell (${serviceWorker.outputFiles.reduce((size, file) => size + file.contents.length, 0)} bytes)`);
+
 /**
  * Xiaolai is Excalidraw's Chinese fallback font, shipped as ~205 unicode-range
  * subsets. Browsers download only the subsets matching the characters on the

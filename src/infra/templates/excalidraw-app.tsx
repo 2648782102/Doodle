@@ -18,14 +18,18 @@ import {
   clearConflictNotice,
   clearError,
   initWelcome,
+  showConnectionNotice,
   showConflictNotice,
   showError,
 } from "./client/banner.js";
 import { createCanvasSync, type CanvasSync, type CanvasSyncOutcome, type SceneElement } from "./client/canvas-sync.js";
 import { stableStringify } from "../../board/model/fingerprint.js";
+import { browserBoardCache } from "./client/board-cache.js";
+import { planBoot, reconcileBoot, registerOfflineShell } from "./client/boot-source.js";
 import { initLibraryUi, initSnapshotExports } from "./client/library-ui.js";
 import { initExternalLinkPolicy, isDoodleProjectLink } from "./client/link-policy.js";
 import { createSyncChip } from "./client/sync-state.js";
+import { presentWriteFailure } from "./client/write-recovery.js";
 import {
   EXCALIDRAW_THEME,
   canvasColors,
@@ -57,6 +61,7 @@ const embedded = Boolean((window as unknown as { DOODLE_MCP_APP_EMBEDDED?: boole
 const transport = createBoardTransport({
   embedded,
   panelToken: window.DOODLE_EXCALIDRAW_TOKEN ?? "",
+  cache: browserBoardCache(),
 });
 /** The one visible answer to "is this saved, and did the agent see it?". */
 const status = createSyncChip(transport.channel);
@@ -170,37 +175,13 @@ function applyRemoteSnapshot(data: BoardSnapshot, options: { repaint?: boolean }
   publishToHost(data);
 }
 
-/** A rejected write, with the recovery path the person actually needs. */
 function handleWriteError(error: unknown, retry: () => Promise<CanvasSyncOutcome>): void {
-  const conflict = error instanceof BoardWriteError && error.code === "REVISION_CONFLICT_OBJECTS"
-    ? error
-    : null;
-  const ids = conflict?.conflicts ?? [];
-  if (!conflict) {
-    status.send("local-edit");
-    showError(error);
-    return;
-  }
-  status.send("conflict");
-  const named = ids.slice(0, 3).join("、");
-  showConflictNotice(
-    ids.length
-      ? `有 ${ids.length} 个对象在此同时被别处改动：${named}${ids.length > 3 ? " 等" : ""}。这次改动还没保存。`
-      : "有对象在此同时被别处改动，这次改动还没保存。",
-    [
-      {
-        label: "载入最新",
-        tone: "primary",
-        run: async () => {
-          const latest = await transport.loadBoard().catch(() => null);
-          if (latest) applyRemoteSnapshot(latest);
-          clearConflictNotice();
-          status.send("saved");
-        },
-      },
-      { label: "保留我的", tone: "danger", run: async () => { await retry(); } },
-    ],
-  );
+  presentWriteFailure(error, {
+    status,
+    loadLatest: () => transport.loadBoard().catch(() => null),
+    applyRemote: (snapshot) => applyRemoteSnapshot(snapshot),
+    retry,
+  });
 }
 
 function CanvasApp({ initial }: { initial: BoardSnapshot }) {
@@ -401,10 +382,38 @@ function renderCanvas(initial: BoardSnapshot): void {
 async function start(): Promise<void> {
   const root = document.querySelector("#excalidrawRoot");
   if (!root || embedded || rootInstance) return;
-  const initial = await transport.loadBoard();
-  renderCanvas(initial);
-  status.send("loaded");
-  if (!embedded) initWelcome(initial);
+  // Paint local first, then reconcile — see `client/boot-source.ts` for why.
+  const plan = planBoot(await transport.restoreBoard().catch(() => null));
+  const cached = plan.kind === "cache-first" ? plan.cached : null;
+  if (plan.kind === "cache-first") {
+    renderCanvas(plan.cached);
+    status.send("loaded");
+    if (!embedded) initWelcome(plan.cached);
+  }
+  let remote: BoardSnapshot | null = null;
+  try {
+    remote = await transport.loadBoard();
+  } catch (error) {
+    if (!cached) throw error;
+    remote = null;
+  }
+  const outcome = reconcileBoot(cached, remote);
+  switch (outcome.kind) {
+    case "replace":
+      renderCanvas(outcome.snapshot);
+      status.send("loaded");
+      if (!embedded && !cached) initWelcome(outcome.snapshot);
+      return;
+    case "keep-cached":
+      return;
+    case "detached":
+      // The board is still readable locally; only the live channel is gone.
+      status.send("detached");
+      showConnectionNotice("画板服务已结束，当前显示的是上次保存的内容。重新打开画板即可继续。");
+      return;
+    case "failed":
+      throw new Error("Board is unavailable");
+  }
 }
 
 window.DoodleExcalidrawInit = (snapshot, mcpApp) => {
@@ -414,6 +423,7 @@ window.DoodleExcalidrawInit = (snapshot, mcpApp) => {
 };
 
 if (document.querySelector("#excalidrawRoot")) {
+  registerOfflineShell(embedded);
   initThemeToggle(() => glassController);
   initExternalLinkPolicy();
   initLibraryUi({
@@ -433,6 +443,7 @@ if (document.querySelector("#excalidrawRoot")) {
     isBusy: () => applyingRemote.current || isEditing(currentAppState.current),
     onSnapshot: (data) => applyRemoteSnapshot(data),
     onOfflineChange: (offline) => status.send(offline ? "offline" : "online"),
+    onDetached: () => status.send("detached"),
   }).catch(() => {});
   void start().catch((error) => showError(error));
 }

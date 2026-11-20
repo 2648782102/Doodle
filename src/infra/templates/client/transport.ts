@@ -11,6 +11,7 @@ import { App } from "@modelcontextprotocol/ext-apps";
 import { buildBoardModelContext } from "../../../board/view/app-context.js";
 import { diffBoardItems, isEmptyDiff } from "../../../board/model/diff.js";
 import { showConnectedNotice, showConnectionNotice, showError } from "./banner.js";
+import type { BoardCache } from "./board-cache.js";
 import type { SyncChannel } from "./sync-state.js";
 import type { BoardSnapshot, McpAppFallback } from "./types.js";
 
@@ -84,6 +85,14 @@ export interface BoardTransport {
   /** Which path this canvas is on, stated rather than inferred by a person. */
   readonly channel: SyncChannel;
   loadBoard(): Promise<BoardSnapshot>;
+  /**
+   * The last board this browser saw, before any network call.
+   *
+   * A boot asks for this first so the canvas paints something immediately and
+   * still paints *something* when the session that hosted it is gone. The
+   * caller decides whether the remote copy is newer.
+   */
+  restoreBoard(): Promise<BoardSnapshot | null>;
   syncBoard(next: unknown[], base: BoardSnapshot): Promise<BoardSnapshot>;
   libraryRequest(action: Record<string, unknown>, expectedRevision: number): Promise<Record<string, unknown>>;
   /** True when the snapshot reached the host model context. */
@@ -94,6 +103,8 @@ export interface BoardTransport {
     isBusy: () => boolean;
     onSnapshot: (snapshot: BoardSnapshot) => void;
     onOfflineChange?: (offline: boolean) => void;
+    /** Reconnect attempts are exhausted; the canvas can no longer save. */
+    onDetached?: () => void;
   }): Promise<void>;
 }
 
@@ -110,6 +121,8 @@ function writeError(payload: { error?: unknown; message?: unknown; code?: unknow
 export function createBoardTransport(options: {
   embedded: boolean;
   panelToken: string;
+  /** Local copy of the board. Absent in tests that do not exercise persistence. */
+  cache?: BoardCache;
 }): BoardTransport {
   const headers = { "Content-Type": "application/json", "X-AI-Draw-Token": options.panelToken };
   const hostApp = options.embedded
@@ -118,6 +131,17 @@ export function createBoardTransport(options: {
   let activeMcpApp: McpAppFallback | null = null;
   let publishedRevision = -1;
   let lastPublishedSnapshot: BoardSnapshot | null = null;
+
+  /**
+   * Remember every snapshot that came back from the board.
+   *
+   * Called on read and on write, because either one proves what the board
+   * currently is. A cache write must never fail a caller: the copy is an
+   * optimisation for the next load, and losing it is not losing the board.
+   */
+  const remember = (snapshot: BoardSnapshot): void => {
+    void options.cache?.write(snapshot).catch(() => {});
+  };
 
   const loadBoard = async (): Promise<BoardSnapshot> => {
     if (hostApp) {
@@ -130,11 +154,14 @@ export function createBoardTransport(options: {
       if (!data || !Array.isArray(data.items) || typeof data.revision !== "number") {
         throw new Error("Invalid board snapshot from host");
       }
+      remember(data);
       return data;
     }
     const response = await fetch("/api/board");
     if (!response.ok) throw new Error(`HTTP ${response.status}`);
-    return response.json();
+    const data = await response.json() as BoardSnapshot;
+    remember(data);
+    return data;
   };
 
   const syncBoard = async (next: unknown[], base: BoardSnapshot): Promise<BoardSnapshot> => {
@@ -150,7 +177,9 @@ export function createBoardTransport(options: {
         const payload = toolErrorPayload(result);
         throw new BoardWriteError(payload.message, payload.code, payload.conflicts);
       }
-      return result.structuredContent as BoardSnapshot;
+      const updated = result.structuredContent as BoardSnapshot;
+      remember(updated);
+      return updated;
     }
     if (activeMcpApp?.drawBoard) {
       const result = await activeMcpApp.drawBoard({
@@ -158,6 +187,7 @@ export function createBoardTransport(options: {
         author: "human",
         expected_revision: base.revision,
       });
+      remember(result as BoardSnapshot);
       return result as BoardSnapshot;
     }
     const response = await fetch("/api/board/batch", {
@@ -167,7 +197,9 @@ export function createBoardTransport(options: {
     });
     const result = await response.json().catch(() => ({}));
     if (!response.ok) throw writeError(result, `HTTP ${response.status}`);
-    return result.board as BoardSnapshot;
+    const updated = result.board as BoardSnapshot;
+    remember(updated);
+    return updated;
   };
 
   const libraryRequest = async (action: Record<string, unknown>, expectedRevision: number) => {
@@ -239,12 +271,36 @@ export function createBoardTransport(options: {
     window.setTimeout(updateVisibility, 1200);
   };
 
+  /**
+   * Reconnect with backoff, and stop claiming a reconnect is coming.
+   *
+   * The loop used to re-arm every 750 ms forever. When the MCP session that
+   * owns the page dies, nothing is coming back: the page sat in a permanent
+   * "正在重连" that was true once and false forever after. Backoff makes a
+   * transient host restart recover in under a second, and the attempt cap turns
+   * an unrecoverable disconnect into a stated fact the person can act on
+   * ("进程已结束，画板仍是上次的内容") instead of a spinner that never resolves.
+   *
+   * The board file is untouched either way; this only governs how hard the page
+   * tries to reattach to a live server.
+   */
+  const RECONNECT_DELAYS_MS = [750, 1500, 3000, 6000, 12000];
+
   const connectStandaloneUpdates = (
     onSnapshot: (snapshot: BoardSnapshot) => void,
     onOfflineChange?: (offline: boolean) => void,
+    attempt = 0,
+    onGaveUp?: () => void,
   ): void => {
     const protocol = location.protocol === "https:" ? "wss" : "ws";
-    const socket = new WebSocket(`${protocol}://${location.host}/ws`);
+    let socket: WebSocket;
+    try {
+      socket = new WebSocket(`${protocol}://${location.host}/ws`);
+    } catch {
+      // A malformed/blocked URL will never open; treat it as the final attempt.
+      onGaveUp?.();
+      return;
+    }
     socket.addEventListener("message", async (event) => {
       try {
         const message = JSON.parse(String(event.data));
@@ -254,9 +310,18 @@ export function createBoardTransport(options: {
       } catch {}
     });
     socket.addEventListener("close", () => {
-      showConnectionNotice("画板连接已断开，正在重连；这期间的改动不会保存。");
       onOfflineChange?.(true);
-      window.setTimeout(() => connectStandaloneUpdates(onSnapshot, onOfflineChange), 750);
+      const delay = RECONNECT_DELAYS_MS[Math.min(attempt, RECONNECT_DELAYS_MS.length - 1)];
+      if (attempt >= RECONNECT_DELAYS_MS.length) {
+        showConnectionNotice("画板服务已结束，页面显示的是上次保存的内容；重新打开画板即可继续。");
+        onGaveUp?.();
+        return;
+      }
+      showConnectionNotice(`画板连接已断开，正在重连（第 ${attempt + 1} 次）…`);
+      window.setTimeout(
+        () => connectStandaloneUpdates(onSnapshot, onOfflineChange, attempt + 1, onGaveUp),
+        delay,
+      );
     });
     socket.addEventListener("open", () => {
       showConnectedNotice();
@@ -264,19 +329,21 @@ export function createBoardTransport(options: {
     });
   };
 
-  const startLiveUpdates = async ({ isBusy, onSnapshot, onOfflineChange }: {
+  const startLiveUpdates = async ({ isBusy, onSnapshot, onOfflineChange, onDetached }: {
     isBusy: () => boolean;
     onSnapshot: (snapshot: BoardSnapshot) => void;
     onOfflineChange?: (offline: boolean) => void;
+    onDetached?: () => void;
   }): Promise<void> => {
     if (!hostApp) {
-      connectStandaloneUpdates(onSnapshot, onOfflineChange);
+      connectStandaloneUpdates(onSnapshot, onOfflineChange, 0, onDetached);
       return;
     }
     hostApp.ontoolresult = (result) => {
       if (result.isError) return;
       const data = result.structuredContent as BoardSnapshot | undefined;
       if (!data || !Array.isArray(data.items) || typeof data.revision !== "number") return;
+      remember(data);
       onSnapshot(data);
     };
     await hostApp.connect();
@@ -291,6 +358,7 @@ export function createBoardTransport(options: {
         if (result.isError) return;
         const data = result.structuredContent as BoardSnapshot | undefined;
         if (!data || !Array.isArray(data.items) || typeof data.revision !== "number") return;
+        remember(data);
         onSnapshot(data);
       } catch {}
     }, 4000);
@@ -301,6 +369,10 @@ export function createBoardTransport(options: {
     embedded: options.embedded,
     channel: options.embedded ? "mcp-app" : "standalone",
     loadBoard,
+    async restoreBoard() {
+      if (!options.cache) return null;
+      return options.cache.readActive().catch(() => null);
+    },
     syncBoard,
     libraryRequest,
     publishContext,
