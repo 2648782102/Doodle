@@ -158,6 +158,34 @@ check(packageJson.scripts["preview:board"] === "node scripts/preview-board.mjs",
 check(await exists("scripts/preview-board.mjs"), "local preview script is missing");
 check(await exists("scripts/open-board.mjs") && packageJson.scripts.doodle === "node scripts/open-board.mjs", "the one-action board open command is missing");
 /*
+ * The private-DOM dependency is bounded, not shrinking.
+ *
+ * Issue #43 asked to replace the .excalidraw selectors with official extension
+ * points. On 0.18 that surface is exhausted — UIOptions has canvasActions,
+ * tools.image and dockedSidebarBreakpoint only, all already set — so the
+ * remaining selectors have no API equivalent. Decision 34 records that. This
+ * check exists so a future upgrade that *does* add chrome theming is noticed:
+ * an unexpected growth in the extension surface is the signal to re-open it.
+ */
+const excalidrawTypes = await read("node_modules/@excalidraw/excalidraw/dist/types/excalidraw/types.d.ts");
+/*
+ * Top-level keys only, indented four spaces. `tools` holds `image` one level
+ * deeper, and counting a nested field as a sibling would make the ceiling
+ * meaningless — the check exists to notice a *new* chrome-theming surface.
+ */
+const uiOptionsStart = excalidrawTypes.indexOf("export type UIOptions = Partial<{");
+const uiOptionsEnd = excalidrawTypes.indexOf("export type AppProps", uiOptionsStart);
+const uiOptionKeys = excalidrawTypes
+  .slice(uiOptionsStart, uiOptionsEnd)
+  .split("\n")
+  .filter((line) => /^ {4}[A-Za-z][A-Za-z]*\??:/.test(line))
+  .map((line) => line.trim().split("?")[0].split(":")[0].trim());
+check(
+  uiOptionKeys.length <= 4,
+  `Excalidraw's UIOptions grew to ${uiOptionKeys.length} keys (${uiOptionKeys.join(", ")}). Re-read decision 34: new chrome-theming options may make the 24 upstream selectors reducible.`,
+);
+
+/*
  * Every Excalidraw internal Doodle styles must be declared in
  * `upstream-contract.ts`. The table is what makes the dependency auditable: an
  * upgrade that renames `.App-toolbar` can be triaged from 24 entries instead of
