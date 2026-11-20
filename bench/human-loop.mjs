@@ -20,7 +20,15 @@
  */
 let handoffModule;
 async function handoff() {
-  handoffModule ??= await import("../dist/board/handoff.js");
+  /*
+   * Absolute URL, built from this module's own location.
+   *
+   * A bare `import("../dist/…")` inside a dynamic import is rewritten by the
+   * test runner's SSR transform into `/dist/…` — an absolute filesystem path at
+   * the repo root, which is where `dist` is *not*. The static form was fine
+   * locally only because the path resolved before any rewriting.
+   */
+  handoffModule ??= await import(new URL("../dist/board/handoff.js", import.meta.url).href);
   return handoffModule;
 }
 

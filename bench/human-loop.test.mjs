@@ -12,8 +12,10 @@ import { applyHumanEdit, expectedHandoff, gradeHumanReport } from "./human-loop.
  * `human-loop.mjs` defers its own import.
  */
 async function server() {
-  const types = await import("../dist/board/types.js");
-  const recipe = await import("../dist/board/diagram/recipe.js");
+  // Absolute URLs: the runner rewrites a bare relative dynamic import into a
+  // path from the filesystem root, where `dist` does not live.
+  const types = await import(new URL("../dist/board/types.js", import.meta.url).href);
+  const recipe = await import(new URL("../dist/board/diagram/recipe.js", import.meta.url).href);
   return {
     createEmptyBoard: types.createEmptyBoard,
     diagramToBoardItems: types.diagramToBoardItems,
