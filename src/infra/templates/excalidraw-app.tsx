@@ -168,6 +168,43 @@ function CanvasApp({ initial }: { initial: BoardSnapshot }) {
     }
   }, [api, theme]);
 
+  /*
+   * Captions were measured before the self-hosted fonts arrived.
+   *
+   * The board is projected once at mount, and Excalidraw sizes a text element
+   * from the face available at that moment. On a cold load the self-hosted
+   * Cascadia face is only fetched the first time something draws text, so every
+   * caption is measured against a fallback and then clipped by the box it was
+   * given: "you edit" painted as "ou edit". Reloading the page fixed it, which
+   * is the tell — the second load measures with the cached face.
+   *
+   * `document.fonts.status` is not a usable signal here: it reads "loaded" when
+   * nothing is loading, including when the face has never been requested. The
+   * faces are loaded explicitly instead, then only the text elements are
+   * re-measured, so a stroke the person already started is never replaced.
+   */
+  useEffect(() => {
+    if (!api || typeof document === "undefined" || !document.fonts) return;
+    let cancelled = false;
+    const faces = ["16px Cascadia", "20px Cascadia", "16px Assistant", "16px Excalifont"];
+    void Promise.all(faces.map((face) => document.fonts.load(face).catch(() => {})))
+      .then(() => document.fonts.ready)
+      .then(() => {
+        if (cancelled || !activeSnapshot) return;
+        const projected = new Map(
+          toElements(activeSnapshot, theme).map((element: ExcalidrawLikeElement) => [element.id, element]),
+        );
+        const patched = api.getSceneElements().map((element: ExcalidrawLikeElement) => (
+          element.type === "text" && projected.has(element.id) ? projected.get(element.id) as never : element
+        ));
+        applyingRemote.current = true;
+        api.updateScene({ elements: patched, captureUpdate: "NEVER" });
+        window.setTimeout(() => { applyingRemote.current = false; }, 0);
+      })
+      .catch(() => {});
+    return () => { cancelled = true; };
+  }, [api, theme]);
+
   useEffect(() => {
     const onThemeChange = (event: Event) => {
       const detail = (event as CustomEvent<DoodleTheme>).detail;

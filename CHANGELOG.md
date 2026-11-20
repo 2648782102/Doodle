@@ -1,5 +1,10 @@
 ## Unreleased — Easier to reach
 
+### Added
+
+- The README opens with a real screenshot of the shared board in the liquid-glass appearance instead of prose: the AI's four-step flow, a note written by the person, and the arrow that points at the step being changed. Both language versions carry copy-paste configuration for Claude Code, Claude Desktop, Cursor, VS Code, and Codex next to the zero-configuration `npx -y doodle-mcp` path, plus a short comparison table against one-way diagram servers.
+- `server.json` declares the npm package for the official MCP Registry, and `package.json` carries the matching `mcpName` the registry verifies before publishing. `npm run repo:check` fails if the two names, versions, or the package identifier drift, or if the registry description outgrows its 100-character limit.
+
 ### Changed
 
 - The library drawer groups actions by intent instead of laying every verb on one grid. The old panel had six equal buttons plus two more under the list: "另存为" and "复制所选" were literally the same duplicate call under two labels, "重命名" read the name field from rows away, and "删除" always applied to the active board even though the list let you pick any board. Now the name field and its rename action share a row, "新建 / 另存一份 / 导入" sit beside the list title, each board row carries its own "导出 / 删除", and clicking a row opens that board — which removed the separate "切换到选中" button and the select/double-click/switch triple path.
@@ -42,6 +47,7 @@
 
 ### Fixed
 
+- Captions are no longer clipped on a cold load. The board is projected once at mount, and Excalidraw sizes a text element from whichever face is available at that moment: the self-hosted Cascadia face is only fetched the first time something draws text, so every caption was measured against a fallback and then cut by the box it was given — "you edit" painted as "ou edit". Reloading fixed it, which was the tell. The faces are now loaded explicitly, and once they settle only the text elements are re-measured, so a stroke the person already started is never replaced.
 - The canvas says when it lost the server. A closed WebSocket only reconnected silently, so the person kept drawing on a board that looked fine and discovered the problem one failed save at a time. A sticky banner now appears on `close` and clears on `open`; the reconnect banner outlives an unrelated successful-save `clearError()`, because a connection state is not a save result.
 - A failed canvas save now says what went wrong. `syncBoard` and `libraryRequest` threw a bare "Board update failed" / "Library action failed" and discarded the `ERROR_JSON` the tool had already produced, so the banner could not tell a bad colour from a revision conflict and the person had nothing to act on. Both read `message` and `fix` now: "Item color must be a six-digit hex value… — Use one of the palette colours from get_board", "Update 0 targets \"ghost\", which is not on this board — Re-read the board…".
 - A delta read no longer carries the full per-object diagnosis. `since_revision` answers "what changed", yet its `diagnosis` enumerated every object: at 80 objects that was 1.4 KB on a reply whose changed-objects array was 135 B. `compactDigest` / `compactDiagnosis` now serve both the graded view and the delta path, and a one-edit delta drops from 6.1 KB to 4.1 KB.

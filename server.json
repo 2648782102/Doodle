@@ -1,0 +1,63 @@
+{
+  "$schema": "https://static.modelcontextprotocol.io/schemas/2025-12-11/server.schema.json",
+  "name": "io.github.2648782102/doodle-mcp",
+  "title": "Doodle",
+  "description": "Local-first two-way Excalidraw board where people and AI draw and sync intent through MCP.",
+  "repository": {
+    "url": "https://github.com/2648782102/Doodle",
+    "source": "github",
+    "id": "1218705506"
+  },
+  "version": "0.8.0",
+  "websiteUrl": "https://github.com/2648782102/Doodle#readme",
+  "packages": [
+    {
+      "registryType": "npm",
+      "identifier": "doodle-mcp",
+      "version": "0.8.0",
+      "runtimeHint": "npx",
+      "transport": {
+        "type": "stdio"
+      },
+      "environmentVariables": [
+        {
+          "name": "DOODLE_WORKSPACE_ROOT",
+          "description": "Optional workspace path scoped for read-only scan_project inspection.",
+          "isRequired": false,
+          "format": "filepath",
+          "isSecret": false
+        },
+        {
+          "name": "OUTPUT_DIR",
+          "description": "Optional directory where .doodle/board.json and saved boards are persisted.",
+          "isRequired": false,
+          "format": "filepath",
+          "isSecret": false
+        },
+        {
+          "name": "PREVIEW_PORT",
+          "description": "Optional fixed local HTTP port for the fallback canvas; auto-selects a free port if unset.",
+          "isRequired": false,
+          "format": "number",
+          "isSecret": false
+        },
+        {
+          "name": "PREVIEW_HOST",
+          "description": "Optional local bind address for the fallback canvas HTTP server (defaults to 127.0.0.1).",
+          "isRequired": false,
+          "format": "string",
+          "isSecret": false,
+          "default": "127.0.0.1"
+        },
+        {
+          "name": "LOG_LEVEL",
+          "description": "Optional stderr log verbosity level (defaults to info).",
+          "isRequired": false,
+          "format": "string",
+          "isSecret": false,
+          "default": "info"
+        }
+      ]
+    }
+  ]
+}
