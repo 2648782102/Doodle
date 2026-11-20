@@ -39,9 +39,19 @@ describe("label matching", () => {
     expect(labelsMatch("校验", "校验订单")).toBe(true);
   });
 
-  it("rejects a label that merely contains the expected one", () => {
-    // 确认发货 is not 发货; accepting it would pass a wrong node.
-    expect(labelsMatch("发货", "确认发货")).toBe(false);
+  it("accepts a numbered, explained node, which is what models actually draw", () => {
+    /*
+     * Live runs produced "1 注册 / 登录：创建账号，完成身份验证" for the expected
+     * "注册". Prefix-only matching scored that drawing zero — a false negative
+     * far more damaging than the collision it was guarding against.
+     */
+    expect(labelsMatch("注册", "1 注册 / 登录：创建账号，完成身份验证")).toBe(true);
+    expect(labelsMatch("发货", "确认发货")).toBe(true);
+  });
+
+  it("still refuses a one-character overlap", () => {
+    // The containment rule needs a length floor or 会 would match 会议.
+    expect(labelsMatch("会", "会议")).toBe(false);
   });
 
   it("never matches blank labels", () => {
@@ -74,6 +84,18 @@ describe("grading a correct drawing", () => {
     expect(result.geometry.edgesThroughNodes).toBe(0);
     expect(result.geometry.danglingConnectors).toBe(0);
     expect(result.checks.every((check) => check.ok)).toBe(true);
+  });
+
+  it("does not count the generator's own frame, title, and subtitle as nodes", () => {
+    /*
+     * `draw_board.diagram` emits a frame, a title with role "label", and a
+     * subtitle repeating the prompt ("草稿 → 反馈 → 修改"). The first live run
+     * counted all three, so a perfectly correct drawing reported precision 0.6
+     * and failed. Furniture is not content.
+     */
+    const result = gradeBoard(board, { kind: "sequence", ordered: true, nodes: ["下单", "校验", "拣货", "发货", "签收"] });
+    expect(result.structure.nodes.precision).toBe(1);
+    expect(result.structure.nodes.extra).toEqual([]);
   });
 });
 

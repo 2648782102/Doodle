@@ -402,3 +402,84 @@ bench/run-cases.mjs     CLI：跑 case → traces/
 node bench/run-cases.mjs                 # 跑全部 case
 node bench/run-report.mjs bench/runs/<时间戳>
 ```
+
+## 11. 已接入真实模型，并跑出第一份基线
+
+### 接入方式：magpie 网关
+
+本机直连模型厂商被阻断（`api.openai.com` 超时），但 magpie 的本地网关
+`127.0.0.1:3425` 可用。执行器因此固定走：
+
+```
+-c model_provider="magpie"
+-c model_providers.magpie.base_url="http://127.0.0.1:3425/v1"
+model = workbuddy/blind-model-c   （「测试模型 C」）
+```
+
+`--ignore-user-config` 会把用户配置里的 provider 一并去掉，所以网关配置必须在
+命令行里重述一遍；`name` 字段不能省，否则 CLI 直接拒绝整个配置。
+
+### 一个拦路的坑：破坏性工具需要审批
+
+第一次真跑，3 个 case 全部「成功但板是空的」。模型确实调了 `get_board`，
+但 `draw_board` 被宿主拒绝：
+
+```
+MCP tool call requires approval, but approval policy is never
+```
+
+`draw_board` 声明为破坏性工具，`--sandbox read-only` 下审批策略是 never。
+改用 `--dangerously-bypass-approvals-and-sandbox` 后正常——进程本就跑在临时目录、
+只连本地 stdio server、提示词禁止碰文件，隔离是够的。
+
+### 第一份真实基线（10 个 case，模型 C）
+
+修完判分器后：
+
+```
+Cases: 10 · pass 100% · mean score 1.00
+
+| category   | n | score | pass | node recall | edge F1 |
+| sequence   | 8 | 1.00  | 100% | 1.00        | 1.00    |
+| tree       | 1 | 1.00  | 100% | 1.00        | 1.00    |
+| comparison | 1 | 1.00  | 100% | 1.00        | 1.00    |
+```
+
+**这个结果本身说明下一件事：case 太容易了。** 满分不是好消息，
+它说明当前这 10 个 case 无法区分模型好坏。真实的待办是加难度，
+而不是庆祝。
+
+### 判分器被真实数据修正了四次
+
+这是先做判分器、再接模型的价值——每一次都是**判分器错，模型对**：
+
+1. `precision 0.6`：生成器自带的 frame / title / subtitle 被当成节点。
+2. `recall 0`：模型写「1 注册 / 登录：创建账号…」，而期望是「注册」，
+   前缀匹配判为缺失。
+3. `edge_f1 0`：对比类图没有边，却被按「缺 4 条边」计分。
+4. `extra: ['六个阶段按顺序流转']`：副标题没逗号，逃过了标点规则。
+
+每一条都补了测试。**判分器的假阳性/假阴性比模型分数更危险**，
+因为它会把方向错误包装成数字。
+
+### 人机回环（双向性）
+
+```
+bench/human-loop.mjs       脚本化的人：移动 / 改名 / 删除
+bench/run-human-loop.mjs   真跑：AI 画 → 人改 → AI 读回
+```
+
+判分不看措辞，看两件事：**有没有指出被改的那个对象**，以及
+**有没有编造板上不存在的对象**（后者比漏掉更严重——模型会对着不存在的东西画）。
+
+第一次真跑（模型 C）：
+
+```
+board : 计划 → 执行 → 复盘
+人   : 把「执行」移动 (260, 140)
+HANDOFF: 人改动了 1 处：新增 0 · 修改 1 · 删除 0
+模型 : 他们改动了「执行」卡片，把它从原位置向下拖到了 (560, 260)，移到「复盘」下方。
+判分 : PASS（识别 1，遗漏 0，编造 0）
+```
+
+这是 Doodle 相对一次性图表生成器的核心差异，之前完全没有测试覆盖。

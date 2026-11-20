@@ -13,12 +13,71 @@
 
 import { labelsMatch, normalizeLabel } from "./normalize.mjs";
 
-/** Nodes we grade: things with a visible label that are not connectors. */
-export function nodesOf(board) {
+/**
+ * Nodes we grade: the things a person would read as a node in the graph.
+ *
+ * Furniture is excluded by role, because the generator emits it on every
+ * diagram and counting it as content would make every correct drawing look like
+ * it invented nodes:
+ *
+ *   - `frame` is the container box drawn around the whole diagram.
+ *   - `label` is the title/heading the generator puts above it.
+ *
+ * A `text` item is not automatically content either: `draw_board.diagram`
+ * writes the prompt's own sequence ("草稿 → 反馈 → 修改") as a subtitle, and
+ * that string repeats every node. Counting it would both inflate precision loss
+ * and, worse, let a model pass `node_recall` by writing the list as prose
+ * without ever drawing the nodes.
+ */
+/** Shaped nodes: things that occupy a box the person reads as a node. */
+function shapedNodes(board) {
   return board.items.filter((item) => item.type !== "line"
     && item.type !== "stroke"
+    && item.type !== "text"
     && item.role !== "frame"
+    && item.role !== "label"
     && (normalizeLabel(item.title) || normalizeLabel(item.text)));
+}
+
+export function nodesOf(board) {
+  const shaped = shapedNodes(board);
+  const shapedLabels = shaped.map((item) => normalizeLabel(item.title) || normalizeLabel(item.text));
+  /*
+   * Standalone text is a node only when it is not just restating the shapes.
+   * A caption that repeats two or more node labels is describing the diagram,
+   * not adding to it.
+   */
+  const standalone = board.items.filter((item) => item.type === "text"
+    && item.role !== "label"
+    && (normalizeLabel(item.title) || normalizeLabel(item.text))
+    && !isEnumerationText(item, shapedLabels));
+  return [...shaped, ...standalone];
+}
+
+/**
+ * Does this text merely enumerate other labels ("A → B → C", "A, B, C")?
+ *
+ * Such a line is a caption or subtitle, not a node: it carries no shape, no
+ * position that means anything, and its content is the rest of the diagram.
+ */
+export function isEnumerationText(item, otherLabels) {
+  if (item.type !== "text" || item.title) return false;
+  const text = normalizeLabel(item.text);
+  if (!text) return false;
+  const hits = otherLabels.filter((label) => label && text.includes(label)).length;
+  if (hits >= 2) return true;
+  /*
+   * A standalone text that names no shape is the generator's subtitle: it sits
+   * above the diagram, carries no box, and describes the picture instead of
+   * being part of it ("六个阶段按顺序流转", "四个关键阶段，按顺序推进").
+   *
+   * Requiring punctuation was not enough — the first of those has none — and a
+   * length floor alone would swallow a legitimate single-word caption. The
+   * distinguishing property is positional: a real content node is a shape, and
+   * these are free-floating text. So an unshaped text with no shape label in it
+   * is furniture.
+   */
+  return hits === 0 && text.length >= 6;
 }
 
 /** The label a person would read on this node. */
@@ -105,11 +164,21 @@ export function expectedEdges(expect) {
   if (expect.ordered && Array.isArray(expect.nodes) && expect.nodes.length > 1) {
     return expect.nodes.slice(0, -1).map((from, index) => [from, expect.nodes[index + 1]]);
   }
+  /*
+   * A comparison is a side-by-side layout, not a graph: there is no legitimate
+   * edge between "方案 A" and "方案 B", and the model that draws a decorative
+   * divider between them is not adding a wrong relationship. Grading edges here
+   * would fail a correct drawing, so this kind of case only grades nodes.
+   */
+  if (expect.kind === "comparison") return null;
   return [];
 }
 
 export function gradeEdges(board, expect) {
   const expected = expectedEdges(expect);
+  if (expected === null) {
+    return { precision: 1, recall: 1, f1: 1, matched: 0, missing: [], dangling: edgesOf(board).dangling, skipped: "comparison has no edges to grade" };
+  }
   const nodes = nodesOf(board);
   const labelById = new Map(nodes.map((node) => [node.id, labelOf(node)]));
   const { bound, dangling } = edgesOf(board);

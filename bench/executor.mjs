@@ -39,6 +39,24 @@ export function codexBinary() {
 }
 
 /**
+ * Model access.
+ *
+ * Defaults to magpie's local gateway, which routes to a model without needing a
+ * network route to the vendor: direct HTTPS to the provider is blocked on this
+ * machine, and `codex exec` reaches the model through `127.0.0.1:3425` just
+ * fine. The model default is the blind comparison model, chosen so a run is
+ * reproducible rather than "whatever the account default is today".
+ */
+export function modelConfig(overrides = {}) {
+  const baseUrl = overrides.baseUrl ?? process.env.DOODLE_BENCH_BASE_URL ?? "http://127.0.0.1:3425/v1";
+  return {
+    model: overrides.model ?? process.env.DOODLE_BENCH_MODEL ?? "workbuddy/blind-model-c",
+    baseUrl,
+    bearer: overrides.bearer ?? process.env.DOODLE_BENCH_BEARER ?? "magpie",
+  };
+}
+
+/**
  * The instruction the model gets.
  *
  * Kept short on purpose: a long prompt would let the benchmark measure prompt
@@ -146,6 +164,7 @@ export async function runCase(testCase, options = {}) {
   await fs.mkdir(stateDir, { recursive: true });
 
   const startedAt = Date.now();
+  const access = modelConfig(options);
   /*
    * `-c` values are parsed as TOML. A JSON string parses as a string, and the
    * CLI then rejects it for `env` ("expected a map") — so the array and the
@@ -160,9 +179,35 @@ export async function runCase(testCase, options = {}) {
     "--skip-git-repo-check",
     // Keep the run to exactly the server under test: no user plugins, no skills.
     "--ignore-user-config",
-    "--sandbox", "read-only",
+    /*
+     * The write tool must be allowed to run.
+     *
+     * `draw_board` is declared destructive, so a read-only sandbox answers every
+     * call with "MCP tool call requires approval, but approval policy is never".
+     * The run then looks like a model that refused to draw — the smoke run that
+     * produced this finding had one `get_board` call and an empty board.
+     *
+     * The bypass is safe here because the process is already confined: it runs
+     * in a throwaway temp directory, talks to a local stdio server, and the
+     * prompt forbids touching files. Nothing it can reach matters.
+     */
+    "--dangerously-bypass-approvals-and-sandbox",
     "--json",
     "-C", workDir,
+    "-m", access.model,
+    /*
+     * The provider is declared inline rather than read from the user config:
+     * `--ignore-user-config` is what keeps this machine's unrelated doodle
+     * plugin out of the run, but it also removes the provider it defined, so
+     * the gateway has to be restated here. `name` is required — without it the
+     * CLI refuses the whole config ("provider name must not be empty").
+     */
+    "-c", 'model_provider="magpie"',
+    "-c", 'model_providers.magpie.name="magpie"',
+    "-c", `model_providers.magpie.base_url="${access.baseUrl}"`,
+    "-c", 'model_providers.magpie.wire_api="responses"',
+    "-c", `model_providers.magpie.experimental_bearer_token="${access.bearer}"`,
+    "-c", 'model_providers.magpie.http_headers={ "x-openai-actor-authorization" = "magpie" }',
     "-c", 'mcp_servers.doodle.command="node"',
     "-c", `mcp_servers.doodle.args=${serverArgs}`,
     "-c", `mcp_servers.doodle.env=${env}`,
@@ -199,7 +244,7 @@ export async function runCase(testCase, options = {}) {
 
   return makeTrace({
     case: testCase.id,
-    model: options.model ?? "codex-default",
+    model: access.model,
     ...experimentHash(testCase),
     started_at: startedAt,
     duration_ms: Date.now() - startedAt,

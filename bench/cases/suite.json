@@ -1,0 +1,82 @@
+[
+  {
+    "id": "seq/release-pipeline",
+    "prompt": "画一个发布流水线：提交 → 构建 → 测试 → 部署 → 监控",
+    "expect": {
+      "kind": "sequence",
+      "ordered": true,
+      "nodes": ["提交", "构建", "测试", "部署", "监控"],
+      "forbid": ["overlap", "through_node"]
+    },
+    "budget": { "max_tool_calls": 4, "max_seconds": 120, "max_bytes": 150000 }
+  },
+  {
+    "id": "seq/six-steps",
+    "prompt": "把客服工单的六个阶段按顺序画出来：接收 → 分类 → 分派 → 处理 → 回复 → 归档",
+    "expect": {
+      "kind": "sequence",
+      "ordered": true,
+      "nodes": ["接收", "分类", "分派", "处理", "回复", "归档"],
+      "forbid": ["overlap"]
+    },
+    "budget": { "max_tool_calls": 4, "max_seconds": 150, "max_bytes": 180000 }
+  },
+  {
+    "id": "seq/short-three",
+    "prompt": "用三个方框画：计划 → 执行 → 复盘",
+    "expect": {
+      "kind": "sequence",
+      "ordered": true,
+      "nodes": ["计划", "执行", "复盘"],
+      "forbid": ["overlap", "through_node"]
+    },
+    "budget": { "max_tool_calls": 3, "max_seconds": 60, "max_bytes": 60000 }
+  },
+  {
+    "id": "tree/decision-branch",
+    "prompt": "画一个二选一决策：是否上线 → 上线 / 暂缓，两条分支汇合到复盘",
+    "expect": {
+      "kind": "tree",
+      "nodes": ["是否上线", "上线", "暂缓", "复盘"],
+      "edges": [
+        ["是否上线", "上线"],
+        ["是否上线", "暂缓"],
+        ["上线", "复盘"],
+        ["暂缓", "复盘"]
+      ],
+      "forbid": ["overlap"]
+    },
+    "budget": { "max_tool_calls": 5, "max_seconds": 150, "max_bytes": 200000 }
+  },
+  {
+    "id": "compare/two-options",
+    "prompt": "左右对比两个方案：方案 A 与方案 B，各写一句优点",
+    "expect": {
+      "kind": "comparison",
+      "nodes": ["方案A", "方案B"],
+      "forbid": ["overlap"]
+    },
+    "budget": { "max_tool_calls": 4, "max_seconds": 120, "max_bytes": 150000 }
+  },
+  {
+    "id": "edge/single-step",
+    "prompt": "只画一个方框，里面写「唯一一步」",
+    "expect": {
+      "kind": "sequence",
+      "nodes": ["唯一一步"],
+      "forbid": ["overlap"]
+    },
+    "budget": { "max_tool_calls": 2, "max_seconds": 60, "max_bytes": 40000 }
+  },
+  {
+    "id": "edge/long-labels",
+    "prompt": "画三步：需求确认与范围界定 → 方案设计与技术评审 → 开发实现与联调测试",
+    "expect": {
+      "kind": "sequence",
+      "ordered": true,
+      "nodes": ["需求确认与范围界定", "方案设计与技术评审", "开发实现与联调测试"],
+      "forbid": ["overlap"]
+    },
+    "budget": { "max_tool_calls": 3, "max_seconds": 90, "max_bytes": 90000 }
+  }
+]
