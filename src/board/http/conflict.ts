@@ -50,6 +50,13 @@ export interface ConflictReport {
 
 export function reportConflicts(base: SimpleBoard, current: SimpleBoard, body: unknown): ConflictReport {
   const touched = touchedIdsOf(body, base);
+  const record = body as { layout?: { ids?: unknown } } | undefined;
+  const wholeBoardLayout = Boolean(record?.layout && (!Array.isArray(record.layout.ids) || record.layout.ids.length === 0));
+  if (wholeBoardLayout) {
+    for (const item of current.items) {
+      if (item.type !== "line" && item.type !== "stroke") touched.add(item.id);
+    }
+  }
   if (touched.size === 0) return { touched, conflicts: [] };
   const changed = changedIds(base.items, current.items);
   return { touched, conflicts: [...touched].filter((id) => changed.has(id)) };

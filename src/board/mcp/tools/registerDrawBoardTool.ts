@@ -115,9 +115,10 @@ server.registerTool(
           throw new BoardRevisionConflictError(expected_revision, current.revision);
         }
       };
+      const writeAuthor = (author ?? "ai") as "human" | "ai";
       const commit = async (candidate: SimpleBoard, from: SimpleBoard): Promise<SimpleBoard> => {
         const board = await ctx.board.replaceIfRevision(candidate, from.revision);
-        ctx.revisions?.remember(board);
+        ctx.revisions?.remember(board, writeAuthor);
         return board;
       };
       /*
@@ -289,7 +290,7 @@ server.registerTool(
       if (expected_revision === undefined) {
         initial = await ctx.board.snapshot();
         board = await ctx.board.mutate((current) => change(current));
-        ctx.revisions?.remember(board);
+        ctx.revisions?.remember(board, writeAuthor);
       } else {
         initial = await ctx.board.snapshot();
         if (initial.revision === expected_revision) {
@@ -319,7 +320,7 @@ server.registerTool(
            * keeps only the current one — so this is a real "re-read" case, not
            * a bug. Say so, and give the revision to retry against.
            */
-          if (!base) {
+          if (!base || base.id !== initial.id) {
             throw new BoardValidationError(
               `Revision ${expected_revision} is not this session's; the board is now at ${initial.revision}`,
               "REVISION_NOT_CACHED",
@@ -344,7 +345,7 @@ server.registerTool(
            */
           if (conflicts.length) throw new ObjectConflictError(expected_revision, initial.revision, conflicts);
           board = await ctx.board.replaceIfRevision(change(initial), initial.revision);
-          ctx.revisions?.remember(board);
+          ctx.revisions?.remember(board, writeAuthor);
           mergedFromRevision = expected_revision;
         }
       }

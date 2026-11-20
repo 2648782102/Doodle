@@ -184,7 +184,7 @@ export class BoardHttpServer {
             throw new BoardRevisionConflictError(expectedRevision, current.revision);
           } else {
             const base = this.revisions?.get(expectedRevision);
-            if (!base) throw new BoardRevisionConflictError(expectedRevision, current.revision);
+            if (!base || base.id !== current.id) throw new BoardRevisionConflictError(expectedRevision, current.revision);
             // `touched` is empty for an add-only request (an added item has no
             // id), so nothing can collide: merge rather than refuse.
             const { conflicts } = reportConflicts(base, current, options.conflictScope ?? res.req.body);
@@ -220,6 +220,7 @@ export class BoardHttpServer {
       }
       this.broadcast({ type: "board_updated", revision: board.revision });
       this.revisions?.remember(board);
+      this.revisions?.markWriter(board.revision, "human");
       const mergedFrom = res.locals.mergedFrom;
       return res.json({ ok: true, board: canvasSnapshot(board), ...(typeof mergedFrom === "number" ? { mergedFrom } : {}) });
     };

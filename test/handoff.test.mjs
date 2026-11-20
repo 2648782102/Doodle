@@ -62,6 +62,15 @@ describe("handoff describes who changed what", () => {
     expect(removed.needsAttention).toBe(true);
   });
 
+  it("ignores AI-only removals when the revision range was written only by AI", () => {
+    const previous = board(1, [item({ id: "a", author: "ai", text: "旧草案" })]);
+    const current = board(2, []);
+    const handoff = describeHandoff(current, previous, { removedByAi: true });
+
+    expect(handoff.humanEdits).toEqual([]);
+    expect(handoff.needsAttention).toBe(false);
+  });
+
   it("ignores AI-only changes so the agent is not told to review itself", () => {
     const previous = board(1, [item({ text: "开始" })]);
     const current = board(2, [item({ text: "开始 → 设计", author: "ai" })]);

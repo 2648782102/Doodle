@@ -121,7 +121,9 @@ server.registerTool(
 
       if (since_revision !== undefined && previous) {
         const delta = boardAgentDelta(current, previous);
-        const handoff = describeHandoff(current, previous);
+        const handoff = describeHandoff(current, previous, {
+          removedByAi: revisions?.isPureAiRange(previous.revision, current.revision) ?? false,
+        });
         const deltaText = [
           `🎨 共享画布 · rev ${delta.baseRevision} → rev ${delta.revision} · ${delta.unchanged ? "无变化" : `新增 ${delta.added.length} · 更新 ${delta.updated.length} · 删除 ${delta.removed.length}`}`,
           "",
