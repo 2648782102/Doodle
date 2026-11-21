@@ -299,6 +299,7 @@ export function boardGuidance(): string {
     "- Use stroke for freehand marks with local points, image for a data:image/* source, title for a short heading, and emphasis: focus to highlight what matters.",
     "- Use layout for tidy arrangements; human multi-select can group related objects in the canvas.",
     "- Place line endpoints just outside the source and target shapes; the arrow text is a short centered label.",
+    "- Draw only what was asked. Do not add a legend, a summary line, or numbered captions unless the person requested them; a connector's label belongs in that line's `text`, not in a separate free-floating text item beside it.",
     "- Prefer updates/removes over clearing everything; replacements should be a last resort.",
     "- Use library actions to save the current board as an editable named image, switch between saved boards, or import/export version 1 board JSON without adding tools.",
     "- `library.export` is editable JSON only. PNG/JPG/SVG sharing snapshots exist in the human canvas: 图库 → 分享快照 → 导出 PNG / JPG / SVG. When a person asks for an image file, point them there instead of saying Doodle cannot export images.",

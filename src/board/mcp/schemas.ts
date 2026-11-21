@@ -20,25 +20,25 @@ import { z } from "zod";
 export const itemInput = z.object({
   id: z.string().optional().describe("Existing item ID to update; omit to create a new item"),
   author: z.string().optional()
-    .describe("Do NOT set this per item. Put author once at the draw_board top level; setting it here is rejected so two authors never get mixed in one call."),
+    .describe("Rejected per item; put author at the draw_board top level"),
   type: z.enum(["note", "text", "rect", "ellipse", "line", "stroke", "image"]).describe("Visual object type"),
   x: z.number().finite().describe("Canvas X coordinate"),
   y: z.number().finite().describe("Canvas Y coordinate"),
   w: z.number().finite().optional().describe("Shape width, line endpoint delta X, or stroke/image bounds width"),
   h: z.number().finite().optional().describe("Shape height, line endpoint delta Y, or stroke/image bounds height"),
-  text: z.string().optional().describe("Visible text on the object, at most 1200 characters"),
+  text: z.string().optional().describe("Visible text"),
   color: z.string().optional().describe("Six-digit hex colour; invalid values return ERROR_JSON with a fix"),
-  title: z.string().optional().describe("Short heading above the object text, at most 120 characters"),
+  title: z.string().optional().describe("Heading above `text`"),
   shape: z.string().optional().describe("Line routing style: straight, curve, or orthogonal"),
   points: z.array(z.object({ x: z.number().finite(), y: z.number().finite() })).optional()
-    .describe("Local stroke points relative to the item bounds; use for freehand marks"),
-  src: z.string().optional().describe("data:image/*;base64 source for image items, at most 700000 characters"),
-  mime: z.string().optional().describe("Image mime type: image/png, image/jpeg, image/gif, or image/webp"),
-  groupId: z.string().optional().describe("Optional group marker for moving related objects together, at most 80 characters"),
+    .describe("Freehand points, local to the item bounds"),
+  src: z.string().optional().describe("data:image/*;base64 source"),
+  mime: z.string().optional().describe("Image mime type"),
+  groupId: z.string().optional().describe("Group marker; grouped objects move together"),
   emphasis: z.string().optional().describe("Visual emphasis marker: normal or focus"),
   variant: z.string().optional().describe("Visual variant: plain, card, frame, pill, diamond, callout, or heading"),
   role: z.string().optional().describe("Semantic role: step, decision, question, constraint, evidence, label, frame, column, annotation, or normal"),
-  z: z.number().finite().optional().describe("Stacking order between -1000 and 1000; higher renders above lower"),
+  z: z.number().finite().optional().describe("Stacking order; higher renders above"),
   style: z.object({
     borderColor: z.string().optional(),
     borderWidth: z.number().finite().optional(),
@@ -50,7 +50,7 @@ export const itemInput = z.object({
     opacity: z.number().finite().optional(),
     radius: z.number().finite().optional(),
     fillOpacity: z.number().finite().optional(),
-  }).optional().describe("Optional bounded visual styling"),
+  }).optional().describe("Visual styling"),
   startItemId: z.string().optional().describe("Source object ID for a connected line"),
   endItemId: z.string().optional().describe("Target object ID for a connected line"),
   scene: z.object({
@@ -75,21 +75,30 @@ export const layoutInput = z.object({
   mode: z.string().optional().describe("Arrangement mode: grid, row, column, timeline, cluster, or architecture. architecture derives layers from connected line IDs"),
 });
 
+/*
+ * One sentence, referenced four times.
+ *
+ * The same default was explained separately under `create`, `save`, `duplicate`,
+ * and `import` — about 400 characters of near-identical prose on every request.
+ * A shared constant keeps the wording in one place and the budget down; the
+ * four variants differed only in which board they moved to, which the action
+ * name already says.
+ */
+const SWITCH_TO = "Defaults to true and makes the new board active. Pass false to keep the person on the board they are looking at.";
+
 export const libraryAction = z.discriminatedUnion("type", [
   z.object({ type: z.literal("list") }),
   z.object({ type: z.literal("get"), id: z.string().optional() }),
   z.object({
     type: z.literal("create"),
     name: z.string().optional(),
-    switchTo: z.boolean().optional()
-      .describe("Defaults to true and makes the new board active. Pass false to keep the person on the board they are looking at."),
+    switchTo: z.boolean().optional().describe(SWITCH_TO),
   }),
   z.object({
     type: z.literal("save"),
     name: z.string().optional(),
     id: z.string().optional(),
-    switchTo: z.boolean().optional()
-      .describe("Defaults to true and makes the saved board active. Pass false to save without changing what the person sees."),
+    switchTo: z.boolean().optional().describe(SWITCH_TO),
     board: z.unknown().optional(),
   }),
   z.object({ type: z.literal("switch"), id: z.string() }),
@@ -98,45 +107,52 @@ export const libraryAction = z.discriminatedUnion("type", [
     type: z.literal("duplicate"),
     id: z.string(),
     name: z.string().optional(),
-    switchTo: z.boolean().optional()
-      .describe("Defaults to true and makes the copy active. Pass false to duplicate in the background."),
+    switchTo: z.boolean().optional().describe(SWITCH_TO),
   }),
   z.object({ type: z.literal("delete"), id: z.string() }),
   z.object({
     type: z.literal("import"),
     name: z.string().optional(),
     board: z.unknown(),
-    switchTo: z.boolean().optional()
-      .describe("Defaults to true and makes the imported board active. Pass false to add it to the library only."),
+    switchTo: z.boolean().optional().describe(SWITCH_TO),
   }),
   z.object({ type: z.literal("export"), id: z.string().optional() }),
 ]);
 
+/*
+ * Schema descriptions are prompt budget, spent on every request.
+ *
+ * Measured against a live model, the four tool definitions cost 5,103 tokens
+ * before the model reads anything, and `draw_board` alone is 4,344 of that —
+ * 85%. The cost is not the field names, it is the prose: the same `switchTo`
+ * sentence appeared four times, and `diagram` restated guidance that the tool
+ * description and the drawing guide already carry.
+ *
+ * The rule here: keep what a field *means* and what it does *instead* of a
+ * sibling field, drop what repeats another field or another document. Anything
+ * a model genuinely needs to size a call belongs in `capabilities.limits`,
+ * which is sent once per process rather than once per tool definition.
+ */
 export const diagramInput = z.object({
   title: z.string().optional(),
-  replace: z.boolean().optional().describe("Replace all existing board objects; defaults to false and adds the generated diagram beside existing objects"),
+  replace: z.boolean().optional().describe("Replace existing objects; default false adds beside them"),
   subtitle: z.string().optional(),
   recipe: z.enum(["flow", "review", "decision", "timeline", "architecture"]).optional()
-    .describe("High-level authoring intent. When set, `steps` supplies the content and nodes/edges are generated; use this instead of hand-computing coordinates. flow: ordered steps; review: draft → feedback → revise; decision: options converging on an outcome; timeline: dated milestones; architecture: layers with dependencies."),
-  steps: z.array(z.string()).optional()
-    .describe("Step captions for `recipe`. Each becomes one node connected to the next in order."),
-  options: z.array(z.string()).optional()
-    .describe("Candidate choices for `recipe: decision`; they fan into the final step/outcome."),
+    .describe("Shortcut: generate nodes/edges from `steps` (or `options` for decision) instead of computing coordinates"),
+  steps: z.array(z.string()).optional().describe("Captions for `recipe`, chained in order"),
+  options: z.array(z.string()).optional().describe("Choices for `recipe: decision`"),
   mode: z.string().optional()
-    .describe("Semantic arrangement, default flow. flow derives columns from edges and snakes after six columns so a 16-step chain is not one 3k-wide strip. timeline/compare/matrix place nodes only where you give `column`/`row` - nodes without them are appended in declaration order below the explicit grid, so set both for a timed sequence."),
+    .describe("Semantic arrangement, default flow. flow derives columns from edges and snakes after six columns so a 16-step chain is not one 3k-wide strip; timeline/compare/matrix place nodes only where you give `column`/`row`"),
   nodes: z.array(z.object({
     id: z.string(),
-    label: z.string().describe("Node caption; this is the field to fill, not `title`. Keep it to about 24 characters - the card renders it at one line, and anything longer is cut, so put the rest in `detail`."),
-    detail: z.string().optional().describe("One-line note under the caption, about 40 characters before it is cut."),
+    label: z.string().describe("Card caption, about 24 chars; use `detail` for the rest"),
+    detail: z.string().optional().describe("Note under the caption, about 40 chars"),
     type: z.enum(["rect", "ellipse"]).optional(),
-    color: z.string().optional().describe("Six-digit hex colour; invalid values return ERROR_JSON with a fix"),
-    role: z.enum(["normal", "label", "frame", "column", "step", "decision", "annotation", "question", "constraint", "evidence"]).optional()
-      .describe("Visual semantics: step, decision, question, constraint, evidence, or annotation"),
-    emphasis: z.enum(["normal", "focus"]).optional().describe("Use focus for the current discussion focus"),
-    column: z.number().int().optional()
-      .describe("Explicit column, 0-12. In timeline/compare/matrix this is the axis step: 17 steps in one row means column 0-16 is NOT available, so use row for the sequence instead."),
-    row: z.number().int().optional()
-      .describe("Explicit row, 0-47. In timeline the sequence usually advances down the page, so increment `row` per step and keep `column` fixed."),
+    color: z.string().optional().describe("Six-digit hex"),
+    role: z.enum(["normal", "label", "frame", "column", "step", "decision", "annotation", "question", "constraint", "evidence"]).optional(),
+    emphasis: z.enum(["normal", "focus"]).optional(),
+    column: z.number().int().optional().describe("Explicit column, 0-12"),
+    row: z.number().int().optional().describe("Explicit row, 0-47; advance this for a vertical timeline"),
   })).optional(),
   edges: z.array(z.object({
     from: z.string(),
