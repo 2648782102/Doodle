@@ -12,7 +12,7 @@ import {
   type ExcalidrawFileData,
   type ExcalidrawLikeElement,
 } from "../../board/excalidraw-adapter.js";
-import { frameNewBoard, remeasureTextAfterFonts, toElements, toFiles, usableViewport } from "./client/canvas-view.js";
+import { buildInitialScene, frameNewBoard, remeasureTextAfterFonts, toElements, toFiles, usableViewport } from "./client/canvas-view.js";
 import { initLiquidGlass, type LiquidGlassController } from "./liquid-glass.js";
 import {
   clearConflictNotice,
@@ -28,7 +28,8 @@ import { stableStringify } from "../../board/model/fingerprint.js";
 import { browserBoardCache } from "./client/board-cache.js";
 import { registerOfflineShell, runBoot } from "./client/boot-source.js";
 import { createPendingEdits, localPendingStorage, pendingEditOf } from "./client/pending-edits.js";
-import { mergeBoardView, recoverFromCanvas } from "./client/recover-edits.js";
+import { recoverCanvasEdits } from "./client/recover-edits.js";
+import { RECONNECT_COPY } from "./client/reconnect.js";
 import { initLibraryUi, initSnapshotExports } from "./client/library-ui.js";
 import { initExternalLinkPolicy, isDoodleProjectLink } from "./client/link-policy.js";
 import { createSyncChip } from "./client/sync-state.js";
@@ -208,20 +209,9 @@ function CanvasApp({ initial }: { initial: BoardSnapshot }) {
   canvasSync.current = sync;
 
   const initialData = useMemo(() => {
-    const files = toFiles(initial);
-    currentFiles.current = Object.fromEntries(files.map((file) => [file.id, file]));
-    const remembered = initial.items.length > 0 ? usableViewport(initial) : undefined;
-    return {
-      elements: toElements(initial, theme),
-      files: currentFiles.current,
-      appState: {
-        viewBackgroundColor: canvasColors[theme].view,
-        exportBackground: true,
-        exportWithDarkMode: false,
-        ...(remembered ? { scrollX: remembered.scrollX, scrollY: remembered.scrollY, zoom: { value: remembered.zoom as never } } : {}),
-      },
-      scrollToContent: !remembered,
-    };
+    const scene = buildInitialScene(initial, theme);
+    currentFiles.current = scene.files;
+    return scene.data;
   }, [initial, theme]);
 
   useEffect(() => {
@@ -379,15 +369,13 @@ async function start(): Promise<void> {
     loadRemote: () => transport.loadBoard(),
     paint: (snapshot) => renderCanvas(snapshot),
     onLoaded: () => status.send("loaded"),
-    // Gated on `embedded` by `runBoot`.
-    onWelcome: (snapshot) => initWelcome(snapshot),
+    onWelcome: (snapshot) => initWelcome(snapshot), // gated on `embedded` by `runBoot`
     onDetached: () => {
       status.send("detached");
-      showConnectionNotice("画板服务已结束，当前显示的是上次保存的内容。重新打开画板即可继续。");
+      showConnectionNotice(RECONNECT_COPY.detachedOnBoot);
     },
   });
-  // Unresolved edits stay on disk when the board is unreachable, so the next
-  // boot that can reach it merges them.
+  // Unreachable boards keep their edits on disk for the next boot that can merge.
   if (result !== "detached") await recoverPendingWork();
 }
 
@@ -399,15 +387,26 @@ async function start(): Promise<void> {
  * this only supplies the canvas' own surfaces.
  */
 async function recoverPendingWork(): Promise<void> {
-  await recoverFromCanvas({
+  await recoverCanvasEdits({
     pending: pendingEdits,
-    activeBoard: mergeBoardView(activeSnapshot),
-    readBoard: async () => mergeBoardView(await transport.loadBoard().catch(() => null)),
-    applyMerged: async (change, expectedRevision) =>
-      mergeBoardView(await transport.applyMergedChange(change, expectedRevision))!,
+    activeBoard: activeSnapshot,
+    loadBoard: () => transport.loadBoard(),
+    applyMerged: (change, expectedRevision) => transport.applyMergedChange(change, expectedRevision),
     refresh: () => { void transport.loadBoard().then((refreshed) => applyRemoteSnapshot(refreshed)).catch(() => {}); },
     onConflict: (conflicts) => presentRecoveredConflict(conflicts, status, clearConflictNotice),
   });
+}
+
+/**
+ * What the canvas does when the live channel comes back.
+ *
+ * Coming back is when unsent edits can finally be merged. Recovery used to run
+ * only in `start()`, so a page that stayed open through an outage never retried
+ * its pending edit — the person saw "online" and assumed their work had landed.
+ */
+function onConnectivityChange(offline: boolean): void {
+  status.send(offline ? "offline" : "online");
+  if (!offline && !isEditing(currentAppState.current)) void recoverPendingWork();
 }
 
 window.DoodleExcalidrawInit = (snapshot, mcpApp) => {
@@ -440,7 +439,7 @@ if (document.querySelector("#excalidrawRoot")) {
   void transport.startLiveUpdates({
     isBusy: () => applyingRemote.current || isEditing(currentAppState.current),
     onSnapshot: (data) => applyRemoteSnapshot(data),
-    onOfflineChange: (offline) => status.send(offline ? "offline" : "online"),
+    onOfflineChange: (offline) => { onConnectivityChange(offline); },
     onDetached: () => status.send("detached"),
   }).catch(() => {});
   void start().catch((error) => showError(error));

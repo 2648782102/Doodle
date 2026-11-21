@@ -213,3 +213,38 @@ export function mergeBoardView(snapshot: {
     items: snapshot.items as Array<Record<string, unknown>>,
   };
 }
+
+/**
+ * Everything one canvas needs to hand over for recovery.
+ *
+ * The entrypoint owns module-level state (the active board, the transport, the
+ * status chip) that cannot move into this module. Taking those as a bundle keeps
+ * the call site one expression instead of a nine-line literal that changes every
+ * time the recovery contract does.
+ */
+export interface CanvasRecoveryWiring {
+  pending: PendingEditsSource;
+  /** The board already painted, or null before one exists. */
+  activeBoard: { id: string; revision: number; items: unknown[] } | null;
+  /** Read the current board from whichever channel this canvas is on. */
+  loadBoard(): Promise<{ id: string; revision: number; items: unknown[] } | null>;
+  applyMerged(
+    change: MergeResult["change"],
+    expectedRevision: number,
+  ): Promise<{ id: string; revision: number; items: unknown[] }>;
+  /** Repaint from the board as it is now. */
+  refresh(): void;
+  onConflict(conflicts: string[]): void;
+}
+
+export function recoverCanvasEdits(wiring: CanvasRecoveryWiring): Promise<RecoverIntoCanvasSummary> {
+  return recoverFromCanvas({
+    pending: wiring.pending,
+    activeBoard: mergeBoardView(wiring.activeBoard),
+    readBoard: async () => mergeBoardView(await wiring.loadBoard().catch(() => null)),
+    applyMerged: async (change, expectedRevision) =>
+      mergeBoardView(await wiring.applyMerged(change, expectedRevision))!,
+    refresh: wiring.refresh,
+    onConflict: wiring.onConflict,
+  });
+}

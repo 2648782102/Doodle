@@ -79,8 +79,17 @@ src/
 │   └── templates/
 │       ├── excalidraw.html     Excalidraw-only standalone and embedded canvas
 │       ├── excalidraw-app.tsx  canvas entrypoint wiring the React canvas
-│       ├── client/             split client modules (transport, theme, link-policy, banner, library-ui,
-│       │                       sync-state, canvas-sync, types)
+│       ├── sw.ts               service worker: offline shell + chunk-graph precache
+│       ├── client/
+│       │   ├── transport.ts    one façade over HTTP, host bridge, fallback draw
+│       │   ├── reconnect.ts    backoff, then a 15 s heartbeat that never stops
+│       │   ├── board-cache.ts  IndexedDB copy of each board
+│       │   ├── boot-source.ts  cold-boot source choice and reconciliation
+│       │   ├── pending-edits.ts   unsent base + edited board, across a reload
+│       │   ├── three-way-merge.ts per-object merge of an offline edit
+│       │   ├── recover-edits.ts   run that merge on boot and on reconnect
+│       │   ├── write-recovery.ts  conflict surface, live and recovered
+│       │   └── canvas-* · library-* · sync-state · theme · banner · shortcuts · types
 │       └── liquid-glass.ts     per-pane SVG refraction filters for the chrome
 plugins/doodle/                 compatibility manifest, MCP config, skill, assets
 .agents/plugins/                repository-scoped plugin marketplace

@@ -124,4 +124,28 @@ describe("live endpoint record", () => {
     await clearLiveEndpoint(dir);
     expect(await readLiveEndpoint(dir)).toBeNull();
   });
+
+  /*
+   * A library switch moves the active board without restarting the process.
+   *
+   * Adoption compares the recorded board id against the current one, so a
+   * record left stale by a switch silently disables single-instance reuse for
+   * every later session — a new port each time, which is the exact behaviour
+   * this whole record exists to remove.
+   */
+  it("can be refreshed when the active board changes under a live process", async () => {
+    const dir = await tempDir();
+    await writeLiveEndpoint(dir, {
+      pid: process.pid, port: 5555, host: "127.0.0.1",
+      boardId: "board_a", startedAt: new Date().toISOString(), version: "0",
+    });
+    // The switch: same endpoint, new board.
+    await writeLiveEndpoint(dir, {
+      pid: process.pid, port: 5555, host: "127.0.0.1",
+      boardId: "board_b", startedAt: new Date().toISOString(), version: "0",
+    });
+    const record = await readLiveEndpoint(dir);
+    expect(record?.boardId).toBe("board_b");
+    expect(record?.port).toBe(5555);
+  });
 });

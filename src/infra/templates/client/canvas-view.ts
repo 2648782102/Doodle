@@ -19,7 +19,7 @@ import {
   isViewportNearContent,
   readStoredViewport,
 } from "../../../board/client/viewport-memory.js";
-import { canvasThemeFor, type DoodleTheme } from "./theme.js";
+import { canvasColors, canvasThemeFor, type DoodleTheme } from "./theme.js";
 import { boardBounds, type BoardSnapshot, type ExcalidrawAPI } from "./types.js";
 
 export function toElements(snapshot: BoardSnapshot, theme: DoodleTheme) {
@@ -144,4 +144,35 @@ export function remeasureTextAfterFonts(
     })
     .catch(() => {});
   return () => { cancelled = true; };
+}
+
+/**
+ * The scene Excalidraw mounts with.
+ *
+ * Extracted from the entrypoint because it is a pure function of a board and a
+ * theme: the camera comes from `usableViewport` (a remembered position when it
+ * still frames the content, otherwise fit-to-content), and the files are the
+ * same projection the live canvas uses. Keeping it here means a change to how a
+ * board becomes a scene lands next to the code that owns that projection.
+ */
+export function buildInitialScene(snapshot: BoardSnapshot, theme: DoodleTheme) {
+  const files = toFiles(snapshot);
+  const fileMap = Object.fromEntries(files.map((file) => [file.id, file]));
+  const remembered = snapshot.items.length > 0 ? usableViewport(snapshot) : undefined;
+  return {
+    files: fileMap,
+    data: {
+      elements: toElements(snapshot, theme),
+      files: fileMap,
+      appState: {
+        viewBackgroundColor: canvasColors[theme].view,
+        exportBackground: true,
+        exportWithDarkMode: false,
+        ...(remembered
+          ? { scrollX: remembered.scrollX, scrollY: remembered.scrollY, zoom: { value: remembered.zoom as never } }
+          : {}),
+      },
+      scrollToContent: !remembered,
+    },
+  };
 }

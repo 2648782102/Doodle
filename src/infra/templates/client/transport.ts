@@ -12,6 +12,7 @@ import { buildBoardModelContext } from "../../../board/view/app-context.js";
 import { diffBoardItems, isEmptyDiff } from "../../../board/model/diff.js";
 import { showConnectedNotice, showConnectionNotice, showError } from "./banner.js";
 import type { BoardCache } from "./board-cache.js";
+import { RECONNECT_COPY, connectBoardUpdates } from "./reconnect.js";
 import type { SyncChannel } from "./sync-state.js";
 import type { BoardSnapshot, McpAppFallback } from "./types.js";
 
@@ -340,48 +341,21 @@ export function createBoardTransport(options: {
    * The board file is untouched either way; this only governs how hard the page
    * tries to reattach to a live server.
    */
-  const RECONNECT_DELAYS_MS = [750, 1500, 3000, 6000, 12000];
-
   const connectStandaloneUpdates = (
     onSnapshot: (snapshot: BoardSnapshot) => void,
     onOfflineChange?: (offline: boolean) => void,
-    attempt = 0,
-    onGaveUp?: () => void,
+    onDetached?: () => void,
   ): void => {
     const protocol = location.protocol === "https:" ? "wss" : "ws";
-    let socket: WebSocket;
-    try {
-      socket = new WebSocket(`${protocol}://${location.host}/ws`);
-    } catch {
-      // A malformed/blocked URL will never open; treat it as the final attempt.
-      onGaveUp?.();
-      return;
-    }
-    socket.addEventListener("message", async (event) => {
-      try {
-        const message = JSON.parse(String(event.data));
-        if (!message || !["board_updated", "board_library_updated"].includes(message.type)) return;
-        const refreshed = await loadBoard().catch(() => null);
-        if (refreshed) onSnapshot(refreshed);
-      } catch {}
-    });
-    socket.addEventListener("close", () => {
-      onOfflineChange?.(true);
-      const delay = RECONNECT_DELAYS_MS[Math.min(attempt, RECONNECT_DELAYS_MS.length - 1)];
-      if (attempt >= RECONNECT_DELAYS_MS.length) {
-        showConnectionNotice("画板服务已结束，页面显示的是上次读到的内容；重新打开画板即可继续。");
-        onGaveUp?.();
-        return;
-      }
-      showConnectionNotice(`画板连接已断开，正在重连（第 ${attempt + 1} 次）… 这期间的改动不会保存`);
-      window.setTimeout(
-        () => connectStandaloneUpdates(onSnapshot, onOfflineChange, attempt + 1, onGaveUp),
-        delay,
-      );
-    });
-    socket.addEventListener("open", () => {
-      showConnectedNotice();
-      onOfflineChange?.(false);
+    connectBoardUpdates({
+      url: `${protocol}://${location.host}/ws`,
+      onChanged: (type) => { if (type) void loadBoard().then(onSnapshot).catch(() => {}); },
+      onOfflineChange: (offline) => onOfflineChange?.(offline),
+      onDetached: () => onDetached?.(),
+      onRetrying: (attempt) => showConnectionNotice(RECONNECT_COPY.retrying(attempt)),
+      onHeartbeat: () => showConnectionNotice(RECONNECT_COPY.heartbeat),
+      onReattached: () => { void loadBoard().then(onSnapshot).catch(() => {}); },
+      onConnected: () => showConnectedNotice(),
     });
   };
 
@@ -392,7 +366,7 @@ export function createBoardTransport(options: {
     onDetached?: () => void;
   }): Promise<void> => {
     if (!hostApp) {
-      connectStandaloneUpdates(onSnapshot, onOfflineChange, 0, onDetached);
+      connectStandaloneUpdates(onSnapshot, onOfflineChange, onDetached);
       return;
     }
     hostApp.ontoolresult = (result) => {

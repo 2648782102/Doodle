@@ -38,6 +38,16 @@ export class BoardHttpServer {
   /** Highest revision this process has announced, so an external write is not announced twice. */
   private lastBroadcastRevision = -1;
   private stateWatch: StateWatch | null = null;
+  /**
+   * The board id this process last recorded in `.doodle/live.json`.
+   *
+   * A library switch moves the active board without restarting the process, so
+   * the record written at `listen` time goes stale. Adoption compares that id
+   * against the current board, so a stale one silently disables single-instance
+   * reuse until the process dies. Tracking it lets `broadcast` repair the record
+   * the moment the board actually changes.
+   */
+  private recordedBoardId: string | null = null;
 
   constructor(
     private board: BoardStore,
@@ -145,11 +155,12 @@ export class BoardHttpServer {
         const activePort = typeof address === "object" && address ? address.port : this.config.previewPort ?? 0;
         this.panelUrlValue = `http://${this.config.previewHost}:${activePort}/`;
         logger.info(`Board preview at ${this.panelUrlValue}`);
+        this.recordedBoardId = (await this.board.snapshot().catch(() => null))?.id ?? null;
         void writeLiveEndpoint(this.config.outputDir, {
           pid: process.pid,
           port: activePort,
           host: this.config.previewHost,
-          boardId: (await this.board.snapshot().catch(() => null))?.id ?? null,
+          boardId: this.recordedBoardId,
           startedAt: new Date().toISOString(),
           version: SERVER_VERSION,
         }).catch((error: unknown) => {
@@ -180,9 +191,41 @@ export class BoardHttpServer {
     const revision = message.type === "board_updated" && typeof message.revision === "number"
       ? message.revision : null;
     if (revision !== null) this.lastBroadcastRevision = Math.max(this.lastBroadcastRevision, revision);
+    /*
+     * A library action can move the active board without this process
+     * restarting, so the endpoint record has to follow it. This is the one
+     * chokepoint every board change already passes through.
+     */
+    if (message.type === "board_library_updated") void this.rerecordEndpoint();
     const data = JSON.stringify(message);
     this.wss?.clients.forEach((client) => {
       if (client.readyState === 1) client.send(data);
+    });
+  }
+
+  /**
+   * Rewrite `.doodle/live.json` when the active board changed under us.
+   *
+   * Only the process that owns the endpoint may rewrite it, and only when the
+   * id actually moved — a broadcast fires on every edit, and each one would
+   * otherwise pay a read plus a file write.
+   */
+  private async rerecordEndpoint(): Promise<void> {
+    if (this.adopted || this.panelUrlValue === null) return;
+    const current = await this.board.snapshot().catch(() => null);
+    if (!current || current.id === this.recordedBoardId) return;
+    this.recordedBoardId = current.id;
+    const port = this.server?.address();
+    if (typeof port !== "object" || port === null) return;
+    await writeLiveEndpoint(this.config.outputDir, {
+      pid: process.pid,
+      port: port.port,
+      host: this.config.previewHost,
+      boardId: current.id,
+      startedAt: new Date().toISOString(),
+      version: SERVER_VERSION,
+    }).catch((error: unknown) => {
+      logger.warn(`Could not refresh the panel endpoint: ${error instanceof Error ? error.message : String(error)}`);
     });
   }
 
