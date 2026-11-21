@@ -180,7 +180,8 @@
     "prompt": "左右对比两个供应商：A 价格低但交付慢，B 价格高但交付快",
     "expect": {
       "kind": "comparison",
-      "nodes": ["A", "B"],
+      "nodes": ["供应商A", "供应商B"],
+      "allow": ["价格", "交付", "成本", "时效", "优点", "取舍", "对比", "VS"],
       "forbid": ["overlap"]
     },
     "budget": { "max_tool_calls": 4, "max_seconds": 120, "max_bytes": 150000 }

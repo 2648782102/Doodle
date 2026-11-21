@@ -52,6 +52,18 @@ describe("label matching", () => {
   it("still refuses a one-character overlap", () => {
     // The containment rule needs a length floor or 会 would match 会议.
     expect(labelsMatch("会", "会议")).toBe(false);
+    expect(labelsMatch("是", "是否迁移")).toBe(false);
+  });
+
+  it("accepts a one-character label that is a whole delimited part", () => {
+    /*
+     * A decision branch is named "是" and a model writes "是·迁移" — the branch
+     * plus what choosing it means. Without this, five correct runs failed with
+     * "missing: 是, 否". The separator on the longer side is what makes the
+     * single character a name rather than a fragment.
+     */
+    expect(labelsMatch("是", "是·迁移")).toBe(true);
+    expect(labelsMatch("否", "否·不迁移")).toBe(true);
   });
 
   it("never matches blank labels", () => {
@@ -301,6 +313,89 @@ describe("furniture that a real model produces", () => {
     expect(result.geometry.danglingConnectors).toBe(0);
     expect(result.checks.find((check) => check.name === "no_overlap").ok).toBe(true);
   });
+
+  /*
+   * The four cases below came from re-grading 305 recorded runs. Each was a
+   * correct drawing scored as wrong, which is the failure mode that matters
+   * most: a benchmark that does this teaches you to optimize against a lie.
+   */
+  it("accepts a vendor label that expands the single-letter name", () => {
+    /*
+     * The case asked for "A" and "B"; every model drew "供应商 A ｜ 低成本".
+     * A one-character expected label can never match under the length floor, so
+     * that case was unpassable. The fix is in the case (name what is drawn), not
+     * in the matching rule, whose floor is what stops 会 matching 会议.
+     */
+    const subject = board([
+      shape("a", "供应商 A · 成本优先", 0), shape("b", "供应商 B · 速度优先", 300),
+    ]);
+    const result = gradeBoard(subject, { kind: "comparison", nodes: ["供应商A", "供应商B"] });
+    expect(result.structure.nodes.missing).toEqual([]);
+    expect(result.pass).toBe(true);
+  });
+
+  it("ignores a VS badge sitting between two groups", () => {
+    // A comparison split by a small "VS" ellipse: punctuation, not content.
+    const subject = board([
+      shape("a", "方案 A", 0), shape("b", "方案 B", 300),
+      {
+        id: "vs", type: "ellipse", role: "label", x: 230, y: 20, w: 54, h: 36,
+        text: "VS", color: "#ffffff", author: "ai",
+        createdAt: "2026-01-01T00:00:00.000Z", updatedAt: "2026-01-01T00:00:00.000Z",
+      },
+    ]);
+    const result = gradeBoard(subject, { kind: "comparison", nodes: ["方案A", "方案B"] });
+    expect(result.structure.nodes.extra).toEqual([]);
+    expect(result.pass).toBe(true);
+  });
+
+  it("keeps a card named 对比 that is not between two groups", () => {
+    /*
+     * The divider rule must not become "a node called 对比 is furniture". With
+     * no box to its right, this is content the model invented.
+     */
+    const subject = board([
+      shape("a", "方案 A", 0), shape("b", "方案 B", 300),
+      {
+        id: "note", type: "note", x: 0, y: 200, w: 180, h: 60,
+        text: "对比", color: "#ffec99", author: "ai",
+        createdAt: "2026-01-01T00:00:00.000Z", updatedAt: "2026-01-01T00:00:00.000Z",
+      },
+    ]);
+    const result = gradeBoard(subject, { kind: "comparison", nodes: ["方案A", "方案B"] });
+    expect(result.structure.nodes.extra).toEqual(["对比"]);
+  });
+
+  it("ignores a footer sentence under the shapes inside the frame", () => {
+    /*
+     * "两条路径最终都汇合到上线" restates one node, so the enumeration rule
+     * (two hits) missed it and precision failed an otherwise correct tree.
+     */
+    const subject = board([
+      { ...shape("f", "", -20), type: "rect", role: "frame", w: 800, h: 480 },
+      shape("a", "评估需求", 0), shape("b", "自建", 250), shape("c", "采购", 250),
+      { ...text("t1", "两条路径最终都汇合到上线"), x: 0, y: 400, w: 760, h: 28 },
+    ]);
+    const result = gradeBoard(subject, {
+      kind: "tree", nodes: ["评估需求", "自建", "采购"], edges: [["评估需求", "自建"], ["评估需求", "采购"]],
+    });
+    expect(result.structure.nodes.extra).toEqual([]);
+  });
+
+  it("ignores a single-entry connector legend", () => {
+    // "连接：对比" is the caption of a one-arrow board, not a node.
+    const subject = board([
+      shape("a", "方案 A", 0), shape("b", "方案 B", 300),
+      // The legend restates the arrow's own label, which is what makes it a caption.
+      {
+        id: "e1", type: "line", x: 190, y: 45, w: 100, h: 0, text: "对比", color: "#1e1e1e", author: "ai",
+        createdAt: "2026-01-01T00:00:00.000Z", updatedAt: "2026-01-01T00:00:00.000Z",
+      },
+      { ...text("t1", "连接：对比"), x: 0, y: 400 },
+    ]);
+    const result = gradeBoard(subject, { kind: "comparison", nodes: ["方案A", "方案B"] });
+    expect(result.structure.nodes.extra).toEqual([]);
+  });
 });
 
 describe("a node named outside its box", () => {
@@ -343,5 +438,86 @@ describe("a node named outside its box", () => {
     ] });
     const result = gradeBoard(board, { kind: "tree", nodes: ["A", "B"] });
     expect(result.structure.nodes.extra).toEqual([]);
+  });
+});
+
+describe("a constraint on a branch", () => {
+  /*
+   * "在「是」的分支上标注「需停机 2 小时」" was declared as a node, which made
+   * the case unpassable by the annotation it asked for. Recorded runs drew it
+   * two legitimate ways; both must satisfy the declaration, and neither may be
+   * satisfied by a constraint that is merely somewhere on the board.
+   */
+  const node = (id, value, x, y) => ({
+    id, type: "rect", x, y, w: 200, h: 90, text: value, color: "#dbeafe", author: "ai",
+    role: "step", createdAt: "2026-01-01T00:00:00.000Z", updatedAt: "2026-01-01T00:00:00.000Z",
+  });
+  const arrow = (id, from, to, x, y, w, h, label = "") => ({
+    id, type: "line", x, y, w, h, text: label, color: "#1e1e1e", author: "ai",
+    startItemId: from, endItemId: to,
+    createdAt: "2026-01-01T00:00:00.000Z", updatedAt: "2026-01-01T00:00:00.000Z",
+  });
+  const expectSpec = {
+    kind: "tree",
+    nodes: ["是否迁移", "是", "否"],
+    edges: [["是否迁移", "是"], ["是否迁移", "否"]],
+    edge_labels: [{ from: "是否迁移", to: "是", text: "需停机 2 小时" }],
+    allow_edges: [["是", "需停机 2 小时"]],
+    /*
+     * The case also allows the constraint *as a node*, because that is how a
+     * downstream card reads. `allow` and `edge_labels` describe one thing from
+     * two directions: whichever layout the model chose, it must be attached.
+     */
+    allow: ["需停机"],
+  };
+
+  it("accepts the constraint written into the connector's own text", () => {
+    const subject = boardFrom([
+      node("q", "是否迁移", 0, 0), node("y", "是", 250, 0), node("n", "否", 250, 200),
+      arrow("e1", "q", "y", 200, 40, 50, 0, "需停机 2 小时"),
+      arrow("e2", "q", "n", 200, 60, 50, 140),
+    ]);
+    const result = gradeBoard(subject, expectSpec);
+    expect(result.structure.nodes.missing).toEqual([]);
+    expect(result.checks.find((check) => check.name === "edge_labels").ok).toBe(true);
+    expect(result.pass).toBe(true);
+  });
+
+  it("accepts the constraint drawn as a card hanging off the branch", () => {
+    const subject = boardFrom([
+      node("q", "是否迁移", 0, 0), node("y", "是", 400, 0), node("n", "否", 400, 220),
+      node("c", "需停机 2 小时", 400, 110),
+      arrow("e1", "q", "y", 200, 40, 50, 0),
+      arrow("e2", "q", "n", 200, 60, 50, 140),
+      arrow("e3", "y", "c", 500, 90, 0, 20),
+    ]);
+    const result = gradeBoard(subject, expectSpec);
+    expect(result.structure.edges.f1).toBe(1);
+    expect(result.checks.find((check) => check.name === "edge_labels").ok).toBe(true);
+    expect(result.pass).toBe(true);
+  });
+
+  it("rejects a constraint that is not attached to its branch", () => {
+    // Same board, but the constraint card floats with no arrow to it.
+    const subject = boardFrom([
+      node("q", "是否迁移", 0, 0), node("y", "是", 250, 0), node("n", "否", 250, 200),
+      node("c", "需停机 2 小时", 600, 400),
+      arrow("e1", "q", "y", 200, 40, 50, 0),
+      arrow("e2", "q", "n", 200, 60, 50, 140),
+    ]);
+    const result = gradeBoard(subject, expectSpec);
+    expect(result.checks.find((check) => check.name === "edge_labels").ok).toBe(false);
+    expect(result.pass).toBe(false);
+  });
+
+  it("still fails when an expected edge is missing", () => {
+    // allow_edges pardons extras only; a missing edge is still an error.
+    const subject = boardFrom([
+      node("q", "是否迁移", 0, 0), node("y", "是", 250, 0), node("n", "否", 250, 200),
+      arrow("e1", "q", "y", 200, 40, 50, 0, "需停机 2 小时"),
+    ]);
+    const result = gradeBoard(subject, expectSpec);
+    expect(result.structure.edges.f1).toBeLessThan(1);
+    expect(result.pass).toBe(false);
   });
 });

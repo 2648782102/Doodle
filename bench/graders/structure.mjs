@@ -31,6 +31,7 @@ import { labelsMatch, normalizeLabel } from "./normalize.mjs";
  */
 /** Shaped nodes: things that occupy a box the person reads as a node. */
 function shapedNodes(board) {
+  const boxes = boxNodes(board);
   return board.items.filter((item) => item.type !== "line"
     && item.type !== "stroke"
     && item.type !== "text"
@@ -49,7 +50,60 @@ function shapedNodes(board) {
      * invented nodes, because the annotation repeats a node's own label.
      */
     && item.role !== "annotation"
+    && !isDividerBadge(item, boxes)
     && (normalizeLabel(item.title) || normalizeLabel(item.text)));
+}
+
+/**
+ * A "VS" (or "对比"/"PK") badge between two groups is a divider, not a node.
+ *
+ * Models split a comparison with a small ellipse carrying "VS". A person reads
+ * that as punctuation between the two columns, but it is a shaped item with a
+ * label, so precision counted it as invented content and failed the case no
+ * matter how correct the two columns were.
+ *
+ * The label set is deliberately small. "对比" is included because a divider
+ * badge is also written as a word, and a node that happens to be called "对比"
+ * would still be dropped — the geometry guard is what keeps that honest: the
+ * item must sit in the horizontal gap between two boxes whose vertical ranges
+ * overlap it, so a standalone card named "对比" is unaffected.
+ */
+const DIVIDER_LABELS = new Set(["vs", "versus", "pk", "对比"]);
+
+export function isDividerBadge(item, boxes) {
+  if (item.type === "line" || item.type === "stroke" || item.type === "text") return false;
+  /* A `label` text is handled by the text branch below, not here. */
+  const text = normalizeLabel(item.title) || normalizeLabel(item.text);
+  if (!DIVIDER_LABELS.has(text)) return false;
+  const others = boxes.filter((box) => box.id !== item.id);
+  const overlapsVertically = (box) => box.y < item.y + item.h && box.y + box.h > item.y;
+  const hasLeft = others.some((box) => box.x + box.w <= item.x + 8 && overlapsVertically(box));
+  const hasRight = others.some((box) => box.x >= item.x + item.w - 8 && overlapsVertically(box));
+  return hasLeft && hasRight;
+}
+
+/**
+ * A sentence under everything the diagram draws, inside its frame, is a caption.
+ *
+ * Models finish a branch diagram with "两条路径最终都汇合到上线". It restates one
+ * node rather than two, so the enumeration rule misses it, and precision then
+ * fails a drawing whose content is entirely right. Position is the signal: it
+ * sits below every box and inside the frame, which is where a reader expects a
+ * footnote — not where any model puts a node.
+ *
+ * The length floor keeps a short label placed under the shapes out of this rule;
+ * only a sentence is treated as a caption.
+ */
+export function isFooterCaption(item, board) {
+  if (item.type !== "text" || item.title) return false;
+  const text = normalizeLabel(item.text);
+  if (text.length <= 8) return false;
+  const frames = board.items.filter((entry) => entry.role === "frame");
+  if (!frames.some((frame) => rectsOverlap(item, frame))) return false;
+  const boxes = boxNodes(board);
+  if (boxes.length < 2) return false;
+  const bottom = Math.max(...boxes.map((box) => box.y + box.h));
+  return item.y >= bottom - 4;
 }
 
 export function nodesOf(board) {
@@ -153,8 +207,15 @@ export function nodesOf(board) {
     && item.role !== "annotation"
     && (normalizeLabel(item.title) || normalizeLabel(item.text))
     && !isEnumerationText(item, enumerableLabels)
+    && !isFooterCaption(item, board)
+    && !isDividerText(item, boxes)
     && !isDiagramHeading(item, shapeLabels, subtitleY, contentTop, containers));
   return [...shaped, ...standalone];
+}
+
+/** The same divider rule, for a badge written as free-floating text. */
+function isDividerText(item, boxes) {
+  return isDividerBadge({ ...item, type: "rect" }, boxes);
 }
 
 /** Every box-shaped item, whether or not it carries its own text. */
@@ -213,6 +274,16 @@ export function isEnumerationText(item, otherLabels) {
   if (!text) return false;
   const hits = otherLabels.filter((label) => label && text.includes(label)).length;
   if (hits >= 2) return true;
+  /*
+   * "连接：对比" is the same legend with only one connector on the board.
+   *
+   * The two-hit rule above caught a legend listing 「是 · 否」, but a board with
+   * a single labelled arrow produces a single-entry legend, and that read as an
+   * invented node. The explicit 「连接：」 prefix is what identifies it as a
+   * caption; a node merely *starting* with those characters ("连接池管理") has
+   * no colon and is unaffected.
+   */
+  if (/^(连接|连线|箭头|关系|标注)[:：]/.test(item.text ?? "") && hits >= 1) return true;
   /*
    * A standalone text that names no shape may be the generator's subtitle
    * ("六个阶段按顺序流转"). But a free note a person or model added is content,
@@ -348,6 +419,48 @@ export function gradeNodes(board, expect) {
 }
 
 /**
+ * A constraint attached to a branch, in either of the two layouts models use.
+ *
+ * "在「是」的分支上标注「需停机 2 小时」" is ambiguous in a way that matters:
+ * five live runs drew it two different ways and every split failed the other
+ * case's declaration.
+ *
+ *   - on the connector: the line between 「是否迁移」and 「是」carries the text,
+ *     or a text item sits on that arrow;
+ *   - downstream: a card 「需停机 2 小时」hangs off 「是」 with its own arrow.
+ *
+ * Both read identically to a person, so both satisfy the declaration. It keeps
+ * its teeth because the constraint must be attached to the branch it belongs
+ * to — a stray note elsewhere on the board does not count, and a constraint on
+ * the wrong branch still fails.
+ */
+export function gradeBranchConstraints(board, expect) {
+  const declared = expect.edge_labels ?? [];
+  if (declared.length === 0) return { ok: true, missing: [], total: 0 };
+  const nodes = nodesOf(board);
+  const labelById = new Map(nodes.map((node) => [node.id, labelOf(node)]));
+  const byId = new Map(board.items.map((item) => [item.id, item]));
+  const { bound } = edgesOf(board);
+  const candidates = board.items.filter((item) => item.type === "text" && !item.title);
+
+  const onTheConnector = (spec) => bound.some((edge) => {
+    if (!labelsMatch(labelById.get(edge.from) ?? "", spec.from)) return false;
+    if (!labelsMatch(labelById.get(edge.to) ?? "", spec.to)) return false;
+    const own = normalizeLabel(byId.get(edge.id)?.text);
+    if (own && labelsMatch(own, spec.text)) return true;
+    return candidates.some((item) => nearLine(item, byId.get(edge.id)) && labelsMatch(item.text, spec.text));
+  });
+
+  const downstream = (spec) => bound.some((edge) => {
+    if (!labelsMatch(labelById.get(edge.from) ?? "", spec.to)) return false;
+    return labelsMatch(labelById.get(edge.to) ?? "", spec.text);
+  });
+
+  const missing = declared.filter((spec) => !onTheConnector(spec) && !downstream(spec));
+  return { ok: missing.length === 0, missing: missing.map((spec) => spec.text), total: declared.length };
+}
+
+/**
  * Edge precision/recall/F1 over label pairs.
  *
  * Expected edges are declared between labels; drawn edges are between ids. The
@@ -391,13 +504,30 @@ export function gradeEdges(board, expect) {
   const findExpected = (fromLabel, toLabel) => expected.find(
     ([from, to]) => labelsMatch(fromLabel, from) && labelsMatch(toLabel, to),
   );
+  /*
+   * `expect.allow_edges` is the edge counterpart of `expect.allow`.
+   *
+   * A branch constraint drawn as a card hanging off the branch adds one
+   * relationship the case did not list: 「是 → 需停机 2 小时」. That drawing is
+   * a correct reading of the prompt, so the extra connector must not be counted
+   * as a wrong edge. Only the listed pairs are pardoned — a missing expected
+   * edge still fails recall, and an invented relationship elsewhere is still an
+   * error.
+   */
+  const allowed = (expect.allow_edges ?? []).map(([from, to]) => [from, to]);
+  const findAllowed = (fromLabel, toLabel) => allowed.find(
+    ([from, to]) => labelsMatch(fromLabel, from) && labelsMatch(toLabel, to),
+  );
 
   const hit = bound.filter((edge) => findExpected(toLabel(edge.from), toLabel(edge.to)));
+  const pardoned = bound.filter((edge) => !findExpected(toLabel(edge.from), toLabel(edge.to))
+    && findAllowed(toLabel(edge.from), toLabel(edge.to)));
   const missed = expected.filter(([from, to]) => !hit.some(
     (edge) => labelsMatch(toLabel(edge.from), from) && labelsMatch(toLabel(edge.to), to),
   ));
 
-  const precision = bound.length === 0 ? (expected.length === 0 ? 1 : 0) : hit.length / bound.length;
+  const graded = bound.length - pardoned.length;
+  const precision = graded === 0 ? (expected.length === 0 ? 1 : 0) : hit.length / graded;
   const recall = expected.length === 0 ? (bound.length === 0 ? 1 : 0) : hit.length / expected.length;
   const f1 = precision + recall === 0 ? 0 : (2 * precision * recall) / (precision + recall);
   return { precision, recall, f1, matched: hit.length, missing: missed, dangling };
