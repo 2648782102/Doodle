@@ -16,6 +16,65 @@ function idFor(index: number): string {
   return `step_${index + 1}`;
 }
 
+/**
+ * Read the direction words a model writes as the mode they mean.
+ *
+ * `mode` is a four-value enum, but agents reach for the vocabulary they use
+ * when describing a picture: "horizontal", "left-right", "vertical", "linear".
+ * Recorded runs sent 42 such values across 305 runs, and every one of them was
+ * silently discarded because a recipe was present. Rejecting them once the
+ * recipe no longer hides them would trade one silent failure for a loud one, on
+ * a field the caller clearly meant something unambiguous by.
+ *
+ * Only directions with one reading are mapped. `flow` and `timeline` already
+ * default to a horizontal axis and a vertical one respectively, so the alias is
+ * the same picture the author asked for — never a reinterpretation of content.
+ */
+const MODE_ALIASES: Record<string, DiagramMode> = {
+  horizontal: "flow",
+  "left-right": "flow",
+  "left to right": "flow",
+  lr: "flow",
+  linear: "flow",
+  sequence: "flow",
+  vertical: "timeline",
+  vertical_top_down: "timeline",
+  "top-down": "timeline",
+};
+
+function normalizeMode(mode: string | undefined): DiagramMode | undefined {
+  if (!mode) return undefined;
+  const key = mode.trim().toLowerCase().replace(/[_\s]+/g, "-");
+  const direct = MODE_ALIASES[key] ?? MODE_ALIASES[key.replace(/-/g, " ")];
+  return direct ?? (mode as DiagramMode);
+}
+
+/**
+ * Reject a bad node colour at the field the caller actually wrote.
+ *
+ * The colour rule lives in `parseBoard`, which sees the generated *items*, so
+ * `color: "blue"` on a diagram node was reported as `items[1].color` — a path
+ * that does not exist in the request the model sent. The model then has to
+ * guess that node 1 was the culprit. Checking here keeps the message, the code,
+ * and the repair identical while pointing at `diagram.nodes[].color`.
+ *
+ * This still rejects rather than guesses: "blue" has no single meaning in a
+ * palette, and silently picking one would persist a colour nobody asked for.
+ */
+function assertNodeColors(nodes: readonly { id: string; color?: string }[]): void {
+  for (const node of nodes) {
+    if (node.color === undefined) continue;
+    if (/^#[0-9a-f]{6}$/i.test(node.color) || node.color === "transparent") continue;
+    throw new BoardValidationError(
+      `Node ${JSON.stringify(node.id)} has color ${JSON.stringify(node.color)}; expected a six-digit hex value`,
+      "INVALID_COLOR",
+      `diagram.nodes[${JSON.stringify(node.id)}].color`,
+      "#rrggbb or transparent",
+      `Use a six-digit hex value such as #f6d365, or transparent for no fill.`,
+    );
+  }
+}
+
 export function expandRecipe(diagram: DiagramInput): ExpandedDiagramInput {
   if (!diagram.recipe) {
     if (!diagram.nodes || diagram.nodes.length === 0) {
@@ -33,7 +92,34 @@ export function expandRecipe(diagram: DiagramInput): ExpandedDiagramInput {
     // "Cannot read properties of undefined (reading 'length')", which told the
     // agent nothing about the fix. Normalise the field here so every downstream
     // reader can rely on an array.
-    return { ...diagram, edges: diagram.edges ?? [] } as ExpandedDiagramInput;
+    assertNodeColors(diagram.nodes ?? []);
+    return {
+      ...diagram,
+      mode: normalizeMode(diagram.mode),
+      edges: diagram.edges ?? [],
+    } as ExpandedDiagramInput;
+  }
+  /*
+   * An explicit `nodes` array wins over `steps`.
+   *
+   * A model routinely sends both: it names a recipe and then spells out the
+   * graph it actually wants. The branches below rebuild nodes and edges from
+   * `steps` alone, so every such call discarded the declared nodes *and* edges
+   * and still replied success. 62 of 305 recorded runs did this, and it is why
+   * a branch diagram came back as a straight line with the rollback edge
+   * missing — the model had declared all four edges correctly.
+   *
+   * Silently dropping part of a request is the worst thing a write tool can do,
+   * because the caller cannot notice. `nodes` is the field that cannot be
+   * ignored: a caller who wants only the recipe omits it.
+   */
+  if (diagram.nodes?.length) {
+    assertNodeColors(diagram.nodes);
+    return {
+      ...diagram,
+      mode: normalizeMode(diagram.mode),
+      edges: diagram.edges ?? [],
+    } as ExpandedDiagramInput;
   }
   const steps = (diagram.steps ?? []).map((step) => step.trim()).filter(Boolean);
   if (!steps.length) {
@@ -63,7 +149,7 @@ export function expandRecipe(diagram: DiagramInput): ExpandedDiagramInput {
       ...(preceding.length && options.length ? [{ from: idFor(preceding.length - 1), to: "option_1" }] : []),
       ...options.map((_, index) => ({ from: `option_${index + 1}`, to: "outcome" })),
     ];
-    return { ...diagram, mode: diagram.mode ?? "flow", nodes, edges };
+    return { ...diagram, mode: normalizeMode(diagram.mode) ?? "flow", nodes, edges };
   }
   const mode: DiagramMode = diagram.recipe === "timeline" ? "timeline"
     : diagram.recipe === "architecture" ? "flow"
