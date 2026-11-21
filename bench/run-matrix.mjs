@@ -12,7 +12,13 @@
  * except the model gateway, which is designed for concurrent requests.
  *
  * Usage:
- *   node bench/run-matrix.mjs --models m1,m2,m3 [--only <case-id>] [--concurrency 3] [--out <dir>]
+ *   node bench/run-matrix.mjs --models m1,m2,m3 [--only <case-id>] [--concurrency 3] [--repeat 3] [--out <dir>]
+ *
+ * `--repeat N` samples each case N times. One run per case cannot tell a real
+ * difference between models from sampling noise: at this scale a model that
+ * scores 82% once may score 88% on the next attempt, and the two models being
+ * compared may both be 85%. `bench/report.mjs` turns the repeats into a pass
+ * rate with a confidence interval, which is the number worth quoting.
  */
 
 import fs from "node:fs/promises";
@@ -67,6 +73,7 @@ async function main() {
   const models = (valueOf("--models") ?? process.env.DOODLE_BENCH_MODEL ?? "workbuddy/blind-model-c")
     .split(",").map((model) => model.trim()).filter(Boolean);
   const concurrency = Number(valueOf("--concurrency") ?? 3);
+  const repeat = Math.max(1, Number(valueOf("--repeat") ?? 1));
   const only = valueOf("--only");
   const outDir = path.resolve(valueOf("--out") ?? path.join(repoRoot, "bench", "runs", `matrix-${Date.now()}`));
 
@@ -82,7 +89,7 @@ async function main() {
 
   await fs.mkdir(outDir, { recursive: true });
   const started = Date.now();
-  console.error(`${models.length} model(s) × ${cases.length} case(s), concurrency ${concurrency}`);
+  console.error(`${models.length} model(s) × ${cases.length} case(s) × ${repeat} attempt(s), concurrency ${concurrency}`);
   console.error(`models: ${models.join(", ")}`);
 
   /*
@@ -93,18 +100,29 @@ async function main() {
   const perModel = await Promise.all(models.map(async (model) => {
     const modelDir = path.join(outDir, slug(model));
     await fs.mkdir(modelDir, { recursive: true });
-    const results = await pool(cases, concurrency, async (testCase) => {
-      const label = `${slug(model)} ${testCase.id}`;
+    /*
+     * Repeats are expanded into the work list rather than looped inside the
+     * worker, so `--concurrency` still bounds total in-flight runs. Looping
+     * inside would make one case hold a slot for N sequential attempts while
+     * other cases waited.
+     */
+    const work = cases.flatMap((testCase) => Array.from({ length: repeat }, (_, attempt) => ({ testCase, attempt })));
+    const results = await pool(work, concurrency, async ({ testCase, attempt }) => {
+      const suffix = repeat > 1 ? ` #${attempt + 1}` : "";
+      const label = `${slug(model)} ${testCase.id}${suffix}`;
       const caseStartedAt = Date.now();
       try {
         const trace = assertTrace(await runCase(testCase, { model }));
-        const file = path.join(modelDir, `${testCase.id.replace(/[^a-z0-9]+/gi, "-")}.json`);
+        // The attempt index is part of the file name, or attempt 2 would
+        // overwrite attempt 1 and the repeats would collapse back to one.
+        const base = testCase.id.replace(/[^a-z0-9]+/gi, "-");
+        const file = path.join(modelDir, repeat > 1 ? `${base}.${attempt + 1}.json` : `${base}.json`);
         await fs.writeFile(file, `${JSON.stringify(trace, null, 2)}\n`, "utf8");
         process.stderr.write(`  ✓ ${label} (${trace.turns.length} calls, ${Date.now() - caseStartedAt} ms)\n`);
-        return { case: testCase.id, ok: true };
+        return { case: testCase.id, attempt, ok: true };
       } catch (error) {
         process.stderr.write(`  ✗ ${label}: ${error.message?.slice(0, 120)}\n`);
-        return { case: testCase.id, ok: false, error: String(error.message ?? error) };
+        return { case: testCase.id, attempt, ok: false, error: String(error.message ?? error) };
       }
     });
     return { model, dir: modelDir, results };
