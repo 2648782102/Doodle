@@ -1,0 +1,241 @@
+[
+  {
+    "id": "seq/four-steps-cn",
+    "prompt": "画四个步骤：收集需求 → 设计原型 → 开发实现 → 验收上线",
+    "expect": {
+      "kind": "sequence",
+      "ordered": true,
+      "nodes": ["收集需求", "设计原型", "开发实现", "验收上线"],
+      "forbid": ["overlap", "through_node"]
+    },
+    "budget": { "max_tool_calls": 3, "max_seconds": 90, "max_bytes": 90000 }
+  },
+  {
+    "id": "seq/ci-pipeline",
+    "prompt": "画 CI 流水线五个阶段：拉取代码 → 装依赖 → 跑测试 → 打包 → 发布",
+    "expect": {
+      "kind": "sequence",
+      "ordered": true,
+      "nodes": ["拉取代码", "装依赖", "跑测试", "打包", "发布"],
+      "forbid": ["overlap"]
+    },
+    "budget": { "max_tool_calls": 3, "max_seconds": 90, "max_bytes": 90000 }
+  },
+  {
+    "id": "seq/refund-flow",
+    "prompt": "退款流程：申请退款 → 商家审核 → 平台介入 → 原路退回",
+    "expect": {
+      "kind": "sequence",
+      "ordered": true,
+      "nodes": ["申请退款", "商家审核", "平台介入", "原路退回"],
+      "forbid": ["overlap"]
+    },
+    "budget": { "max_tool_calls": 3, "max_seconds": 90, "max_bytes": 90000 }
+  },
+  {
+    "id": "seq/three-argue",
+    "prompt": "把三个论点按顺序画出来：成本更低 → 风险可控 → 收益更高",
+    "expect": {
+      "kind": "sequence",
+      "ordered": true,
+      "nodes": ["成本更低", "风险可控", "收益更高"],
+      "forbid": ["overlap"]
+    },
+    "budget": { "max_tool_calls": 3, "max_seconds": 60, "max_bytes": 60000 }
+  },
+  {
+    "id": "seq/deploy-rollback",
+    "prompt": "画部署与回滚：准备 → 部署 → 验证 → 回滚",
+    "expect": {
+      "kind": "sequence",
+      "ordered": true,
+      "nodes": ["准备", "部署", "验证", "回滚"],
+      "forbid": ["overlap"]
+    },
+    "budget": { "max_tool_calls": 3, "max_seconds": 90, "max_bytes": 90000 }
+  },
+  {
+    "id": "seq/onboarding-3",
+    "prompt": "新员工入职三步：报到 → 培训 → 上岗",
+    "expect": {
+      "kind": "sequence",
+      "ordered": true,
+      "nodes": ["报到", "培训", "上岗"],
+      "forbid": ["overlap"]
+    },
+    "budget": { "max_tool_calls": 3, "max_seconds": 60, "max_bytes": 60000 }
+  },
+  {
+    "id": "seq/data-flow",
+    "prompt": "数据从采集到入库：采集 → 清洗 → 转换 → 入库",
+    "expect": {
+      "kind": "sequence",
+      "ordered": true,
+      "nodes": ["采集", "清洗", "转换", "入库"],
+      "forbid": ["overlap", "through_node"]
+    },
+    "budget": { "max_tool_calls": 3, "max_seconds": 90, "max_bytes": 90000 }
+  },
+  {
+    "id": "seq/support-escalation",
+    "prompt": "客服升级路径：一线客服 → 二线支持 → 技术专家 → 研发团队",
+    "expect": {
+      "kind": "sequence",
+      "ordered": true,
+      "nodes": ["一线客服", "二线支持", "技术专家", "研发团队"],
+      "forbid": ["overlap"]
+    },
+    "budget": { "max_tool_calls": 3, "max_seconds": 90, "max_bytes": 90000 }
+  },
+  {
+    "id": "seq/five-whys",
+    "prompt": "用五个为什么追根因：现象 → 为什么1 → 为什么2 → 为什么3 → 根因",
+    "expect": {
+      "kind": "sequence",
+      "ordered": true,
+      "nodes": ["现象", "为什么1", "为什么2", "为什么3", "根因"],
+      "forbid": ["overlap"]
+    },
+    "budget": { "max_tool_calls": 3, "max_seconds": 90, "max_bytes": 90000 }
+  },
+  {
+    "id": "seq/content-publish",
+    "prompt": "内容发布流程：撰写 → 审核 → 排版 → 发布 → 推广",
+    "expect": {
+      "kind": "sequence",
+      "ordered": true,
+      "nodes": ["撰写", "审核", "排版", "发布", "推广"],
+      "forbid": ["overlap", "through_node"]
+    },
+    "budget": { "max_tool_calls": 3, "max_seconds": 90, "max_bytes": 90000 }
+  },
+  {
+    "id": "seq/incident-response",
+    "prompt": "故障响应六步：发现 → 告警 → 定位 → 止损 → 修复 → 复盘",
+    "expect": {
+      "kind": "sequence",
+      "ordered": true,
+      "nodes": ["发现", "告警", "定位", "止损", "修复", "复盘"],
+      "forbid": ["overlap"]
+    },
+    "budget": { "max_tool_calls": 4, "max_seconds": 120, "max_bytes": 120000 }
+  },
+  {
+    "id": "seq/sales-funnel",
+    "prompt": "销售漏斗四层：线索 → 商机 → 报价 → 成交",
+    "expect": {
+      "kind": "sequence",
+      "ordered": true,
+      "nodes": ["线索", "商机", "报价", "成交"],
+      "forbid": ["overlap"]
+    },
+    "budget": { "max_tool_calls": 3, "max_seconds": 90, "max_bytes": 90000 }
+  },
+  {
+    "id": "tree/feature-rollout",
+    "prompt": "功能上线决策：是否灰度 → 灰度 / 全量，两者都到观察期",
+    "expect": {
+      "kind": "tree",
+      "nodes": ["是否灰度", "灰度", "全量", "观察期"],
+      "edges": [
+        ["是否灰度", "灰度"],
+        ["是否灰度", "全量"],
+        ["灰度", "观察期"],
+        ["全量", "观察期"]
+      ],
+      "forbid": ["overlap"]
+    },
+    "budget": { "max_tool_calls": 5, "max_seconds": 150, "max_bytes": 200000 }
+  },
+  {
+    "id": "tree/build-or-buy",
+    "prompt": "自建还是采购：评估需求 → 自建 / 采购，两条路都到上线",
+    "expect": {
+      "kind": "tree",
+      "nodes": ["评估需求", "自建", "采购", "上线"],
+      "edges": [
+        ["评估需求", "自建"],
+        ["评估需求", "采购"],
+        ["自建", "上线"],
+        ["采购", "上线"]
+      ],
+      "forbid": ["overlap"]
+    },
+    "budget": { "max_tool_calls": 5, "max_seconds": 150, "max_bytes": 200000 }
+  },
+  {
+    "id": "tree/three-tier-service",
+    "prompt": "画三层服务依赖：网关层 → 应用层 → 数据层",
+    "expect": {
+      "kind": "tree",
+      "nodes": ["网关层", "应用层", "数据层"],
+      "edges": [["网关层", "应用层"], ["应用层", "数据层"]],
+      "depth": { "网关层": 0, "应用层": 1, "数据层": 2 },
+      "forbid": ["overlap"]
+    },
+    "budget": { "max_tool_calls": 4, "max_seconds": 120, "max_bytes": 150000 }
+  },
+  {
+    "id": "compare/vendor-a-b",
+    "prompt": "左右对比两个供应商：A 价格低但交付慢，B 价格高但交付快",
+    "expect": {
+      "kind": "comparison",
+      "nodes": ["A", "B"],
+      "forbid": ["overlap"]
+    },
+    "budget": { "max_tool_calls": 4, "max_seconds": 120, "max_bytes": 150000 }
+  },
+  {
+    "id": "compare/before-after",
+    "prompt": "对比改造前后：改造前人工处理耗时一天，改造后自动处理耗时一小时",
+    "expect": {
+      "kind": "comparison",
+      "nodes": ["改造前", "改造后"],
+      "forbid": ["overlap"]
+    },
+    "budget": { "max_tool_calls": 4, "max_seconds": 120, "max_bytes": 150000 }
+  },
+  {
+    "id": "edge/two-objects",
+    "prompt": "只画两个方框并用箭头连起来：输入 → 输出",
+    "expect": {
+      "kind": "sequence",
+      "ordered": true,
+      "nodes": ["输入", "输出"],
+      "forbid": ["overlap"]
+    },
+    "budget": { "max_tool_calls": 2, "max_seconds": 60, "max_bytes": 50000 }
+  },
+  {
+    "id": "edge/mixed-lengths",
+    "prompt": "三步，标签长度差异很大：启动 / 完整的端到端回归测试与灰度验证 / 结束",
+    "expect": {
+      "kind": "sequence",
+      "ordered": true,
+      "nodes": ["启动", "完整的端到端回归测试与灰度验证", "结束"],
+      "forbid": ["overlap"]
+    },
+    "budget": { "max_tool_calls": 3, "max_seconds": 90, "max_bytes": 90000 }
+  },
+  {
+    "id": "edge/single-ellipse",
+    "prompt": "画一个椭圆，写「候选方案」",
+    "expect": {
+      "kind": "sequence",
+      "nodes": ["候选方案"],
+      "forbid": ["overlap"]
+    },
+    "budget": { "max_tool_calls": 2, "max_seconds": 60, "max_bytes": 40000 }
+  },
+  {
+    "id": "seq/annual-cycle",
+    "prompt": "年度规划周期：目标设定 → 季度复盘 → 年中调整 → 年终总结",
+    "expect": {
+      "kind": "sequence",
+      "ordered": true,
+      "nodes": ["目标设定", "季度复盘", "年中调整", "年终总结"],
+      "forbid": ["overlap"]
+    },
+    "budget": { "max_tool_calls": 3, "max_seconds": 90, "max_bytes": 90000 }
+  }
+]

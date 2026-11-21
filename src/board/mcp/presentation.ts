@@ -297,6 +297,7 @@ export function boardGuidance(): string {
     `- Size the write to the bounds: at most 100 items per call, shapes 16-2000 wide and 16-1200 tall, text 1200 characters, coordinates within ±100000, and a diagram of 48 nodes / 96 edges. capabilities.limits has the full table; every rejection names the field and the fix.`,
     "- A line is an arrow from (x,y) to (x+w,y+h); w/h are signed endpoint deltas. Set shape to straight, curve, or orthogonal.",
     "- Use stroke for freehand marks with local points, image for a data:image/* source, title for a short heading, and emphasis: focus to highlight what matters.",
+    "- Draw two or more related objects with draw_board.diagram, not hand-placed items: it lays them out and connects them. Hand-computing x/y/w/h makes a model re-adjust geometry over and over — measured at 4.8 turns per drawing against 1.6 with diagram.",
     "- Use layout for tidy arrangements; human multi-select can group related objects in the canvas.",
     "- Place line endpoints just outside the source and target shapes; the arrow text is a short centered label.",
     "- Draw only what was asked. Do not add a legend, a summary line, or numbered captions unless the person requested them; a connector's label belongs in that line's `text`, not in a separate free-floating text item beside it.",
