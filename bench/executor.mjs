@@ -286,7 +286,20 @@ async function runCaseOnce(testCase, options = {}) {
     started_at: startedAt,
     duration_ms: Date.now() - startedAt,
     turns,
-    ...(usage ? { usage: { input_tokens: usage.input_tokens, output_tokens: usage.output_tokens } } : {}),
+    ...(usage ? {
+      usage: {
+        input_tokens: usage.input_tokens,
+        /*
+         * The split is what makes cost measurable. The Codex CLI ships roughly
+         * 40k tokens of its own system prompt and reports nearly all of it as
+         * cached; without this field every run looked like ~294k input tokens,
+         * which reads as "Doodle is expensive" when the fresh tokens are a few
+         * thousand.
+         */
+        cached_input_tokens: usage.cached_input_tokens ?? 0,
+        output_tokens: usage.output_tokens,
+      },
+    } : {}),
     final_board: finalBoard,
     ...(code !== 0 ? { budget_exceeded: true } : {}),
   });

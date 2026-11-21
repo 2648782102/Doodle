@@ -20,3 +20,6 @@ output/*.html
 
 # Scratch probes: never part of the project.
 .probe/
+
+# Benchmark traces and measurements are per-run artifacts, not source.
+bench/runs/
