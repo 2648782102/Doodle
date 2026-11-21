@@ -89,19 +89,87 @@ export function summarizeByModel(rows) {
     groups.set(row.model, list);
   }
   return [...groups.entries()]
-    .map(([model, list]) => ({
-      model,
-      count: list.length,
-      score: mean(list.map((row) => row.score)),
-      passRate: mean(list.map((row) => (row.pass ? 1 : 0))),
-      nodeRecall: mean(list.map((row) => row.structure.nodes.recall)),
-      edgeF1: mean(list.map((row) => row.structure.edges.f1)),
-      crossings: mean(list.map((row) => row.geometry.crossings)),
-      medianMs: median(list.map((row) => row.durationMs ?? 0)),
-      calls: mean(list.map((row) => row.turns)),
-      retries: list.reduce((sum, row) => sum + row.retries, 0),
-    }))
+    .map(([model, list]) => {
+      /*
+       * With repeats, "pass rate" is no longer a single boolean per case: it is
+       * how often this model produced a passing drawing. The interval says how
+       * much of the apparent difference between two models could be sampling
+       * noise — at three attempts a 6-point gap is usually not real.
+       */
+      const interval = wilsonInterval(list.filter((row) => row.pass).length, list.length);
+      return {
+        model,
+        count: list.length,
+        cases: new Set(list.map((row) => row.case)).size,
+        score: mean(list.map((row) => row.score)),
+        passRate: interval.rate,
+        passLow: interval.low,
+        passHigh: interval.high,
+        nodeRecall: mean(list.map((row) => row.structure.nodes.recall)),
+        edgeF1: mean(list.map((row) => row.structure.edges.f1)),
+        crossings: mean(list.map((row) => row.geometry.crossings)),
+        medianMs: median(list.map((row) => row.durationMs ?? 0)),
+        calls: mean(list.map((row) => row.turns)),
+        retries: list.reduce((sum, row) => sum + row.retries, 0),
+      };
+    })
     .sort((left, right) => right.score - left.score);
+}
+
+/**
+ * Wilson score interval for a pass rate.
+ *
+ * The normal approximation is unusable here: with three attempts per case and
+ * rates near 1.0 it produces intervals that extend past 100%, and at 3/3 it
+ * collapses to zero width and claims certainty. Wilson stays inside [0, 1] and
+ * correctly widens for small samples, which is the whole point of repeating.
+ *
+ * z = 1.96 (95%). Exact per-case modelling was rejected: attempts are not
+ * independent (the same prompt, same model, same case), so a tighter interval
+ * would overstate what the run proves.
+ */
+export function wilsonInterval(successes, total, z = 1.96) {
+  if (total === 0) return { rate: 0, low: 0, high: 0 };
+  const p = successes / total;
+  const denominator = 1 + (z * z) / total;
+  const centre = p + (z * z) / (2 * total);
+  const spread = z * Math.sqrt((p * (1 - p)) / total + (z * z) / (4 * total * total));
+  return {
+    rate: p,
+    low: Math.max(0, (centre - spread) / denominator),
+    high: Math.min(1, (centre + spread) / denominator),
+  };
+}
+
+/**
+ * Per-case pass rate, which is where instability actually lives.
+ *
+ * A model at 85% overall can be 100% on ten easy cases and 0% on seven hard
+ * ones, or 85% on every single one. The first is a capability gap; the second
+ * is a model that guesses. Only the per-case view tells them apart.
+ */
+export function summarizeByCase(rows) {
+  const groups = new Map();
+  for (const row of rows) {
+    const key = `${row.case}\u0000${row.model}`;
+    const list = groups.get(key) ?? [];
+    list.push(row);
+    groups.set(key, list);
+  }
+  return [...groups.values()].map((list) => {
+    const first = list[0];
+    const passes = list.filter((row) => row.pass).length;
+    return {
+      case: first.case,
+      model: first.model,
+      attempts: list.length,
+      passes,
+      rate: passes / list.length,
+      // "flaky" is only meaningful once a case has been tried more than once.
+      unstable: list.length > 1 && passes > 0 && passes < list.length,
+      score: mean(list.map((row) => row.score)),
+    };
+  });
 }
 
 /**
@@ -189,17 +257,56 @@ export function renderMarkdown({ rows, unknown, comparison, perModel = false }) 
     + (models.length > 1 ? ` · models: ${models.length}` : ""));
   lines.push("");
 
-  if (perModel || models.length > 1) {
+  const byModel = summarizeByModel(rows);
+  /*
+   * "Repeated" is about sampling, not about how many models ran. A single model
+   * sampled three times still needs its interval and its unstable cases named —
+   * gating that on `models.length > 1` hid exactly the runs that were trying to
+   * measure variance.
+   */
+  const repeated = byModel.some((group) => group.count > group.cases);
+
+  if (perModel || models.length > 1 || repeated) {
     lines.push("## By model");
     lines.push("");
-    lines.push("| model | cases | score | pass | node recall | edge F1 | crossings | median ms | calls | retries |");
-    lines.push("|---|---|---|---|---|---|---|---|---|---|");
-    for (const group of summarizeByModel(rows)) {
-      lines.push(`| ${group.model} | ${group.count} | ${group.score.toFixed(2)} | ${formatPercent(group.passRate)} `
-        + `| ${group.nodeRecall.toFixed(2)} | ${group.edgeF1.toFixed(2)} | ${group.crossings.toFixed(1)} `
-        + `| ${group.medianMs} | ${group.calls.toFixed(1)} | ${group.retries} |`);
+    /*
+     * The pass column carries its interval whenever a model was sampled more
+     * than once. Reading "82%" and "88%" as a ranking is exactly the mistake
+     * repeats exist to prevent — the two intervals usually overlap.
+     */
+    lines.push(repeated
+      ? "| model | cases | attempts | score | pass (95% CI) | node recall | edge F1 | crossings | median ms |"
+      : "| model | cases | score | pass | node recall | edge F1 | crossings | median ms | calls | retries |");
+    lines.push(repeated ? "|---|---|---|---|---|---|---|---|---|" : "|---|---|---|---|---|---|---|---|---|---|");
+    for (const group of byModel) {
+      if (repeated) {
+        lines.push(`| ${group.model} | ${group.cases} | ${group.count} | ${group.score.toFixed(2)} `
+          + `| ${formatPercent(group.passRate)} (${formatPercent(group.passLow)}–${formatPercent(group.passHigh)}) `
+          + `| ${group.nodeRecall.toFixed(2)} | ${group.edgeF1.toFixed(2)} | ${group.crossings.toFixed(1)} | ${group.medianMs} |`);
+      } else {
+        lines.push(`| ${group.model} | ${group.count} | ${group.score.toFixed(2)} | ${formatPercent(group.passRate)} `
+          + `| ${group.nodeRecall.toFixed(2)} | ${group.edgeF1.toFixed(2)} | ${group.crossings.toFixed(1)} `
+          + `| ${group.medianMs} | ${group.calls.toFixed(1)} | ${group.retries} |`);
+      }
     }
     lines.push("");
+
+    if (repeated) {
+      const flaky = summarizeByCase(rows).filter((entry) => entry.unstable);
+      lines.push("### Stability");
+      lines.push("");
+      if (flaky.length === 0) {
+        lines.push("No case passed on some attempts and failed on others — the per-case results are stable.");
+      } else {
+        lines.push(`${flaky.length} case(s) passed sometimes and failed sometimes, which is the difference between`
+          + " \"this model is weaker\" and \"this model is guessing\":");
+        lines.push("");
+        for (const entry of flaky.sort((a, b) => a.rate - b.rate).slice(0, 12)) {
+          lines.push(`- ${entry.model} · ${entry.case} — ${entry.passes}/${entry.attempts} passed`);
+        }
+      }
+      lines.push("");
+    }
 
     /*
      * Per-case matrix. A model-level average hides the shape of a difference:
@@ -211,11 +318,21 @@ export function renderMarkdown({ rows, unknown, comparison, perModel = false }) 
     lines.push("");
     lines.push(`| case | ${models.join(" | ")} |`);
     lines.push(`|---|${models.map(() => "---").join("|")}|`);
+    const byCase = summarizeByCase(rows);
     for (const caseId of caseIds) {
       const cells = models.map((model) => {
-        const row = rows.find((candidate) => candidate.case === caseId && candidate.model === model);
-        if (!row) return "—";
-        return `${row.pass ? "✅" : "❌"} ${row.score.toFixed(2)}`;
+        const entry = byCase.find((candidate) => candidate.case === caseId && candidate.model === model);
+        if (!entry) return "—";
+        /*
+         * With repeats the cell shows the ratio, not one attempt's verdict:
+         * "2/3" means the model can draw this but does not always, which is a
+         * different fact from either "yes" or "no".
+         */
+        if (entry.attempts > 1) {
+          const mark = entry.passes === entry.attempts ? "✅" : entry.passes === 0 ? "❌" : "⚠️";
+          return `${mark} ${entry.passes}/${entry.attempts}`;
+        }
+        return `${entry.passes === 1 ? "✅" : "❌"} ${entry.score.toFixed(2)}`;
       });
       lines.push(`| ${caseId} | ${cells.join(" | ")} |`);
     }

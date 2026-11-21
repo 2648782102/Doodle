@@ -8,7 +8,10 @@ import { describe, expect, it } from "vitest";
 import { createEmptyBoard, diagramToBoardItems, touchBoard } from "../dist/board/types.js";
 import { expandRecipe } from "../dist/board/diagram/recipe.js";
 import { assertTrace, makeTrace, shortHash } from "./trace.mjs";
-import { clusterFailures, compareRuns, gradeTraces, renderMarkdown, summarizeByKind, summarizeByModel } from "./report.mjs";
+import {
+  clusterFailures, compareRuns, gradeTraces, renderMarkdown,
+  summarizeByCase, summarizeByKind, summarizeByModel, wilsonInterval,
+} from "./report.mjs";
 
 function flowBoard(steps) {
   return touchBoard({ ...createEmptyBoard(), items: diagramToBoardItems(expandRecipe({ recipe: "flow", steps }), "ai") });
@@ -200,5 +203,88 @@ describe("multi-model comparison", () => {
     // m1 fails case b while passing a — the matrix must show both.
     expect(markdown).toMatch(/\| b \|.*✅ 1\.00.*\|/);
     expect(markdown).toMatch(/\| b \|.*❌ 0\.50.*\|/);
+  });
+});
+
+
+describe("repeated sampling", () => {
+  /*
+   * One attempt per case cannot separate a real difference from noise: a model
+   * that scores 82% once may score 88% next time, and the model it is compared
+   * with may genuinely be 85%. These tests are about reporting that honestly
+   * rather than producing a confident ranking from three coin flips.
+   */
+  const row = (model, testCase, pass, score = pass ? 1 : 0.5) => ({
+    case: testCase, kind: "sequence", model, score, pass, failed: pass ? [] : ["edge_f1"],
+    structure: { nodes: { recall: 1 }, edges: { f1: pass ? 1 : 0.5 } },
+    geometry: { crossings: 0 }, budget: {}, durationMs: 1000, turns: 2, retries: 0,
+    promptHash: "p", toolDescHash: "t",
+  });
+
+  it("reports an interval that widens when the sample is small", () => {
+    /*
+     * The naive interval is unusable here: at 3/3 it collapses to zero width and
+     * claims certainty, and near 1.0 it can extend past 100%. Wilson stays
+     * inside [0,1] and keeps the uncertainty visible.
+     */
+    const tiny = wilsonInterval(3, 3);
+    const large = wilsonInterval(300, 300);
+    expect(tiny.low).toBeGreaterThan(0);
+    expect(tiny.low).toBeLessThan(0.6);
+    expect(large.low).toBeGreaterThan(0.98);
+    expect(tiny.high).toBeLessThanOrEqual(1);
+    expect(large.high).toBeLessThanOrEqual(1);
+  });
+
+  it("never reports an interval outside 0..1", () => {
+    for (const [passes, total] of [[0, 3], [1, 3], [3, 3], [0, 1]]) {
+      const interval = wilsonInterval(passes, total);
+      expect(interval.low).toBeGreaterThanOrEqual(0);
+      expect(interval.high).toBeLessThanOrEqual(1);
+      expect(interval.low).toBeLessThanOrEqual(interval.high);
+    }
+  });
+
+  it("treats a mixed pass/fail case as unstable, not as a verdict", () => {
+    const rows = [row("m1", "a", true), row("m1", "a", false), row("m1", "a", true)];
+    const summary = summarizeByCase(rows);
+    expect(summary).toHaveLength(1);
+    expect(summary[0]).toMatchObject({ attempts: 3, passes: 2, unstable: true });
+  });
+
+  it("does not call a case unstable when every attempt agrees", () => {
+    const allPass = summarizeByCase([row("m1", "a", true), row("m1", "a", true)]);
+    const allFail = summarizeByCase([row("m1", "b", false), row("m1", "b", false)]);
+    expect(allPass[0].unstable).toBe(false);
+    expect(allFail[0].unstable).toBe(false);
+  });
+
+  it("counts attempts separately from cases", () => {
+    // A model with 2 cases × 3 attempts is 6 rows, not 6 cases.
+    const rows = ["a", "b"].flatMap((testCase) => [1, 2, 3].map(() => row("m1", testCase, true)));
+    const [summary] = summarizeByModel(rows);
+    expect(summary.count).toBe(6);
+    expect(summary.cases).toBe(2);
+  });
+
+  it("shows the ratio in the per-case matrix once a case is repeated", () => {
+    const rows = [
+      row("m1", "a", true), row("m1", "a", true), row("m1", "a", false),
+      row("m2", "a", true), row("m2", "a", true), row("m2", "a", true),
+    ];
+    const markdown = renderMarkdown({ rows, unknown: [] });
+    expect(markdown).toContain("⚠️ 2/3");
+    expect(markdown).toContain("✅ 3/3");
+  });
+
+  it("names the unstable cases so a report cannot hide them behind an average", () => {
+    const rows = [
+      row("m1", "steady", true), row("m1", "steady", true),
+      row("m1", "coin", true), row("m1", "coin", false),
+    ];
+    const markdown = renderMarkdown({ rows, unknown: [] });
+    expect(markdown).toContain("### Stability");
+    expect(markdown).toContain("coin");
+    expect(markdown).not.toContain("steady — 2/2");
   });
 });

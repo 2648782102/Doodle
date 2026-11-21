@@ -15,7 +15,7 @@ import fs from "node:fs/promises";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { assertTrace } from "./trace.mjs";
-import { clusterFailures, compareRuns, gradeTraces, renderMarkdown, summarizeByKind, summarizeByModel } from "./report.mjs";
+import { clusterFailures, compareRuns, gradeTraces, renderMarkdown, summarizeByCase, summarizeByKind, summarizeByModel } from "./report.mjs";
 
 const here = path.dirname(fileURLToPath(import.meta.url));
 const repoRoot = path.resolve(here, "..");
