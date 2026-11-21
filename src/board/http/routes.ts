@@ -21,12 +21,11 @@ import { boardLibraryIndexText, type BoardLibrary, type BoardLibraryAction } fro
 import type { BoardRevisionCache } from "../state/revision-cache.js";
 import type { BoardStore } from "../state/store.js";
 import { conflictPayload } from "../write/conflict.js";
-import { boardToSvg } from "../svg/render.js";
 import { isAllowedHost, isAllowedOrigin, validationErrorBody } from "./security.js";
 import { commitBoardWrite } from "../write/commit.js";
 import { projectSnapshotText, scanProject, type ProjectScanOptions } from "../project/scan.js";
 import { readAsset } from "./templates.js";
-import { serveAsset } from "./assets.js";
+import { registerActiveBoardSvg, registerLibrarySvg, serveAsset } from "./assets.js";
 import { expandRecipe } from "../diagram/recipe.js";
 import { boardVisualDigest } from "../types.js";
 
@@ -97,26 +96,14 @@ export interface BoardRoutesContext {
     });
 
     /*
-     * The board as an image, for readers with no browser.
+     * Board pictures live in their own module: one derived-on-request render of
+     * the active board, and one per saved board for the library rows.
      *
-     * A README screenshot goes stale the moment the board changes; a CI job that
-     * wants to attach "what the board looked like" has nowhere to get it. This
-     * renders the current board with plain shapes. Read-only: no revision bump,
-     * no write, and `capabilities.svgPreview` tells the agent it exists.
+     * Both are read-only — no revision bump, no write — and
+     * `capabilities.svgPreview` tells the agent the active one exists.
      */
-    ctx.app.get("/api/board.svg", async (req, res) => {
-      const current = await ctx.board.snapshot();
-      const maxSize = Number(req.query.max);
-      const svg = boardToSvg(current, {
-        maxSize: Number.isFinite(maxSize) && maxSize > 0 ? maxSize : undefined,
-        background: req.query.background !== "false",
-      });
-      res.type("image/svg+xml");
-      // The board changes on every edit, so the preview must not be cached
-      // beyond the response like the content-hashed client assets are.
-      res.setHeader("Cache-Control", "no-cache");
-      res.send(svg);
-    });
+    registerActiveBoardSvg(ctx.app, { board: ctx.board, library: ctx.library });
+    registerLibrarySvg(ctx.app, { board: ctx.board, library: ctx.library });
 
     ctx.app.get("/api/board/library", async (_req, res) => {
       const result = await ctx.library.apply({ type: "list" }, await ctx.board.snapshot());

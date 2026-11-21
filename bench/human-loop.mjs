@@ -48,7 +48,30 @@ export function applyHumanEdit(board, edit) {
         return item;
     }
   }).filter(Boolean);
-  return { ...board, items, revision: board.revision + 1, updatedAt: new Date().toISOString() };
+  /*
+   * Deleting a node must take its connectors with it.
+   *
+   * A line that still binds to the removed id makes `parseBoard` reject the
+   * whole board ("ends at step_2, which no item declares"), and the server then
+   * quarantines the file and starts empty. The model was then correctly
+   * reporting "the board has zero objects" while the grader called it a
+   * comprehension failure — the harness had corrupted the board, not the model
+   * misread it.
+   *
+   * A person deleting a card in the canvas removes its arrows too, so this is
+   * also the more faithful edit.
+   */
+  const kept = edit.type === "delete"
+    ? items.filter((item) => {
+      const surviving = new Set(items.map((candidate) => candidate.id));
+      // A connector with a missing endpoint is removed whole, which is what the
+      // canvas does when a person deletes an arrow's source or target.
+      if (item.startItemId && !surviving.has(item.startItemId)) return false;
+      if (item.endItemId && !surviving.has(item.endItemId)) return false;
+      return true;
+    })
+    : items;
+  return { ...board, items: kept, revision: board.revision + 1, updatedAt: new Date().toISOString() };
 }
 
 /** What the board itself says the person did — the ground truth for grading. */
@@ -76,7 +99,14 @@ export function gradeHumanReport({ answer, handoff, before, after }) {
   const edits = handoff.humanEdits ?? [];
   const labels = edits
     .map((edit) => {
-      const item = after.items.find((candidate) => candidate.id === edit.id);
+      /*
+       * A removed object only exists on the *before* board. Looking it up in
+       * `after` returned nothing, so a correct answer about a deletion could
+       * never be recognised — the hardest edit kind would score zero by
+       * construction.
+       */
+      const item = after.items.find((candidate) => candidate.id === edit.id)
+        ?? before.items.find((candidate) => candidate.id === edit.id);
       return item ? (item.title || item.text || "").trim() : "";
     })
     .filter(Boolean);
@@ -104,7 +134,13 @@ export function gradeHumanReport({ answer, handoff, before, after }) {
    * board. A model that says "I see you moved 「登录」" when no such object
    * exists has hallucinated the board, which matters more than missing a detail.
    */
-  const boardLabels = after.items.map((item) => (item.title || item.text || "").trim()).filter(Boolean);
+  /*
+   * A deletion legitimately mentions a label that is no longer on the board, so
+   * the invention check accepts labels from both sides. Inventing an object that
+   * never existed is still caught.
+   */
+  const boardLabels = [...after.items, ...before.items]
+    .map((item) => (item.title || item.text || "").trim()).filter(Boolean);
   const quoted = [...text.matchAll(/[「"“]([^」"”]{1,24})[」"”]/g)].map((match) => match[1].trim());
   const invented = quoted.filter((label) => !boardLabels.some((existing) => existing.includes(label) || label.includes(existing)));
 

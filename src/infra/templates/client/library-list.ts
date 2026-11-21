@@ -90,6 +90,14 @@ export interface EntryHandlers {
   delete: (entry: LibraryEntry) => void;
   /** Re-render, so a cancelled edit or an empty rename restores the row. */
   refresh: () => void;
+  /**
+   * The picture for a board, or `undefined` to keep the row text-only.
+   *
+   * Standalone serves it from `/api/board/library/:id.svg`; the embedded host
+   * has no such route, and a broken `<img>` in every row would be worse than a
+   * row with no picture.
+   */
+  thumbnailUrl?: (entry: LibraryEntry) => string | undefined;
 }
 
 /**
@@ -124,6 +132,32 @@ export function renderBoardRows(
 
     const actions = document.createElement("div");
     actions.className = "doodle-library-entry-actions";
+
+    /*
+     * The picture replaces the row's left padding, not its text.
+     *
+     * A thumbnail beside the name would steal width from the one thing that has
+     * to stay readable — the board's name — so it sits in its own column at a
+     * fixed size. `loading="lazy"` keeps a twenty-board library from firing
+     * twenty requests the moment the drawer opens; the ones below the fold are
+     * only fetched when they are scrolled to. `alt=""` because the name beside
+     * it already says what the board is; a screen reader reading the picture too
+     * would repeat it.
+     */
+    const thumbnailSrc = handlers.thumbnailUrl?.(entry);
+    if (thumbnailSrc) {
+      const thumb = document.createElement("img");
+      thumb.className = "doodle-library-thumb";
+      thumb.src = thumbnailSrc;
+      thumb.alt = "";
+      thumb.loading = "lazy";
+      thumb.decoding = "async";
+      // A missing or failed render leaves an empty box; hide it so the row falls
+      // back to the text-only layout it had before.
+      thumb.addEventListener("error", () => { thumb.hidden = true; });
+      row.append(thumb);
+      row.classList.add("has-thumb");
+    }
 
     const renameButton = document.createElement("button");
     renameButton.textContent = "改名";

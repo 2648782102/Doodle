@@ -193,3 +193,23 @@ export async function recoverFromCanvas(deps: RecoverFromCanvasDeps): Promise<Re
     onConflict: deps.onConflict,
   });
 }
+
+/**
+ * The shape recovery needs from a board, and nothing else.
+ *
+ * The canvas holds `BoardSnapshot`s whose `items` are `unknown[]`; recovery only
+ * ever reads ids and revisions. Projecting in one place keeps the three call
+ * sites from each inventing a slightly different cast.
+ */
+export function mergeBoardView(snapshot: {
+  id: string;
+  revision: number;
+  items: unknown[];
+} | null): MergeBoard | null {
+  if (!snapshot) return null;
+  return {
+    id: snapshot.id,
+    revision: snapshot.revision,
+    items: snapshot.items as Array<Record<string, unknown>>,
+  };
+}

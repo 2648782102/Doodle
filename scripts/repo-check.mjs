@@ -964,12 +964,14 @@ check(
   /*
    * A ceiling, not a target.
    *
-   * origin/master ships 79 modules; the offline layer added six (board cache,
-   * boot reconciliation, write recovery, service worker, endpoint record, route
-   * table). 88 leaves room for three more before a reviewer has to justify the
-   * growth. The point is that adding a module is a decision, not a side effect.
+   * upstream ships 80 modules. The offline layer adds nine, each with a named
+   * job: the route table split out of the server's lifecycle, the single-instance
+   * endpoint record, the local board cache, boot reconciliation, pending-edit
+   * storage, offline recovery, the three-way merge, the write-recovery surface,
+   * and the service worker. 92 leaves room for three more before a reviewer has
+   * to justify the growth — adding a module should be a decision, not a reflex.
    */
-  totalSourceFiles.length >= 25 && totalSourceFiles.length <= 88,
+  totalSourceFiles.length >= 25 && totalSourceFiles.length <= 92,
   `src has ${totalSourceFiles.length} TypeScript modules; expected a modular but bounded tree`,
 );
 check(

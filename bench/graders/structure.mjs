@@ -35,23 +35,170 @@ function shapedNodes(board) {
     && item.type !== "stroke"
     && item.type !== "text"
     && item.role !== "frame"
-    && item.role !== "label"
+    /*
+     * A *box* carrying role `label` is a node.
+     *
+     * The exclusion below is about the free-floating `label` text the generator
+     * puts above a diagram. A rectangle with that role is a headed card — one
+     * model drew a comparison as 「方案 A」 box over a 优点 box — and dropping it
+     * removed a real node from a correct drawing.
+     */
+    /*
+     * An `annotation` is a label *on an edge* ("选择上线", "需停机 2 小时"), not a
+     * node. Counting it turned a correct decision tree into one with two
+     * invented nodes, because the annotation repeats a node's own label.
+     */
+    && item.role !== "annotation"
     && (normalizeLabel(item.title) || normalizeLabel(item.text)));
 }
 
 export function nodesOf(board) {
   const shaped = shapedNodes(board);
-  const shapedLabels = shaped.map((item) => normalizeLabel(item.title) || normalizeLabel(item.text));
+  /*
+   * Edge labels count as labels a caption may enumerate.
+   *
+   * A model writes "是"/"否" on the arrows and then a legend "连接：是 · 否".
+   * Only the shape labels were considered, so the legend looked like new content
+   * instead of a summary of labels already on the board.
+   */
+  const edgeLabels = board.items
+    .filter((item) => item.type === "line" && (item.text || item.title))
+    .map((item) => normalizeLabel(item.title) || normalizeLabel(item.text));
+  const shapeLabels = shaped.map((item) => normalizeLabel(item.title) || normalizeLabel(item.text));
+  /** Everything a caption could be enumerating, shapes and edge labels alike. */
+  const enumerableLabels = [...shapeLabels, ...edgeLabels];
+  /*
+   * A short text sitting on a connector is that connector's label.
+   *
+   * Models often put "是"/"否"/"依赖"/"通过" in a free-floating text next to the
+   * arrow instead of in the line's own `text` field. Counting those as nodes
+   * made every state machine and architecture diagram look like it invented
+   * content.
+   */
+  const lines = board.items.filter((item) => item.type === "line");
+  const edgeLabelTexts = new Set(board.items
+    .filter((item) => item.type === "text" && !item.title
+      && normalizeLabel(item.text).length <= 6
+      && lines.some((line) => nearLine(item, line)))
+    .map((item) => item.id));
+  /*
+   * Where a subtitle would sit: 46px under the title, matching the generator's
+   * layout. Derived from the board rather than hard-coded so a title-less board
+   * does not silently start dropping text at y=72.
+   */
+  const title = board.items.find((item) => item.role === "label" && item.type === "text");
+  const subtitleY = title ? title.y + 46 : undefined;
+  /*
+   * A `label` that sits on a card is that card's name, not the diagram's title.
+   *
+   * Models legitimately draw a layer as "empty box + text naming it" rather than
+   * "box with the text inside". Excluding every `label` made such a drawing
+   * score zero on all its nodes — a correct three-layer architecture diagram
+   * graded as if nothing had been drawn. Overlap with a shape is the signal that
+   * separates a card's name from the diagram heading.
+   */
+  /*
+   * Compare against *every* box, including empty ones. A model can draw a layer
+   * as a blank card with its name on top, which is a legitimate reading of the
+   * same diagram; only shapes that carry their own text were in `shaped`, so the
+   * overlap test never saw the card the label was sitting on.
+   */
+  const boxes = boxNodes(board);
+  /** Where the drawn content starts, for telling a heading from a group name. */
+  const contentTop = boxes.length ? Math.min(...boxes.map((item) => item.y)) : undefined;
+  /*
+   * Containers (frames, columns) carry their own heading at the top. A text that
+   * sits there names the group, so it is content, not the diagram title.
+   */
+  const containers = board.items.filter((item) => item.role === "frame" || item.role === "column");
+  /*
+   * A title spans the whole diagram, so it overlaps several boxes; a card or
+   * group name overlaps exactly one. Area ratio was the wrong test: a column
+   * container is tall, so its heading failed the ratio and was dropped even
+   * though the heading names that group.
+   */
+  const overlapCount = (item) => boxes.filter((shape) => rectsOverlap(item, shape)).length;
+  /*
+   * A `label` is a node when it names something *inside* the diagram rather
+   * than the diagram itself. Two shapes of that are common:
+   *
+   *   - it sits on one box (a card's name placed on top of an empty card);
+   *   - it sits inside the frame, below the frame's own heading (a column or
+   *     group name: 「方案 A」 above its bullet, 「现状」above its column).
+   *
+   * The frame's heading is the `label` near the frame's top edge, so that one is
+   * excluded by position. Without the second rule a comparison drawn as two
+   * labelled groups lost both group names and failed.
+   */
+  const frames = board.items.filter((item) => item.role === "frame");
+  const insideFrameBelowHeading = (item) => frames.some((frame) => rectsOverlap(item, frame)
+    && item.y > frame.y + 60);
+  const labelOnShape = new Set(board.items
+    .filter((item) => item.type === "text" && item.role === "label"
+      && (overlapCount(item) === 1 || insideFrameBelowHeading(item)))
+    .map((item) => item.id));
   /*
    * Standalone text is a node only when it is not just restating the shapes.
    * A caption that repeats two or more node labels is describing the diagram,
    * not adding to it.
    */
   const standalone = board.items.filter((item) => item.type === "text"
-    && item.role !== "label"
+    && !edgeLabelTexts.has(item.id)
+    && (item.role !== "label" || labelOnShape.has(item.id))
+    /*
+     * An edge annotation is rendered as a text item, so the shape filter above
+     * never sees it. It must be excluded here too or the same double-count
+     * returns through the other branch.
+     */
+    && item.role !== "annotation"
     && (normalizeLabel(item.title) || normalizeLabel(item.text))
-    && !isEnumerationText(item, shapedLabels));
+    && !isEnumerationText(item, enumerableLabels)
+    && !isDiagramHeading(item, shapeLabels, subtitleY, contentTop, containers));
   return [...shaped, ...standalone];
+}
+
+/** Every box-shaped item, whether or not it carries its own text. */
+function boxNodes(board) {
+  return board.items.filter((item) => item.type !== "line"
+    && item.type !== "stroke"
+    && item.type !== "text"
+    /*
+     * Containers are not the box a label names. A column spans all its cards, so
+     * comparing a group heading's area against it failed the ratio test and the
+     * heading was dropped — every model lost 「现状」and 「目标」on the same case.
+     */
+    && item.role !== "frame"
+    && item.role !== "column");
+}
+
+/** Do two items' boxes intersect by more than a few pixels? */
+function rectsOverlap(left, right) {
+  const padding = 4;
+  return left.x < right.x + right.w - padding
+    && left.x + left.w > right.x + padding
+    && left.y < right.y + right.h - padding
+    && left.y + left.h > right.y + padding;
+}
+
+/**
+ * Is this text sitting on (or immediately beside) a connector?
+ *
+ * A connector's box is the bounding box of its two endpoints, so a label on the
+ * arrow is either inside that box or a few pixels outside it. The tolerance is
+ * generous because the model places these labels by eye.
+ */
+function nearLine(item, line) {
+  /*
+   * 48px, not 24. A vertical connector is a zero-width box, and models place its
+   * label a comfortable 45px to the side — just outside the tighter window.
+   */
+  const left = Math.min(line.x, line.x + line.w) - 48;
+  const right = Math.max(line.x, line.x + line.w) + 48;
+  const top = Math.min(line.y, line.y + line.h) - 48;
+  const bottom = Math.max(line.y, line.y + line.h) + 48;
+  const centerX = item.x + item.w / 2;
+  const centerY = item.y + item.h / 2;
+  return centerX >= left && centerX <= right && centerY >= top && centerY <= bottom;
 }
 
 /**
@@ -67,17 +214,62 @@ export function isEnumerationText(item, otherLabels) {
   const hits = otherLabels.filter((label) => label && text.includes(label)).length;
   if (hits >= 2) return true;
   /*
-   * A standalone text that names no shape is the generator's subtitle: it sits
-   * above the diagram, carries no box, and describes the picture instead of
-   * being part of it ("六个阶段按顺序流转", "四个关键阶段，按顺序推进").
+   * A standalone text that names no shape may be the generator's subtitle
+   * ("六个阶段按顺序流转"). But a free note a person or model added is content,
+   * and treating every unlabelled text as furniture would hide it — the
+   * "unlisted text is still extra" test exists to catch exactly that.
    *
-   * Requiring punctuation was not enough — the first of those has none — and a
-   * length floor alone would swallow a legitimate single-word caption. The
-   * distinguishing property is positional: a real content node is a shape, and
-   * these are free-floating text. So an unshaped text with no shape label in it
-   * is furniture.
+   * The distinction that holds up: a subtitle *describes* the diagram as a
+   * whole, so it either contains a separator (a comma or arrow joining two
+   * ideas) or explicitly refers to the sequence. Anything else is content.
    */
-  return hits === 0 && text.length >= 6;
+  return hits === 0 && /[,，、→>]|顺序|流程|阶段|步骤/.test(item.text ?? "");
+}
+
+/**
+ * A heading that names the whole diagram rather than one node in it.
+ *
+ * Diagrams routinely carry a title ("方案对比", "决策与约束") and a legend. They
+ * are real content to a reader and noise to a graph comparison: counting them
+ * makes precision look bad on a drawing nobody would call wrong. A short
+ * heading that shares no shape label is treated as the diagram's own title.
+ */
+export function isDiagramHeading(item, otherLabels, subtitleY, contentTop, containers = []) {
+  if (item.type !== "text" || item.title) return false;
+  /*
+   * Only meaningful beside a diagram. With one or no shapes, a lone text item
+   * *is* the content, and dropping it would make a one-node case unpassable.
+   */
+  if (otherLabels.length < 2) return false;
+  /*
+   * The generator puts its subtitle at a fixed offset under the title (y≈72),
+   * and that is the only reliable signal: the sentence is too long for a length
+   * rule and too specific for a keyword rule ("从需求发布到新员工入职的完整链路"
+   * contains none of 顺序/流程/阶段). Position is not a heuristic here — it is
+   * the layout contract the generator emits on every diagram.
+   */
+  if (subtitleY !== undefined && Math.abs(item.y - subtitleY) <= 8) return true;
+  const text = normalizeLabel(item.text);
+  /*
+   * Eight characters, not twelve. The threshold is what separates a two-to-four
+   * word heading ("方案对比", "决策与约束") from a sentence someone added; at
+   * twelve, a free note like "随手写的第三方说明内容" (11) was silently dropped
+   * and the precision check lost the very case it exists to catch.
+   */
+  if (!text || text.length > 8) return false;
+  if (otherLabels.some((label) => label && (text.includes(label) || label.includes(text)))) return false;
+  /*
+   * A group name ("现状", "目标") sits at the *top of its container*, not above
+   * the whole diagram. Comparing against the content top alone put it above the
+   * cards and it was dropped as a heading — every model lost those two nodes.
+   */
+  const insideContainerTop = containers.some((container) => rectsOverlap(item, container)
+    && Math.abs(item.y - container.y) <= 40);
+  if (insideContainerTop) return false;
+  /*
+   * Otherwise a heading sits above everything the diagram draws.
+   */
+  return contentTop === undefined || item.y < contentTop - 8;
 }
 
 /** The label a person would read on this node. */
@@ -135,10 +327,21 @@ export function gradeNodes(board, expect) {
   if (expected.length === 0) return { recall: 1, precision: nodes.length ? 0 : 1, missing: [], extra: nodes.map(labelOf) };
   const { matched, used } = matchNodes(nodes, expected);
   const missing = expected.filter((label) => !matched.has(label));
-  const extra = nodes.filter((node) => !used.has(node.id)).map(labelOf);
+  /*
+   * `expect.allow` lets a case say which additional content is legitimate.
+   *
+   * A diagram that annotates a branch with "需停机 2 小时" is *better* than one
+   * that omits the constraint, but precision would punish it as an invented
+   * node. The case author knows the difference; anything not listed here is
+   * still counted as extra, so the check keeps its teeth.
+   */
+  const allowed = expect.allow ?? [];
+  const afterAllow = nodes.filter((node) => !used.has(node.id) && !allowed.some((label) => labelsMatch(labelOf(node), label)));
+  const extra = afterAllow.map(labelOf);
   return {
     recall: (expected.length - missing.length) / expected.length,
-    precision: nodes.length === 0 ? 0 : used.size / nodes.length,
+    // Precision is measured against the content the case cares about.
+    precision: nodes.length === 0 ? 0 : (used.size + (nodes.length - used.size - extra.length)) / nodes.length,
     missing,
     extra,
   };

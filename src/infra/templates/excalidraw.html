@@ -1320,6 +1320,98 @@
      * Tab inside itself (see `library-ui.ts`) so neither can be reached.
      */
     .doodle-library-panel:focus { outline: none; }
+    /*
+     * Shortcut panel.
+     *
+     * Anchored under the capsule it opens from, at the same 16px inset, so it
+     * reads as that button's popover rather than a floating dialog in the wrong
+     * corner. Three columns at desktop width, one on a phone: a shortcut list is
+     * read by scanning a group, not by reading it linearly.
+     */
+    .doodle-shortcuts {
+      position: fixed;
+      top: 68px;
+      left: 16px;
+      z-index: 25;
+      width: min(560px, calc(100vw - 32px));
+      max-height: min(70vh, 520px);
+      overflow: auto;
+      overscroll-behavior: contain;
+      padding: 12px 14px 14px;
+      border-radius: var(--doodle-radius-lg);
+      color: var(--doodle-ink);
+      font-size: 12px;
+      box-shadow:
+        inset 0 1px 0 0 var(--glass-edge),
+        inset 0 0 0 1px var(--glass-tint),
+        var(--glass-shadow-raised);
+    }
+    .doodle-shortcuts[hidden] { display: none; }
+    .doodle-shortcuts-head { display: flex; align-items: center; gap: 8px; margin-bottom: 8px; }
+    .doodle-shortcuts-head strong { font-size: 13px; font-weight: 650; letter-spacing: 0.02em; }
+    .doodle-shortcuts-head button { margin-left: auto; width: 26px; height: 26px; border: 0; border-radius: 7px; background: transparent; color: var(--doodle-muted); cursor: pointer; font-size: 15px; line-height: 1; }
+    .doodle-shortcuts-head button:hover { background: var(--doodle-accent-soft); color: var(--doodle-ink); }
+    /*
+     * Columns sized to their content, not split three ways.
+     *
+     * At 560px an equal split left ~45px of description per column, which wrapped
+     * "编组 / 取消编组" to one character per line and made the middle column
+     * taller than the panel. The key and label pairs are short, so `max-content`
+     * gives every column the width it needs.
+     */
+    .doodle-shortcuts-body { display: grid; grid-template-columns: repeat(3, max-content); justify-content: space-between; gap: 6px 22px; }
+    .doodle-shortcuts-group { min-width: 0; }
+    .doodle-shortcuts-group h3 { margin: 4px 0 6px; color: var(--doodle-muted); font-size: 11px; font-weight: 600; letter-spacing: 0.04em; }
+    /*
+     * `auto` sizes the key column to its widest label, and `align-items: start`
+     * keeps each row at its own height. Without it the grid stretches every key
+     * chip to the row height, so `⌘/Ctrl + Shift + Z` painted a tall box and the
+     * description beside it wrapped to one character per line.
+     */
+    .doodle-shortcuts-group dl { display: grid; grid-template-columns: max-content minmax(0, 1fr); align-items: start; gap: 4px 8px; margin: 0; }
+    .doodle-shortcuts-group dt {
+      justify-self: start;
+      align-self: start;
+      padding: 1px 5px;
+      border: 1px solid var(--doodle-border);
+      border-radius: 5px;
+      background: var(--doodle-surface-solid);
+      color: var(--doodle-ink);
+      font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+      font-size: 10.5px;
+      line-height: 1.45;
+      white-space: nowrap;
+      /* The key column may be as wide as its longest label; the description gets
+         the rest. `auto` + `1fr` let the chips compete with the text instead. */
+    }
+    .doodle-shortcuts-group dd { margin: 0; align-self: start; color: var(--doodle-muted); font-size: 11px; line-height: 1.45; }
+    @media (max-width: 640px) {
+      /*
+       * On a phone the panel is a bottom sheet, not a dropdown.
+       *
+       * Anchored under the capsule it was 366 × 560 on a 390 × 780 screen: 67%
+       * of the viewport, covering the capsule that opened it and the empty board
+       * the shortcuts are meant to explain. The bottom sheet sits above the
+       * bottom toolbar instead, leaving the canvas and the capsule visible.
+       */
+      .doodle-shortcuts {
+        top: auto;
+        left: 8px;
+        right: 8px;
+        bottom: 84px;
+        width: auto;
+        max-height: min(52vh, 430px);
+        border-radius: 16px;
+      }
+      /*
+       * Two columns, not one. In one column the tool list alone is eleven rows
+       * and the sheet covered more than half the screen; two columns halve the
+       * height and still fit the longest label ("按工具栏顺序选工具").
+       */
+      .doodle-shortcuts-body { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 4px 12px; }
+      .doodle-shortcuts-group dl { grid-template-columns: max-content minmax(0, 1fr); gap: 3px 6px; }
+      .doodle-shortcuts-group dd { font-size: 10.5px; }
+    }
     .doodle-tool-primary { background: var(--doodle-accent); color: var(--doodle-accent-ink); border-color: transparent; }
     .doodle-tool-primary:hover { color: var(--doodle-accent-ink); filter: brightness(1.05); }
     .doodle-tool-icon { width: 30px; padding: 0; font-size: 14px; }
@@ -1380,6 +1472,7 @@
     }
     .doodle-notify-agent { position: fixed; right: 14px; bottom: 14px; z-index: 20; height: 36px; padding: 0 16px; border-radius: var(--doodle-radius-lg); color: var(--doodle-accent-ink); background: var(--doodle-accent); cursor: pointer; font-size: 12px; }
     .doodle-notify-agent:hover { filter: brightness(1.05); }
+    .doodle-notify-agent:disabled { cursor: default; opacity: 0.85; filter: none; }
     .doodle-notify-agent[hidden] { display: none; }
     /*
      * The sync state, stated rather than implied.
@@ -1480,6 +1573,7 @@
      * or dismiss anyway.
      */
     body.doodle-drawer-open .doodle-welcome,
+    body.doodle-drawer-open .doodle-shortcuts,
     body.doodle-drawer-open .doodle-notify-agent,
     body.doodle-drawer-open .doodle-sync-banner {
       opacity: 0;
@@ -1627,6 +1721,29 @@
     .doodle-library-entry-confirm button[data-tone="danger"]:hover { background: color-mix(in srgb, var(--doodle-danger) 12%, transparent); }
     .doodle-library-entry.is-confirming { border-color: var(--doodle-danger); background: var(--doodle-surface-solid); }
     .doodle-library-entry.is-confirming .doodle-library-entry-actions { display: none; }
+    /*
+     * A thumbnail in its own column.
+     *
+     * The row is a grid; a picture beside the name would take width away from the
+     * name, which is the one thing that must stay readable. It gets a fixed 40px
+     * column and the row keeps its two-column arrangement for everything else.
+     * `contain` keeps an SVG with a huge internal viewBox from painting outside
+     * the box, and `pointer-events: none` makes the whole row still one target.
+     */
+    .doodle-library-entry.has-thumb { grid-template-columns: 40px minmax(0, 1fr) auto; }
+    .doodle-library-thumb {
+      width: 40px;
+      height: 32px;
+      object-fit: contain;
+      pointer-events: none;
+      border-radius: 6px;
+      background: var(--doodle-surface);
+      border: 1px solid var(--doodle-border);
+      overflow: hidden;
+    }
+    .doodle-library-thumb[hidden] { display: none; }
+    .doodle-library-entry.has-thumb:has(.doodle-library-thumb[hidden]) { grid-template-columns: minmax(0, 1fr) auto; }
+    .doodle-library-entry.has-thumb .doodle-library-entry-confirm { grid-column: 1 / -1; }
     .excalidraw .HelpDialog__header { display: none; }
     .excalidraw .dropdown-menu .dropdown-menu-group[data-doodle-hidden="true"] { display: none; }
     .excalidraw [data-doodle-hidden="true"] { display: none !important; }
@@ -2144,12 +2261,74 @@
       <button class="doodle-theme-option" data-theme-option="dark" aria-pressed="false" title="深色 · 夜纸与浅墨">深</button>
       <button class="doodle-theme-option" data-theme-option="glass" aria-pressed="false" title="液态玻璃 · 暖纸与松绿">玻</button>
     </div>
+    <!--
+      Shortcuts live in the chrome, not only in the first-use card.
+
+      The welcome card teaches the five basic gestures once, and then it is
+      dismissed forever — there was no way back to it. The shape shortcuts were
+      never written down anywhere a person could reach. This button is the way
+      back, and the panel is the list.
+    -->
+    <button class="doodle-tool doodle-tool-icon" id="doodleShortcutToggle" type="button"
+            aria-expanded="false" aria-controls="doodleShortcuts" title="键盘快捷键" aria-label="键盘快捷键">?</button>
     <div class="doodle-sync-state" id="doodleSyncState" data-phase="idle" data-channel="standalone" role="status" aria-live="polite">
       <span class="doodle-sync-dot" aria-hidden="true"></span>
       <span class="doodle-sync-label" data-sync-label>就绪</span>
       <span class="doodle-sync-channel" data-sync-detail>本机页面</span>
     </div>
   </div>
+  <section class="doodle-shortcuts doodle-glass" id="doodleShortcuts" hidden role="dialog"
+           tabindex="-1" aria-label="键盘快捷键" aria-modal="false">
+    <div class="doodle-shortcuts-head">
+      <strong>键盘快捷键</strong>
+      <button id="doodleShortcutsClose" type="button" aria-label="关闭快捷键">×</button>
+    </div>
+      <div class="doodle-shortcuts-body">
+      <div class="doodle-shortcuts-group">
+        <h3>工具</h3>
+        <dl>
+          <dt>V</dt><dd>选择</dd>
+          <dt>H</dt><dd>抓手（平移）</dd>
+          <dt>R</dt><dd>矩形</dd>
+          <dt>D</dt><dd>菱形</dd>
+          <dt>O</dt><dd>椭圆</dd>
+          <dt>A</dt><dd>箭头</dd>
+          <dt>L</dt><dd>线条</dd>
+          <dt>P</dt><dd>自由书写</dd>
+          <dt>T</dt><dd>文字</dd>
+          <dt>E</dt><dd>橡皮</dd>
+          <dt>1–0</dt><dd>按工具栏顺序选工具</dd>
+          <dt>Q</dt><dd>绘制后保持当前工具</dd>
+        </dl>
+      </div>
+      <div class="doodle-shortcuts-group">
+        <h3>编辑</h3>
+        <dl>
+          <dt>⌘Z</dt><dd>撤销</dd>
+          <dt>⇧⌘Z</dt><dd>重做</dd>
+          <dt>⌘A</dt><dd>全选</dd>
+          <dt>⌘D</dt><dd>再制所选</dd>
+          <dt>⌘G</dt><dd>编组 / 解组</dd>
+          <dt>Delete</dt><dd>删除所选</dd>
+          <dt>方向键</dt><dd>微移所选</dd>
+          <dt>⇧方向键</dt><dd>加速微移</dd>
+          <dt>⌘V</dt><dd>粘贴图片</dd>
+        </dl>
+      </div>
+      <div class="doodle-shortcuts-group">
+        <h3>画布</h3>
+        <dl>
+          <dt>空格拖拽</dt><dd>平移</dd>
+          <dt>滚轮</dt><dd>平移</dd>
+          <dt>⌘滚轮</dt><dd>缩放</dd>
+          <dt>⇧1</dt><dd>缩放到全部</dd>
+          <dt>双击空白</dt><dd>新建便签</dd>
+          <dt>拖拽空白</dt><dd>框选对象</dd>
+          <dt>?</dt><dd>打开或关闭本面板</dd>
+        </dl>
+      </div>
+    </div>
+  </section>
   <button class="doodle-notify-agent doodle-glass" id="doodleNotifyAgent" hidden>通知 Agent</button>
   <section class="doodle-conflict doodle-glass" id="doodleConflictNotice" hidden role="alertdialog" aria-live="assertive" aria-label="保存冲突需要选择">
     <p data-conflict-message></p>

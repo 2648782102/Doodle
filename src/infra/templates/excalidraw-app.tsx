@@ -23,11 +23,12 @@ import {
   showError,
 } from "./client/banner.js";
 import { createCanvasSync, type CanvasSync, type CanvasSyncOutcome, type SceneElement } from "./client/canvas-sync.js";
+import { initShortcutPanel } from "./client/shortcuts.js";
 import { stableStringify } from "../../board/model/fingerprint.js";
 import { browserBoardCache } from "./client/board-cache.js";
 import { registerOfflineShell, runBoot } from "./client/boot-source.js";
 import { createPendingEdits, localPendingStorage, pendingEditOf } from "./client/pending-edits.js";
-import { recoverFromCanvas } from "./client/recover-edits.js";
+import { mergeBoardView, recoverFromCanvas } from "./client/recover-edits.js";
 import { initLibraryUi, initSnapshotExports } from "./client/library-ui.js";
 import { initExternalLinkPolicy, isDoodleProjectLink } from "./client/link-policy.js";
 import { createSyncChip } from "./client/sync-state.js";
@@ -400,17 +401,10 @@ async function start(): Promise<void> {
 async function recoverPendingWork(): Promise<void> {
   await recoverFromCanvas({
     pending: pendingEdits,
-    activeBoard: activeSnapshot
-      ? { id: activeSnapshot.id, revision: activeSnapshot.revision, items: activeSnapshot.items as Array<Record<string, unknown>> }
-      : null,
-    readBoard: async () => {
-      const snapshot = await transport.loadBoard().catch(() => null);
-      return snapshot ? { id: snapshot.id, revision: snapshot.revision, items: snapshot.items as Array<Record<string, unknown>> } : null;
-    },
-    applyMerged: async (change, expectedRevision) => {
-      const merged = await transport.applyMergedChange(change, expectedRevision);
-      return { id: merged.id, revision: merged.revision, items: merged.items as Array<Record<string, unknown>> };
-    },
+    activeBoard: mergeBoardView(activeSnapshot),
+    readBoard: async () => mergeBoardView(await transport.loadBoard().catch(() => null)),
+    applyMerged: async (change, expectedRevision) =>
+      mergeBoardView(await transport.applyMergedChange(change, expectedRevision))!,
     refresh: () => { void transport.loadBoard().then((refreshed) => applyRemoteSnapshot(refreshed)).catch(() => {}); },
     onConflict: (conflicts) => presentRecoveredConflict(conflicts, status, clearConflictNotice),
   });
@@ -426,6 +420,7 @@ if (document.querySelector("#excalidrawRoot")) {
   registerOfflineShell(embedded);
   initThemeToggle(() => glassController);
   initExternalLinkPolicy();
+  initShortcutPanel();
   initLibraryUi({
     transport,
     getActiveSnapshot: () => activeSnapshot,
@@ -437,7 +432,10 @@ if (document.querySelector("#excalidrawRoot")) {
     getApi: () => apiRef.current,
     getFiles: () => currentFiles.current,
   });
-  transport.initNotifyButton(() => activeSnapshot);
+  transport.initNotifyButton(
+    () => activeSnapshot,
+    () => { status.send("notified"); },
+  );
   glassController = initLiquidGlass();
   void transport.startLiveUpdates({
     isBusy: () => applyingRemote.current || isEditing(currentAppState.current),

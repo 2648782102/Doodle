@@ -22,6 +22,18 @@ function describeHandoffForTest(current, previous) {
   const before = new Map((previous?.items ?? []).map((item) => [item.id, item]));
   const humanEdits = [];
   const readings = [];
+  const currentIds = new Set(current.items.map((item) => item.id));
+  /*
+   * A removal has no surviving item to inspect, so it is detected from the
+   * previous board. The real handoff does the same, and attributes the
+   * disappearance to the person unless the AI removed its own object.
+   */
+  for (const [id, old] of before) {
+    if (currentIds.has(id)) continue;
+    if (old.author !== "human" && old.author !== "ai") continue;
+    humanEdits.push({ id, change: "removed", author: "human", fields: ["__removed"] });
+    readings.push({ id, kind: "remove" });
+  }
   for (const item of current.items) {
     const old = before.get(item.id);
     const changed = !old
@@ -86,6 +98,31 @@ describe("scripted human edits", () => {
     expect(after.revision).toBe(before.revision + 1);
   });
 
+  it("removes a connector along with the node it pointed at", () => {
+    /*
+     * Leaving the line behind made `parseBoard` reject the whole board, and the
+     * server quarantined it and started empty. The model then truthfully said
+     * "zero objects" while the grader called it a comprehension failure — the
+     * harness had corrupted the board.
+     */
+    const before = {
+      ...flowBoard(["A", "B"]),
+      items: [
+        ...flowBoard(["A", "B"]).items,
+      ],
+    };
+    const [a, b] = before.items;
+    before.items.push({
+      id: "e1", type: "line", x: 0, y: 0, w: 240, h: 0, text: "",
+      color: "#000", author: "ai",
+      createdAt: "2026-01-01T00:00:00.000Z", updatedAt: "2026-01-01T00:00:00.000Z",
+      startItemId: a.id, endItemId: b.id,
+    });
+    const after = applyHumanEdit(before, { type: "delete", label: "B" });
+    expect(after.items.some((item) => item.type === "line")).toBe(false);
+    expect(after.items.every((item) => !item.startItemId && !item.endItemId)).toBe(true);
+  });
+
   it("leaves every other object untouched", () => {
     const before = flowBoard(["A", "B"]);
     const after = applyHumanEdit(before, { type: "move", label: "B", dx: 50 });
@@ -146,6 +183,56 @@ describe("grading what the model understood", () => {
 
   it("accepts a paraphrase — comprehension is not phrasing", () => {
     const result = gradeHumanReport({ answer: "B 现在换了个位置，我按新布局继续。", handoff, before, after });
+    expect(result.ok).toBe(true);
+  });
+});
+
+describe("grading a deletion", () => {
+  /*
+   * A deleted object is gone from the board, so the grader must look it up in
+   * the *previous* board. Without that the hardest edit kind could never be
+   * recognised, and a correct answer would score zero.
+   */
+  let before;
+  let after;
+  let handoff;
+  beforeAll(() => {
+    before = flowBoard(["A", "B", "C"]);
+    after = applyHumanEdit(before, { type: "delete", label: "B" });
+    handoff = expectedHandoff(before, after);
+  });
+
+  it("reports the removal at all", () => {
+    expect(handoff.needsAttention).toBe(true);
+    expect(after.items).toHaveLength(2);
+  });
+
+  it("passes an answer that names the removed object", () => {
+    const result = gradeHumanReport({ answer: "你把「B」删掉了。", handoff, before, after });
+    expect(result.detected).toBe(1);
+    expect(result.ok).toBe(true);
+  });
+
+  it("does not treat the removed label as invented", () => {
+    // The label is legitimately absent from the current board.
+    const result = gradeHumanReport({ answer: "「B」这张卡被我删除了。", handoff, before, after });
+    expect(result.invented).toEqual([]);
+    expect(result.ok).toBe(true);
+  });
+});
+
+describe("grading a relabel", () => {
+  let before;
+  let after;
+  let handoff;
+  beforeAll(() => {
+    before = flowBoard(["A", "B"]);
+    after = applyHumanEdit(before, { type: "relabel", label: "B", to: "B（已调整）" });
+    handoff = expectedHandoff(before, after);
+  });
+
+  it("passes an answer that quotes the new label", () => {
+    const result = gradeHumanReport({ answer: "你把 B 改名了，现在是「B（已调整）」。", handoff, before, after });
     expect(result.ok).toBe(true);
   });
 });

@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { describeEntry, orderLibrary, relativeTime } from "../dist/infra/templates/client/library-list.js";
+import { readFileSync } from "node:fs";
 
 function entry(id, name, extra = {}) {
   return { id, name, revision: 1, itemCount: 0, updatedAt: "2026-01-01T00:00:00.000Z", ...extra };
@@ -59,5 +60,19 @@ describe("board library list", () => {
     const text = describeEntry(entry("a", "Board", { itemCount: 8, revision: 586, updatedAt: "2026-01-01T11:00:00.000Z" }), now);
     expect(text).toBe("8 个对象 · 1 小时前");
     expect(text, "the internal revision leaked into the library").not.toContain("586");
+  });
+
+  it("keeps the library thumbnail off the active-board route", () => {
+    /*
+     * A row's picture must name its own board. Resolving to "the active board"
+     * would make a row's image depend on which row happened to be active when
+     * the request fired, and an `<img>` whose src silently changes meaning shows
+     * the wrong board's picture.
+     */
+    const ui = readFileSync(new URL("../src/infra/templates/client/library-ui.ts", import.meta.url), "utf8");
+    expect(ui).toContain("/api/board/library/");
+    expect(ui, "the thumbnail falls back to the active board").not.toMatch(/thumbnailUrl[^\n]*\/api\/board\.svg/);
+    // Embedded hosts have no page routes; the picture must be optional there.
+    expect(ui).toContain("deps.transport.embedded");
   });
 });

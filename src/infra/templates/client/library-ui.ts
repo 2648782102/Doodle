@@ -102,6 +102,18 @@ export function initLibraryUi(deps: LibraryUiDeps): void {
       exportJson: (entry) => void runLibraryAction({ type: "export", id: entry.id }),
       delete: (entry) => void runLibraryAction({ type: "delete", id: entry.id }),
       refresh: () => void refreshLibraryUi().catch(() => {}),
+      /*
+       * Standalone only. The embedded host talks to the board through the MCP
+       * bridge rather than this page's routes, and the active board's geometry is
+       * live in the canvas anyway.
+       *
+       * Versioned by revision so a row's picture refreshes after the board is
+       * edited, and scoped to the library route so it never resolves to the
+       * active board by accident.
+       */
+      thumbnailUrl: deps.transport.embedded
+        ? undefined
+        : (entry) => `/api/board/library/${encodeURIComponent(entry.id)}.svg?max=320&v=${entry.revision}`,
     });
     if (empty) {
       const filtering = (search?.value ?? "").trim().length > 0;
