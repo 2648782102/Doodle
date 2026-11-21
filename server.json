@@ -8,13 +8,13 @@
     "source": "github",
     "id": "1218705506"
   },
-  "version": "0.8.0",
+  "version": "0.9.0",
   "websiteUrl": "https://github.com/2648782102/Doodle#readme",
   "packages": [
     {
       "registryType": "npm",
       "identifier": "doodle-mcp",
-      "version": "0.8.0",
+      "version": "0.9.0",
       "runtimeHint": "npx",
       "transport": {
         "type": "stdio"

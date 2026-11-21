@@ -62,7 +62,14 @@ const terms = await read("TERMS.md");
 const submission = await read("docs/SUBMISSION.md");
 const submissionScript = await read("scripts/build-submission.mjs");
 
-check(packageJson.version === "0.8.0" && manifest.version === packageJson.version, "plugin version does not match package.json 0.8.0");
+/*
+ * The plugin must ship the same version as the package it is built from.
+ *
+ * The literal is gone: a release bumps `package.json`, and this check exists to
+ * catch the manifest being forgotten, not to pin the number here as well. The
+ * released value is asserted once, against every manifest, in `repo-check.mjs`.
+ */
+check(manifest.version === packageJson.version, `plugin version ${manifest.version} does not match package.json ${packageJson.version}`);
 check(packageJson.scripts.build.includes("build-plugin.mjs"), "npm build does not produce the plugin package");
 check(packageJson.scripts.check.includes("repo:plugin-check"), "npm check does not run the plugin guard");
 check(manifest.name === "doodle", "plugin identity is not doodle");

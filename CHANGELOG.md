@@ -1,4 +1,4 @@
-## Unreleased — Easier to reach
+## 0.9.0 — Survives the session
 
 ### Added
 
