@@ -12,7 +12,7 @@
  * that as a hard failure would make the benchmark noisy.
  */
 
-import { gradeEdges, gradeNodes, gradeSequence, gradeTree, nodesOf } from "./structure.mjs";
+import { gradeBranchConstraints, gradeEdges, gradeNodes, gradeSequence, gradeTree, nodesOf } from "./structure.mjs";
 import { gradeGeometry } from "./geometry.mjs";
 
 export const DEFAULT_WEIGHTS = {
@@ -35,6 +35,7 @@ export function gradeBoard(board, expect, options = {}) {
   const edges = gradeEdges(board, expect);
   const sequence = expect.kind === "sequence" || expect.ordered ? gradeSequence(board, expect) : { ok: true };
   const tree = expect.depth ? gradeTree(board, expect) : { ok: true };
+  const edgeLabels = gradeBranchConstraints(board, expect);
   const geometry = gradeGeometry(board);
 
   const checks = [];
@@ -46,6 +47,7 @@ export function gradeBoard(board, expect, options = {}) {
   edges.f1 < 1 ? fail("edge_f1", `f1=${edges.f1.toFixed(2)}, missing ${edges.missing.length} edge(s)`) : pass("edge_f1");
   sequence.ok ? pass("sequence") : fail("sequence", sequence.reason);
   tree.ok ? pass("tree") : fail("tree", `${tree.wrong?.length ?? 0} node(s) at the wrong depth`);
+  edgeLabels.ok ? pass("edge_labels") : fail("edge_labels", `missing on connector: ${edgeLabels.missing.join(", ")}`);
   geometry.danglingConnectors ? fail("dangling", `${geometry.danglingConnectors} connector(s) bound to nothing`) : pass("dangling");
 
   const forbid = new Set(expect.forbid ?? []);
@@ -84,7 +86,8 @@ export function gradeBoard(board, expect, options = {}) {
     + (sequence.ok && tree.ok ? 1 : 0) * weights.sequence,
   );
 
-  const structuralPass = nodes.recall === 1 && nodes.precision === 1 && edges.f1 === 1 && sequence.ok && tree.ok;
+  const structuralPass = nodes.recall === 1 && nodes.precision === 1 && edges.f1 === 1
+    && sequence.ok && tree.ok && edgeLabels.ok;
   const hardFailure = checks.some((check) => !check.ok && !["node_precision", "edge_f1"].includes(check.name));
 
   return {

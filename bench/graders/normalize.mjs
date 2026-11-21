@@ -13,6 +13,16 @@
 
 const PUNCTUATION = /[\s\u3000.,;:!?'"`~()[\]{}<>/\\|+=*&^%$#@。，、；：！？“”‘’（）【】《》〈〉…—–\-_]+/g;
 
+/**
+ * Separators that divide a drawn label into independently readable parts.
+ *
+ * "是·迁移" reads as the branch name plus what it means, the same way
+ * "供应商 A ｜ 低成本" does. Splitting on these is what lets a one-character
+ * branch name match without loosening the length floor that stops 会 matching
+ * 会议.
+ */
+const SEGMENT_SEPARATORS = /[·•｜|｜/／\\：:·.\-–—\s\u3000]+/;
+
 export function normalizeLabel(value) {
   if (typeof value !== "string") return "";
   return value
@@ -40,7 +50,7 @@ export function labelsMatch(left, right) {
   if (!a || !b) return false;
   if (a === b) return true;
   const [shorter, longer] = a.length <= b.length ? [a, b] : [b, a];
-  if (shorter.length < 2) return false;
+  if (shorter.length < 2) return hasSegment(left, right, shorter);
   /*
    * Containment, not prefix. "确认发货" contains "发货" and is a different step,
    * which is the cost of this rule — but the alternative rejected every drawing
@@ -48,4 +58,26 @@ export function labelsMatch(left, right) {
    * was far more common in the live runs than a wrong-node collision.
    */
   return longer.includes(shorter);
+}
+
+/**
+ * True when the short label is one whole delimited part of the longer one.
+ *
+ * This is the only way a single character may match. "是" matches the segment
+ * "是" in "是·迁移"; it does not match "是否迁移", where it is merely the first
+ * character. Requiring a separator on both sides is what keeps the rule honest:
+ * a substring for a one-character needle would match almost any Chinese label.
+ *
+ * Only a label that actually contains a separator may match this way. The
+ * needle itself always splits into one part, so it must not be the segmented
+ * side — otherwise "会" would match "会议" by being "a part of itself".
+ */
+function hasSegment(left, right, needle) {
+  for (const value of [left, right]) {
+    if (typeof value !== "string") continue;
+    const parts = value.split(SEGMENT_SEPARATORS).map((part) => normalizeLabel(part));
+    if (parts.length < 2) continue;
+    if (parts.filter((part) => part === needle).length === 1) return true;
+  }
+  return false;
 }
