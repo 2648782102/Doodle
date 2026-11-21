@@ -35,7 +35,14 @@ function shapedNodes(board) {
     && item.type !== "stroke"
     && item.type !== "text"
     && item.role !== "frame"
-    && item.role !== "label"
+    /*
+     * A *box* carrying role `label` is a node.
+     *
+     * The exclusion below is about the free-floating `label` text the generator
+     * puts above a diagram. A rectangle with that role is a headed card — one
+     * model drew a comparison as 「方案 A」 box over a 优点 box — and dropping it
+     * removed a real node from a correct drawing.
+     */
     /*
      * An `annotation` is a label *on an edge* ("选择上线", "需停机 2 小时"), not a
      * node. Counting it turned a correct decision tree into one with two
@@ -111,9 +118,24 @@ export function nodesOf(board) {
    * though the heading names that group.
    */
   const overlapCount = (item) => boxes.filter((shape) => rectsOverlap(item, shape)).length;
+  /*
+   * A `label` is a node when it names something *inside* the diagram rather
+   * than the diagram itself. Two shapes of that are common:
+   *
+   *   - it sits on one box (a card's name placed on top of an empty card);
+   *   - it sits inside the frame, below the frame's own heading (a column or
+   *     group name: 「方案 A」 above its bullet, 「现状」above its column).
+   *
+   * The frame's heading is the `label` near the frame's top edge, so that one is
+   * excluded by position. Without the second rule a comparison drawn as two
+   * labelled groups lost both group names and failed.
+   */
+  const frames = board.items.filter((item) => item.role === "frame");
+  const insideFrameBelowHeading = (item) => frames.some((frame) => rectsOverlap(item, frame)
+    && item.y > frame.y + 60);
   const labelOnShape = new Set(board.items
     .filter((item) => item.type === "text" && item.role === "label"
-      && overlapCount(item) === 1)
+      && (overlapCount(item) === 1 || insideFrameBelowHeading(item)))
     .map((item) => item.id));
   /*
    * Standalone text is a node only when it is not just restating the shapes.
