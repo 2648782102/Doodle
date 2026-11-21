@@ -45,6 +45,17 @@ export interface CanvasSyncDeps {
   applySaved(snapshot: BoardSnapshot, info: { rebased: boolean; dropped: number }): void;
   report(event: SyncEvent): void;
   onError(error: unknown, retry: () => Promise<CanvasSyncOutcome>): void;
+  /**
+   * Keep an edit that could not be written, so a reload or a reconnect can
+   * still recover it.
+   *
+   * Optional because not every host has local storage, and because a test does
+   * not need it. When absent, a failed write is exactly as recoverable as it
+   * was before: the in-memory retry frame, and nothing more.
+   */
+  persistUnsent?(edit: { base: BoardSnapshot; mine: BoardSnapshot }): void;
+  /** Drop the stored copy once the edit has definitely landed. */
+  clearUnsent?(boardId: string): void;
   debounceMs?: number;
   setTimer?(run: () => void, ms: number): unknown;
   clearTimer?(handle: unknown): void;
@@ -137,6 +148,13 @@ export function createCanvasSync(deps: CanvasSyncDeps): CanvasSync {
     try {
       const updated = await deps.transport.syncBoard(projected.items, latest);
       retryFrame = null;
+      /*
+       * The write landed, so nothing is pending for this board any more.
+       *
+       * Cleared only on success: a failure keeps the stored copy, and that is
+       * what makes the edit survive a reload rather than an in-memory frame.
+       */
+      deps.clearUnsent?.(latest.id);
       deps.applySaved(updated, { rebased, dropped });
       deps.report("saved");
       return "saved";
@@ -146,6 +164,15 @@ export function createCanvasSync(deps: CanvasSyncDeps): CanvasSync {
        * "keep mine" cannot bring a deleted object back to life.
        */
       retryFrame = { elements, files: frame.files, base: latest };
+      /*
+       * Also keep the edit itself, base and result together.
+       *
+       * The frame above only survives until the tab is closed. Storing both
+       * boards is what lets a later three-way merge re-apply this edit onto a
+       * board that changed while it was stuck — the case the old queue could
+       * only drop.
+       */
+      deps.persistUnsent?.({ base: latest, mine: projected });
       deps.onError(error, () => retry());
       return "failed";
     }

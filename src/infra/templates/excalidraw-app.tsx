@@ -25,11 +25,13 @@ import {
 import { createCanvasSync, type CanvasSync, type CanvasSyncOutcome, type SceneElement } from "./client/canvas-sync.js";
 import { stableStringify } from "../../board/model/fingerprint.js";
 import { browserBoardCache } from "./client/board-cache.js";
-import { planBoot, reconcileBoot, registerOfflineShell } from "./client/boot-source.js";
+import { registerOfflineShell, runBoot } from "./client/boot-source.js";
+import { createPendingEdits, localPendingStorage, pendingEditOf } from "./client/pending-edits.js";
+import { recoverFromCanvas } from "./client/recover-edits.js";
 import { initLibraryUi, initSnapshotExports } from "./client/library-ui.js";
 import { initExternalLinkPolicy, isDoodleProjectLink } from "./client/link-policy.js";
 import { createSyncChip } from "./client/sync-state.js";
-import { presentWriteFailure } from "./client/write-recovery.js";
+import { presentRecoveredConflict, presentWriteFailure } from "./client/write-recovery.js";
 import {
   EXCALIDRAW_THEME,
   canvasColors,
@@ -63,6 +65,8 @@ const transport = createBoardTransport({
   panelToken: window.DOODLE_EXCALIDRAW_TOKEN ?? "",
   cache: browserBoardCache(),
 });
+/** The person's unsent edits, so a reload or a reconnect can still recover them. */
+const pendingEdits = createPendingEdits(localPendingStorage());
 /** The one visible answer to "is this saved, and did the agent see it?". */
 const status = createSyncChip(transport.channel);
 
@@ -128,26 +132,14 @@ function publishToHost(snapshot: BoardSnapshot): void {
     .catch(() => {});
 }
 
-/**
- * Adopt a board that arrived from somewhere else.
- *
- * `repaint: false` is the interesting case: the person has just finished a
- * gesture and someone else wrote meanwhile. Repainting there is what used to
- * erase the gesture, so the newer board only becomes the write target and the
- * scene is reconciled by the rebase in `canvas-sync`.
- */
+/** Adopt a board that arrived from somewhere else. See `docs/DECISIONS.md` #44. */
 function applyRemoteSnapshot(data: BoardSnapshot, options: { repaint?: boolean } = {}): void {
   if (!data || !Array.isArray(data.items) || typeof data.revision !== "number") return;
   if (activeSnapshot && data.revision <= activeSnapshot.revision && data.id === activeSnapshot.id) return;
   /*
-   * A different board can never be adopted silently.
-   *
-   * `repaint: false` exists for one case: a newer revision of the *same* board
-   * landing mid-gesture, where the scene still shows the older revision and the
-   * rebase reconciles them on the next write. Carrying that across boards is a
-   * data migration, not a rebase — `sceneBase` would still point at the old
-   * board's items, so the pending projection would copy the person's stroke
-   * onto a board they never drew on and leave the original empty.
+   * `repaint: false` is only ever the same board mid-gesture: the scene still
+   * shows the older revision and the rebase reconciles them on the next write.
+   * Carrying it across boards is a data migration, not a rebase.
    */
   if (options.repaint === false && activeSnapshot && data.id === activeSnapshot.id) {
     activeSnapshot = data;
@@ -158,13 +150,8 @@ function applyRemoteSnapshot(data: BoardSnapshot, options: { repaint?: boolean }
     pendingRemote.current = data;
     return;
   }
-  /*
-   * Switching boards abandons whatever the previous board's scene was about to
-   * write. `runLibraryAction` flushes first, so a pending frame is already gone;
-   * this covers the remaining window where the flush failed and the timer is
-   * still armed. The board we are leaving keeps its stored state instead of
-   * receiving a projection of a scene that belongs to another board.
-   */
+  // Leaving a board abandons its pending frame: the board we are leaving keeps
+  // its stored state rather than receiving another board's projection.
   if (activeSnapshot && data.id !== activeSnapshot.id) {
     canvasSync.current?.cancel();
     pendingRemote.current = null;
@@ -173,15 +160,6 @@ function applyRemoteSnapshot(data: BoardSnapshot, options: { repaint?: boolean }
   activeSnapshot = data;
   repaintFromActive();
   publishToHost(data);
-}
-
-function handleWriteError(error: unknown, retry: () => Promise<CanvasSyncOutcome>): void {
-  presentWriteFailure(error, {
-    status,
-    loadLatest: () => transport.loadBoard().catch(() => null),
-    applyRemote: (snapshot) => applyRemoteSnapshot(snapshot),
-    retry,
-  });
 }
 
 function CanvasApp({ initial }: { initial: BoardSnapshot }) {
@@ -211,7 +189,19 @@ function CanvasApp({ initial }: { initial: BoardSnapshot }) {
       }
     },
     report: (event) => { status.send(event); },
-    onError: (error, retry) => handleWriteError(error, retry),
+    onError: (error, retry) => presentWriteFailure(error, {
+      status,
+      loadLatest: () => transport.loadBoard().catch(() => null),
+      applyRemote: (snapshot) => applyRemoteSnapshot(snapshot),
+      retry,
+    }),
+    // Both boards, not the request: a verbatim replay is unsafe once anyone
+    // else has drawn, while base + result can be merged. See `three-way-merge`.
+    persistUnsent: ({ base, mine }) => {
+      const edit = pendingEditOf(base, mine);
+      if (edit) void pendingEdits.save(edit);
+    },
+    clearUnsent: (boardId) => { void pendingEdits.drop(boardId); },
     debounceMs: 450,
   }), []);
   canvasSync.current = sync;
@@ -382,38 +372,48 @@ function renderCanvas(initial: BoardSnapshot): void {
 async function start(): Promise<void> {
   const root = document.querySelector("#excalidrawRoot");
   if (!root || embedded || rootInstance) return;
-  // Paint local first, then reconcile — see `client/boot-source.ts` for why.
-  const plan = planBoot(await transport.restoreBoard().catch(() => null));
-  const cached = plan.kind === "cache-first" ? plan.cached : null;
-  if (plan.kind === "cache-first") {
-    renderCanvas(plan.cached);
-    status.send("loaded");
-    if (!embedded) initWelcome(plan.cached);
-  }
-  let remote: BoardSnapshot | null = null;
-  try {
-    remote = await transport.loadBoard();
-  } catch (error) {
-    if (!cached) throw error;
-    remote = null;
-  }
-  const outcome = reconcileBoot(cached, remote);
-  switch (outcome.kind) {
-    case "replace":
-      renderCanvas(outcome.snapshot);
-      status.send("loaded");
-      if (!embedded && !cached) initWelcome(outcome.snapshot);
-      return;
-    case "keep-cached":
-      return;
-    case "detached":
-      // The board is still readable locally; only the live channel is gone.
+  const result = await runBoot({
+    embedded,
+    restoreCached: () => transport.restoreBoard(),
+    loadRemote: () => transport.loadBoard(),
+    paint: (snapshot) => renderCanvas(snapshot),
+    onLoaded: () => status.send("loaded"),
+    // Gated on `embedded` by `runBoot`.
+    onWelcome: (snapshot) => initWelcome(snapshot),
+    onDetached: () => {
       status.send("detached");
       showConnectionNotice("画板服务已结束，当前显示的是上次保存的内容。重新打开画板即可继续。");
-      return;
-    case "failed":
-      throw new Error("Board is unavailable");
-  }
+    },
+  });
+  // Unresolved edits stay on disk when the board is unreachable, so the next
+  // boot that can reach it merges them.
+  if (result !== "detached") await recoverPendingWork();
+}
+
+/**
+ * Re-apply edits that could not be written before the last reload or outage.
+ *
+ * Runs after the board is on screen so a merge can never paint over the canvas
+ * mid-boot. The recovery contract itself lives in `client/recover-edits.ts`;
+ * this only supplies the canvas' own surfaces.
+ */
+async function recoverPendingWork(): Promise<void> {
+  await recoverFromCanvas({
+    pending: pendingEdits,
+    activeBoard: activeSnapshot
+      ? { id: activeSnapshot.id, revision: activeSnapshot.revision, items: activeSnapshot.items as Array<Record<string, unknown>> }
+      : null,
+    readBoard: async () => {
+      const snapshot = await transport.loadBoard().catch(() => null);
+      return snapshot ? { id: snapshot.id, revision: snapshot.revision, items: snapshot.items as Array<Record<string, unknown>> } : null;
+    },
+    applyMerged: async (change, expectedRevision) => {
+      const merged = await transport.applyMergedChange(change, expectedRevision);
+      return { id: merged.id, revision: merged.revision, items: merged.items as Array<Record<string, unknown>> };
+    },
+    refresh: () => { void transport.loadBoard().then((refreshed) => applyRemoteSnapshot(refreshed)).catch(() => {}); },
+    onConflict: (conflicts) => presentRecoveredConflict(conflicts, status, clearConflictNotice),
+  });
 }
 
 window.DoodleExcalidrawInit = (snapshot, mcpApp) => {

@@ -72,3 +72,56 @@ export function registerOfflineShell(embedded: boolean, scope: Window = window):
     });
   });
 }
+
+/**
+ * Drive a cold boot: paint local, ask the board, reconcile.
+ *
+ * The decisions live in `planBoot` / `reconcileBoot` above; this is the loop
+ * that applies them, kept beside the rules so the entrypoint is a call site
+ * rather than a second copy of the ordering. `onWelcome` fires only on a first
+ * load — a restored board is not the person's first visit, even if the process
+ * that served it is gone.
+ */
+export interface BootDeps {
+  embedded: boolean;
+  restoreCached(): Promise<BoardSnapshot | null>;
+  loadRemote(): Promise<BoardSnapshot | null>;
+  paint(snapshot: BoardSnapshot): void;
+  onLoaded(): void;
+  onWelcome(snapshot: BoardSnapshot): void;
+  onDetached(): void;
+}
+
+export async function runBoot(deps: BootDeps): Promise<"painted" | "cached" | "detached"> {
+  const plan = planBoot(await deps.restoreCached().catch(() => null));
+  const cached = plan.kind === "cache-first" ? plan.cached : null;
+  if (plan.kind === "cache-first") {
+    deps.paint(plan.cached);
+    deps.onLoaded();
+    if (!deps.embedded) deps.onWelcome(plan.cached);
+  }
+
+  let remote: BoardSnapshot | null = null;
+  try {
+    remote = await deps.loadRemote();
+  } catch (error) {
+    if (!cached) throw error;
+    remote = null;
+  }
+
+  const outcome = reconcileBoot(cached, remote);
+  switch (outcome.kind) {
+    case "replace":
+      deps.paint(outcome.snapshot);
+      deps.onLoaded();
+      if (!deps.embedded && !cached) deps.onWelcome(outcome.snapshot);
+      return "painted";
+    case "keep-cached":
+      return "cached";
+    case "detached":
+      deps.onDetached();
+      return "detached";
+    case "failed":
+      throw new Error("Board is unavailable");
+  }
+}

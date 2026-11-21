@@ -94,6 +94,18 @@ export interface BoardTransport {
    */
   restoreBoard(): Promise<BoardSnapshot | null>;
   syncBoard(next: unknown[], base: BoardSnapshot): Promise<BoardSnapshot>;
+  /**
+   * Apply a request body the client built itself, against a named revision.
+   *
+   * Used only by offline recovery: the merge in `three-way-merge.ts` already
+   * decided which objects to add, update, and remove, so this must not run
+   * `diffBoardItems` again — that would re-diff against a revision the request
+   * was not built from.
+   */
+  applyMergedChange(
+    change: { items: Array<Record<string, unknown>>; updates: Array<{ id: string; patch: Record<string, unknown> }>; remove_ids: string[] },
+    expectedRevision: number,
+  ): Promise<BoardSnapshot>;
   libraryRequest(action: Record<string, unknown>, expectedRevision: number): Promise<Record<string, unknown>>;
   /** True when the snapshot reached the host model context. */
   publishContext(snapshot: BoardSnapshot, force?: boolean): Promise<boolean>;
@@ -193,6 +205,43 @@ export function createBoardTransport(options: {
     const response = await fetch("/api/board/batch", {
       method: "POST",
       headers: { ...headers, "If-Match-Revision": String(base.revision) },
+      body: JSON.stringify({ confirmedBy: "human", ...change }),
+    });
+    const result = await response.json().catch(() => ({}));
+    if (!response.ok) throw writeError(result, `HTTP ${response.status}`);
+    const updated = result.board as BoardSnapshot;
+    remember(updated);
+    return updated;
+  };
+
+  /**
+   * Send a pre-built request.
+   *
+   * Deliberately a separate function from `syncBoard`: that one diffs the board
+   * it is given against `base` and builds its own request. Recovery already has
+   * a merged request against a *specific* revision, and re-diffing it would
+   * silently drop the additions the merge decided on.
+   */
+  const applyMergedChange = async (
+    change: { items: Array<Record<string, unknown>>; updates: Array<{ id: string; patch: Record<string, unknown> }>; remove_ids: string[] },
+    expectedRevision: number,
+  ): Promise<BoardSnapshot> => {
+    if (hostApp) {
+      const result = await hostApp.callServerTool({
+        name: "draw_board",
+        arguments: { ...change, author: "human", expected_revision: expectedRevision },
+      });
+      if (result.isError) {
+        const payload = toolErrorPayload(result);
+        throw new BoardWriteError(payload.message, payload.code, payload.conflicts);
+      }
+      const updated = result.structuredContent as BoardSnapshot;
+      remember(updated);
+      return updated;
+    }
+    const response = await fetch("/api/board/batch", {
+      method: "POST",
+      headers: { ...headers, "If-Match-Revision": String(expectedRevision) },
       body: JSON.stringify({ confirmedBy: "human", ...change }),
     });
     const result = await response.json().catch(() => ({}));
@@ -374,6 +423,7 @@ export function createBoardTransport(options: {
       return options.cache.readActive().catch(() => null);
     },
     syncBoard,
+    applyMergedChange,
     libraryRequest,
     publishContext,
     initNotifyButton,

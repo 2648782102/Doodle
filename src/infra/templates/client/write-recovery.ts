@@ -70,3 +70,21 @@ export function presentWriteFailure(error: unknown, deps: WriteRecoveryDeps): vo
     { label: "保留我的", tone: "danger", run: async () => { await deps.retry(); } },
   ]);
 }
+
+/**
+ * Report a conflict that was found *after* the fact — by offline recovery,
+ * not by a rejected write.
+ *
+ * The two cases differ in what has already happened. A rejected write means
+ * nothing was saved, so it offers "reload" and "keep mine". A recovery conflict
+ * means the person's version is already kept on disk and simply could not be
+ * merged; there is nothing to retry yet, so this states the fact and dismisses.
+ * Keeping both here means one module owns every conflict surface.
+ */
+export function presentRecoveredConflict(conflicts: string[], status: SyncChip, dismiss: () => void): void {
+  status.send("conflict");
+  showConflictNotice(
+    `有 ${conflicts.length} 个对象在离线期间被两边同时改动，已保留你的版本待你决定。`,
+    [{ label: "知道了", tone: "primary", run: async () => { dismiss(); } }],
+  );
+}
