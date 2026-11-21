@@ -605,8 +605,8 @@ exports[`board model golden contract > lays out every arrangement mode determini
     ],
     [
       "line",
-      190,
-      70,
+      0,
+      50,
     ],
   ],
   "column": [
@@ -632,8 +632,8 @@ exports[`board model golden contract > lays out every arrangement mode determini
     ],
     [
       "line",
-      190,
-      70,
+      90,
+      100,
     ],
   ],
   "grid": [
@@ -659,8 +659,8 @@ exports[`board model golden contract > lays out every arrangement mode determini
     ],
     [
       "line",
-      190,
-      70,
+      180,
+      50,
     ],
   ],
   "row": [
@@ -686,8 +686,8 @@ exports[`board model golden contract > lays out every arrangement mode determini
     ],
     [
       "line",
-      190,
-      70,
+      180,
+      50,
     ],
   ],
   "timeline": [
@@ -713,8 +713,8 @@ exports[`board model golden contract > lays out every arrangement mode determini
     ],
     [
       "line",
-      190,
-      70,
+      180,
+      50,
     ],
   ],
 }

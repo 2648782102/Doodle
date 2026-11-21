@@ -346,6 +346,62 @@ describe("simple shared board", () => {
     expect(board.items.find((item) => item.id === "edge").text).toBe("read");
   });
 
+  /*
+   * A generated diagram carries a frame and a heading beside its cards. Both
+   * are furniture: the frame is 800px wide and the heading 760px. Arranging
+   * them as cards sized every grid cell to the frame, then moved the frame off
+   * the objects it surrounds — its dashed edge cut through the diagram's own
+   * title, which reads as a crooked heading. In `architecture` the frame even
+   * became a layer-0 node, shifting real cards by 24px and collapsing a
+   * connector to zero length, so the whole reflow was rejected with
+   * `LINE_WITHOUT_DIRECTION`.
+   */
+  it("never arranges diagram furniture as content", () => {
+    let board = createEmptyBoard();
+    board = {
+      ...board,
+      items: diagramToBoardItems({
+        title: "验证板",
+        mode: "flow",
+        nodes: [{ id: "a", label: "开始" }, { id: "b", label: "中间" }, { id: "c", label: "完成" }],
+        edges: [{ from: "a", to: "b" }, { from: "b", to: "c" }],
+      }, "ai"),
+    };
+    const frame = board.items.find((item) => item.id === "diagram_frame");
+    const heading = board.items.find((item) => item.id === "diagram_title");
+    const headingBefore = { x: heading.x, y: heading.y, w: heading.w, h: heading.h };
+    const margins = (snapshot) => {
+      const content = snapshot.items.filter((item) => item.type !== "line" && item.id !== "diagram_frame");
+      const active = snapshot.items.find((item) => item.id === "diagram_frame");
+      return {
+        left: Math.min(...content.map((item) => item.x)) - active.x,
+        top: Math.min(...content.map((item) => item.y)) - active.y,
+        right: active.x + active.w - Math.max(...content.map((item) => item.x + item.w)),
+        bottom: active.y + active.h - Math.max(...content.map((item) => item.y + item.h)),
+      };
+    };
+    const before = margins(board);
+    for (const mode of ["grid", "row", "column", "timeline", "cluster", "architecture"]) {
+      const arranged = layoutBoardItems(board, { mode, origin: { x: 40, y: 120 } }, "ai");
+      const headingAfter = arranged.items.find((item) => item.id === "diagram_title");
+      /*
+       * The frame's size may change — `column` stacks three cards down one
+       * axis, so the box has to grow — but it must keep hugging its content at
+       * the same margins. Leaving it fixed is the hollow-rectangle bug the
+       * card-shaped arrangement produced; treating it as content is what made
+       * the dashed edge cut through the title.
+       */
+      expect({ mode, margins: margins(arranged) }).toEqual({ mode, margins: before });
+      expect({ mode, heading: { x: headingAfter.x, y: headingAfter.y, w: headingAfter.w, h: headingAfter.h } })
+        .toEqual({ mode, heading: headingBefore });
+      // Every arrow still has a direction, so the arrangement keeps a valid board.
+      for (const line of arranged.items.filter((item) => item.type === "line")) {
+        expect(Math.abs(line.w) + Math.abs(line.h), `${mode}: ${line.id} lost its direction`).toBeGreaterThan(0);
+      }
+    }
+    expect(frame.w).toBeGreaterThan(0);
+  });
+
   it("rejects malformed extended objects", () => {
     let board = createEmptyBoard();
     expect(() => addBoardItem(board, { type: "stroke", x: 0, y: 0, points: [{ x: 0, y: 0 }] })).toThrow();

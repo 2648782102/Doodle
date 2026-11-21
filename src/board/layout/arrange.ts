@@ -14,6 +14,122 @@ import type {
 import { updateBoardItems } from "../model/board.js";
 import { BoardValidationError } from "../errors.js";
 
+/**
+ * Frames and labels are furniture, not content.
+ *
+ * `diagnoseBoard` already draws this line: counting a diagram's frame as a node
+ * made it report itself as isolated and overlapping with every real step. A
+ * layout that treats furniture as a card is worse than noisy: a generated
+ * diagram carries a 794px-wide frame, so every grid cell was sized to 794px and
+ * the frame was moved off the objects it surrounds — its dashed edge ended up
+ * cutting through the diagram's own title, which reads as "the title is
+ * crooked". In `architecture` the frame became a layer-0 node, which shifted
+ * real cards by 24px and collapsed a connector to zero length; the whole
+ * reflow was then rejected with `LINE_WITHOUT_DIRECTION`.
+ */
+function isLayoutFurniture(item: BoardItem): boolean {
+  return item.role === "frame" || item.role === "label" || item.variant === "frame";
+}
+
+function isFrame(item: BoardItem): boolean {
+  return item.role === "frame" || item.variant === "frame";
+}
+
+/**
+ * Keep a frame around the objects it enclosed, once those objects have moved.
+ *
+ * A frame is a grouping statement, not a card: "these objects belong together".
+ * Leaving it where it was turns every arrangement into a hollow rectangle with
+ * the content scattered outside it, which is the same false drawing the old
+ * `grid` produced by dragging the frame into a cell. Only frames that actually
+ * contained something move, and each keeps the margins it had, so a hand-drawn
+ * border keeps its own breathing room instead of being re-styled.
+ */
+function refitFrames(board: SimpleBoard, updates: BoardItemPatch[]): BoardItemPatch[] {
+  const frames = board.items.filter(isFrame);
+  if (!frames.length) return [];
+  const after = new Map(board.items.map((item) => [item.id, { x: item.x, y: item.y, w: item.w, h: item.h }]));
+  for (const update of updates) {
+    const current = after.get(update.id);
+    if (current) Object.assign(current, update.patch);
+  }
+  const patches: BoardItemPatch[] = [];
+  for (const frame of frames) {
+    const inside = board.items.filter((item) => item.id !== frame.id && !isFrame(item)
+      && item.x + item.w / 2 >= frame.x
+      && item.x + item.w / 2 <= frame.x + frame.w
+      && item.y + item.h / 2 >= frame.y
+      && item.y + item.h / 2 <= frame.y + frame.h);
+    if (!inside.length) continue;
+    const boundsOf = (geometry: Map<string, { x: number; y: number; w: number; h: number }>) => {
+      const boxes = inside.map((item) => geometry.get(item.id)!);
+      return {
+        left: Math.min(...boxes.map((box) => box.x)),
+        top: Math.min(...boxes.map((box) => box.y)),
+        right: Math.max(...boxes.map((box) => box.x + box.w)),
+        bottom: Math.max(...boxes.map((box) => box.y + box.h)),
+      };
+    };
+    const before = boundsOf(new Map(board.items.map((item) => [item.id, { x: item.x, y: item.y, w: item.w, h: item.h }])));
+    const now = boundsOf(after);
+    const next = {
+      x: Math.round(now.left - (before.left - frame.x)),
+      y: Math.round(now.top - (before.top - frame.y)),
+      w: Math.round(now.right - now.left + (frame.x + frame.w - before.right) + (before.left - frame.x)),
+      h: Math.round(now.bottom - now.top + (frame.y + frame.h - before.bottom) + (before.top - frame.y)),
+    };
+    if (next.x !== frame.x || next.y !== frame.y || next.w !== frame.w || next.h !== frame.h) {
+      patches.push({ id: frame.id, patch: next });
+    }
+  }
+  return patches;
+}
+
+/**
+ * Move a bound arrow with the objects it connects.
+ *
+ * `architecture` always did this — it derives both endpoints from the new
+ * positions — but the plain modes only moved the cards. A reflowed diagram then
+ * showed arrows floating in the old empty space while the cards sat elsewhere,
+ * which is a drawing that asserts a connection that is no longer drawn. An
+ * arrow whose endpoints did not both move is left alone: it may be bound to
+ * something outside the arrangement, and guessing would be worse than leaving
+ * it visibly unchanged.
+ */
+function reanchorLines(board: SimpleBoard, updates: BoardItemPatch[]): BoardItemPatch[] {
+  const moved = new Set(updates.map((update) => update.id));
+  if (!moved.size) return [];
+  const boxes = new Map(board.items.map((item) => [item.id, { x: item.x, y: item.y, w: item.w, h: item.h }]));
+  for (const update of updates) {
+    const box = boxes.get(update.id);
+    if (box) Object.assign(box, update.patch);
+  }
+  const patches: BoardItemPatch[] = [];
+  for (const line of board.items) {
+    if (line.type !== "line" || !line.startItemId || !line.endItemId) continue;
+    const source = boxes.get(line.startItemId);
+    const target = boxes.get(line.endItemId);
+    if (!source || !target) continue;
+    if (!moved.has(line.startItemId) && !moved.has(line.endItemId)) continue;
+    const dx = (target.x + target.w / 2) - (source.x + source.w / 2);
+    const dy = (target.y + target.h / 2) - (source.y + source.h / 2);
+    const horizontal = Math.abs(dx) >= Math.abs(dy);
+    const startX = horizontal ? (dx >= 0 ? source.x + source.w : source.x) : source.x + source.w / 2;
+    const startY = horizontal ? source.y + source.h / 2 : (dy >= 0 ? source.y + source.h : source.y);
+    const endX = horizontal ? (dx >= 0 ? target.x : target.x + target.w) : target.x + target.w / 2;
+    const endY = horizontal ? target.y + target.h / 2 : (dy >= 0 ? target.y : target.y + target.h);
+    const w = Math.round(endX - startX);
+    const h = Math.round(endY - startY);
+    // A zero-length arrow has no direction, and `normalizeItem` rejects it.
+    if (w === 0 && h === 0) continue;
+    const patch = { x: Math.round(startX), y: Math.round(startY), w, h };
+    if (patch.x === line.x && patch.y === line.y && patch.w === line.w && patch.h === line.h) continue;
+    patches.push({ id: line.id, patch });
+  }
+  return patches;
+}
+
+
 /** Both layout paths share these, but each mode has its own readable range. */
 function assertLayoutBounds(
   layout: BoardLayoutInput,
@@ -99,7 +215,7 @@ export function layoutBoardItems(
   }
   const selected = new Set(layout.ids ?? []);
   const candidates = board.items.filter((item) =>
-    item.type !== "line" && (!selected.size || selected.has(item.id)));
+    item.type !== "line" && !isLayoutFurniture(item) && (!selected.size || selected.has(item.id)));
   if (candidates.length < 2) return board;
   const sorted = [...candidates].sort((left, right) => left.y - right.y || left.x - right.x);
   const mode = layout.mode ?? "grid";
@@ -124,7 +240,13 @@ export function layoutBoardItems(
             : cellY(Math.floor(index / columns))),
     },
   }));
-  return updateBoardItems(board, updates, author);
+  /*
+   * Order matters: arrows follow the cards, then the frame follows everything
+   * inside it. Refitting the frame first would size it to the old arrow
+   * endpoints and leave the new ones outside the border.
+   */
+  const movement = [...updates, ...reanchorLines(board, updates)];
+  return updateBoardItems(board, [...movement, ...refitFrames(board, movement)], author);
 }
 
 function layoutArchitectureBoard(
@@ -153,6 +275,7 @@ function layoutArchitectureBoard(
   const selected = new Set(layout.ids ?? []);
   const nodes = board.items.filter((item) =>
     item.type !== "line" && item.type !== "stroke" && item.type !== "image"
+    && !isLayoutFurniture(item)
     && (!selected.size || selected.has(item.id)));
   const connections = board.items.filter((item) => item.type === "line");
   if (!nodes.length) return board;
@@ -213,16 +336,25 @@ function layoutArchitectureBoard(
     const source = line.startItemId ? positions.get(line.startItemId) : undefined;
     const target = line.endItemId ? positions.get(line.endItemId) : undefined;
     if (!source || !target) continue;
+    const deltaX = Math.max(-MAX_LINE_DELTA_X, Math.min(MAX_LINE_DELTA_X, Math.round(target.x - source.x - maxWidth)));
+    const deltaY = Math.max(-MAX_LINE_DELTA_Y, Math.min(MAX_LINE_DELTA_Y, Math.round(target.y - source.y)));
+    /*
+     * Leave a connector alone rather than patch it to zero length. A line with
+     * no direction fails `normalizeItem`, and one bad arrow would reject the
+     * whole reflow — a layout this code produced itself must never be a board
+     * the model refuses.
+     */
+    if (deltaX === 0 && deltaY === 0) continue;
     updates.push({
       id: line.id,
       patch: {
         x: Math.round(source.x + maxWidth),
         y: Math.round(source.y + maxHeight / 2),
-        w: Math.max(-MAX_LINE_DELTA_X, Math.min(MAX_LINE_DELTA_X, Math.round(target.x - source.x - maxWidth))),
-        h: Math.max(-MAX_LINE_DELTA_Y, Math.min(MAX_LINE_DELTA_Y, Math.round(target.y - source.y))),
+        w: deltaX,
+        h: deltaY,
       },
     });
   }
-  return updateBoardItems(board, updates, author);
+  return updateBoardItems(board, [...updates, ...refitFrames(board, updates)], author);
 }
 
