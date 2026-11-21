@@ -64,7 +64,34 @@ export function frameNewBoard(api: ExcalidrawAPI, snapshot: BoardSnapshot): void
    * Next frame, because the caller has just replaced the elements and
    * Excalidraw recalculates its scroll bounds from them.
    */
-  window.requestAnimationFrame(() => {
+  const frame = (attempt: number) => window.requestAnimationFrame(() => {
+    /*
+     * A camera fit needs a measured container.
+     *
+     * On a cold mount the API exists before Excalidraw has read its own
+     * `clientWidth`/`clientHeight`, and `fitToContent` divides by those
+     * dimensions. Zero gave `0/0`, which the app wrote back as
+     * `zoom.value = NaN`, `scrollX = NaN`, `scrollY = NaN`: the canvas painted
+     * nothing and the footer read `NaN%`. Waiting for a non-zero viewport is
+     * the difference between "frame the board" and "erase the camera".
+     */
+    const state = api.getAppState?.() as { width?: number; height?: number } | undefined;
+    const measured = typeof state?.width === "number" && typeof state?.height === "number"
+      && state.width > 0 && state.height > 0;
+    /*
+     * `fitToContent` also needs the elements, not only the container.
+     *
+     * The scene is applied through `updateScene`, which is a React state
+     * update, so one animation frame after the effect is not a guarantee that
+     * Excalidraw sees the objects. Fitting an empty scene divides by a
+     * zero-width bound and stores `NaN` in the camera, which is worse than
+     * leaving it alone: nothing paints at all. Wait for both.
+     */
+    const hasScene = snapshot.items.length === 0 || (api.getSceneElements?.() ?? []).length > 0;
+    if (!measured || !hasScene) {
+      if (attempt < 20) frame(attempt + 1);
+      return;
+    }
     if (!stored) {
       /*
        * Empty boards have nothing to frame. `scrollToContent` on an empty scene
@@ -79,7 +106,19 @@ export function frameNewBoard(api: ExcalidrawAPI, snapshot: BoardSnapshot): void
         });
         return;
       }
-      api.scrollToContent();
+      /*
+       * `fitToContent` is the difference between "show the board" and "put the
+       * board's origin at the viewport origin".
+       *
+       * `initialData.scrollToContent` on a cold mount keeps the default 100%
+       * zoom and only pans, so a 980px-wide diagram opened on a 390px phone
+       * with its top-left corner off-screen: the first paint showed a fragment
+       * of the title and one card. Framing the content instead scales it down
+       * until all of it fits, which is what a first look at a board means.
+       * `animate: false` because this runs under the first paint, where a
+       * camera animation would read as the page settling oddly.
+       */
+      api.scrollToContent(undefined, { fitToContent: true, animate: false });
       return;
     }
     /*
@@ -98,7 +137,36 @@ export function frameNewBoard(api: ExcalidrawAPI, snapshot: BoardSnapshot): void
       captureUpdate: "NEVER",
     });
   });
+  frame(0);
 }
+
+/**
+ * Frame the board the very first time the canvas mounts.
+ *
+ * `frameNewBoard` only ran on a board *switch*, and a cold boot sets the
+ * painted-board id before the first render — so the opening camera was whatever
+ * `initialData.scrollToContent` produced, which pans at 100% zoom. On a 390px
+ * phone that opened a 980px diagram with its top-left corner off-screen and
+ * only a fragment of the title visible; the person's first impression of a
+ * healthy board was that it was broken.
+ *
+ * The guard is a separate flag rather than the painted-board id: switching
+ * appearance re-runs the repaint effect, and re-framing there would yank the
+ * camera away from wherever the person had panned to.
+ */
+export function frameFirstPaint(api: ExcalidrawAPI | null, snapshot: BoardSnapshot | null, framed: { current: boolean }): void {
+  if (!api || !snapshot || framed.current) return;
+  framed.current = true;
+  frameNewBoard(api, snapshot);
+}
+
+/**
+ * The process-wide "the first paint has been framed" flag.
+ *
+ * Kept here rather than in the entrypoint so the guard lives beside the rule it
+ * protects, and so `excalidraw-app.tsx` gains only the one call site.
+ */
+export const firstPaint = { current: false };
 
 /**
  * Re-measure text elements once the self-hosted fonts have actually loaded.

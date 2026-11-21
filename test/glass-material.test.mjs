@@ -521,6 +521,29 @@ describe("liquid glass material", () => {
     expect(template).toContain("@media (max-width: 640px)");
   });
 
+  it("drops the capsule to its own row before the centred toolbar reaches it", () => {
+    /*
+     * The 900px band was measured against the toolbar *sliding left*, but the
+     * capsule ends at x≈308 regardless: at 1100px the centred toolbar already
+     * starts at ~274, so 901–1200 overlapped for the whole band. One capsule
+     * row plus the toolbar is ~296 + 547 + margins; the capsule moves below
+     * 1200 and stays on the top row above it.
+     *
+     * The exact number is measured against this chrome, so the test asserts the
+     * band exists and is contiguous with the tablet band rather than pinning a
+     * toolbar width that would drift with Excalidraw.
+     */
+    const middle = template.slice(template.indexOf("@media (min-width: 901px) and (max-width: 1200px)"));
+    expect(middle, "no band covers the 901-1200 overlap").not.toBe("");
+    const rule = middle.slice(0, middle.indexOf("}\n    }") + 1);
+    expect(rule, "the capsule does not move to its own row").toMatch(/\.doodle-topbar \{ top: 72px/);
+    // Both bands drop the capsule to 72px, so they must agree on the offset.
+    const tablet = template.slice(template.indexOf("@media (min-width: 641px) and (max-width: 900px)"));
+    expect(tablet.slice(0, 200)).toMatch(/\.doodle-topbar \{ top: 72px/);
+    // No gap may remain between the two bands.
+    expect(template).not.toMatch(/@media \(min-width: 901px\) and \(max-width: (89[0-9]|90[0-9])px\)/);
+  });
+
   it("keeps the style panel clear of the capsule in the tablet band", () => {
     /*
      * Moving the capsule down to 72px put it exactly where the selected-object

@@ -12,7 +12,7 @@ import {
   type ExcalidrawFileData,
   type ExcalidrawLikeElement,
 } from "../../board/excalidraw-adapter.js";
-import { buildInitialScene, frameNewBoard, remeasureTextAfterFonts, toElements, toFiles, usableViewport } from "./client/canvas-view.js";
+import { buildInitialScene, firstPaint, frameFirstPaint, frameNewBoard, remeasureTextAfterFonts, toElements, toFiles, usableViewport } from "./client/canvas-view.js";
 import { initLiquidGlass, type LiquidGlassController } from "./liquid-glass.js";
 import {
   clearConflictNotice,
@@ -237,6 +237,7 @@ function CanvasApp({ initial }: { initial: BoardSnapshot }) {
       applyingRemote.current = true;
       api.updateScene({ elements: toElements(activeSnapshot, theme), captureUpdate: "NEVER" });
       window.setTimeout(() => { applyingRemote.current = false; }, 0);
+      frameFirstPaint(api, activeSnapshot, firstPaint);
     }
   }, [api, theme]);
 

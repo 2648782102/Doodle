@@ -21,7 +21,12 @@ export type BoardSnapshot = {
 export type ExcalidrawAPI = {
   updateScene: (scene: { elements?: unknown[]; appState?: Record<string, unknown>; captureUpdate?: string }) => void;
   getSceneElements: () => ExcalidrawLikeElement[];
-  scrollToContent: (elements?: unknown[]) => void;
+  /**
+   * `fitToContent` frames the whole board inside the viewport; without it the
+   * camera stays at 100% and simply pans, which put a phone's first paint on
+   * the top-right corner of a board that is wider than the screen.
+   */
+  scrollToContent: (elements?: unknown[], options?: { fitToContent?: boolean; animate?: boolean }) => void;
   addFiles: (files: ExcalidrawFileData[]) => void;
   getAppState?: () => Record<string, unknown>;
   getFiles?: () => Record<string, ExcalidrawFileData>;

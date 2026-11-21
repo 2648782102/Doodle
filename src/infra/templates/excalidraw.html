@@ -285,8 +285,19 @@
       --glass-hover-rim: rgba(255, 255, 255, 0.75);
       --glass-hover-shade: rgba(120, 104, 76, 0.18);
       --glass-active-fill: #ece4d1;
-      --glass-selected-fill: #e6edf3;
-      --glass-selected-hover-fill: #dbe6ef;
+      /*
+       * Selection is a pencil wash, not a blue chip.
+       *
+       * The selected tool used to be painted `#e6edf3` — a cool, near-white
+       * blue. On cream stock that patch read as a hole punched through to a
+       * different material, and it was the loudest colour on a screen whose
+       * every other surface is warm. The fill is now the paper's own accent at
+       * low alpha: it composites to a soft graphite-blue over the sheet, the
+       * same relationship a pencil wash has to newsprint, and the accent rim
+       * still carries "this one is engaged".
+       */
+      --glass-selected-fill: rgba(74, 103, 133, 0.16);
+      --glass-selected-hover-fill: rgba(74, 103, 133, 0.24);
       --glass-selected-rim: rgba(74, 103, 133, 0.5);
       --glass-input-fill: #fdfbf5;
       --glass-surface-float: var(--paper-sheet);
@@ -1294,6 +1305,18 @@
     .excalidraw [data-testid="main-menu-trigger"],
     .excalidraw .App-menu_top__left > div:has(.main-menu-trigger) { display: none !important; }
     /*
+     * The bottom-right help button duplicated the capsule's `?`.
+     *
+     * Excalidraw ships its own help trigger there, and the capsule already
+     * carries the same affordance in the top-left — one screen showed two
+     * question marks, each opening a different panel in a different corner.
+     * The capsule's panel is the documented surface, so the upstream trigger
+     * is emptied rather than stacked. The element itself stays in the tree:
+     * the paper material still targets it, and deleting it would silently
+     * break that contract on the next theme.
+     */
+    .excalidraw .help-icon { width: 0 !important; height: 0 !important; padding: 0 !important; border: 0 !important; overflow: hidden; visibility: hidden; }
+    /*
      * The top row keeps Excalidraw's `1fr 2fr 1fr` grid. With the menu gone the
      * left column is empty, so the shape column still centres on the viewport
      * and the toolbar stays optically centred; the Doodle capsule occupies the
@@ -1304,11 +1327,30 @@
      * toolbar's height, radius, and 16px inset so the top row reads as three
      * panes on one line rather than three different sizes.
      */
-    .doodle-topbar { position: fixed; top: 16px; left: 16px; z-index: 23; height: 44px; display: flex; gap: 2px; align-items: center; padding: 4px; border-radius: var(--doodle-radius); transition: box-shadow var(--doodle-duration) var(--doodle-ease), opacity var(--doodle-duration) var(--doodle-ease), visibility 0s linear; }
+    .doodle-topbar { position: fixed; top: 16px; left: 16px; z-index: 23; height: 44px; display: flex; gap: 2px; align-items: center; padding: 4px 8px 4px 4px; border-radius: var(--doodle-radius); transition: box-shadow var(--doodle-duration) var(--doodle-ease), opacity var(--doodle-duration) var(--doodle-ease), visibility 0s linear; }
     .doodle-topbar:has(#doodleLibraryToggle[aria-expanded="true"]) { border-color: var(--doodle-border-strong); }
     body.doodle-drawer-open .doodle-topbar { opacity: 0; visibility: hidden; pointer-events: none; transition: opacity var(--doodle-duration) var(--doodle-ease), visibility 0s linear var(--doodle-duration); }
     body:has(.excalidraw .dropdown-menu) .doodle-topbar,
     body:has(.excalidraw .Modal) .doodle-topbar { opacity: 0; visibility: hidden; pointer-events: none; transition: opacity var(--doodle-duration) var(--doodle-ease), visibility 0s linear var(--doodle-duration); }
+    /*
+     * Two groups, one hairline between them.
+     *
+     * The capsule holds two different kinds of control: 图库 is an action that
+     * opens a surface, while 浅/深/玻 is a setting that is always one of three
+     * states. Set at equal weight in an even row they read as five siblings.
+     * The hairline is drawn as a pseudo-element on the appearance group so the
+     * buttons keep their own boxes untouched (hover must not change geometry).
+     */
+    .doodle-themes::before {
+      content: "";
+      position: absolute;
+      left: -4px;
+      top: 5px;
+      bottom: 5px;
+      width: 1px;
+      background: var(--doodle-border);
+      pointer-events: none;
+    }
     .doodle-tool { min-height: 30px; padding: 0 11px; border: 1px solid transparent; border-radius: 9px; background: transparent; color: var(--doodle-muted); cursor: pointer; font-size: 12px; letter-spacing: 0.01em; transition: color var(--doodle-duration) var(--doodle-ease), background-color var(--doodle-duration) var(--doodle-ease), border-color var(--doodle-duration) var(--doodle-ease), box-shadow var(--doodle-duration) var(--doodle-ease); }
     .doodle-tool:active { background: var(--doodle-accent-soft); box-shadow: inset 0 1px 2px rgba(0, 0, 0, 0.08); }
     .doodle-tool:hover { border-color: var(--doodle-border); color: var(--doodle-ink); background: var(--doodle-accent-soft); }
@@ -1424,7 +1466,7 @@
      * hairline, and the active segment carrying the accent at low alpha. The
      * whole group is 30px tall to match the sibling tool button.
      */
-    .doodle-themes { display: inline-flex; align-items: stretch; gap: 2px; height: 30px; padding: 1px; border-radius: 9px; }
+    .doodle-themes { position: relative; display: inline-flex; align-items: stretch; gap: 2px; height: 30px; padding: 1px; border-radius: 9px; }
     .doodle-theme-option {
       position: relative;
       min-width: 26px;
@@ -1449,6 +1491,15 @@
       border-color: var(--doodle-border-strong);
       font-weight: 600;
     }
+    /*
+     * The selection is a rounded key, not a circle.
+     *
+     * At 8px radius on a 30px-tall segment the corners rounder than the capsule
+     * that contains them, so the pressed state read as a lozenge floating on a
+     * rounded rectangle. Two fewer pixels make the three segments and the pane
+     * share a family of curves.
+     */
+    .doodle-theme-option { border-radius: 7px; }
     /*
      * Hand-drawn cue, kept to this one spot. The active appearance carries a
      * slightly wobbly ink underline instead of a ruler-straight rule — the one
@@ -1672,7 +1723,25 @@
     .doodle-library-entry.active { border-color: var(--doodle-accent); background: var(--doodle-accent-soft); }
     .doodle-library-entry-main { min-width: 0; border: 0; background: transparent; color: var(--doodle-ink); text-align: left; cursor: pointer; padding: 0; font-size: 12px; overflow: hidden; text-overflow: ellipsis; }
     .doodle-library-entry small { display: block; color: var(--doodle-muted); font-size: 10px; margin-top: 2px; white-space: nowrap; }
-    .doodle-library-entry-actions { display: flex; flex: none; gap: 2px; }
+    /*
+     * Row actions appear on the row you are considering, not on all of them.
+     *
+     * Three text buttons per row — 改名 / 导出 / 删除 — repeated down a list of
+     * twenty boards, turned the library into a wall of links and squeezed the
+     * one thing worth reading (the name) into a column. The active and hovered
+     * rows keep them, and they stay in the DOM for every row so keyboard focus
+     * and screen readers still reach them: the rule fades them, it does not
+     * remove them from the tab order.
+     */
+    .doodle-library-entry-actions { display: flex; flex: none; gap: 2px; opacity: 0; transition: opacity var(--doodle-duration) var(--doodle-ease); }
+    .doodle-library-entry:hover .doodle-library-entry-actions,
+    .doodle-library-entry:focus-within .doodle-library-entry-actions,
+    .doodle-library-entry.active .doodle-library-entry-actions,
+    .doodle-library-entry.is-confirming .doodle-library-entry-actions { opacity: 1; }
+    @media (hover: none) {
+      /* A touch screen has no hover, so hiding them would hide them for good. */
+      .doodle-library-entry-actions { opacity: 1; }
+    }
     .doodle-library-entry-actions button { min-width: 0; padding: 4px 6px; border: 0; border-radius: 6px; background: transparent; color: var(--doodle-muted); cursor: pointer; font-size: 11px; white-space: nowrap; transition: background-color var(--doodle-duration) var(--doodle-ease), color var(--doodle-duration) var(--doodle-ease); }
     .doodle-library-entry-actions button:hover { background: var(--doodle-surface-solid); color: var(--doodle-ink); }
     .doodle-library-entry-actions .doodle-library-entry-delete:hover { color: var(--doodle-danger); }
@@ -1730,13 +1799,13 @@
      * `contain` keeps an SVG with a huge internal viewBox from painting outside
      * the box, and `pointer-events: none` makes the whole row still one target.
      */
-    .doodle-library-entry.has-thumb { grid-template-columns: 40px minmax(0, 1fr) auto; }
+    .doodle-library-entry.has-thumb { grid-template-columns: 52px minmax(0, 1fr) auto; }
     .doodle-library-thumb {
-      width: 40px;
-      height: 32px;
+      width: 52px;
+      height: 40px;
       object-fit: contain;
       pointer-events: none;
-      border-radius: 6px;
+      border-radius: 7px;
       background: var(--doodle-surface);
       border: 1px solid var(--doodle-border);
       overflow: hidden;
@@ -2051,10 +2120,24 @@
     :root[data-doodle-material="paper"] .doodle-library-rename button,
     :root[data-doodle-material="paper"] .doodle-library-sectionhead-actions button,
     :root[data-doodle-material="paper"] .doodle-library-footer button,
-    :root[data-doodle-material="paper"] .doodle-library-shares button,
-    :root[data-doodle-material="paper"] .doodle-tool {
+    :root[data-doodle-material="paper"] .doodle-library-shares button {
       background-color: transparent;
       border-color: var(--paper-crease);
+      box-shadow: none;
+    }
+    /*
+     * The capsule's own buttons carry no resting outline.
+     *
+     * `图库` and `?` were drawn as outlined pills inside an already-outlined
+     * capsule, and the theme group added a third radius beside them — three
+     * nested frames for one row of controls. On paper a key is identified by
+     * its label, not by a box: it gets colour on hover and an inset shadow when
+     * pressed, and nothing at rest. The capsule itself keeps the one edge that
+     * matters, because that is the pane.
+     */
+    :root[data-doodle-material="paper"] .doodle-tool {
+      background-color: transparent;
+      border-color: transparent;
       box-shadow: none;
     }
     :root[data-doodle-material="paper"] .doodle-library-entry.active {
@@ -2119,11 +2202,25 @@
     /* Doodle's own capsule buttons keep their pressed states on paper too. */
     :root[data-doodle-material="paper"] .doodle-tool:hover {
       background: var(--glass-hover-fill);
-      border-color: var(--paper-crease);
+      border-color: transparent;
+    }
+    /*
+     * The chip is a reading, not a control.
+     *
+     * It was drawn as an outlined pill inside the outlined capsule — a box in a
+     * box, which made a read-only status look tappable. On paper the chip keeps
+     * no border and no fill: the dot and the words are the whole signal, and
+     * they sit at the same weight as the neighbouring labels.
+     */
+    :root[data-doodle-material="paper"] .doodle-sync-state {
+      border-color: transparent;
+      background: transparent;
+      padding-right: 7px;
     }
     :root[data-doodle-material="paper"] .doodle-theme-option[aria-pressed="true"] {
       background: var(--glass-selected-fill);
       box-shadow: inset 0 1px 2px 0 var(--glass-hover-shade);
+      border-color: transparent;
     }
     .doodle-welcome p { margin: 0; color: var(--doodle-muted); font-size: 12px; line-height: 1.6; }
     .doodle-welcome dl { display: grid; grid-template-columns: auto 1fr; gap: 6px 12px; margin: 2px 0 0; font-size: 12px; }
@@ -2145,6 +2242,15 @@
     @media (min-width: 641px) and (max-width: 900px) {
       .doodle-topbar { top: 72px; left: 12px; }
       /*
+       * The capsule is one row of five controls, and at this width it has to
+       * give the toolbar room rather than sit beside it. Collapsing the channel
+       * label ("本机页面") first is the least destructive step: the dot and the
+       * state word still say saved/unsaved, and the channel is a detail a
+       * person reads once.
+       */
+      .doodle-sync-channel { display: none; }
+      .doodle-sync-state { padding-right: 8px; }
+      /*
        * The style panel has to step aside for the capsule.
        *
        * Both used to start at `top: 72px; left: 12px` in this band, so the
@@ -2153,6 +2259,28 @@
        * moves below it: 72 + 44 capsule + 12 gap. The height budget loses the
        * same 56px so it still clears the bottom controls, and it stays above the
        * 641px breakpoint where the panel moves into the mobile bottom bar.
+       */
+      .excalidraw .Island.App-menu__left {
+        top: 128px;
+        max-height: calc(100vh - 204px);
+      }
+    }
+    /*
+     * The band the old breakpoints missed.
+     *
+     * The capsule is 296px at its widest and the shape toolbar is centred at
+     * roughly 547px, so at 900px the toolbar starts at x≈176 while the capsule
+     * still ends at 308 — the two overlapped for the whole 900–1200 range, and
+     * the 900px breakpoint only fixed it below that. Below this width the
+     * capsule drops to its own row; above it there is room for both on one line.
+     */
+    @media (min-width: 901px) and (max-width: 1200px) {
+      .doodle-topbar { top: 72px; left: 16px; }
+      /*
+       * The style panel is the only other thing that can start at 72px, and it
+       * wins no z-order argument against a fixed capsule. Give it the same
+       * treatment as the tablet band: start under the capsule, and lose the
+       * capsule's height from its budget so it still clears the bottom row.
        */
       .excalidraw .Island.App-menu__left {
         top: 128px;
