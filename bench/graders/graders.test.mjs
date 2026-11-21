@@ -7,8 +7,14 @@
  * coordinates, so the tests exercise the shape a model actually produces.
  */
 import { describe, expect, it } from "vitest";
-import { createEmptyBoard, diagramToBoardItems, touchBoard } from "../../dist/board/types.js";
-import { expandRecipe } from "../../dist/board/diagram/recipe.js";
+/*
+ * The model comes from `src`: these tests need the generator, and reading
+ * `dist` meant they could not run until something had built first — while
+ * silently grading whatever that build contained. See `bench/report.test.mjs`
+ * for the same change and the reasoning.
+ */
+import { createEmptyBoard, diagramToBoardItems, touchBoard } from "../../src/board/types.ts";
+import { expandRecipe } from "../../src/board/diagram/recipe.ts";
 import { gradeBoard, gradeBudget } from "./index.mjs";
 import { labelsMatch, normalizeLabel } from "./normalize.mjs";
 import { countCrossings, countEdgesThroughNodes, segmentsIntersect } from "./geometry.mjs";

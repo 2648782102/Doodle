@@ -5,8 +5,22 @@
  * must refuse rather than print a confident number.
  */
 import { describe, expect, it } from "vitest";
-import { createEmptyBoard, diagramToBoardItems, touchBoard } from "../dist/board/types.js";
-import { expandRecipe } from "../dist/board/diagram/recipe.js";
+/*
+ * Import the model from `src`, not `dist`.
+ *
+ * These tests build their fixtures with the real diagram generator, which the
+ * product code owns. Reading `dist` made `npm test` fail on a clean checkout —
+ * `dist` is gitignored and only exists after a build — and it silently tested
+ * the last build rather than the code being edited. Vitest transforms
+ * TypeScript, and the repository already reads `src` this way in
+ * `test/write-pipeline-and-loop.test.mjs`, so the only thing the build artifact
+ * was adding here was a stale copy.
+ *
+ * The end-to-end matrix run still goes through `dist/index.js`: that one is
+ * deliberate, because it measures the artifact a person installs.
+ */
+import { createEmptyBoard, diagramToBoardItems, touchBoard } from "../src/board/types.ts";
+import { expandRecipe } from "../src/board/diagram/recipe.ts";
 import { assertTrace, makeTrace, shortHash } from "./trace.mjs";
 import {
   clusterFailures, compareRuns, gradeTraces, renderMarkdown,
