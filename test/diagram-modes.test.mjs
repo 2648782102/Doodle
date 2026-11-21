@@ -143,6 +143,106 @@ describe("diagram layout modes", () => {
     ]);
   });
 
+  it("keeps the declared nodes and edges when a recipe is also present", () => {
+    /*
+     * A model often names a recipe and then spells out the graph. The recipe
+     * branches rebuilt both nodes and edges from `steps`, so the declared graph
+     * was thrown away — and the reply still said success. 62 of 305 recorded
+     * runs did this. Here `steps` would make a straight four-step chain; the
+     * declared edges are a loop, and the loop must be what gets drawn.
+     */
+    const items = diagramToBoardItems(expandRecipe({
+      recipe: "flow",
+      steps: ["提交", "评审", "发布", "验证"],
+      nodes: [
+        { id: "a", label: "提交" },
+        { id: "b", label: "评审" },
+        { id: "c", label: "发布" },
+        { id: "d", label: "验证" },
+      ],
+      edges: [
+        { from: "a", to: "b" },
+        { from: "b", to: "c" },
+        { from: "c", to: "d" },
+        { from: "d", to: "b" },
+      ],
+    }));
+    const lines = items.filter((item) => item.type === "line");
+
+    expect(lines).toHaveLength(4);
+    expect(lines.map((line) => [line.startItemId, line.endItemId])).toContainEqual(["d", "b"]);
+  });
+
+  it("stacks sibling branches instead of drawing them on one point", () => {
+    /*
+     * Two arms of a decision share a derived column. They were both placed at
+     * the column's first free row, so 上线 and 暂缓 landed on the same
+     * coordinate and a correct branch diagram graded as overlapping.
+     */
+    const layout = resolveDiagramLayout(diagram({
+      mode: "flow",
+      nodes: [
+        { id: "q", label: "是否上线" },
+        { id: "y", label: "上线" },
+        { id: "n", label: "暂缓" },
+        { id: "r", label: "复盘" },
+      ],
+      edges: [
+        { from: "q", to: "y" },
+        { from: "q", to: "n" },
+        { from: "y", to: "r" },
+        { from: "n", to: "r" },
+      ],
+    }));
+    const yes = layout.positions.get("y");
+    const no = layout.positions.get("n");
+
+    expect(yes.x).toBe(no.x);
+    expect(yes.y).not.toBe(no.y);
+  });
+
+  it("reads a direction word as the mode it names", () => {
+    /*
+     * `mode` is a four-value enum, but agents write the words they use to
+     * describe a picture: "horizontal", "left-right", "LR", "vertical". 42
+     * recorded runs sent one, and a recipe was present in every case, so the
+     * value was silently discarded. Rejecting it now would trade a silent
+     * failure for a loud one on a field whose meaning is not in doubt.
+     */
+    const expanded = (mode) => expandRecipe({ mode, nodes: [{ id: "a", label: "A" }] }).mode;
+
+    expect(expanded("horizontal")).toBe("flow");
+    expect(expanded("left-right")).toBe("flow");
+    expect(expanded("LR")).toBe("flow");
+    expect(expanded("linear")).toBe("flow");
+    expect(expanded("vertical")).toBe("timeline");
+    expect(expanded("top-down")).toBe("timeline");
+    // The real values still mean themselves.
+    expect(expanded("flow")).toBe("flow");
+    expect(expanded("matrix")).toBe("matrix");
+    // An unknown word is left alone so the layout rejection still names it.
+    expect(expanded("diagonal")).toBe("diagonal");
+  });
+
+  it("names a bad node colour at the field the caller wrote", () => {
+    /*
+     * `parseBoard` sees generated items, so `color: "blue"` was reported as
+     * `items[1].color` — a path that does not exist in the request. The colour
+     * is still rejected rather than guessed: "blue" has no single meaning.
+     */
+    expect(() => expandRecipe({ nodes: [{ id: "a", label: "A", color: "blue" }] }))
+      .toThrowError();
+    try {
+      expandRecipe({ nodes: [{ id: "a", label: "A", color: "blue" }] });
+      throw new Error("should have thrown");
+    } catch (error) {
+      // The path is the part the model repairs against, so it is what is checked.
+      expect(error.path).toBe('diagram.nodes["a"].color');
+      expect(error.code).toBe("INVALID_COLOR");
+    }
+    expect(expandRecipe({ nodes: [{ id: "a", label: "A", color: "#dbeafe" }] }).nodes).toHaveLength(1);
+  });
+
   it("continues the sequence in one column when only rows are given", () => {
     // A timeline author states the axis once (`column: 0`) and then advances
     // `row`; nodes that carry only a row must stay on that axis instead of

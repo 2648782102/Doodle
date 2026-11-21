@@ -196,6 +196,32 @@ export function resolveDiagramLayout(diagram: ExpandedDiagramInput): DiagramLayo
   const perRow = Math.max(1, Math.min(flowWrap, fallbackColumn));
   const positions = new Map<string, BoardPoint>();
   const rows = new Map<number, number>();
+  /*
+   * Nodes that share a derived column must not share a cell.
+   *
+   * `row` came from the per-column counter for every node in a column, but the
+   * counter was read once per node and only advanced at the end of the pass.
+   * Two siblings — the 上线 / 暂缓 arms of a decision — both read row 0 and
+   * landed on the same point, so a correct branch diagram graded as overlapping
+   * and unreadable. Dense flows hid it because their nodes sit on distinct
+   * layers; a fan-out is what exposes it.
+   */
+  /*
+   * Cell occupancy, keyed by visual column.
+   *
+   * Both layouts below need the same guarantee: two nodes that resolve to the
+   * same column must not be drawn on the same point. A sequential chain never
+   * collides, which is why this went unnoticed; a fan-out does.
+   */
+  const occupied = new Map<number, Set<number>>();
+  const claimRow = (column: number, preferred: number): number => {
+    const used = occupied.get(column) ?? new Set<number>();
+    let row = preferred;
+    while (used.has(row)) row += 1;
+    used.add(row);
+    occupied.set(column, used);
+    return row;
+  };
   for (const node of diagram.nodes) {
     /*
      * Do not clamp the derived layer to 12.
@@ -224,13 +250,33 @@ export function resolveDiagramLayout(diagram: ExpandedDiagramInput): DiagramLayo
      * share a column stack downwards as before. Both cases still honour an
      * explicit `node.row`.
      */
+    /*
+     * The snaked pass owns its row; a node inside the pass shares it.
+     *
+     * That expression is the fix for a chain drifting a whole pass down the
+     * page, so it stays literally intact — but on its own it also puts two
+     * *siblings* on the same point, because both arms of a branch read the same
+     * pass row. `claimRow` walks down only when the cell is already taken, so a
+     * plain chain is byte-identical and a fan-out stacks. Keeping the original
+     * expression and correcting it is what keeps both behaviours.
+     */
     const row = node.row ?? (wrap ? wrappedRow : (rows.get(column) ?? 0));
-    rows.set(column, Math.max(rows.get(column) ?? 0, row + 1));
+    /*
+     * Stack a fan-out instead of drawing its arms on one point.
+     *
+     * The line above is the fix for a chain drifting a whole pass down the
+     * page, and it stays verbatim. It also gives every node of a pass the same
+     * row, so the two arms of a branch land on the same coordinate. Only an
+     * occupied cell is pushed down, so a plain chain is byte-identical and a
+     * fan-out stacks.
+     */
+    const placedRow = node.row !== undefined ? row : claimRow(column, row);
+    rows.set(column, Math.max(rows.get(column) ?? 0, placedRow + 1));
     const reversed = wrap && wrappedRow % 2 === 1;
     const xColumn = reversed ? perRow - 1 - column : column;
     positions.set(node.id, {
       x: Math.round(origin.x + xColumn * (width + columnGap)),
-      y: Math.round(origin.y + row * (height + rowGap)),
+      y: Math.round(origin.y + placedRow * (height + rowGap)),
     });
   }
   return { origin, width, height, columnGap, rowGap, positions, rows };

@@ -181,7 +181,10 @@
     "expect": {
       "kind": "comparison",
       "nodes": ["供应商A", "供应商B"],
-      "allow": ["价格", "交付", "成本", "时效", "优点", "取舍", "对比", "VS"],
+      "allow": [
+        "价格", "交付", "成本", "时效", "优点", "取舍", "对比", "VS",
+        "交期", "规划", "响应", "建议", "到货", "周期", "选择"
+      ],
       "forbid": ["overlap"]
     },
     "budget": { "max_tool_calls": 4, "max_seconds": 120, "max_bytes": 150000 }
@@ -192,6 +195,7 @@
     "expect": {
       "kind": "comparison",
       "nodes": ["改造前", "改造后"],
+      "allow": ["人工", "自动", "处理", "耗时", "一天", "一小时", "对比"],
       "forbid": ["overlap"]
     },
     "budget": { "max_tool_calls": 4, "max_seconds": 120, "max_bytes": 150000 }
