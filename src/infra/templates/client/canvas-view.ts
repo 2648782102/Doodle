@@ -20,7 +20,7 @@ import {
   readStoredViewport,
 } from "../../../board/client/viewport-memory.js";
 import { canvasColors, canvasThemeFor, type DoodleTheme } from "./theme.js";
-import { boardBounds, type BoardSnapshot, type ExcalidrawAPI } from "./types.js";
+import { boardBounds, fitCamera, type BoardSnapshot, type ExcalidrawAPI } from "./types.js";
 
 export function toElements(snapshot: BoardSnapshot, theme: DoodleTheme) {
   const skeletons = boardItemsToExcalidrawSkeleton(snapshot.items as never[], canvasThemeFor(theme));
@@ -78,6 +78,8 @@ export function frameNewBoard(api: ExcalidrawAPI, snapshot: BoardSnapshot): void
     const state = api.getAppState?.() as { width?: number; height?: number } | undefined;
     const measured = typeof state?.width === "number" && typeof state?.height === "number"
       && state.width > 0 && state.height > 0;
+    const viewportWidth = state?.width ?? 0;
+    const viewportHeight = state?.height ?? 0;
     /*
      * `fitToContent` also needs the elements, not only the container.
      *
@@ -107,18 +109,32 @@ export function frameNewBoard(api: ExcalidrawAPI, snapshot: BoardSnapshot): void
         return;
       }
       /*
-       * `fitToContent` is the difference between "show the board" and "put the
-       * board's origin at the viewport origin".
+       * Fit the content the board *has*, not the scene Excalidraw may not have
+       * committed yet.
        *
-       * `initialData.scrollToContent` on a cold mount keeps the default 100%
-       * zoom and only pans, so a 980px-wide diagram opened on a 390px phone
-       * with its top-left corner off-screen: the first paint showed a fragment
-       * of the title and one card. Framing the content instead scales it down
-       * until all of it fits, which is what a first look at a board means.
-       * `animate: false` because this runs under the first paint, where a
-       * camera animation would read as the page settling oddly.
+       * `scrollToContent(undefined, { fitToContent: true })` reads the live
+       * scene. Called one frame after `updateScene`, that scene is still empty
+       * often enough to matter: `fitToContent` then divides a zero-width bound
+       * and writes `zoom.value = NaN`, `scrollX = NaN`, `scrollY = NaN`. The
+       * canvas stops painting *everything* — the board looks like it vanished a
+       * moment after it appeared, and the zoom chip reads `NaN%`.
+       *
+       * The bounds are already known from `snapshot`, so compute the camera
+       * from them directly. The formula is Excalidraw's own: a scene point maps
+       * to `(x + scrollX) * zoom` on the canvas, so centring the content means
+       * `scroll = viewport/2 - centre * zoom`.
        */
-      api.scrollToContent(undefined, { fitToContent: true, animate: false });
+      const camera = fitCamera(snapshot.items, { width: viewportWidth, height: viewportHeight });
+      if (camera) {
+        api.updateScene({
+          appState: {
+            scrollX: camera.scrollX,
+            scrollY: camera.scrollY,
+            zoom: { value: camera.zoom as never },
+          },
+          captureUpdate: "NEVER",
+        });
+      }
       return;
     }
     /*

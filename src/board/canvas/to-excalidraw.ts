@@ -59,6 +59,24 @@ function baseSkeleton(item: BoardItem, theme: CanvasTheme): ExcalidrawSkeleton {
     width: item.type === "line" ? Math.abs(item.w) : item.w,
     height: item.type === "line" ? Math.abs(item.h) : item.h,
     verticalAlign: item.type === "text" ? "top" : "middle",
+    /*
+     * Fields Excalidraw always materialises, declared here too.
+     *
+     * The reverse projection stores the full scene element on the item, and
+     * `convertToExcalidrawElements` fills these in with defaults. A stored item
+     * that predates one of them therefore projects to a scene that differs from
+     * the stored snapshot on *every* read, and the canvas reports an "edit"
+     * nobody made — which rewrote the board and bumped the revision on each
+     * reload. Declaring the defaults makes read → write → read stable.
+     */
+    angle: 0,
+    roundness: null,
+    fillStyle: "solid",
+    frameId: null,
+    boundElements: [],
+    link: null,
+    locked: false,
+    lastCommittedPoint: null,
     ...styleFor(item, theme),
   };
 }
@@ -132,6 +150,25 @@ export function boardItemsToExcalidrawSkeleton(items: BoardItem[], theme: Canvas
     }
     if (item.type === "stroke") {
       base.points = (item.points ?? []).map((point) => [point.x, point.y] as [number, number]);
+      /*
+       * A freedraw element must say how its pressure map is produced.
+       *
+       * Excalidraw's perfect-freehand projection reads `pressures[i]` for every
+       * point unless `simulatePressure` is on. The skeleton supplied neither, so
+       * the very first brush stroke threw `Cannot read properties of undefined`
+       * inside the renderer and the whole scene stayed blank — rectangles and
+       * all — while `get_board` reported every object present. Stroke thickness
+       * is already carried by `strokeWidth`, so pressure is simulated rather
+       * than invented per point.
+       *
+       * Do not also add `version` / `versionNonce` here. This field pair exists
+       * precisely so Excalidraw can rebuild the pressure map: a hand-supplied
+       * version makes it reuse the path cache instead, and the freedraw's
+       * `fill()` then paints a cached, empty path — drawn every frame, visible
+       * never. The adapter's own elements go through `convertToExcalidrawElements`,
+       * which derives both fields itself.
+       */
+      base.simulatePressure = true;
       base.width = item.w;
       base.height = item.h;
       return [base];

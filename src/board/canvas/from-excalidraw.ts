@@ -58,6 +58,20 @@ function itemStyle(element: ExcalidrawLikeElement): NonNullable<BoardItem["style
  * shape as an outline.
  */
 function elementColor(element: ExcalidrawLikeElement): string {
+  /*
+   * A freehand stroke has no fill; its ink is the stroke colour.
+   *
+   * The "unfilled shape keeps `transparent`" rule above is about *fills*, and
+   * applying it to a brush stroke stored `color: "transparent"` for every stroke
+   * a person drew. The canvas was correct until the write landed, then the saved
+   * board re-projected the ink as transparent and the stroke vanished — the
+   * "draw it, and a moment later it is gone" report. The chosen colour belongs
+   * in `color` for a stroke exactly as it does for an arrow.
+   */
+  if (elementType(element) === "stroke") {
+    const ink = element.strokeColor ?? "#1e1e1e";
+    return /^#[0-9a-fA-F]{6}$/i.test(ink) ? ink : "#1e1e1e";
+  }
   if (element.backgroundColor === "transparent") return "transparent";
   const color = element.backgroundColor && element.backgroundColor !== "transparent"
     ? element.backgroundColor : element.strokeColor ?? "#f6d365";

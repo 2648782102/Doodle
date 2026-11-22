@@ -152,7 +152,16 @@ function renderItem(item: BoardItem): string {
       const d = points
         .map((point, index) => `${index === 0 ? "M" : "L"} ${item.x + point.x} ${item.y + point.y}`)
         .join(" ");
-      return `<path d="${d}" fill="none" stroke="${style.strokeWidth ? stroke : item.color}" stroke-width="${style.strokeWidth ?? 2}" stroke-linecap="round" stroke-linejoin="round"${opacityAttr}/>`;
+      /*
+       * A freehand stroke paints with `color`, the same ink the canvas uses.
+       *
+       * The condition used to be `style.strokeWidth ? stroke : item.color`,
+       * which meant setting the brush width silently swapped the chosen colour
+       * for the default border ink — a red stroke exported black. Width and
+       * colour are independent; only an explicit border colour overrides.
+       */
+      const ink = style.borderColor ?? item.color;
+      return `<path d="${d}" fill="none" stroke="${ink}" stroke-width="${style.strokeWidth ?? 3}" stroke-linecap="round" stroke-linejoin="round"${opacityAttr}/>`;
     }
     case "image":
       // Without the data URL inlined this is a placeholder frame; the canvas is

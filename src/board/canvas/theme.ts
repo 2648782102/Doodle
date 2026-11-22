@@ -117,7 +117,19 @@ export function styleFor(item: BoardItem, theme: CanvasTheme): Partial<Excalidra
   return {
     strokeColor: textInk
       ?? borderInk
-      ?? (item.type === "line" ? readableStroke(item.color, theme) : CANVAS_INK[theme]),
+      /*
+       * A freehand stroke paints with `color`, exactly like an arrow.
+       *
+       * `stroke` fell through to the theme ink, so every brush colour was
+       * silently replaced by `#1f2937` on light and the dark ink on dark: the
+       * person picked red, drew, and watched black appear. Nothing rejected the
+       * write and the board stored the right value, which is why only the
+       * rendered pixels showed it. The same readability floor applies, because
+       * a stored ink the page cannot show is still unreadable ink.
+       */
+      ?? (item.type === "line" || item.type === "stroke"
+        ? readableStroke(item.color, theme)
+        : CANVAS_INK[theme]),
     backgroundColor: item.type === "line" || item.type === "stroke" || item.type === "image" ? "transparent" : (themedFill(item.color, theme) ?? "transparent"),
     strokeWidth: style.strokeWidth ?? (item.type === "stroke" ? 3 : 2),
     strokeStyle: item.variant === "frame" ? "dashed" : "solid",

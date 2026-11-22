@@ -323,3 +323,120 @@ describe("degenerate canvas elements", () => {
     expect(() => parseBoard(JSON.parse(JSON.stringify(board)))).not.toThrow();
   });
 });
+
+describe("freehand ink", () => {
+  const stroke = (color) => ({
+    id: "ink", type: "stroke", x: 0, y: 0, w: 120, h: 60, color,
+    author: "ai",
+    createdAt: "2026-01-01T00:00:00.000Z",
+    updatedAt: "2026-01-01T00:00:00.000Z",
+    points: [{ x: 0, y: 60 }, { x: 60, y: 0 }, { x: 120, y: 60 }],
+  });
+
+  /*
+   * A brush stroke paints with the colour it was given.
+   *
+   * It used to fall through to the theme ink, so every freehand colour rendered
+   * as `#1f2937` on a light page: the person picked red, drew, and watched
+   * black appear. The board stored the right value and nothing rejected the
+   * write, so only the rendered pixels were wrong — which is exactly the kind of
+   * defect a round-trip assertion misses and a colour assertion catches.
+   */
+  it("renders the stored colour as the stroke colour", () => {
+    const [light] = boardItemsToExcalidrawSkeleton([stroke("#e04a4a")], "light");
+    expect(light.strokeColor).toBe("#e04a4a");
+    // Freehand is never filled, whatever the colour.
+    expect(light.backgroundColor).toBe("transparent");
+  });
+
+  it("still replaces an ink the page cannot show", () => {
+    // The readability floor is not waived: near-white on a light page is
+    // unreadable, so the theme ink takes over rather than painting nothing.
+    const [light] = boardItemsToExcalidrawSkeleton([stroke("#ffffff")], "light");
+    expect(light.strokeColor).not.toBe("#ffffff");
+    const [dark] = boardItemsToExcalidrawSkeleton([stroke("#ffffff")], "dark");
+    expect(dark.strokeColor).toBe("#ffffff");
+  });
+
+  /*
+   * A freedraw element has to declare how pressure is derived.
+   *
+   * Excalidraw's stroke projection indexes `pressures` per point unless
+   * `simulatePressure` is set, and the skeleton set neither. The first brush
+   * stroke therefore threw inside the renderer and the entire scene painted
+   * blank — every rectangle on the board with it — while the stored board was
+   * perfectly valid. Asserting the field is what turns a blank canvas into a
+   * failing test.
+   */
+  it("declares simulated pressure so the stroke projection can run", () => {
+    const [element] = boardItemsToExcalidrawSkeleton([stroke("#e04a4a")], "light");
+    expect(element.simulatePressure).toBe(true);
+  });
+});
+
+describe("camera and change detection", () => {
+  const brush = (color) => ({
+    id: "ink", type: "stroke", x: 0, y: 0, w: 120, h: 60, color,
+    author: "ai",
+    createdAt: "2026-01-01T00:00:00.000Z",
+    updatedAt: "2026-01-01T00:00:00.000Z",
+    points: [{ x: 0, y: 60 }, { x: 60, y: 0 }, { x: 120, y: 60 }],
+  });
+
+  /*
+   * A brush stroke drawn on the canvas must keep its ink in `color`.
+   *
+   * `elementColor` reads "no background" as "this is an outline, remember
+   * transparent" — correct for a shape, wrong for a stroke. A person drew,
+   * the saved board re-projected the ink as transparent, and the stroke
+   * disappeared a moment later. The canvas passing its own scene through this
+   * adapter is exactly the path that lost it.
+   */
+  it("keeps a freehand stroke's ink when the canvas writes it back", () => {
+    const drawn = {
+      id: "brush", type: "freedraw", x: 120, y: 90, width: 260, height: 140,
+      angle: 0, strokeColor: "#c62828", backgroundColor: "transparent", strokeWidth: 3,
+      strokeStyle: "solid", roughness: 1, roundness: null, opacity: 100, fontSize: 16,
+      fontFamily: 3, textAlign: "center", groupIds: [],
+      points: [[0, 140], [52, 12], [104, 130], [156, 4], [208, 120], [260, 30]],
+      pressures: [], simulatePressure: true,
+      customData: { doodle: { author: "human" } },
+    };
+    const [item] = boardItemsFromExcalidrawBoard(createEmptyBoard("rt"), [drawn]).items;
+    expect(item.color).toBe("#c62828");
+    // And the stored item still paints that ink after a reload.
+    const [reprojected] = boardItemsToExcalidrawSkeleton([item], "light");
+    expect(reprojected.strokeColor).toBe("#c62828");
+  });
+
+  /*
+   * Projecting a stored board must not look like an edit.
+   *
+   * Excalidraw materialises `angle`, `fillStyle`, `frameId`, `boundElements`,
+   * `link`, `locked` and `lastCommittedPoint`. A skeleton that omits them
+   * produced a scene differing from the stored snapshot on every read, so each
+   * reload wrote the board back and bumped the revision for a change nobody
+   * made. Declaring the defaults is what makes read -> write -> read a no-op.
+   */
+  it("declares the scene fields Excalidraw would otherwise invent", () => {
+    const [element] = boardItemsToExcalidrawSkeleton([brush("#e04a4a")], "light");
+    expect(element).toMatchObject({
+      angle: 0,
+      fillStyle: "solid",
+      frameId: null,
+      boundElements: [],
+      link: null,
+      locked: false,
+      lastCommittedPoint: null,
+    });
+    const [item] = boardItemsFromExcalidrawBoard(createEmptyBoard("fields"), [{
+      ...element, id: "fields", type: "freedraw", x: 0, y: 0, width: 40, height: 40,
+      strokeColor: "#e04a4a", backgroundColor: "transparent", opacity: 100,
+      points: [[0, 40], [20, 0], [40, 40]],
+    }]).items;
+    const [again] = boardItemsToExcalidrawSkeleton([item], "light");
+    for (const field of ["angle", "frameId", "link", "locked", "lastCommittedPoint"]) {
+      expect(again[field]).toEqual(element[field]);
+    }
+  });
+});

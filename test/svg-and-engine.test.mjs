@@ -66,6 +66,33 @@ describe("Board v1 → SVG", () => {
     expect(svg).toContain("&lt;script&gt;");
   });
 
+  it("paints a freehand stroke with the colour it stores", () => {
+    /*
+     * Width and colour are independent. The projection used to read
+     * `style.strokeWidth ? borderInk : item.color`, so giving a brush stroke an
+     * explicit width swapped its colour for the default ink: the canvas showed
+     * red and the exported SVG black.
+     */
+    let board = createEmptyBoard("ink");
+    board = addBoardItems(board, [
+      {
+        type: "stroke", x: 0, y: 0, w: 120, h: 60, color: "#e04a4a",
+        points: [{ x: 0, y: 60 }, { x: 60, y: 0 }, { x: 120, y: 60 }],
+      },
+    ]);
+    expect(boardToSvg(board)).toContain('stroke="#e04a4a"');
+
+    let weighted = createEmptyBoard("ink-weight");
+    weighted = addBoardItems(weighted, [
+      {
+        type: "stroke", x: 0, y: 0, w: 120, h: 60, color: "#e04a4a",
+        style: { strokeWidth: 6 },
+        points: [{ x: 0, y: 60 }, { x: 60, y: 0 }, { x: 120, y: 60 }],
+      },
+    ]);
+    expect(boardToSvg(weighted)).toContain('stroke="#e04a4a" stroke-width="6"');
+  });
+
   it("honours maxSize without distorting the aspect ratio", () => {
     const wide = boardToSvg(sampleBoard(), { maxSize: 400 });
     const width = Number(wide.match(/width="(\d+)"/)?.[1]);

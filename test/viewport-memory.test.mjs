@@ -4,6 +4,7 @@ import {
   readStoredViewport,
   writeStoredViewport,
 } from "../dist/board/client/viewport-memory.js";
+import { fitCamera } from "../dist/infra/templates/client/types.js";
 
 function storage(initial = {}) {
   const data = new Map(Object.entries(initial));
@@ -66,6 +67,39 @@ describe("viewport memory", () => {
 
     expect(store.size()).toBeLessThanOrEqual(8);
     expect(readStoredViewport(store, "board_39")).toEqual({ scrollX: 39, scrollY: 0, zoom: 1 });
+  });
+});
+
+describe("the first-paint camera", () => {
+  it("centres the board and never scales past 1:1", () => {
+    const camera = fitCamera([{ x: 100, y: 100, w: 200, h: 100 }], { width: 900, height: 650 });
+    // The content is small, so it stays life-size and sits in the middle.
+    expect(camera.zoom).toBe(1);
+    expect(camera.scrollX + 200 * 1).toBeCloseTo(450, 5);
+    expect(camera.scrollY + 150 * 1).toBeCloseTo(325, 5);
+  });
+
+  it("scales a wide diagram down until all of it fits", () => {
+    // 1200x420 on a phone: the previous behaviour panned at 100% and showed a
+    // fragment, which reads as a broken board on the first look.
+    const camera = fitCamera([{ x: 0, y: 0, w: 1200, h: 420 }], { width: 390, height: 700 });
+    expect(camera.zoom).toBeLessThan(1);
+    expect(camera.zoom * (1200 + 96)).toBeLessThanOrEqual(390 + 0.001);
+  });
+
+  /*
+   * This is the failure the old code produced: `fitToContent` on an empty
+   * scene divided by a zero-width bound and stored `NaN`, and the canvas then
+   * painted nothing at all — the board looked like it had vanished.
+   */
+  it("refuses to produce a camera without content or a measured viewport", () => {
+    expect(fitCamera([], { width: 900, height: 650 })).toBeUndefined();
+    expect(fitCamera([{ x: 0, y: 0, w: 100, h: 100 }], { width: 0, height: 0 })).toBeUndefined();
+  });
+
+  it("keeps every number finite for a board with negative coordinates", () => {
+    const camera = fitCamera([{ x: -400, y: -250, w: 300, h: 200 }], { width: 800, height: 600 });
+    for (const value of Object.values(camera)) expect(Number.isFinite(value)).toBe(true);
   });
 });
 

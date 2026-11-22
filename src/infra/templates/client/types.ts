@@ -68,6 +68,39 @@ export function boardBounds(items: unknown[]): { minX: number; minY: number; max
   return Number.isFinite(minX) ? { minX, minY, maxX, maxY } : undefined;
 }
 
+/**
+ * The camera that shows a whole board inside a viewport.
+ *
+ * Pure, and deliberately independent of the live scene: Excalidraw's own
+ * `fitToContent` reads whatever the scene holds at that instant, which on a
+ * cold mount can still be empty. It then divides a zero-width bound and writes
+ * `NaN` into the camera, and the canvas stops painting everything — the board
+ * appears to vanish. Computing from the board's own bounds cannot fail that
+ * way.
+ *
+ * The formula is Excalidraw's: a scene point `p` lands at `(p + scroll) * zoom`,
+ * so centring content at `centre` means `scroll = viewport / 2 - centre * zoom`.
+ */
+export function fitCamera(
+  items: unknown[],
+  viewport: { width: number; height: number },
+  padding = 48,
+): { scrollX: number; scrollY: number; zoom: number } | undefined {
+  const bounds = boardBounds(items);
+  if (!bounds || viewport.width <= 0 || viewport.height <= 0) return undefined;
+  const contentWidth = Math.max(1, bounds.maxX - bounds.minX + padding * 2);
+  const contentHeight = Math.max(1, bounds.maxY - bounds.minY + padding * 2);
+  // Never zoom past 1:1 on an opened board, and never below Excalidraw's floor.
+  const zoom = Math.min(2, Math.max(0.1, Math.min(viewport.width / contentWidth, viewport.height / contentHeight, 1)));
+  const centreX = (bounds.minX + bounds.maxX) / 2;
+  const centreY = (bounds.minY + bounds.maxY) / 2;
+  return {
+    scrollX: viewport.width / 2 - centreX * zoom,
+    scrollY: viewport.height / 2 - centreY * zoom,
+    zoom,
+  };
+}
+
 /** Save the camera at most a few times a second; it changes on every pan frame. */
 export function rememberViewport(boardId: string | undefined, appState: ExcalidrawAppState): void {
   if (!boardId) return;
