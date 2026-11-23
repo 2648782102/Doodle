@@ -55,6 +55,14 @@ Observed friction, ordered by user harm:
 | E25 | P0 | fixed | A human drag was silently discarded when an agent write landed inside the canvas' 450 ms save window. | The timer callback returned as soon as `activeSnapshot` had moved. The gesture stayed on screen, was never written, and produced no banner, so the board still looked saved. The pending scene is now re-projected against the newest board and written; `rebaseScene` drops only the elements the other writer deleted, so the fix does not resurrect them. `test/sync-loop.test.mjs` covers both halves and `scripts/repo-check.mjs` fails if the silent `return` returns. | A gesture that races a remote write is persisted; the other writer's newer objects survive; an object deleted remotely is not re-added; nothing repaints mid-gesture |
 | E26 | P1 | fixed | The canvas could not say whether a change was saved or whether the agent had seen it, and a write conflict was an eight-second toast with no way out. | One chip now carries a finite phase (`未保存` / `保存中` / `已保存` / `已同步` / `等 Agent`, plus `待处理` and `已断线`) and names the path (`本机页面` / `宿主内嵌`); `已同步` is claimed only after `updateModelContext` resolves. A conflict names the colliding objects and offers `载入最新` or `保留我的`, with no automatic overwrite. `test/sync-loop.test.mjs` covers the transitions and `test/startup-budget.test.mjs` asserts both surfaces ship on every entry path. | Every save has a visible end state; host sync is never claimed without a resolved publish; a conflict states which objects collided and stays on screen until the person chooses |
 
+## Current release gap — 0.9.1
+
+The repository, plugin manifest, and GitHub Release are at `0.9.1`. CI and Publish Release succeeded for commit `8212d08`, and `v0.9.1` carries `doodle-0.9.1.zip`.
+
+npm is intentionally **not** claimed as current: `npm view doodle-mcp versions` still ends at `0.8.0`, and `npm view doodle-mcp@0.9.1 version` returns `E404`. Publishing `0.9.1` requires the maintainer's npm 2FA/web proof of presence, which no repository command can satisfy. Until that happens, `npx -y doodle-mcp` serves `0.8.0` and the first-use fixes in this release are available through the `0.9.1` Codex plugin ZIP or a local checkout.
+
+Acceptance for closing this gap: a maintainer publishes `0.9.1`, `npm view doodle-mcp version` and `npm view doodle-mcp@0.9.1 version` both report `0.9.1`, `dist-tags.latest` follows, and one clean `npx -y doodle-mcp` startup lists exactly the four tools.
+
 ## Execution plan
 
 1. Write this audit and link it from the documentation map.
