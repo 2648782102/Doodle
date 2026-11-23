@@ -99,6 +99,16 @@ export function expandRecipe(diagram: DiagramInput): ExpandedDiagramInput {
       edges: diagram.edges ?? [],
     } as ExpandedDiagramInput;
   }
+  const RECIPES = ["flow", "review", "decision", "timeline", "architecture"] as const;
+  if (!RECIPES.includes(diagram.recipe as typeof RECIPES[number])) {
+    throw new BoardValidationError(
+      `diagram recipe ${JSON.stringify(diagram.recipe)} is not one of ${RECIPES.join(", ")}`,
+      "INVALID_RECIPE",
+      "diagram.recipe",
+      RECIPES.join(", "),
+      `Use "flow" for a sequence, "decision" for options, or "timeline" for an ordered axis.`,
+    );
+  }
   /*
    * An explicit `nodes` array wins over `steps`.
    *

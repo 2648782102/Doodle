@@ -21,7 +21,7 @@ export const itemInput = z.object({
   id: z.string().optional().describe("Existing item ID to update; omit to create a new item"),
   author: z.string().optional()
     .describe("Rejected per item; put author at the draw_board top level"),
-  type: z.enum(["note", "text", "rect", "ellipse", "line", "stroke", "image"]).describe("Visual object type"),
+  type: z.string().describe("Visual object type: note, text, rect, ellipse, line, stroke, or image"),
   x: z.number().finite().describe("Canvas X coordinate"),
   y: z.number().finite().describe("Canvas Y coordinate"),
   w: z.number().finite().optional().describe("Shape width, line endpoint delta X, or stroke/image bounds width"),
@@ -120,7 +120,7 @@ export const diagramInput = z.object({
   title: z.string().optional(),
   replace: z.boolean().optional().describe("Replace existing objects; default false adds beside them"),
   subtitle: z.string().optional(),
-  recipe: z.enum(["flow", "review", "decision", "timeline", "architecture"]).optional()
+  recipe: z.string().optional()
     .describe("Shortcut: generate nodes/edges from `steps` (or `options` for decision) instead of computing coordinates"),
   steps: z.array(z.string()).optional().describe("Captions for `recipe`, chained in order"),
   options: z.array(z.string()).optional().describe("Choices for `recipe: decision`"),
@@ -130,10 +130,10 @@ export const diagramInput = z.object({
     id: z.string(),
     label: z.string().describe("Card caption, about 24 chars; use `detail` for the rest"),
     detail: z.string().optional().describe("Note under the caption, about 40 chars"),
-    type: z.enum(["rect", "ellipse"]).optional(),
+    type: z.string().optional(),
     color: z.string().optional().describe("Six-digit hex"),
-    role: z.enum(["normal", "label", "frame", "column", "step", "decision", "annotation", "question", "constraint", "evidence"]).optional(),
-    emphasis: z.enum(["normal", "focus"]).optional(),
+    role: z.string().optional(),
+    emphasis: z.string().optional(),
     column: z.number().int().optional().describe("Explicit column, 0-12"),
     row: z.number().int().optional().describe("Explicit row, 0-47; advance this for a vertical timeline"),
   })).optional(),

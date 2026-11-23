@@ -552,6 +552,8 @@ describe("first-try repair contract", () => {
         ["draw_board", { library: { type: "rename", id: "ghost", name: "x" } }, "BOARD_NOT_FOUND", "library.id"],
         ["draw_board", { library: { type: "nuke" } }, "UNKNOWN_LIBRARY_ACTION", "library.type"],
         ["draw_board", { library: { type: "switch" } }, "BOARD_NOT_FOUND", "library.id"],
+        ["draw_board", { items: [{ type: "blob", x: 0, y: 0, w: 20, h: 20 }] }, "INVALID_ITEM_TYPE", "items[].type"],
+        ["draw_board", { diagram: { recipe: "wizard", steps: ["A"] } }, "INVALID_RECIPE", "diagram.recipe"],
       ];
       for (const [tool, args, code, path] of cases) {
         const result = await client.callTool({ name: tool, arguments: args });
