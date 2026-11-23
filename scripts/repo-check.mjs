@@ -163,7 +163,7 @@ const hoverGeometry = [...excalidrawTemplate.matchAll(/([^{}]+)\{([^{}]*)\}/g)]
  * version would let a tag ship with a package whose manifests disagree, and
  * the registry reads all three.
  */
-const RELEASE_VERSION = "0.9.0";
+const RELEASE_VERSION = "0.9.1";
 check(packageJson.version === RELEASE_VERSION, `package.json is not version ${RELEASE_VERSION}`);
 check(serverJson.version === RELEASE_VERSION, `server.json is not version ${RELEASE_VERSION}`);
 check(

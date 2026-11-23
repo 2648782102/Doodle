@@ -1,4 +1,4 @@
-## Unreleased
+## 0.9.1 — First-use polish
 
 ### Fixed
 
