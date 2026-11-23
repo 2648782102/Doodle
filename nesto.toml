@@ -22,9 +22,12 @@ diagram = ["src/board/diagram/**"]
 layout = ["src/board/layout/**"]
 canvas = ["src/board/canvas/**"]
 "mcp-surface" = ["src/board/mcp/**"]
-http-surface = ["src/board/http/**", "src/board/http.ts"]
+http-surface = ["src/board/http/**"]
 library = ["src/board/library/**", "src/board/library.ts"]
-persistence = ["src/board/store.ts", "src/board/mutex.ts", "src/board/errors.ts"]
+persistence = ["src/board/state/**", "src/board/errors.ts"]
+write = ["src/board/write/**"]
+derive = ["src/board/view/**", "src/board/svg/**", "src/board/client/**"]
+project = ["src/board/project/**"]
 chrome = [
   "src/infra/templates/excalidraw.html",
   "src/infra/templates/excalidraw-app.tsx",

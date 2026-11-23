@@ -304,3 +304,20 @@ describe("shipped artifact size", () => {
     expect(oversized, `artifacts over budget: ${oversized.join(", ")}`).toEqual([]);
   });
 });
+
+describe("parallel session manifest", () => {
+  it("keeps every declared module path rooted in the current source tree", async () => {
+    const manifest = await fs.readFile(path.join(root, "nesto.toml"), "utf8");
+    const paths = [...manifest.matchAll(/"?([\w./-]+)"?\s*=\s*\[([^\]]+)\]/g)]
+      .flatMap((match) => [...match[2].matchAll(/"([^"]+)"/g)].map((entry) => entry[1]))
+      .filter((entry) => entry.startsWith("src/"));
+    expect(paths.length, "no source paths found in nesto.toml").toBeGreaterThan(0);
+    const missing = [];
+    for (const entry of paths) {
+      const target = path.join(root, entry.replace(/\/\*\*$/, ""));
+      const exists = await fs.access(target).then(() => true, () => false);
+      if (!exists) missing.push(entry);
+    }
+    expect(missing, `nesto module leases point at removed paths: ${missing.join(", ")}`).toEqual([]);
+  });
+});

@@ -27,6 +27,7 @@
 - `test/mcp.test.mjs` now pins the one-board-one-canvas contract: a second MCP session against the same `OUTPUT_DIR` must adopt the first session's `PANEL_URL` instead of opening another random port.
 - `test/live-endpoint.test.mjs` covers the pure half of that contract: a live sibling endpoint is reusable, a dead or self-owned one is not, and a malformed record is ignored rather than trusted.
 - `test/mcp.test.mjs` also asserts that `scan_project` returns no hidden paths or `.env` references, so the bounded read-only scan cannot become a secret leak through a future path-filter regression.
+- `nesto.toml`'s parallel-session module leases now follow the 0.8.0 restructure: `state/`, `write/`, `view/`, `svg/`, `client/`, and `project/` are covered, and the removed `http.ts`, `store.ts`, and `mutex.ts` paths are gone. A cleanup test rejects a lease that points at a path that no longer exists, so two sessions cannot silently be given overlapping write domains again.
 - `test/browser-contract.test.mjs` no longer removed `#doodleWelcome` from the DOM, which made the later "notices are hidden behind the drawer" case fail with `missing`, and it opens the drawer with a real click instead of `element.click()` so the focus-return assertion tests the state a person actually produces. The error banner is created lazily on the first failure, so that case now adds the same node the app would before asserting it is hidden.
 
 ## 0.9.0 — Survives the session
