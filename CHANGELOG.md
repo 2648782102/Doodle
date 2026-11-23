@@ -1,3 +1,15 @@
+## Unreleased
+
+### Fixed
+
+- The first visit showed two overlapping panels. The shortcut panel autopened when the first-use card was *still up*: the condition ran on the card's dismissal flag before anyone could dismiss it, so a newcomer landed on a 520px card with a 560px shortcut list painted 20px over its top edge — and then never saw the shortcut panel again, because the flag is only written by dismissing the card. It now opens after the card is gone (a second visit) and only once, tracked by its own `doodle-shortcuts-seen` key.
+- Escape inside the open `图库` drawer also closed the shortcut panel behind it. Both listeners sit on `window`, where `stopPropagation` from one handler does not stop a sibling on the same node, so the drawer closed *and* focus was moved out of the dialog to the capsule. The shortcut panel now stands down whenever the drawer is open, and the drawer announces `doodle-library-open` so a popover it covers is shut rather than merely painted over.
+- The drawer could restore focus to a control it had just hidden. If the shortcut panel was the opener and the drawer shut it, `target.focus()` on the hidden node silently left focus on `<body>`. The return target is now checked for visibility first and falls back to the library toggle.
+
+### Changed
+
+- `test/browser-contract.test.mjs` no longer removed `#doodleWelcome` from the DOM, which made the later "notices are hidden behind the drawer" case fail with `missing`, and it opens the drawer with a real click instead of `element.click()` so the focus-return assertion tests the state a person actually produces. The error banner is created lazily on the first failure, so that case now adds the same node the app would before asserting it is hidden.
+
 ## 0.9.0 — Survives the session
 
 ### Added

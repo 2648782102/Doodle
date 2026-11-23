@@ -138,7 +138,13 @@ describe("human canvas contract", () => {
     await page.evaluate(() => {
       const dismiss = document.querySelector("#doodleWelcome button, #doodleWelcome [role='button']");
       if (dismiss instanceof HTMLElement) dismiss.click();
-      document.querySelector("#doodleWelcome")?.remove();
+      /*
+       * Hide it; do not remove it. A later case asserts that page notices are
+       * hidden while the drawer is open, and removing the node here made that
+       * assertion fail with "missing" — an ordering bug in the test, not the page.
+       */
+      const card = document.querySelector("#doodleWelcome");
+      if (card instanceof HTMLElement) card.hidden = true;
     });
     /*
      * Poll the server instead of sleeping a fixed time.
@@ -256,7 +262,15 @@ describe("human canvas contract", () => {
      * the page — so a keyboard user could not reach the panel without tabbing
      * through the whole toolbar, and could not leave it once inside.
      */
-    await page.evaluate(() => document.querySelector("#doodleLibraryToggle")?.click());
+    /*
+     * Open it the way a person does.
+     *
+     * A programmatic `element.click()` leaves focus wherever it was — on the
+     * canvas, in this case — so "return focus to the control that opened it"
+     * could only ever be satisfied by accident. A real click focuses the button
+     * first, which is the state the contract is about.
+     */
+    await page.click("#doodleLibraryToggle");
     await page.waitForSelector("#doodleLibraryPanel[aria-modal='true']", { timeout: 10_000 });
     const opened = await page.evaluate(() => document.activeElement?.id);
     expect(opened, "opening the drawer must move focus into it").toBe("doodleLibraryPanel");
@@ -290,6 +304,16 @@ describe("human canvas contract", () => {
      * change waiting on a decision, so it stays above the panel.
      */
     await page.evaluate(() => {
+      /*
+       * The banner is created lazily on the first failure, so a quiet page has
+       * none. Add the same node the app would, then prove the drawer hides it.
+       */
+      if (!document.querySelector("#doodleSyncBanner")) {
+        const banner = document.createElement("div");
+        banner.id = "doodleSyncBanner";
+        banner.className = "doodle-sync-banner doodle-glass";
+        document.body.append(banner);
+      }
       for (const selector of ["#doodleWelcome", "#doodleSyncBanner"]) {
         const element = document.querySelector(selector);
         if (element instanceof HTMLElement) {
@@ -297,8 +321,8 @@ describe("human canvas contract", () => {
           element.dataset.visible = "true";
         }
       }
-      document.querySelector("#doodleLibraryToggle")?.click();
     });
+    await page.click("#doodleLibraryToggle");
     await page.waitForSelector("#doodleLibraryPanel[aria-modal='true']", { timeout: 10_000 });
 
     const state = await page.evaluate(() => {

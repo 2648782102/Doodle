@@ -44,11 +44,31 @@ describe("keyboard shortcut panel", () => {
   it("stays out of the way of a board that already has content", () => {
     /*
      * The welcome card answers the same question on a genuinely empty board, so
-     * opening both on a first visit stacks two panels. Auto-open only when the
-     * person has dismissed the card already.
+     * opening both on a first visit stacks two panels over each other. Auto-open
+     * only once the person has dismissed the card, and only ever once — the
+     * card's flag never clears, so "dismissed" alone means "every visit".
      */
     expect(module).toContain("WELCOME_STORAGE_KEY");
     expect(module).toContain("welcomeDismissed");
+    expect(module).toContain("shortcutsSeen");
+
+    const autoOpen = module.slice(module.indexOf("if (welcomeDismissed()"));
+    expect(autoOpen, "the panel still opens itself over the first-use card").not.toContain("!welcomeDismissed()");
+    expect(autoOpen, "the panel opens on every visit, not once").toContain("!shortcutsSeen()");
+    expect(autoOpen, "the panel never records that it introduced itself").toContain("rememberShortcutsSeen()");
+  });
+
+  it("lets the library drawer own Escape while it is open", () => {
+    /*
+     * Both handlers listen on `window`, where one handler calling
+     * `stopPropagation` does not stop a sibling listener on the same node. In
+     * the drawer, Escape therefore also closed the shortcut panel behind it and
+     * pulled focus out of the dialog to the capsule.
+     */
+    expect(module).toContain("drawerOpen");
+    const handler = module.slice(module.indexOf('window.addEventListener("keydown"'));
+    const guard = handler.slice(0, handler.indexOf('event.key === "Escape"'));
+    expect(guard, "the shortcut panel handles keys before checking for the drawer").toContain("drawerOpen()");
   });
 
   it("documents the shortcuts the toolbar actually binds", () => {
@@ -89,7 +109,7 @@ describe("keyboard shortcut panel", () => {
     // Above the 64px bottom bar plus its own margin, and never over it.
     expect(84).toBeGreaterThan(64);
 
-    const autoOpen = module.slice(module.indexOf("if (!welcomeDismissed()"));
+    const autoOpen = module.slice(module.indexOf("if (welcomeDismissed()"));
     expect(autoOpen, "the panel still opens itself on a phone").toContain('matchMedia("(min-width: 641px)")');
   });
 });

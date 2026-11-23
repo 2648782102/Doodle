@@ -5,7 +5,7 @@
 import { exportToBlob, exportToSvg } from "@excalidraw/excalidraw";
 import type { ExcalidrawFileData } from "../../../board/excalidraw-adapter.js";
 import { showError } from "./banner.js";
-import { orderLibrary, renderBoardRows, type LibraryEntry, type LibraryOrder } from "./library-list.js";
+import { canFocus, orderLibrary, renderBoardRows, type LibraryEntry, type LibraryOrder } from "./library-list.js";
 import { canvasColors, readTheme } from "./theme.js";
 import type { BoardTransport } from "./transport.js";
 import type { BoardSnapshot, ExcalidrawAPI } from "./types.js";
@@ -293,6 +293,12 @@ export function initLibraryUi(deps: LibraryUiDeps): void {
     panel.classList.add("is-open");
     document.addEventListener("keydown", onPanelKeydown);
     /*
+     * Other floating surfaces hide under the drawer through CSS alone, so they
+     * would reappear the moment it closed. Announce the open so they can shut
+     * for real instead of being merely painted over.
+     */
+    window.dispatchEvent(new CustomEvent("doodle-library-open"));
+    /*
      * Focus the panel, not its first button: a dialog should announce its own
      * label before its controls, and the name field would otherwise open with
      * the board name pre-selected for accidental overwrite.
@@ -307,7 +313,7 @@ export function initLibraryUi(deps: LibraryUiDeps): void {
     panel.classList.remove("is-open");
     document.body.classList.remove("doodle-drawer-open");
     toggle.setAttribute("aria-expanded", "false");
-    const target = returnFocus && document.contains(returnFocus) ? returnFocus : toggle;
+    const target = canFocus(returnFocus) ? returnFocus : toggle;
     returnFocus = null;
     // After the slide-out, so the focus ring is not drawn on a moving panel.
     target.focus({ preventScroll: true });

@@ -8,6 +8,14 @@
 /** The first-use card and this panel teach the same first gestures; share the flag. */
 const WELCOME_STORAGE_KEY = "doodle-welcome-dismissed";
 
+/**
+ * Whether this panel has already introduced itself once.
+ *
+ * Without it, "open after the card is dismissed" means "open on every visit
+ * forever", because the card's flag never clears.
+ */
+const SHORTCUTS_SEEN_KEY = "doodle-shortcuts-seen";
+
 function welcomeDismissed(): boolean {
   try {
     return localStorage.getItem(WELCOME_STORAGE_KEY) === "1";
@@ -16,6 +24,20 @@ function welcomeDismissed(): boolean {
     // than opening an overlay the person cannot dismiss persistently.
     return true;
   }
+}
+
+function shortcutsSeen(): boolean {
+  try {
+    return localStorage.getItem(SHORTCUTS_SEEN_KEY) === "1";
+  } catch {
+    return true;
+  }
+}
+
+function rememberShortcutsSeen(): void {
+  try {
+    localStorage.setItem(SHORTCUTS_SEEN_KEY, "1");
+  } catch {}
 }
 
 /**
@@ -38,6 +60,19 @@ export function initShortcutPanel(): void {
   if (!toggle || !panel || !close) return;
 
   const isOpen = () => !panel.hidden;
+  /*
+   * The library is a modal surface, so it owns Escape and `?` while it is up.
+   *
+   * Both listeners sit on `window`, where `stopPropagation` from one handler
+   * does not stop a sibling on the same node: pressing Escape in the drawer also
+   * closed this panel behind it and moved focus to the capsule, so the person
+   * was dropped out of the dialog they had not dismissed. Ask the drawer instead
+   * of racing it.
+   */
+  const drawerOpen = () => {
+    const drawer = document.querySelector<HTMLElement>("#doodleLibraryPanel");
+    return Boolean(drawer && !drawer.hidden);
+  };
 
   const open = () => {
     panel.hidden = false;
@@ -51,7 +86,17 @@ export function initShortcutPanel(): void {
     panel.hidden = true;
     toggle.setAttribute("aria-expanded", "false");
   };
+  /*
+   * Opening the drawer hides this panel with CSS anyway; shutting it as well
+   * keeps the state honest, so closing the drawer does not resurrect a popover
+   * the person had already navigated away from.
+   */
+  window.addEventListener("doodle-library-open", () => {
+    rememberShortcutsSeen();
+    if (isOpen()) shut();
+  });
   const togglePanel = () => {
+    rememberShortcutsSeen();
     if (isOpen()) {
       shut();
       toggle.focus({ preventScroll: true });
@@ -62,6 +107,7 @@ export function initShortcutPanel(): void {
 
   toggle.addEventListener("click", togglePanel);
   close.addEventListener("click", () => {
+    rememberShortcutsSeen();
     shut();
     toggle.focus({ preventScroll: true });
   });
@@ -75,9 +121,11 @@ export function initShortcutPanel(): void {
     if (!isOpen()) return;
     const target = event.target as Node | null;
     if (target && (panel.contains(target) || toggle.contains(target))) return;
+    rememberShortcutsSeen();
     shut();
   });
   window.addEventListener("keydown", (event) => {
+    if (drawerOpen()) return;
     if (event.key === "Escape" && isOpen()) {
       // Before Excalidraw's own handlers: Escape should close the panel, not
       // also drop the current selection underneath it.
@@ -116,5 +164,8 @@ export function initShortcutPanel(): void {
    * something a phone user opens deliberately — the `?` button is in the capsule,
    * one tap away.
    */
-  if (!welcomeDismissed() && window.matchMedia("(min-width: 641px)").matches) open();
+  if (welcomeDismissed() && !shortcutsSeen() && window.matchMedia("(min-width: 641px)").matches) {
+    rememberShortcutsSeen();
+    open();
+  }
 }

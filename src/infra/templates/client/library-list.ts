@@ -18,6 +18,23 @@ export interface LibraryEntry {
 export type LibraryOrder = "recent" | "name";
 
 /**
+ * Whether an element can actually take focus right now.
+ *
+ * The control that opened a modal can be hidden by the time it closes — opening
+ * the library shuts the shortcut panel, and that panel is a plausible opener.
+ * Focusing a hidden node silently leaves focus on `<body>`, which is the exact
+ * outcome a "return focus to the opener" rule exists to prevent.
+ */
+export function canFocus(element: HTMLElement | null): element is HTMLElement {
+  return Boolean(
+    element
+    && document.contains(element)
+    && !element.hidden
+    && element.getClientRects().length > 0,
+  );
+}
+
+/**
  * Narrow the library to a query, then order it.
  *
  * Filtering is a case-insensitive substring match on the name, because that is
