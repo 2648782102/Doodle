@@ -14,13 +14,22 @@ const endpoint = (overrides = {}) => ({
   ...overrides,
 });
 
+/** Find a pid that is definitely unused right now, without assuming a constant. */
+function unusedPid() {
+  for (let candidate = 100_000; candidate < 400_000; candidate += 1) {
+    if (!isProcessAlive(candidate)) return candidate;
+  }
+  throw new Error("no unused pid found");
+}
+
 describe("live canvas endpoint", () => {
   it("reuses a live sibling but never itself or a dead process", () => {
     expect(isProcessAlive(process.pid)).toBe(true);
     expect(isReusable(endpoint({ pid: process.pid }))).toBe(false);
-    // A different, definitely-live process is reusable; a made-up high pid is not.
-    expect(isReusable(endpoint({ pid: process.pid }), process.pid + 100_000)).toBe(true);
-    expect(isReusable(endpoint({ pid: 2_147_483_647 }))).toBe(false);
+    const dead = unusedPid();
+    // A live sibling is reusable; a dead process and this process are not.
+    expect(isReusable(endpoint({ pid: process.pid }), dead)).toBe(true);
+    expect(isReusable(endpoint({ pid: dead }))).toBe(false);
     expect(isReusable(null)).toBe(false);
   });
 
