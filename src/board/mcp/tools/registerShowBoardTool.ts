@@ -42,7 +42,8 @@ server.registerTool(
           type: "text" as const,
           text: [
             `🎨 共享画布 · revision ${snapshot.revision} · ${snapshot.itemCount} 个对象`,
-            "兼容宿主会显示可交互画布；文本宿主请从 get_board 的 PANEL_URL 打开本地画板。",
+            `兼容宿主会显示可交互画布；文本宿主打开下方 PANEL_URL。`,
+            `PANEL_URL: ${ctx.preview.panelUrl ?? "unavailable (standalone preview not started)"}`,
             `NEXT: 画布显示的是完整保真数据；要读对象用 get_board（可传 since_revision: ${snapshot.revision} 只取差量）。`,
             ...(withGuide ? [
               "CAPABILITIES:",

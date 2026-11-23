@@ -2,6 +2,7 @@
 
 ### Fixed
 
+- `show_board` now prints `PANEL_URL` directly. Text-only hosts previously got a sentence pointing them at `get_board`'s URL, so opening the board after "show it" cost a second tool call. The reply keeps the same `PANEL_URL: <url>` form the model already knows from `get_board`.
 - A brush stroke no longer vanishes after it is saved. The reverse projection stored its ink as `color: "transparent"` (a rule that fits a shape outline, not a fill-less stroke), so the saved board re-projected the stroke with no colour. A first-paint camera could also divide an empty scene's zero-width bounds and store `NaN%` zoom, making every object disappear; framing now computes the camera from the board's own bounds. Reading no longer looked like editing either: undeclared Excalidraw defaults made every load write the board back and bump the revision for nobody's change.
 - The canvas chrome gets room across 641–1200px: the capsule drops to its own row where the centred toolbar would overlap it, and the duplicate bottom-right `?` is collapsed. The paper theme's cool near-white selected-tool wash is replaced with the paper's own accent. A cold boot now frames the whole board once; a 390px phone no longer opens a wide diagram with its title off-screen.
 - Arranging a board no longer tears a generated diagram apart. Frames and headings are treated as layout furniture, bound arrows move with the cards they connect, a frame follows its content with its margins intact, and a connector that would collapse to zero length is skipped instead of rejected.

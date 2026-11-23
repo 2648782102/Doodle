@@ -930,6 +930,9 @@ describe("MCP board server", () => {
       const first = textOf(await client.callTool({ name: "show_board", arguments: {} }));
       expect(first).toContain("CAPABILITIES:");
       expect(first).toContain("Visual recipes:");
+      // A text-only host cannot render the MCP App; show_board must hand it
+      // the panel URL directly instead of asking for another get_board call.
+      expect(first).toMatch(/PANEL_URL: http:\/\/127\.0\.0\.1:\d+\//);
 
       const second = textOf(await client.callTool({ name: "show_board", arguments: {} }));
       expect(second).not.toContain("CAPABILITIES:");
