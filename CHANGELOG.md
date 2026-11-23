@@ -9,6 +9,7 @@
 
 ### Changed
 
+- Updated `vitest` 5.1.0 → 5.1.1 and the matching Rollup patch, removing the remaining test-toolchain version drift. Full unit, browser, build, repository, and plugin checks still pass.
 - `test/welcome.test.mjs` guards the retire-on-first-object contract; the browser contract suite now checks both drawing through the card and the agent drawing the first object over a live MCP connection.
 - `test/browser-contract.test.mjs` no longer removed `#doodleWelcome` from the DOM, which made the later "notices are hidden behind the drawer" case fail with `missing`, and it opens the drawer with a real click instead of `element.click()` so the focus-return assertion tests the state a person actually produces. The error banner is created lazily on the first failure, so that case now adds the same node the app would before asserting it is hidden.
 
