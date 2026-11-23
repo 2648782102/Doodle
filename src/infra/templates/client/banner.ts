@@ -98,6 +98,7 @@ export function initWelcome(snapshot: BoardSnapshot): void {
  * covering the drawing they had already done.
  */
 export function dismissWelcome(): void {
+  if (welcomeDismissed) return;
   const card = document.querySelector<HTMLElement>("#doodleWelcome");
   if (card) card.hidden = true;
   welcomeDismissed = true;
