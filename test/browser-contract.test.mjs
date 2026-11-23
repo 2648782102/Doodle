@@ -128,7 +128,7 @@ describe("human canvas contract", () => {
       });
       expect(boxes.welcomeHidden, "the card still covers the first object").toBe(true);
     } finally {
-      await firstPage.close();
+      await context.close();
     }
   }, 60_000);
 
@@ -145,7 +145,7 @@ describe("human canvas contract", () => {
       await firstPage.waitForFunction(() => document.querySelector("#doodleWelcome")?.hidden === true, { timeout: 10_000 });
       expect(await firstPage.evaluate(() => localStorage.getItem("doodle-welcome-dismissed"))).toBe("1");
     } finally {
-      await firstPage.close();
+      await context.close();
     }
   }, 60_000);
 
