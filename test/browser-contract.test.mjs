@@ -103,6 +103,50 @@ afterAll(async () => {
 });
 
 describe("human canvas contract", () => {
+  it("retires the welcome card when the first object is drawn through it", async () => {
+    /*
+     * A newcomer does not have to press 开始画. Drawing straight onto the empty
+     * board is a valid first move, and leaving the card up then covers the very
+     * object they just made. Use a fresh page: the shared page below has already
+     * dismissed the card by the time its cases run.
+     */
+    const firstPage = await browser.newPage({ viewport: { width: 1280, height: 800 } });
+    try {
+      await firstPage.goto(panelUrl, { waitUntil: "domcontentloaded" });
+      await firstPage.waitForSelector("#doodleWelcome:not([hidden])", { timeout: 30_000 });
+      await firstPage.mouse.dblclick(900, 600);
+      await firstPage.keyboard.type("first object");
+      await firstPage.keyboard.press("Escape");
+      await firstPage.waitForFunction(() => document.querySelector("#doodleWelcome")?.hidden === true, { timeout: 10_000 });
+      expect(await firstPage.evaluate(() => localStorage.getItem("doodle-welcome-dismissed"))).toBe("1");
+      const boxes = await firstPage.evaluate(() => {
+        const welcome = document.querySelector("#doodleWelcome");
+        const text = [...document.querySelectorAll(".excalidraw text, .excalidraw [data-testid*='text']")]
+          .find((element) => element.textContent?.includes("first object"));
+        return { welcomeHidden: welcome?.hidden === true, textVisible: Boolean(text) };
+      });
+      expect(boxes.welcomeHidden, "the card still covers the first object").toBe(true);
+    } finally {
+      await firstPage.close();
+    }
+  }, 60_000);
+
+  it("retires the welcome card when the agent draws the first object", async () => {
+    const firstPage = await browser.newPage({ viewport: { width: 1280, height: 800 } });
+    try {
+      await firstPage.goto(panelUrl, { waitUntil: "domcontentloaded" });
+      await firstPage.waitForSelector("#doodleWelcome:not([hidden])", { timeout: 30_000 });
+      await server.callTool({
+        name: "draw_board",
+        arguments: { items: [{ type: "note", x: 120, y: 120, w: 180, h: 80, text: "agent first" }] },
+      });
+      await firstPage.waitForFunction(() => document.querySelector("#doodleWelcome")?.hidden === true, { timeout: 10_000 });
+      expect(await firstPage.evaluate(() => localStorage.getItem("doodle-welcome-dismissed"))).toBe("1");
+    } finally {
+      await firstPage.close();
+    }
+  }, 60_000);
+
   it("keeps the Doodle top bar clear of Excalidraw's toolbar", async () => {
     // Both float at the top of the page. They overlapped once already, and a
     // bare screenshot would not catch a two-pixel regression on every width.

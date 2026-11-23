@@ -9,6 +9,7 @@ export const WELCOME_STORAGE_KEY = "doodle-welcome-dismissed";
 
 let errorTimer: number | null = null;
 let connectionNoticeVisible = false;
+let welcomeDismissed = false;
 
 /** The one page-level banner, created on first use. Not board state. */
 export function ensureSyncBanner(): HTMLElement {
@@ -80,19 +81,29 @@ export function initWelcome(snapshot: BoardSnapshot): void {
   const card = document.querySelector<HTMLElement>("#doodleWelcome");
   const dismiss = document.querySelector<HTMLButtonElement>("#doodleWelcomeDismiss");
   if (!card || !dismiss) return;
-  let dismissed = false;
   try {
-    dismissed = localStorage.getItem(WELCOME_STORAGE_KEY) === "1";
+    welcomeDismissed = localStorage.getItem(WELCOME_STORAGE_KEY) === "1";
   } catch {}
-  if (dismissed || snapshot.items.length > 0) return;
-  const hide = () => {
-    card.hidden = true;
-    try {
-      localStorage.setItem(WELCOME_STORAGE_KEY, "1");
-    } catch {}
-  };
-  dismiss.addEventListener("click", hide);
+  if (welcomeDismissed || snapshot.items.length > 0) return;
+  dismiss.addEventListener("click", () => dismissWelcome());
   card.hidden = false;
+}
+
+/**
+ * Retire the first-use card as soon as it has served its purpose.
+ *
+ * Dismissing the card by its button is not the only way to graduate from an
+ * empty board: a person can draw straight through it. In that case the card
+ * stayed up over the first object they made, and they had to close a tutorial
+ * covering the drawing they had already done.
+ */
+export function dismissWelcome(): void {
+  const card = document.querySelector<HTMLElement>("#doodleWelcome");
+  if (card) card.hidden = true;
+  welcomeDismissed = true;
+  try {
+    localStorage.setItem(WELCOME_STORAGE_KEY, "1");
+  } catch {}
 }
 
 export interface ConflictAction {

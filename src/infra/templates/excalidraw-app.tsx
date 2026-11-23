@@ -17,6 +17,7 @@ import { initLiquidGlass, type LiquidGlassController } from "./liquid-glass.js";
 import {
   clearConflictNotice,
   clearError,
+  dismissWelcome,
   initWelcome,
   showConnectionNotice,
   showConflictNotice,
@@ -160,6 +161,7 @@ function applyRemoteSnapshot(data: BoardSnapshot, options: { repaint?: boolean }
     pendingRepaint.current = false;
   }
   activeSnapshot = data;
+  if (data.items.length > 0) dismissWelcome();
   repaintFromActive();
   publishToHost(data);
 }
@@ -184,8 +186,7 @@ function CanvasApp({ initial }: { initial: BoardSnapshot }) {
       clearError();
       clearConflictNotice();
       publishToHost(updated);
-      // A rebase means the person's scene is missing whatever landed meanwhile;
-      // converge once the write is safely in, never mid-gesture.
+      // A rebase leaves the scene behind; converge once the write is safely in, never mid-gesture.
       if ((info.rebased || info.dropped > 0 || pendingRepaint.current) && !isEditing(currentAppState.current)) {
         repaintFromActive();
       }
@@ -316,6 +317,7 @@ function CanvasApp({ initial }: { initial: BoardSnapshot }) {
       if (pendingRepaint.current) repaintFromActive();
       return;
     }
+  if (projected.items.length > 0) dismissWelcome();
     sync.schedule(elements as SceneElement[], currentFiles.current);
   }, [api, sync]);
 
