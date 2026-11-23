@@ -22,6 +22,8 @@ npm run check
 
 `npm run check` runs TypeScript lint, build, plugin build, Vitest, example syntax checks, offline repository guards, plugin guards, setup dry-run, `doctor`, and `npm pack --dry-run`. It never modifies the active user's Codex configuration. To inspect the human canvas, start `node dist/index.js`, read the `PANEL_URL` returned by `get_board`, and open that local address only when a person wants to see it.
 
+The browser contract suite is intentionally opt-in: `npm run test:browser` needs a local Chromium download, so `npm run check` and CI leave it out. Run it before finishing any change to the canvas chrome, the first-use panels, the library drawer, or an Excalidraw upgrade. Those are precisely the surfaces where a DOM rename or focus regression looks fine in unit tests and fails for a person; the suite also pins the first-use card → shortcut-panel-once sequence.
+
 ## Parallel worktrees
 
 Several branches can be worked on at the same time without cloning the repository again:
