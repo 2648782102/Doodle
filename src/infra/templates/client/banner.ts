@@ -106,6 +106,11 @@ export function dismissWelcome(): void {
   } catch {}
 }
 
+/** Retire the card once a snapshot has any object, from either writer. */
+export function dismissWelcomeFor(snapshot: { items: unknown[] }): void {
+  if (snapshot.items.length > 0) dismissWelcome();
+}
+
 export interface ConflictAction {
   label: string;
   /** `primary` is the safe choice; `danger` overwrites the other writer. */

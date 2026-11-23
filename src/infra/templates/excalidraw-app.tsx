@@ -17,7 +17,7 @@ import { initLiquidGlass, type LiquidGlassController } from "./liquid-glass.js";
 import {
   clearConflictNotice,
   clearError,
-  dismissWelcome,
+  dismissWelcomeFor,
   initWelcome,
   showConnectionNotice,
   showConflictNotice,
@@ -161,7 +161,7 @@ function applyRemoteSnapshot(data: BoardSnapshot, options: { repaint?: boolean }
     pendingRepaint.current = false;
   }
   activeSnapshot = data;
-  if (data.items.length > 0) dismissWelcome();
+  dismissWelcomeFor(data);
   repaintFromActive();
   publishToHost(data);
 }
@@ -317,7 +317,7 @@ function CanvasApp({ initial }: { initial: BoardSnapshot }) {
       if (pendingRepaint.current) repaintFromActive();
       return;
     }
-  if (projected.items.length > 0) dismissWelcome();
+    dismissWelcomeFor(projected);
     sync.schedule(elements as SceneElement[], currentFiles.current);
   }, [api, sync]);
 
