@@ -14,7 +14,7 @@ In an MCP Apps host that supports `updateModelContext`, the embedded canvas publ
 
 ## Why is `show_board` separate from `get_board`?
 
-`get_board` is the data tool for every MCP host and now also leads with `FIRST_USE` / `NEXT_STEPS`. `show_board` is an optional render tool for hosts that support MCP Apps. Text-only hosts retain the complete four-tool workflow and can use the `PANEL_URL` reported by `get_board` as a human-facing local fallback.
+`get_board` is the data tool for every MCP host and now also leads with `FIRST_USE` / `NEXT_STEPS`. `show_board` is an optional render tool for hosts that support MCP Apps. Text-only hosts retain the complete four-tool workflow: `show_board` prints `PANEL_URL` in its own reply, and `get_board` reports the same address, so either tool gives a human-facing local fallback without a second call.
 
 ## What do I say after installing?
 
