@@ -24,6 +24,10 @@ The `0.5.0` cleanup removed Mermaid CLI, Mermaid, sharp, open, nanoid, and the V
 
 Other transitive advisories are constrained with npm `overrides` without raising the Node.js floor (`>=20.0.0`). Re-evaluate whenever `@excalidraw/excalidraw` releases a version that moves Mermaid to an optional peer dependency or upgrades `chevrotain` / `lodash-es`.
 
+## React version
+
+Keep React and React DOM pinned to `18.3.1`, with matching `@types/react` and `@types/react-dom`. Excalidraw 0.18.1 itself advertises React 19 support, but its bundled Radix UI components declare `^16.8 || ^17.0 || ^18.0`. A React 19 trial passed lint, build, the full `npm run check`, the browser contract suite, and live theme/library/edit interactions, yet `npm ls react react-dom` reported those Radix peers as `invalid` throughout the tree. That is an unsupported combination: a stricter install or an untested popover path could fail later for no product gain. Do not bump React until Excalidraw ships Radix versions that declare React 19 support.
+
 The npm package name is `doodle-mcp`; the bare `doodle` name on npm belongs to another project and is not used here.
 
 ## Decision rules
