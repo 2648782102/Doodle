@@ -63,7 +63,7 @@ function freePort() {
 }
 
 /** One MCP connection owns the server lifetime; the browser only reads its page. */
-async function startBoard() {
+async function startBoard(outputDir = tempDir) {
   const transport = new StdioClientTransport({
     command: "node",
     args: ["dist/index.js"],
@@ -71,7 +71,7 @@ async function startBoard() {
       ...process.env,
       PREVIEW_PORT: String(await freePort()),
       LOG_LEVEL: "error",
-      OUTPUT_DIR: tempDir,
+      OUTPUT_DIR: outputDir,
       DOODLE_WORKSPACE_ROOT: process.cwd(),
     },
   });
@@ -110,7 +110,8 @@ describe("human canvas contract", () => {
      * object they just made. Use a fresh page: the shared page below has already
      * dismissed the card by the time its cases run.
      */
-    const firstPage = await browser.newPage({ viewport: { width: 1280, height: 800 } });
+    const context = await browser.newContext({ viewport: { width: 1280, height: 800 } });
+    const firstPage = await context.newPage();
     try {
       await firstPage.goto(panelUrl, { waitUntil: "domcontentloaded" });
       await firstPage.waitForSelector("#doodleWelcome:not([hidden])", { timeout: 30_000 });
@@ -132,7 +133,8 @@ describe("human canvas contract", () => {
   }, 60_000);
 
   it("retires the welcome card when the agent draws the first object", async () => {
-    const firstPage = await browser.newPage({ viewport: { width: 1280, height: 800 } });
+    const context = await browser.newContext({ viewport: { width: 1280, height: 800 } });
+    const firstPage = await context.newPage();
     try {
       await firstPage.goto(panelUrl, { waitUntil: "domcontentloaded" });
       await firstPage.waitForSelector("#doodleWelcome:not([hidden])", { timeout: 30_000 });
@@ -144,6 +146,46 @@ describe("human canvas contract", () => {
       expect(await firstPage.evaluate(() => localStorage.getItem("doodle-welcome-dismissed"))).toBe("1");
     } finally {
       await firstPage.close();
+    }
+  }, 60_000);
+
+  it("introduces the shortcut panel once after the welcome card retires", async () => {
+    /*
+     * The two panels are complementary, not simultaneous: the card teaches
+     * gestures on a truly empty board, then the `?` list introduces itself on
+     * the next visit. Neither should keep appearing after that.
+     */
+    /*
+     * The shared board has content by now, which correctly suppresses the
+     * welcome card. A clean OUTPUT_DIR is the only honest way to test the
+     * first-visit sequence without depending on case order.
+     */
+    const emptyDir = await fs.mkdtemp(path.join(os.tmpdir(), "doodle-browser-welcome-"));
+    const emptyServer = await startBoard(emptyDir);
+    const context = await browser.newContext({ viewport: { width: 1280, height: 800 } });
+    const firstPage = await context.newPage();
+    try {
+      await firstPage.goto(emptyServer.url, { waitUntil: "domcontentloaded" });
+      await firstPage.waitForSelector("#doodleWelcome:not([hidden])", { timeout: 30_000 });
+      await firstPage.click("#doodleWelcomeDismiss");
+      expect(await firstPage.evaluate(() => document.querySelector("#doodleShortcuts")?.hidden)).toBe(true);
+
+      await firstPage.reload({ waitUntil: "domcontentloaded" });
+      await firstPage.waitForSelector("#doodleShortcuts:not([hidden])", { timeout: 30_000 });
+      expect(await firstPage.evaluate(() => localStorage.getItem("doodle-shortcuts-seen"))).toBe("1");
+
+      await firstPage.reload({ waitUntil: "domcontentloaded" });
+      await firstPage.waitForSelector(".excalidraw", { timeout: 30_000 });
+      await firstPage.waitForTimeout(600);
+      expect(await firstPage.evaluate(() => {
+        const card = document.querySelector("#doodleWelcome");
+        const panel = document.querySelector("#doodleShortcuts");
+        return (card?.hidden ?? true) && (panel?.hidden ?? true);
+      }), "both first-use surfaces should stay retired").toBe(true);
+    } finally {
+      await context.close();
+      await emptyServer.client.close();
+      await fs.rm(emptyDir, { recursive: true, force: true });
     }
   }, 60_000);
 
