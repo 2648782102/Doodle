@@ -86,38 +86,21 @@ export const layoutInput = z.object({
  */
 const SWITCH_TO = "Defaults to true and makes the new board active. Pass false to keep the person on the board they are looking at.";
 
-export const libraryAction = z.discriminatedUnion("type", [
-  z.object({ type: z.literal("list") }),
-  z.object({ type: z.literal("get"), id: z.string().optional() }),
-  z.object({
-    type: z.literal("create"),
-    name: z.string().optional(),
-    switchTo: z.boolean().optional().describe(SWITCH_TO),
-  }),
-  z.object({
-    type: z.literal("save"),
-    name: z.string().optional(),
-    id: z.string().optional(),
-    switchTo: z.boolean().optional().describe(SWITCH_TO),
-    board: z.unknown().optional(),
-  }),
-  z.object({ type: z.literal("switch"), id: z.string() }),
-  z.object({ type: z.literal("rename"), id: z.string(), name: z.string() }),
-  z.object({
-    type: z.literal("duplicate"),
-    id: z.string(),
-    name: z.string().optional(),
-    switchTo: z.boolean().optional().describe(SWITCH_TO),
-  }),
-  z.object({ type: z.literal("delete"), id: z.string() }),
-  z.object({
-    type: z.literal("import"),
-    name: z.string().optional(),
-    board: z.unknown(),
-    switchTo: z.boolean().optional().describe(SWITCH_TO),
-  }),
-  z.object({ type: z.literal("export"), id: z.string().optional() }),
-]);
+/*
+ * `type` is a plain string, not a Zod literal union: an unknown action must
+ * reach `BoardLibrary.apply`, which returns UNKNOWN_LIBRARY_ACTION with the
+ * accepted list and a concrete fix. A discriminated union rejected it in the
+ * SDK with a bare -32602 before the handler could explain the repair.
+ * Per-action required fields are checked by the library itself, which already
+ * answers a missing id with BOARD_NOT_FOUND.
+ */
+export const libraryAction = z.object({
+  type: z.string().describe("list, get, create, save, switch, rename, duplicate, delete, import, or export"),
+  id: z.string().optional(),
+  name: z.string().optional(),
+  switchTo: z.boolean().optional().describe(SWITCH_TO),
+  board: z.unknown().optional(),
+});
 
 /*
  * Schema descriptions are prompt budget, spent on every request.

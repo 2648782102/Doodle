@@ -550,6 +550,8 @@ describe("first-try repair contract", () => {
         ["get_board", { view: "ultra" }, "INVALID_VIEW", "view"],
         ["draw_board", { library: { type: "switch", id: "ghost" } }, "BOARD_NOT_FOUND", "library.id"],
         ["draw_board", { library: { type: "rename", id: "ghost", name: "x" } }, "BOARD_NOT_FOUND", "library.id"],
+        ["draw_board", { library: { type: "nuke" } }, "UNKNOWN_LIBRARY_ACTION", "library.type"],
+        ["draw_board", { library: { type: "switch" } }, "BOARD_NOT_FOUND", "library.id"],
       ];
       for (const [tool, args, code, path] of cases) {
         const result = await client.callTool({ name: tool, arguments: args });
