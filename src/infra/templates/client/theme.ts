@@ -23,6 +23,9 @@ export type DoodleTheme = (typeof THEMES)[number]["id"];
 const THEME_IDS = THEMES.map((theme) => theme.id) as readonly DoodleTheme[];
 export const THEME_STORAGE_KEY = "doodle-theme";
 
+/** Cross-bundle event name; both the switcher and the canvas import this. */
+export const THEME_CHANGE_EVENT = "doodle-theme-change";
+
 export function isDoodleTheme(value: unknown): value is DoodleTheme {
   return typeof value === "string" && (THEME_IDS as readonly string[]).includes(value);
 }
@@ -85,7 +88,7 @@ export function applyTheme(theme: DoodleTheme, animate = false): void {
   try {
     localStorage.setItem(THEME_STORAGE_KEY, theme);
   } catch {}
-  window.dispatchEvent(new CustomEvent("doodle-theme-change", { detail: theme }));
+  window.dispatchEvent(new CustomEvent(THEME_CHANGE_EVENT, { detail: theme }));
 }
 
 export function initThemeToggle(getGlass: () => LiquidGlassController | null): void {
@@ -95,7 +98,7 @@ export function initThemeToggle(getGlass: () => LiquidGlassController | null): v
     const button = (event.target as HTMLElement | null)?.closest<HTMLButtonElement>("[data-theme-option]");
     if (button && isDoodleTheme(button.dataset.themeOption)) applyTheme(button.dataset.themeOption, true);
   });
-  window.addEventListener("doodle-theme-change", () => {
+  window.addEventListener(THEME_CHANGE_EVENT, () => {
     requestAnimationFrame(() => getGlass()?.refresh());
   });
 }

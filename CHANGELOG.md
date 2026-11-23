@@ -11,6 +11,7 @@
 
 - The MCP App resource URI now has one source of truth in `mcp/context.ts`; the tool composition root imports it instead of repeating the literal. A repository guard rejects a second copy, so `show_board` cannot point at a resource that is not registered.
 - The first-use storage key now has one source of truth in `client/banner.ts`; the shortcut panel imports it instead of repeating the literal. A guard rejects a second copy, so the two first-use surfaces cannot drift onto different flags.
+- The theme-change event name now has one source of truth in `client/theme.ts`; the canvas app imports it instead of repeating the literal. A guard rejects a second copy, so a theme switch cannot silently stop refreshing the canvas.
 - Documented the current `0.9.1` distribution gap in the experience audit and both READMEs: GitHub Release and plugin ZIP are current, while npm still serves `0.8.0` until a maintainer completes 2FA publication. Repository guards keep that acceptance record and user-facing disclosure in place.
 - Updated `vitest` 5.1.0 → 5.1.1 and the matching Rollup patch, removing the remaining test-toolchain version drift. Full unit, browser, build, repository, and plugin checks still pass.
 - `test/welcome.test.mjs` guards the retire-on-first-object contract; the browser contract suite now checks both drawing through the card and the agent drawing the first object over a live MCP connection, plus the full card → shortcut-panel-once → quiet third-visit sequence on an isolated empty board.

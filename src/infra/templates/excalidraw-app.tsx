@@ -41,6 +41,7 @@ import {
   initThemeToggle,
   isDoodleTheme,
   readTheme,
+  THEME_CHANGE_EVENT,
   type DoodleTheme,
 } from "./client/theme.js";
 import { BoardWriteError, createBoardTransport } from "./client/transport.js";
@@ -186,7 +187,6 @@ function CanvasApp({ initial }: { initial: BoardSnapshot }) {
       clearError();
       clearConflictNotice();
       publishToHost(updated);
-      // A rebase leaves the scene behind; converge once the write is safely in, never mid-gesture.
       if ((info.rebased || info.dropped > 0 || pendingRepaint.current) && !isEditing(currentAppState.current)) {
         repaintFromActive();
       }
@@ -258,8 +258,8 @@ function CanvasApp({ initial }: { initial: BoardSnapshot }) {
       const detail = (event as CustomEvent<DoodleTheme>).detail;
       if (isDoodleTheme(detail)) setTheme(detail);
     };
-    window.addEventListener("doodle-theme-change", onThemeChange);
-    return () => window.removeEventListener("doodle-theme-change", onThemeChange);
+    window.addEventListener(THEME_CHANGE_EVENT, onThemeChange);
+    return () => window.removeEventListener(THEME_CHANGE_EVENT, onThemeChange);
   }, []);
 
   useEffect(() => {

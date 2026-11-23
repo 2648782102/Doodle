@@ -892,6 +892,8 @@ const mcpToolsSource = await read("src/board/mcp/tools.ts");
 check(mcpToolsSource.includes('import { APP_RESOURCE_URI } from "./context.js"') && !mcpToolsSource.includes('const APP_RESOURCE_URI = "ui://doodle/'), "MCP App resource URI is duplicated instead of imported from its single source");
 const shortcutsSource = await read("src/infra/templates/client/shortcuts.ts");
 check(shortcutsSource.includes('import { WELCOME_STORAGE_KEY } from "./banner.js"') && !shortcutsSource.includes('const WELCOME_STORAGE_KEY = "doodle-welcome-dismissed"'), "welcome storage key is duplicated instead of imported from the banner module");
+const themeSource = await read("src/infra/templates/client/theme.ts");
+check(themeSource.includes('export const THEME_CHANGE_EVENT = "doodle-theme-change"') && excalidrawApp.includes("THEME_CHANGE_EVENT") && !excalidrawApp.includes('addEventListener("doodle-theme-change"'), "theme change event name is duplicated instead of imported from the theme module");
 check(appContext.includes("structuredContent") && !appContext.includes("operationLog"), "board model context lost its complete structured snapshot or added an operation log");
 check(instructions.includes("conversation") && !instructions.includes("reply_on_board"), "MCP instructions duplicate the host conversation");
 check(http.includes('"/api/board"') && http.includes("X-AI-Draw-Token"), "board HTTP server lost its authenticated API");
