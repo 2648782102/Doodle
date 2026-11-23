@@ -154,7 +154,7 @@ Starts the local board and opens your browser, printing the address and a few ge
 | Tool | Annotations | Purpose |
 |---|---|---|
 | `get_board` | Read-only | Reads the shared canvas. The first read returns the full guide, later reads stay concise; `since_revision` returns only changed objects plus `HANDOFF` (what the person changed, never the agent's own writes). Read-only, the default first step. |
-| `show_board` | Read-only | Opens the interactive canvas beside the conversation. Use it when the user wants to see or edit the board. |
+| `show_board` | Read-only | Opens the interactive canvas beside the conversation and includes `PANEL_URL` in its reply so text-only hosts can open the local board. Use it when the user wants to see or edit the board. |
 | `draw_board` | Write (destructive) | The write surface: add, precise updates, removals, deterministic layout, connected lines, variants/roles/styles/z-order, and `library` actions. `diagram` appends one diagram from semantic nodes and edges; `replace: true` redraws the whole board. |
 | `scan_project` | Read-only | Optional read-only project scan returning bounded relative paths, `file:line` evidence, and a `DIAGRAM_DRAFT_JSON` draft. It never writes files and never draws. |
 
