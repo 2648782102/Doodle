@@ -602,6 +602,48 @@ describe("MCP board server", () => {
     }
   }, 30_000);
 
+  it("adopts one canvas server when a second session uses the same board", async () => {
+    /*
+     * PANEL_URL names a board directory's canvas, not a process. Two MCP
+     * sessions against one OUTPUT_DIR must converge on one loopback address:
+     * a second random port leaves the person with two different canvases and
+     * a stale link in whichever session they opened first.
+     */
+    const outputDir = path.join(tempDir, "adopt");
+    const startSession = async (name) => {
+      const transport = new StdioClientTransport({
+        command: "node",
+        args: ["dist/index.js"],
+        env: {
+          ...process.env,
+          LOG_LEVEL: "error",
+          OUTPUT_DIR: outputDir,
+          DOODLE_WORKSPACE_ROOT: process.cwd(),
+        },
+      });
+      const client = new Client({ name, version: "1.0.0" });
+      await client.connect(transport);
+      return { client, transport };
+    };
+    const first = await startSession("doodle-adopt-first");
+    let second;
+    try {
+      const firstPanel = textOf(await first.client.callTool({ name: "get_board", arguments: {} }))
+        .match(/PANEL_URL: (http:\/\/127\.0\.0\.1:\d+\/)/)?.[1];
+      expect(firstPanel).toBeTruthy();
+      second = await startSession("doodle-adopt-second");
+      const secondPanel = textOf(await second.client.callTool({ name: "get_board", arguments: {} }))
+        .match(/PANEL_URL: (http:\/\/127\.0\.0\.1:\d+\/)/)?.[1];
+      expect(secondPanel).toBe(firstPanel);
+
+      const live = JSON.parse(await fs.readFile(path.join(outputDir, ".doodle", "live.json"), "utf8"));
+      expect(Number.parseInt(new URL(firstPanel).port, 10)).toBe(live.port);
+    } finally {
+      await first.transport.close();
+      await second?.transport.close();
+    }
+  }, 30_000);
+
   it("draws a directed board arrow and returns an authoritative canvas snapshot", async () => {
     await withClient(async (client) => {
       const before = jsonAfter(textOf(await client.callTool({ name: "get_board", arguments: {} })), "BOARD_JSON:");
