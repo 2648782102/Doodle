@@ -365,6 +365,7 @@ check(experienceAudit.includes("Current release gap — 0.9.1") && experienceAud
 check(experienceAudit.includes("| E19 | P1 | fixed |") && experienceAudit.includes("terminal-owned preview command"), "experience audit does not record PANEL_URL lifecycle clarification");
 check(!readme.includes("尚未更新") && !readmeEn.includes("until `npm view doodle-mcp version`"), "READMEs still warn about a resolved npm version gap");
 check(readme.includes("npm 的 `latest` 仍是 `0.8.0`") && readmeEn.includes("npm's `latest` is still `0.8.0`"), "READMEs no longer disclose the current npm publication gap");
+check(readme.includes(`截至 \`${RELEASE_VERSION}\``) && readmeEn.includes(`As of \`${RELEASE_VERSION}\``), "README npm-gap note names a different release than package.json");
 check(gitignore.includes(".doodle-plugin/") && gitignore.includes(".doodle-data/") && gitignore.includes("doodle-plugin-submission/"), "generated plugin output, data, or submission ZIP is not ignored");
 check(index.indexOf("await mcp.connect(transport);") < index.indexOf("await preview.start();"), "MCP stdio is not connected before optional preview startup");
 check(index.includes("Preview unavailable"), "preview failure does not keep the MCP server alive");
