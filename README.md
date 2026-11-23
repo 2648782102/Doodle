@@ -56,7 +56,7 @@ AI 读取 HANDOFF 增量  ◀──  终态同步进当前对话上下文（或�
 
 **方式一：任意 MCP 宿主（`npx -y doodle-mcp`，无需 clone 仓库）**
 
-把下面对应客户端的零配置片段加入宿主配置（也保存在 [examples/mcp-config/](examples/mcp-config/)），重启 MCP 会话后对 AI 说：**「打开 Doodle 画板，我们先用画板交流。」** 这条路径不需要 clone 仓库，也不等于公共插件目录发布。
+把下面对应客户端的零配置片段加入宿主配置（也保存在 [examples/mcp-config/](examples/mcp-config/)），重启 MCP 会话后对 AI 说：**「打开 Doodle 画板，我们先用画板交流。」** 这条路径不需要 clone 仓库，也不等于公共插件目录发布。注意 npm 发布版可能落后于仓库版本，当前差异见[安装与配置](#安装与配置)。
 
 <details open>
 <summary><strong>Claude Code（终端一行命令）</strong></summary>

@@ -56,7 +56,7 @@ Most "diagram MCPs" only work one way: the AI generates a static picture or dump
 
 **Any MCP host (`npx -y doodle-mcp`, no clone required)**
 
-Add the zero-configuration snippet for your host (also stored in [examples/mcp-config/](examples/mcp-config/)), restart the MCP session, and say: **"Open the Doodle board so we can communicate on it."** This path needs no repository clone and does not imply public plugin-directory publication.
+Add the zero-configuration snippet for your host (also stored in [examples/mcp-config/](examples/mcp-config/)), restart the MCP session, and say: **"Open the Doodle board so we can communicate on it."** This path needs no repository clone and does not imply public plugin-directory publication. The npm release can lag the repository; the current gap is noted under [Install and configure](#install-and-configure).
 
 <details open>
 <summary><strong>Claude Code (CLI)</strong></summary>
