@@ -24,6 +24,7 @@
 - Updated `vitest` 5.1.0 → 5.1.1 and the matching Rollup patch, removing the remaining test-toolchain version drift. Full unit, browser, build, repository, and plugin checks still pass.
 - `test/welcome.test.mjs` guards the retire-on-first-object contract; the browser contract suite now checks both drawing through the card and the agent drawing the first object over a live MCP connection, plus the full card → shortcut-panel-once → quiet third-visit sequence on an isolated empty board.
 - `test/mcp.test.mjs` now pins the one-board-one-canvas contract: a second MCP session against the same `OUTPUT_DIR` must adopt the first session's `PANEL_URL` instead of opening another random port.
+- `test/live-endpoint.test.mjs` covers the pure half of that contract: a live sibling endpoint is reusable, a dead or self-owned one is not, and a malformed record is ignored rather than trusted.
 - `test/mcp.test.mjs` also asserts that `scan_project` returns no hidden paths or `.env` references, so the bounded read-only scan cannot become a secret leak through a future path-filter regression.
 - `test/browser-contract.test.mjs` no longer removed `#doodleWelcome` from the DOM, which made the later "notices are hidden behind the drawer" case fail with `missing`, and it opens the drawer with a real click instead of `element.click()` so the focus-return assertion tests the state a person actually produces. The error banner is created lazily on the first failure, so that case now adds the same node the app would before asserting it is hidden.
 
