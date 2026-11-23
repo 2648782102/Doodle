@@ -321,3 +321,13 @@ describe("parallel session manifest", () => {
     expect(missing, `nesto module leases point at removed paths: ${missing.join(", ")}`).toEqual([]);
   });
 });
+
+describe("editor rules", () => {
+  it("keeps the Cursor AGENTS.md rule pointed at the current source layout", async () => {
+    const rule = await fs.readFile(path.join(root, ".cursor", "rules", "keep-agents-md-current.mdc"), "utf8");
+    for (const stale of ["src/tools/", "tools/_shared.ts", "extensions/"]) {
+      expect(rule, `Cursor rule still references removed path ${stale}`).not.toContain(stale);
+    }
+    expect(rule).toContain("src/board/mcp/tools/");
+  });
+});
