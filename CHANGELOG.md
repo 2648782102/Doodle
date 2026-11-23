@@ -9,7 +9,7 @@
 
 ### Changed
 
-- Documented the current `0.9.1` distribution gap: GitHub Release and plugin ZIP are current, while npm still serves `0.8.0` until a maintainer completes 2FA publication. A repository guard keeps that acceptance record in place.
+- Documented the current `0.9.1` distribution gap in the experience audit and both READMEs: GitHub Release and plugin ZIP are current, while npm still serves `0.8.0` until a maintainer completes 2FA publication. Repository guards keep that acceptance record and user-facing disclosure in place.
 - Updated `vitest` 5.1.0 → 5.1.1 and the matching Rollup patch, removing the remaining test-toolchain version drift. Full unit, browser, build, repository, and plugin checks still pass.
 - `test/welcome.test.mjs` guards the retire-on-first-object contract; the browser contract suite now checks both drawing through the card and the agent drawing the first object over a live MCP connection, plus the full card → shortcut-panel-once → quiet third-visit sequence on an isolated empty board.
 - `test/browser-contract.test.mjs` no longer removed `#doodleWelcome` from the DOM, which made the later "notices are hidden behind the drawer" case fail with `missing`, and it opens the drawer with a real click instead of `element.click()` so the focus-return assertion tests the state a person actually produces. The error banner is created lazily on the first failure, so that case now adds the same node the app would before asserting it is hidden.
