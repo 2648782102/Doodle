@@ -14,6 +14,7 @@
 ### Changed
 
 - The benchmark grader is now a trustworthy instrument: six false failures were fixed, repeated sampling separates signal from noise, and the tests read `src` directly instead of a build that may not exist. The published rate is re-graded against recorded runs before any optimization claim, because a grader that marks correct drawings wrong optimizes a non-existent problem.
+- Tool guidance steers related objects to `draw_board.diagram` instead of hand-computed item coordinates. On the same 38-case benchmark the drawing model dropped from 4.8 to 1.6 calls per case (41% fewer turns) with no change to the four-tool surface.
 - The MCP App resource URI now has one source of truth in `mcp/context.ts`; the tool composition root imports it instead of repeating the literal. A repository guard rejects a second copy, so `show_board` cannot point at a resource that is not registered.
 - The first-use storage key now has one source of truth in `client/banner.ts`; the shortcut panel imports it instead of repeating the literal. A guard rejects a second copy, so the two first-use surfaces cannot drift onto different flags.
 - The theme-change event name now has one source of truth in `client/theme.ts`; the canvas app imports it instead of repeating the literal. A guard rejects a second copy, so a theme switch cannot silently stop refreshing the canvas.
