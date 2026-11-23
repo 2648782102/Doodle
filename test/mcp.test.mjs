@@ -1104,6 +1104,10 @@ describe("MCP board server", () => {
       expect(snapshot.files.length).toBeGreaterThan(0);
       expect(snapshot).not.toHaveProperty("workspaceRoot");
       expect(JSON.stringify(snapshot)).not.toContain(process.cwd());
+      // Hidden entries (including .env) are private by construction: a scan
+      // must return relative source paths, never a secret-bearing config.
+      expect(snapshot.files.some((file) => String(file.path ?? file).split("/").some((segment) => segment.startsWith(".")))).toBe(false);
+      expect(JSON.stringify(snapshot)).not.toContain(".env");
       expect(text).not.toContain("Use draw_board to visualize this read-only context");
       expect(text).not.toContain("PROJECT_TEXT:");
       expect(text.length).toBeLessThan(14_000);
