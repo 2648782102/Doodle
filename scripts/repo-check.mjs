@@ -888,6 +888,8 @@ check(
 );
 check(excalidrawApp.includes("buildBoardModelContext") && appContext.includes("finalStateNotOperationLog"), "Excalidraw MCP App context is not a final-state delta");
 check(excalidrawApp.includes("sendMessage") && excalidrawTemplate.includes('id="doodleNotifyAgent"'), "embedded Excalidraw canvas lost the host notification button");
+const mcpToolsSource = await read("src/board/mcp/tools.ts");
+check(mcpToolsSource.includes('import { APP_RESOURCE_URI } from "./context.js"') && !mcpToolsSource.includes('const APP_RESOURCE_URI = "ui://doodle/'), "MCP App resource URI is duplicated instead of imported from its single source");
 check(appContext.includes("structuredContent") && !appContext.includes("operationLog"), "board model context lost its complete structured snapshot or added an operation log");
 check(instructions.includes("conversation") && !instructions.includes("reply_on_board"), "MCP instructions duplicate the host conversation");
 check(http.includes('"/api/board"') && http.includes("X-AI-Draw-Token"), "board HTTP server lost its authenticated API");

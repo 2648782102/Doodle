@@ -10,12 +10,11 @@
 import { registerAppResource, RESOURCE_MIME_TYPE } from "@modelcontextprotocol/ext-apps/server";
 import type { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import type { BoardToolContext } from "./context.js";
+import { APP_RESOURCE_URI } from "./context.js";
 import { registerDrawBoardTool } from "./tools/registerDrawBoardTool.js";
 import { registerGetBoardTool } from "./tools/registerGetBoardTool.js";
 import { registerScanProjectTool } from "./tools/registerScanProjectTool.js";
 import { registerShowBoardTool } from "./tools/registerShowBoardTool.js";
-
-const APP_RESOURCE_URI = "ui://doodle/board/excalidraw/v1.html";
 
 export function registerBoardTools(server: McpServer, ctx: BoardToolContext): void {
   registerAppResource(server, "Doodle Excalidraw board", APP_RESOURCE_URI, {
