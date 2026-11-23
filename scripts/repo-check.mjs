@@ -525,6 +525,10 @@ check(
   "a length or range bound moved back into the MCP input schema: the SDK rejects it with bare prose instead of ERROR_JSON",
 );
 check(
+  !/z\.enum\(|z\.discriminatedUnion\(/.test(await read("src/board/mcp/schemas.ts")),
+  "a user-written enum moved back into the MCP input schema: the SDK rejects an unknown value with bare -32602 instead of ERROR_JSON",
+);
+check(
   tools.includes("BATCH_TOO_LARGE") && tools.includes("MUTATION_BATCH_LIMIT"),
   "the per-call batch ceiling is missing from the handler, so an oversized draw is rejected without a repair path",
 );
