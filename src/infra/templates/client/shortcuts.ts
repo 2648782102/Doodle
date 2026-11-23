@@ -5,8 +5,7 @@
  * worth remembering, in browser storage. It is never board state or permission.
  */
 
-/** The first-use card and this panel teach the same first gestures; share the flag. */
-const WELCOME_STORAGE_KEY = "doodle-welcome-dismissed";
+import { WELCOME_STORAGE_KEY } from "./banner.js";
 
 /**
  * Whether this panel has already introduced itself once.
