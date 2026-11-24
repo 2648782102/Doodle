@@ -166,7 +166,7 @@ Starts the local board and opens your browser, printing the address and a few ge
 
 **Direct MCP stdio** — published installs use `npx -y doodle-mcp`; a local checkout can use `node dist/index.js` after `npm run build`. The server picks a free loopback port, an isolated state directory, and the launched workspace by default; set `DOODLE_WORKSPACE_ROOT` only when the host starts outside the project that `scan_project` should inspect.
 
-> As of `0.9.1`, npm's `latest` is still `0.8.0`: `npx -y doodle-mcp` starts the four tools but does not include this release's first-use fixes. For `0.9.1`, install the Codex plugin with `npm run setup:codex` above or build from a local checkout; npm publication is waiting on the maintainer's 2FA approval.
+> As of `0.9.2`, npm's `latest` is still `0.8.0`: `npx -y doodle-mcp` starts the four tools but does not include this release's first-use fixes. For `0.9.2`, install the Codex plugin with `npm run setup:codex` above or build from a local checkout; npm publication is waiting on the maintainer's 2FA approval.
 
 | Variable | Default | Meaning |
 |---|---|---|

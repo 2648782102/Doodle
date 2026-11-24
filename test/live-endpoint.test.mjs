@@ -10,7 +10,7 @@ const endpoint = (overrides = {}) => ({
   host: "127.0.0.1",
   boardId: "board-1",
   startedAt: "2026-11-24T00:00:00.000Z",
-  version: "0.9.1",
+  version: "0.9.2",
   ...overrides,
 });
 

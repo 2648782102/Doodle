@@ -51,8 +51,19 @@ jobs:
         run: |
           version=$(node -p "require('./package.json').version")
           tag="${REQUESTED_TAG:-v$version}"
+          asset="doodle-$version.zip"
+          asset_path="doodle-plugin-submission/$asset"
           if gh release view "$tag" >/dev/null 2>&1; then
-            echo "Release $tag already exists; leaving it unchanged"
+            echo "Release $tag already exists; checking whether its ZIP is current"
+            remote_sha=$(gh release view "$tag" --json assets \
+              --jq ".assets[] | select(.name == \"$asset\") | .digest" || true)
+            local_sha="sha256:$(sha256sum "$asset_path" | cut -d' ' -f1)"
+            if [ "$remote_sha" = "$local_sha" ]; then
+              echo "Release asset is already current"
+              exit 0
+            fi
+            echo "Release asset is stale or missing; replacing it from this commit"
+            gh release upload "$tag" "$asset_path#$asset" --clobber
             exit 0
           fi
           if ! git rev-parse -q --verify "refs/tags/$tag" >/dev/null; then
@@ -66,4 +77,4 @@ jobs:
             --verify-tag \
             --title "$tag — Doodle Shared Board plugin" \
             --notes-file release-notes.md \
-            "doodle-plugin-submission/doodle-$version.zip#doodle-$version.zip"
+            "$asset_path#$asset"

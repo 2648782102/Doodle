@@ -166,7 +166,7 @@ npm run doodle
 
 **直接 MCP stdio**：发布版用 `npx -y doodle-mcp`，本地检出可用 `node dist/index.js`（先 `npm run build`）。默认自动选空闲端口、隔离状态目录，并从启动环境推断工作区；只有宿主在项目外启动时才需要 `DOODLE_WORKSPACE_ROOT`。
 
-> 截至 `0.9.1`，npm 的 `latest` 仍是 `0.8.0`：`npx -y doodle-mcp` 能启动四个工具，但还没有本版本的首用体验修复。需要 `0.9.1` 时用上面的 `npm run setup:codex` 安装 Codex 插件或从本地检出构建；npm 发布需要维护者完成 2FA 验证。
+> 截至 `0.9.2`，npm 的 `latest` 仍是 `0.8.0`：`npx -y doodle-mcp` 能启动四个工具，但还没有本版本的首用体验修复。需要 `0.9.2` 时用上面的 `npm run setup:codex` 安装 Codex 插件或从本地检出构建；npm 发布需要维护者完成 2FA 验证。
 
 | 变量 | 默认值 | 说明 |
 |---|---|---|

@@ -163,7 +163,7 @@ const hoverGeometry = [...excalidrawTemplate.matchAll(/([^{}]+)\{([^{}]*)\}/g)]
  * version would let a tag ship with a package whose manifests disagree, and
  * the registry reads all three.
  */
-const RELEASE_VERSION = "0.9.1";
+const RELEASE_VERSION = "0.9.2";
 check(packageJson.version === RELEASE_VERSION, `package.json is not version ${RELEASE_VERSION}`);
 check(serverJson.version === RELEASE_VERSION, `server.json is not version ${RELEASE_VERSION}`);
 check(
@@ -354,6 +354,7 @@ check(
   `a workflow or script imports a compiled module that no longer exists: ${brokenCompiledRefs.join(", ")}`,
 );
 check(publishWorkflow.includes("contents: write") && publishWorkflow.includes("gh release create"), "publish workflow cannot create a release");
+check(publishWorkflow.includes("Release asset is stale or missing") && publishWorkflow.includes("--clobber"), "publish workflow cannot refresh a stale release asset");
 check(publishWorkflow.includes("npm run check") && publishWorkflow.includes("--notes-file"), "publish workflow does not verify the package or use changelog notes");
 check(publishWorkflow.includes('git tag -a "$tag"') && publishWorkflow.includes('git push origin "$tag"') && publishWorkflow.includes('--target "$GITHUB_SHA"'), "publish workflow does not create the matching tag before verifying it");
 check(releasing.includes("publish workflow") && !releasing.includes("does not create a Release automatically"), "releasing guide does not describe release automation");
@@ -361,7 +362,7 @@ check(releasing.includes("npm stage approve") && releasing.includes("npm view do
 check(experienceAudit.includes("| E12 | P1 | fixed |") && experienceAudit.includes("doodle-mcp@0.6.3"), "experience audit does not record the closed npm publication");
 check(experienceAudit.includes("| E13 | P0 | fixed |") && experienceAudit.includes("final-state delta"), "experience audit does not record host model context sync");
 check(experienceAudit.includes("| E15 | P1 | fixed |") && experienceAudit.includes("npm `latest`") && experienceAudit.includes("dist-tags.latest"), "experience audit does not record the closed npm publication gate");
-check(experienceAudit.includes("Current release gap — 0.9.1") && experienceAudit.includes("npm view doodle-mcp@0.9.1 version"), "experience audit does not record the current npm publication gate");
+check(experienceAudit.includes("Current release gap — 0.9.2") && experienceAudit.includes("npm view doodle-mcp@0.9.2 version"), "experience audit does not record the current npm publication gate");
 check(experienceAudit.includes("| E19 | P1 | fixed |") && experienceAudit.includes("terminal-owned preview command"), "experience audit does not record PANEL_URL lifecycle clarification");
 check(!readme.includes("尚未更新") && !readmeEn.includes("until `npm view doodle-mcp version`"), "READMEs still warn about a resolved npm version gap");
 check(readme.includes("npm 的 `latest` 仍是 `0.8.0`") && readmeEn.includes("npm's `latest` is still `0.8.0`"), "READMEs no longer disclose the current npm publication gap");

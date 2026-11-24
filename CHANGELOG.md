@@ -1,8 +1,14 @@
+## 0.9.2 — Release closure
+
+### Fixed
+
+- Switching appearance no longer writes the board. The reverse projection had copied theme-derived render colours into Board v1 and its scene fidelity record, so a theme switch bumped the revision for no human edit.
+- The publish workflow now refreshes a stale GitHub Release ZIP instead of leaving an old asset untouched. It compares the remote asset digest with the local submission ZIP and uploads with `--clobber` when they differ.
+
 ## 0.9.1 — First-use polish
 
 ### Fixed
 
-- Switching appearance no longer writes the board. The reverse projection had copied theme-derived render colours into both `style.borderColor` and the scene fidelity record, so a theme switch changed the fingerprint and bumped the revision for no human edit. It now restores the Board v1 colours recorded in `customData.doodle`.
 - Unknown `draw_board.library` actions now return a repairable `UNKNOWN_LIBRARY_ACTION` instead of a bare MCP `-32602`. The Zod discriminated union used to reject `library.type` in the SDK before the handler ran, so the library's existing "accepted actions" error was unreachable; `type` is now a plain string and the library owns the validation. A missing id on `switch` likewise reaches `BOARD_NOT_FOUND` with the known board list.
 - The same repair path now covers every user-written enum: `items[].type`, `diagram.recipe`, `diagram.nodes[].type`, `.role`, and `.emphasis` are plain strings in the input schema, so the model layer's `INVALID_ITEM_TYPE`, `INVALID_ROLE`, `INVALID_EMPHASIS`, and a new `INVALID_RECIPE` error are reachable. An unknown recipe used to be silently drawn as `flow` once it got past the SDK; it is now rejected with the accepted recipe list.
 - `show_board` now prints `PANEL_URL` directly. Text-only hosts previously got a sentence pointing them at `get_board`'s URL, so opening the board after "show it" cost a second tool call. The reply keeps the same `PANEL_URL: <url>` form the model already knows from `get_board`.
