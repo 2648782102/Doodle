@@ -311,6 +311,7 @@ check(packageJson.scripts.check.includes("setup:codex -- --dry-run"), "npm check
 check(ci.includes("npm run repo:plugin-check"), "CI does not run the plugin guard");
 check(ci.includes("npm run setup:codex -- --dry-run"), "CI does not dry-run the Codex setup");
 check(ci.includes("npm run build:submission"), "CI does not build the submission ZIP");
+check(ci.includes("browser-contract:") && ci.includes("npm run test:browser"), "CI does not run the opt-in browser contract suite");
 check(ci.includes("resolveDiagramLayout") && ci.includes("diagramToBoardItems"), "CI does not verify deterministic semantic diagrams");
 check(ci.includes("BoardLibrary") && ci.includes("type: \"create\""), "CI does not verify the local board library");
 check(ci.includes("Verify final-state board context projection") && ci.includes("buildBoardModelContext") && ci.includes("doodle_board_context"), "CI does not verify the final-state context projection");
