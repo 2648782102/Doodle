@@ -439,4 +439,26 @@ describe("camera and change detection", () => {
       expect(again[field]).toEqual(element[field]);
     }
   });
+
+  it("does not adopt a theme's render ink back into the board", () => {
+    /*
+     * Reported from a live board: switching appearance bumped the revision.
+     * `styleFor` rewrites an outline that would be unreadable on the current
+     * page, and the reverse projection stored that render value in both
+     * `style.borderColor` and the scene copy, so every theme switch looked like
+     * a real edit. The recorded Board value must win.
+     */
+    const board = addBoardItems(createEmptyBoard(), [
+      { id: "card", type: "rect", x: 10, y: 10, w: 120, h: 80, text: "A", color: "#f6d365", style: { borderColor: "#1e1e1e" } },
+    ]);
+    const dark = boardItemsToExcalidrawSkeleton(board.items, "dark");
+    expect(dark[0].strokeColor, "the dark page must render its own ink").not.toBe("#1e1e1e");
+
+    const projected = boardItemsFromExcalidrawBoard(board, dark.map((element, index) => ({
+      ...element, id: "card", index: `a${index}`, version: 1, versionNonce: 1, seed: 1, updated: 1, isDeleted: false,
+    })));
+    expect(projected.items[0].style?.borderColor).toBe("#1e1e1e");
+    expect(projected.items[0].scene?.element?.strokeColor).toBe("#1e1e1e");
+    expect(projected.items[0].color).toBe("#f6d365");
+  });
 });

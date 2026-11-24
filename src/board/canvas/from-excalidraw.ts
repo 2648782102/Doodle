@@ -37,11 +37,26 @@ function itemText(element: ExcalidrawLikeElement): { title?: string; text: strin
 }
 
 function itemStyle(element: ExcalidrawLikeElement): NonNullable<BoardItem["style"]> {
+  /*
+   * Prefer the style recorded at projection time over the rendered colour.
+   *
+   * `styleFor` deliberately changes a stored colour when it would be unreadable
+   * on the current page: a saved `#1e1e1e` outline becomes the theme's ink on a
+   * dark page. Reading `element.strokeColor` back therefore adopted the *render*
+   * value into Board v1, so every theme switch rewrote the board and bumped its
+   * revision for a change the person never made. `customData.doodle` carries the
+   * values the board actually holds; the element fields stay as the fallback for
+   * elements Excalidraw created without Doodle metadata.
+   */
+  const recorded = element.customData?.doodle as Record<string, unknown> | undefined;
+  const recordedBorder = typeof recorded?.borderColor === "string" ? recorded.borderColor : undefined;
   return {
     ...(typeof element.opacity === "number" ? { opacity: Math.max(0.1, Math.min(1, element.opacity / 100)) } : {}),
     ...(typeof element.strokeWidth === "number" ? { strokeWidth: element.strokeWidth } : {}),
     ...(typeof element.fontSize === "number" ? { fontSize: element.fontSize } : {}),
-    ...(typeof element.strokeColor === "string" ? { borderColor: element.strokeColor } : {}),
+    ...(recordedBorder
+      ? { borderColor: recordedBorder }
+      : typeof element.strokeColor === "string" ? { borderColor: element.strokeColor } : {}),
     ...(typeof element.textAlign === "string" && ["left", "center", "right"].includes(element.textAlign)
       ? { textAlign: element.textAlign as "left" | "center" | "right" } : {}),
   };
@@ -86,6 +101,27 @@ function cloneElement(element: ExcalidrawLikeElement): Record<string, unknown> {
   delete clone.versionNonce;
   delete clone.seed;
   delete clone.updated;
+  /*
+   * The scene copy must not remember a colour that only existed for one theme.
+   *
+   * `styleFor` rewrites the render colours for readability, so a saved outline
+   * came back as the current theme's ink. Keeping that in `scene` made every
+   * theme switch a genuine board change: the fingerprint saw a different
+   * `strokeColor` and the canvas saved it. Restore the recorded Board v1 values
+   * here so the fidelity copy stays theme-independent; the next render rebuilds
+   * both fields from the board anyway.
+   */
+  const recorded = element.customData?.doodle as Record<string, unknown> | undefined;
+  if (typeof recorded?.textColor === "string") {
+    clone.strokeColor = recorded.textColor;
+  } else if (typeof recorded?.borderColor === "string") {
+    clone.strokeColor = recorded.borderColor;
+  }
+  const fillLess = element.type === "line" || element.type === "arrow"
+    || element.type === "freedraw" || element.type === "image" || element.type === "text";
+  if (!fillLess && typeof recorded?.color === "string") {
+    clone.backgroundColor = recorded.color;
+  }
   return clone;
 }
 
