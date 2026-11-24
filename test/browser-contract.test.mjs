@@ -213,6 +213,24 @@ describe("human canvas contract", () => {
     expect(overlaps).toBe(false);
   });
 
+  it("lets a keyboard user reach the Doodle controls", async () => {
+    /*
+     * The chrome is a toolbar plus buttons; keyboard users must be able to
+     * reach it without a mouse. Focus starts at the document so the test does
+     * not inherit whatever the previous case left selected.
+     */
+    await page.evaluate(() => document.activeElement instanceof HTMLElement && document.activeElement.blur());
+    const seen = new Set();
+    for (let step = 0; step < 40; step += 1) {
+      await page.keyboard.press("Tab");
+      seen.add(await page.evaluate(() => document.activeElement?.id || ""));
+      if (seen.has("doodleLibraryToggle") && seen.has("doodleShortcutToggle")) break;
+    }
+    expect(seen.has("doodleLibraryToggle"), "图库 button is not tabbable").toBe(true);
+    expect(seen.has("doodleShortcutToggle"), "? help button is not tabbable").toBe(true);
+    expect(await page.locator("[data-theme-option]").count()).toBe(3);
+  });
+
   it("keeps a card's id across create, move, and a second edit", async () => {
     // Id drift is silent: the board looks right and the AI loses every
     // reference it held. Check the id the *server* stores, not the canvas text.
