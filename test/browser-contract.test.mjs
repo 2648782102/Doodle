@@ -354,6 +354,16 @@ describe("human canvas contract", () => {
       for (const selector of MOBILE_SELECTORS) {
         await mobilePage.waitForSelector(selector, { state: "visible", timeout: 15_000 });
       }
+      const layout = await mobilePage.evaluate(() => {
+        const topbar = document.querySelector(".doodle-topbar")?.getBoundingClientRect();
+        const bottom = document.querySelector(".App-bottom-bar")?.getBoundingClientRect();
+        return {
+          overflowX: document.documentElement.scrollWidth - document.documentElement.clientWidth,
+          separated: !topbar || !bottom || topbar.bottom <= bottom.top,
+        };
+      });
+      expect(layout.overflowX, "phone layout scrolls horizontally").toBeLessThanOrEqual(1);
+      expect(layout.separated, "Doodle chrome overlaps the mobile toolbar").toBe(true);
     } finally {
       await mobilePage.close();
     }
