@@ -25,6 +25,7 @@
 
 ### Changed
 
+- `doodle-mcp@0.9.2` is published to npm with `latest` pointing at 0.9.2. A clean `npx -y doodle-mcp` startup was verified to expose four tools, `FIRST_USE`, and `PANEL_URL`; README, experience audit, goals, and repository guards now state the closed release status instead of the former npm gap.
 - Browser contracts now pin keyboard reachability of the Doodle controls and check that the 390px mobile layout has no horizontal overflow or toolbar overlap. An isolated `CODEX_HOME` install of the 0.9.2 plugin was also smoke-tested with four tools and host capability guidance intact.
 - The benchmark grader is now a trustworthy instrument: six false failures were fixed, repeated sampling separates signal from noise, and the tests read `src` directly instead of a build that may not exist. The published rate is re-graded against recorded runs before any optimization claim, because a grader that marks correct drawings wrong optimizes a non-existent problem.
 - Tool guidance steers related objects to `draw_board.diagram` instead of hand-computed item coordinates. On the same 38-case benchmark the drawing model dropped from 4.8 to 1.6 calls per case (41% fewer turns) with no change to the four-tool surface.
