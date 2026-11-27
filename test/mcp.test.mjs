@@ -6,9 +6,9 @@ import { afterAll, describe, expect, it } from "vitest";
 import { Client } from "@modelcontextprotocol/sdk/client/index.js";
 import { StdioClientTransport } from "@modelcontextprotocol/sdk/client/stdio.js";
 import { loadConfig, loadRuntimeConfig } from "../dist/infra/config.js";
-import { projectWorkspace } from "../dist/infra/project-workspace.js";
+import { boardStorageRoot } from "../dist/infra/board-storage.js";
 
-const EXPECTED_TOOLS = ["get_board", "show_board", "draw_board", "scan_project"];
+const EXPECTED_TOOLS = ["get_board", "show_board", "draw_board"];
 const tempDir = await fs.mkdtemp(path.join(os.tmpdir(), "doodle-mcp-test-"));
 
 afterAll(async () => {
@@ -45,7 +45,6 @@ async function withClient(callback) {
       PREVIEW_PORT: String(port),
       LOG_LEVEL: "error",
       OUTPUT_DIR: tempDir,
-      DOODLE_WORKSPACE_ROOT: process.cwd(),
     },
   });
   const client = new Client({ name: "doodle-board-tests", version: "1.0.0" });
@@ -71,7 +70,6 @@ async function withClientIn(outputDir, callback) {
       PREVIEW_PORT: String(port),
       LOG_LEVEL: "error",
       OUTPUT_DIR: outputDir,
-      DOODLE_WORKSPACE_ROOT: process.cwd(),
     },
   });
   const client = new Client({ name: "doodle-board-tests", version: "1.0.0" });
@@ -113,19 +111,16 @@ describe("MCP board server", () => {
     const previous = { ...process.env };
     try {
       delete process.env.OUTPUT_DIR;
-      delete process.env.DOODLE_WORKSPACE_ROOT;
-      delete process.env.AI_DRAW_WORKSPACE_ROOT;
       process.env.CODEX_PROJECT_ROOT = tempWorkspace;
       process.env.PLUGIN_DATA = tempPluginData;
       const config = loadConfig();
-      expect(projectWorkspace()).toBe(tempWorkspace);
+      expect(boardStorageRoot()).toBe(tempWorkspace);
       expect(config.outputDir).toBe(path.join(tempPluginData, "doodle"));
-      expect(config.workspaceRoot).toBe(tempWorkspace);
       expect(config.previewPort).toBeNull();
       const runtime = await loadRuntimeConfig();
       expect(runtime.previewPort).toBeNull();
     } finally {
-      for (const key of ["OUTPUT_DIR", "DOODLE_WORKSPACE_ROOT", "AI_DRAW_WORKSPACE_ROOT", "CODEX_PROJECT_ROOT", "PLUGIN_DATA", "CLAUDE_PLUGIN_DATA"]) {
+      for (const key of ["OUTPUT_DIR", "CODEX_PROJECT_ROOT", "PLUGIN_DATA", "CLAUDE_PLUGIN_DATA"]) {
         if (previous[key] === undefined) delete process.env[key];
         else process.env[key] = previous[key];
       }
@@ -133,7 +128,7 @@ describe("MCP board server", () => {
     }
   });
 
-  it("registers four agent-first tools and an embedded board app", async () => {
+  it("registers three drawing tools and an embedded board app", async () => {
     await withClient(async (client) => {
       const { tools } = await client.listTools();
       expect(tools.map((tool) => tool.name).sort()).toEqual([...EXPECTED_TOOLS].sort());
@@ -144,10 +139,11 @@ describe("MCP board server", () => {
       expect(tools.find((tool) => tool.name === "get_board").annotations).toEqual(readOnly);
       expect(tools.find((tool) => tool.name === "show_board").annotations).toEqual(readOnly);
       expect(tools.find((tool) => tool.name === "draw_board").annotations).toEqual({ readOnlyHint: false, destructiveHint: true, openWorldHint: false });
-      expect(tools.find((tool) => tool.name === "scan_project").annotations).toEqual(readOnly);
       expect(client.getInstructions()).toContain("Use get_board");
       expect(client.getInstructions()).toContain("show_board");
-      expect(client.getInstructions()).toContain("scan_project is optional");
+      expect(client.getInstructions()).not.toContain("inspect the repository");
+      expect(client.getInstructions()).not.toContain("project scanning");
+      expect(client.getInstructions()).toContain("Doodle only reads and writes visual board state");
       expect(client.getInstructions()).toContain("First use");
     });
   }, 30_000);
@@ -179,7 +175,6 @@ describe("MCP board server", () => {
         PREVIEW_PORT: "0",
         LOG_LEVEL: "error",
         OUTPUT_DIR: path.join(tempDir, "first-use"),
-        DOODLE_WORKSPACE_ROOT: process.cwd(),
       },
     });
     const client = new Client({ name: "doodle-first-use-tests", version: "1.0.0" });
@@ -562,7 +557,6 @@ describe("MCP board server", () => {
         PREVIEW_PORT: "0",
         LOG_LEVEL: "error",
         OUTPUT_DIR: path.join(tempDir, "auto-zero"),
-        DOODLE_WORKSPACE_ROOT: process.cwd(),
       },
     });
     const client = new Client({ name: "doodle-auto-port-tests", version: "1.0.0" });
@@ -586,7 +580,6 @@ describe("MCP board server", () => {
         PREVIEW_PORT: "",
         LOG_LEVEL: "error",
         OUTPUT_DIR: path.join(tempDir, "dynamic"),
-        DOODLE_WORKSPACE_ROOT: process.cwd(),
       },
     });
     const client = new Client({ name: "doodle-dynamic-port-tests", version: "1.0.0" });
@@ -618,7 +611,6 @@ describe("MCP board server", () => {
           ...process.env,
           LOG_LEVEL: "error",
           OUTPUT_DIR: outputDir,
-          DOODLE_WORKSPACE_ROOT: process.cwd(),
         },
       });
       const client = new Client({ name, version: "1.0.0" });
@@ -756,7 +748,6 @@ describe("MCP board server", () => {
           PREVIEW_PORT: String(await freePort()),
           LOG_LEVEL: "error",
           OUTPUT_DIR: outputDir,
-          DOODLE_WORKSPACE_ROOT: process.cwd(),
         },
       });
       const client = new Client({ name, version: "1.0.0" });
@@ -1095,25 +1086,12 @@ describe("MCP board server", () => {
     });
   }, 30_000);
 
-  it("scans the project read-only as optional board context", async () => {
+  it("keeps the exposed MCP tools drawing-only", async () => {
     await withClient(async (client) => {
-      const text = textOf(await client.callTool({
-        name: "scan_project",
-        arguments: { max_depth: 1, max_files: 12, include_evidence: false },
-      }));
-      expect(text).toContain("PROJECT_JSON:");
-      const snapshot = jsonAfter(text, "PROJECT_JSON:");
-      expect(snapshot).toMatchObject({ version: 1, readOnly: true, writes: "none" });
-      expect(snapshot.files.length).toBeGreaterThan(0);
-      expect(snapshot).not.toHaveProperty("workspaceRoot");
-      expect(JSON.stringify(snapshot)).not.toContain(process.cwd());
-      // Hidden entries (including .env) are private by construction: a scan
-      // must return relative source paths, never a secret-bearing config.
-      expect(snapshot.files.some((file) => String(file.path ?? file).split("/").some((segment) => segment.startsWith(".")))).toBe(false);
-      expect(JSON.stringify(snapshot)).not.toContain(".env");
-      expect(text).not.toContain("Use draw_board to visualize this read-only context");
-      expect(text).not.toContain("PROJECT_TEXT:");
-      expect(text.length).toBeLessThan(14_000);
+      const { tools } = await client.listTools();
+      expect(tools.map((tool) => tool.name).sort()).toEqual([...EXPECTED_TOOLS].sort());
+      expect(client.getInstructions()).toContain("Doodle only reads and writes visual board state");
+      expect(tools.every((tool) => !JSON.stringify(tool).includes("project"))).toBe(true);
     });
   }, 30_000);
 });

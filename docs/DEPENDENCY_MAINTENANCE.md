@@ -7,7 +7,7 @@ The `0.5.0` cleanup removed Mermaid CLI, Mermaid, sharp, open, nanoid, and the V
 1. Read the Dependabot diff and identify whether it changes runtime behavior, MCP protocol, or package size.
 2. Run `npm install` to regenerate `package-lock.json`.
 3. Run `npm run check`.
-4. Start both `dist/index.js` and `.doodle-plugin/doodle/server/index.mjs`; verify each `listTools` returns exactly four annotated tools, that `show_board` explicitly advertises the shared UI resource, and that `draw_board` advertises the same resource for automatic post-draw rendering.
+4. Start both `dist/index.js` and `.doodle-plugin/doodle/server/index.mjs`; verify each `listTools` returns exactly `get_board`, `show_board`, and `draw_board` with annotations, that `show_board` explicitly advertises the shared UI resource, and that `draw_board` advertises the same resource for automatic post-draw rendering.
 5. Confirm that no dependency reintroduces browser launching, image rendering, or a second state model.
 
 ## Current audit note

@@ -5,7 +5,7 @@ Doodle is a local-first shared canvas for people and AI. This policy describes t
 ## Data categories
 
 - **Board content:** text, coordinates, sizes, colors, author markers, object IDs, timestamps, revision metadata, optional visual variant/style/connection fields, and named editable board-library snapshots saved on the same machine.
-- **Local project context:** when `scan_project` is called, bounded workspace-relative file paths and short `file:line` evidence excerpts. The scan skips dot-private paths, `.env`-like files, common generated directories, large text files, and credential-like evidence.
+- **Board storage location:** `CODEX_PROJECT_ROOT` and `PWD` may provide a path used to choose the default directory for Doodle board data. Doodle uses that location for its board data and does not inspect surrounding files.
 - **Local connection metadata:** the loopback address and selected `PREVIEW_PORT`, a random per-page `X-AI-Draw-Token`, WebSocket update messages, and an in-memory `confirmedBy: "human"` marker required for non-GET board writes.
 - **Experimental canvas assets:** on the `codex/excalidraw-spike` branch, Excalidraw CSS, fonts, locale chunks, and JavaScript are served from the local plugin/preview package. The canvas is rendered from the same local version 1 board state; no separate scene file, CDN, hosted font, telemetry endpoint, or external asset request is used by the experimental engine.
 - **Browser view preferences:** camera position and zoom saved by the standalone canvas in browser localStorage.
@@ -16,11 +16,11 @@ Doodle does not require an account, hosted profile, payment data, precise locati
 
 ## Purpose of use
 
-Board content provides shared visual context between a person and an AI. Local project context is used only to answer the current bounded scan request; the AI decides whether to visualize it with `draw_board`. The loopback server, token, and WebSocket updates keep the human canvas synchronized with the same local board. The board library keeps named editable snapshots locally so a person can save or switch boards. View preferences remember the same person's camera position. Support data is used to diagnose reports and maintain the open-source project.
+Board content provides shared visual context between a person and an AI. The loopback server, token, and WebSocket updates keep the human canvas synchronized with the same local board. The board library keeps named editable snapshots locally so a person can save or switch boards. View preferences remember the same person's camera position. Support data is used to diagnose reports and maintain the open-source project.
 
 ## Recipients and disclosure
 
-Doodle keeps board and scan data on the user's machine. Normal operation sends no board content, project evidence, telemetry, or credentials to Doodle contributors or another hosted third party. MCP tool results are returned to the connected agent host as part of the user's active conversation; compatible embedded Apps may also pass local board state into that same host conversation's model context through the MCP Apps bridge, and the notification button may add one short message. Whether the host subsequently processes conversation data under its own policy is controlled by that host. If a person opens a GitHub Issue or private vulnerability report, the information they choose to include is visible to repository maintainers and GitHub according to that reporting channel.
+Doodle keeps board data on the user's machine. Normal operation sends no board content, telemetry, or credentials to Doodle contributors or another hosted third party. MCP tool results are returned to the connected agent host as part of the user's active conversation; compatible embedded Apps may also pass local board state into that same host conversation's model context through the MCP Apps bridge, and the notification button may add one short message. Whether the host subsequently processes conversation data under its own policy is controlled by that host. If a person opens a GitHub Issue or private vulnerability report, the information they choose to include is visible to repository maintainers and GitHub according to that reporting channel.
 
 ## Retention
 
@@ -31,7 +31,7 @@ Doodle keeps board and scan data on the user's machine. Normal operation sends n
 
 ## User controls
 
-The user chooses the workspace root, output directory, preview host, and preview port. They can stop the server, clear browser localStorage, delete the active board state or saved library snapshots, avoid calling `scan_project`, and remove the plugin at any time. `draw_board` supports object removal by ID and library snapshot deletion; HTTP write authorization requires a fresh page token and explicit human confirmation. Board content never becomes authority to write project files.
+The user chooses the output directory, preview host, and preview port. They can stop the server, clear browser localStorage, delete the active board state or saved library snapshots, and remove the plugin at any time. `draw_board` supports object removal by ID and library snapshot deletion; HTTP write authorization requires a fresh page token and explicit human confirmation. Board content never becomes authority to write project files.
 
 ## Security and children
 

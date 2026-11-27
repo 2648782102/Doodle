@@ -1,8 +1,7 @@
 import fs from "node:fs/promises";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
-import { projectWorkspace } from "./project-workspace.js";
-import { resolveWorkspaceRoot } from "./workspace.js";
+import { boardStorageRoot } from "./board-storage.js";
 
 const sourceDir = path.dirname(fileURLToPath(import.meta.url));
 const packageRoot = path.resolve(sourceDir, "../..");
@@ -11,8 +10,6 @@ export interface AppConfig {
   previewHost: string;
   previewPort: number | null;
   outputDir: string;
-  workspaceRoot: string;
-  cwd: string;
 }
 
 function parsePort(raw: string): number {
@@ -31,10 +28,10 @@ function resolveOutputDir(): string {
   const pluginData = process.env.PLUGIN_DATA?.trim() || process.env.CLAUDE_PLUGIN_DATA?.trim();
   if (pluginData) return path.join(path.resolve(pluginData), "doodle");
 
-  const workspace = projectWorkspace();
-  return workspace === packageRoot
+  const storageRoot = boardStorageRoot();
+  return storageRoot === packageRoot
     ? path.join(packageRoot, "output")
-    : path.join(workspace, ".doodle-data");
+    : path.join(storageRoot, ".doodle-data");
 }
 
 export function loadConfig(): AppConfig {
@@ -43,8 +40,6 @@ export function loadConfig(): AppConfig {
     previewHost: (process.env.PREVIEW_HOST ?? "127.0.0.1").trim() || "127.0.0.1",
     previewPort: rawPort ? parsePort(rawPort) : null,
     outputDir: resolveOutputDir(),
-    workspaceRoot: resolveWorkspaceRoot(),
-    cwd: process.cwd(),
   };
 }
 

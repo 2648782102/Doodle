@@ -185,8 +185,9 @@ describe("post-cleanup repository shape", () => {
     expect(template).toContain("Doodle · Excalidraw Canvas");
     expect(template).toContain('id="excalidrawRoot"');
     const architecture = await fs.readFile(path.join(root, "docs", "ARCHITECTURE.md"), "utf8");
-    expect(architecture).toContain("GET /api/board/project");
-    expect(architecture).not.toContain("GET /project");
+    expect(architecture).toContain("three drawing-board tools");
+    expect(architecture).not.toContain("GET /api/board/project");
+    expect(architecture).toContain("Doodle only reads and writes shared board state");
     expect(architecture).toContain("mutex.ts");
     expect(architecture).toContain("errors.ts");
     const stdioExample = JSON.parse(await fs.readFile(path.join(root, "examples", "mcp-config", "stdio.json"), "utf8"));

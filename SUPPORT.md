@@ -4,4 +4,4 @@ For installation problems, drawing issues, bugs, and feature requests, open a [D
 
 For security reports, use GitHub's private vulnerability reporting instead of a public issue. See [SECURITY.md](SECURITY.md).
 
-Maintainers are volunteers. Doodle has no hosted service, service-level agreement, or paid support channel. The [Troubleshooting guide](docs/TROUBLESHOOTING.md), [FAQ](docs/FAQ.md), and [English quickstart](README.en.md) cover first-run setup, plugin discovery, local panel URLs, board authorization, project scans, arrows, and stdout diagnostics.
+Maintainers are volunteers. Doodle has no hosted service, service-level agreement, or paid support channel. The [Troubleshooting guide](docs/TROUBLESHOOTING.md), [FAQ](docs/FAQ.md), and [English quickstart](README.en.md) cover first-run setup, plugin discovery, local panel URLs, board authorization, drawing arrows, and stdout diagnostics.

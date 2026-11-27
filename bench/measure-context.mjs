@@ -85,7 +85,7 @@ const byName = new Map(tools.map((tool) => [tool.name, tool]));
  */
 const rows = [];
 rows.push(await measure("(no tools)", []));
-for (const name of ["get_board", "show_board", "scan_project", "draw_board"]) {
+for (const name of ["get_board", "show_board", "draw_board"]) {
   if (byName.has(name)) rows.push(await measure(name, [byName.get(name)]));
 }
 rows.push(await measure("all four", tools));

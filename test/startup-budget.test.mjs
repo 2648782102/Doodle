@@ -61,8 +61,6 @@ if (hasTemplate) {
     previewHost: "127.0.0.1",
     previewPort: port,
     outputDir: path.join(tempDir, "output"),
-    workspaceRoot: tempDir,
-    cwd: root,
   }, revisions);
   await preview.start();
 }

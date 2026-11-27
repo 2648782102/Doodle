@@ -23,7 +23,6 @@ import type { BoardStore } from "../state/store.js";
 import { conflictPayload } from "../write/conflict.js";
 import { isAllowedHost, isAllowedOrigin, validationErrorBody } from "./security.js";
 import { commitBoardWrite } from "../write/commit.js";
-import { projectSnapshotText, scanProject, type ProjectScanOptions } from "../project/scan.js";
 import { readAsset } from "./templates.js";
 import { registerActiveBoardSvg, registerLibrarySvg, serveAsset } from "./assets.js";
 import { expandRecipe } from "../diagram/recipe.js";
@@ -285,26 +284,6 @@ export interface BoardRoutesContext {
       }, { wholeBoard: Boolean(body.diagram.replace) });
     });
 
-    ctx.app.get("/api/board/project", async (req, res) => {
-      const options: ProjectScanOptions = {
-        maxDepth: req.query.max_depth ? Number(req.query.max_depth) : undefined,
-        maxFiles: req.query.max_files ? Number(req.query.max_files) : undefined,
-        includeEvidence: req.query.evidence !== "0",
-      };
-      try {
-        const snapshot = await scanProject(ctx.config.workspaceRoot, options);
-        res.json(snapshot);
-      } catch (error) {
-        if (error instanceof BoardValidationError) return res.status(400).json(validationErrorBody(error));
-        throw error;
-      }
-    });
-
-    ctx.app.get("/api/board/project/text", async (_req, res) => {
-      const snapshot = await scanProject(ctx.config.workspaceRoot);
-      res.type("text/plain").send(projectSnapshotText(snapshot));
-    });
-
     ctx.app.get("/", (_req, res) => ctx.serveBoard(res));
     /*
      * The service worker must live at the origin root to control `/`.
@@ -316,12 +295,12 @@ export interface BoardRoutesContext {
      * never pick up a fix.
      */
     ctx.app.get("/sw.js", async (_req, res) => {
-      const source = await readAsset(ctx.config, "sw.js");
+      const source = await readAsset("sw.js");
       if (!source) return void res.status(404).type("text/plain").send("service worker not built");
       res.set("Cache-Control", "no-cache");
       res.type("application/javascript").send(source);
     });
-    ctx.app.use("/excalidraw", (req, res, next) => serveAsset(req, res, next, ctx.config));
+    ctx.app.use("/excalidraw", (req, res, next) => serveAsset(req, res, next));
 
     ctx.app.use((error: unknown, _req: express.Request, res: express.Response, _next: express.NextFunction) => {
       const parserError = (error as { type?: string }).type;

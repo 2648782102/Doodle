@@ -37,7 +37,7 @@ const httpSource = [
 const httpTemplates = await read("src/board/http/templates.ts");
 /*
  * Tool surface is one module per tool after the refactor. Read them together so
- * the plugin guard keeps asserting the four-tool contract.
+ * the plugin guard keeps asserting the three-tool contract.
  */
 const toolsSource = (await Promise.all([
   read("src/board/mcp/tools.ts"),
@@ -47,7 +47,6 @@ const toolsSource = (await Promise.all([
   read("src/board/mcp/tools/registerGetBoardTool.ts"),
   read("src/board/mcp/tools/registerShowBoardTool.ts"),
   read("src/board/mcp/tools/registerDrawBoardTool.ts"),
-  read("src/board/mcp/tools/registerScanProjectTool.ts"),
 ])).join("\n");
 const configSource = await read("src/infra/config.ts");
 const versionSource = await read("src/infra/version.ts");
@@ -97,8 +96,8 @@ check(!JSON.stringify(mcp).includes("${PLUGIN_DATA}"), "MCP env uses an unsuppor
 check(mcp.mcpServers.doodle?.env_vars?.includes("PLUGIN_DATA") === true, "MCP env does not allow PLUGIN_DATA");
 check(marketplace.plugins?.[0]?.name === "doodle", "marketplace does not expose doodle");
 check(marketplace.plugins?.[0]?.source?.path === "./.doodle-plugin/doodle", "marketplace does not point at the generated plugin package");
-check(skill.includes("get_board") && skill.includes("show_board") && skill.includes("draw_board") && skill.includes("scan_project"), "Doodle skill lacks the four-tool workflow");
-check(skill.includes("two-way board"), "Doodle skill lost the two-way product definition");
+check(skill.includes("get_board") && skill.includes("show_board") && skill.includes("draw_board") && !skill.includes("scan_project"), "Doodle skill exceeds or omits the three-tool workflow");
+check(skill.includes("two-way board shared by a person and an AI"), "Doodle skill lost the two-way product definition");
 check(skill.includes("FIRST_USE") && skill.includes("NEXT_STEPS") && skill.includes("打开 Doodle 画板"), "Doodle skill does not lead with the first-use path");
 check(skill.includes("draw_board.diagram") && skill.includes("architecture"), "Doodle skill does not describe semantic diagram authoring");
 check(!skill.includes("reply_on_board"), "Doodle skill references the removed reply tool");
@@ -107,14 +106,14 @@ check(buildScript.includes("bundle: true") && buildScript.includes("board.html")
 check(buildScript.includes("excalidraw.html") && buildScript.includes("excalidraw"), "plugin build does not copy Excalidraw assets");
 check(buildScript.includes("__DOODLE_PLUGIN_VERSION__"), "plugin build does not inject the package version");
 check(pluginCheckScript.includes("requires_local_executor"), "plugin guard does not verify desktop-only status");
-check(httpTemplates.includes('"server", "infra", "templates", "excalidraw.html"') && httpTemplates.includes("excalidrawTemplateCandidates"), "bundled server cannot resolve plugin Excalidraw templates");
+check(httpTemplates.includes('path.resolve(sourceDir, "infra", "templates", "excalidraw.html")') && httpTemplates.includes("excalidrawTemplateCandidates") && !httpTemplates.includes("config.cwd"), "bundled server cannot resolve plugin Excalidraw templates without host-workspace lookup");
 check(toolsSource.includes("getAppHtml()") && toolsSource.includes('ui://doodle/board/excalidraw/v1.html'), "bundled server cannot resolve the Excalidraw MCP App resource");
 check(toolsSource.includes("CANVAS_UI_META") && toolsSource.includes("_meta: CANVAS_UI_META"), "bundled draw_board path does not advertise automatic post-draw rendering");
 check(toolsSource.includes("FIRST_USE:") && toolsSource.includes("NEXT_STEPS:") && toolsSource.includes("NEXT:"), "bundled get_board path lacks progressive first-use guidance");
 check(toolsSource.includes("PANEL_URL") && instructions.includes("PANEL_URL"), "active local panel URL is not exposed to the agent");
 check(!instructions.includes("reply_on_board"), "MCP instructions reference the removed reply tool");
 check(instructions.includes("updateModelContext") && instructions.includes("sendMessage"), "MCP instructions do not describe host context and notification boundaries");
-check(configSource.includes("previewPort: rawPort ? parsePort(rawPort) : null") && configSource.includes("PLUGIN_DATA"), "runtime config is not plugin-safe");
+check(configSource.includes("previewPort: rawPort ? parsePort(rawPort) : null") && configSource.includes("PLUGIN_DATA") && !configSource.includes("cwd:"), "runtime config is not plugin-safe or includes a host-workspace path");
 check(versionSource.includes("__DOODLE_PLUGIN_VERSION__"), "bundled server cannot report the injected version");
 check(indexSource.indexOf("await mcp.connect(transport);") < indexSource.indexOf("await preview.start();"), "MCP stdio is not connected before optional preview startup");
 check(indexSource.includes("Preview unavailable"), "preview failure does not keep the MCP server alive");
@@ -125,7 +124,7 @@ check(ci.includes("resolveDiagramLayout") && ci.includes("diagramToBoardItems"),
 check(ci.includes("BoardLibrary"), "CI does not verify the local board library");
 check(gitignore.includes(".doodle-plugin/") && gitignore.includes(".doodle-data/") && gitignore.includes("doodle-plugin-submission/"), "generated plugin output, plugin data, or submission ZIP is not ignored");
 check(goals.includes("## 5. Codex 插件分发") && goals.includes("show_board") && goals.includes("Codex 插件"), "plugin goal section is incomplete");
-check(await exists("src/infra/project-workspace.ts"), "plugin-safe workspace resolution is missing");
+check(await exists("src/infra/board-storage.ts"), "plugin-safe board-storage resolution is missing");
 for (const [name, content, phrase] of [
   ["PRIVACY.md", privacy, "Data categories"],
   ["SUPPORT.md", support, "GitHub Issue"],
@@ -137,7 +136,7 @@ for (const [name, content, phrase] of [
 check(privacy.includes("Retention") && privacy.includes("User controls"), "privacy policy is missing retention or user controls");
 check(submissionScript.includes("doodle-${packageJson.version}.zip"), "submission ZIP does not use the package version");
 check(toolsSource.includes("READ_ONLY_LOCAL_ANNOTATIONS") && toolsSource.includes("BOARD_WRITE_ANNOTATIONS"), "tool annotations are missing");
-check((toolsSource.match(/server\.registerTool\(/g) ?? []).length === 4, "tools are not all registered through the annotated config API");
+check((toolsSource.match(/server\.registerTool\(/g) ?? []).length === 3, "the three drawing tools are not registered through the annotated config API");
 check(toolsSource.includes("libraryAction") && toolsSource.includes("ctx.library.apply"), "bundled tools lost board-library actions");
 check(toolsSource.includes("visualDigest: boardVisualDigest(board)") && toolsSource.includes("boardRecipes()"), "bundled tools lost AI visual language");
 check(httpSource.includes('"/api/board/library"') && excalidrawTemplate.includes("Doodle · Excalidraw Canvas"), "bundled board library HTTP or Excalidraw-only UI surface is missing");

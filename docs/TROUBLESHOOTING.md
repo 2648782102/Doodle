@@ -7,7 +7,7 @@ npm run setup:codex
 npm run doctor
 ```
 
-`npm run setup:codex` builds the plugin, adds this repository as a local marketplace, and installs `doodle@doodle`. Start a new Codex session and use one first prompt: 「打开 Doodle 画板，我们先用画板交流。」 If the host cannot embed the canvas, ask the agent for `PANEL_URL`. For direct MCP hosts, use a zero-configuration snippet from `examples/mcp-config/`; set `DOODLE_WORKSPACE_ROOT` only when the MCP server starts outside the project that `scan_project` should inspect. Older `AI_DRAW_WORKSPACE_ROOT` settings still work as a legacy alias.
+`npm run setup:codex` builds the plugin, adds this repository as a local marketplace, and installs `doodle@doodle`. Start a new Codex session and use one first prompt: 「打开 Doodle 画板，我们先用画板交流。」 If the host cannot embed the canvas, ask the agent for `PANEL_URL`. For direct MCP hosts, use a zero-configuration snippet from `examples/mcp-config/`.
 
 ## Common issues
 
@@ -42,10 +42,6 @@ Run `npm run setup:codex` so `.doodle-plugin/doodle/` exists and the local marke
 ### `X-AI-Draw-Token` or human confirmation fails
 
 Reload `/` to obtain a fresh token. Browser write requests must include both `X-AI-Draw-Token` and `confirmedBy: "human"`. This is intentional: an arbitrary local client cannot silently mutate the human board.
-
-### `scan_project` misses files
-
-The scan is bounded and deliberately skips generated directories, dot-private paths, `.env`-like files, and large text. Raise `max_depth` or `max_files` explicitly. It never follows outside the workspace root and never reads binary payloads.
 
 ### Arrows point the wrong way
 

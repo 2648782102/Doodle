@@ -30,7 +30,7 @@ export function registerGetBoardTool(
 server.registerTool(
   "get_board",
   {
-    description: "读取人和 AI 共享画布的数据：revision、对象 ID、坐标、作者、BOARD_JSON 和画图规范。用于回答画布内容或给 Agent 提供视觉上下文；只读，不打开浏览器，也不写项目文件。重复读取同一画板时传 since_revision，只返回变化的对象。画布保真元数据不会出现在返回里。想显示可编辑画布时调用 show_board。",
+    description: "读取人和 AI 共享画布的数据：revision、对象 ID、坐标、作者、BOARD_JSON 和画图规范。用于回答画布内容或给 Agent 提供视觉上下文；只读。重复读取同一画板时传 since_revision，只返回变化的对象。画布保真元数据不会出现在返回里。想显示可编辑画布时调用 show_board。",
     inputSchema: z.object({
       since_revision: z.number().int().optional()
         .describe("Optional revision you already read. Returns only objects added, updated, or removed since it, or a compact unchanged summary."),

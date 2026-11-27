@@ -14,7 +14,7 @@ Please use GitHub's private vulnerability reporting or contact the maintainers p
 
 ## Threat model
 
-Doodle is local-first. The MCP server uses stdio either directly or from a bundled desktop-only plugin; a small HTTP server binds to `127.0.0.1` by default so a person can see and edit the same canvas. Do not expose that port to an untrusted network. Point `DOODLE_WORKSPACE_ROOT` only at a workspace you are willing to scan for bounded path and short source-evidence text.
+Doodle is local-first. The MCP server uses stdio either directly or from a bundled desktop-only plugin; a small HTTP server binds to `127.0.0.1` by default so a person can see and edit the same canvas. Do not expose that port to an untrusted network. Doodle reads and writes board state only.
 
 ## Guarantees and boundaries
 
@@ -24,7 +24,7 @@ Doodle is local-first. The MCP server uses stdio either directly or from a bundl
 - The token separates the canvas from other web origins; it does not separate it from other processes running as the same local user. Anything that can read the injected HTML can read the token, so a same-user process, browser extension, or a shared machine is inside the trust boundary. Doodle assumes one user owns the machine it runs on.
 - Board objects are visual context. They never become approval credentials or authority to write project files. The MCP App calls the server's normal tools through the host bridge; it has no separate project-write capability.
 - In compatible MCP Apps hosts, the embedded canvas passes the current final board snapshot and final-state delta to the host's current conversation model context after capability detection. This is local visual context, not an operation log or a project-write grant. User-initiated `通知 Agent` adds one short message to the existing host chat; automatic context updates never send chat messages. Hosts lacking either capability and the standalone `PANEL_URL` page do not expose that button.
-- `scan_project` is read-only. It returns workspace-relative paths and bounded evidence excerpts, skips dot-private and `.env`-like paths, skips common generated directories, caps evidence at 40 lines, filters common secret names and credential formats, and does not follow symlinks outside the configured workspace root.
+- Doodle only provides shared drawing. Project contents are outside the Doodle runtime surface.
 - Board writes use a cross-process filesystem lock and atomic rename. Snapshot replacements with stale or non-advancing revisions are rejected.
 - Normal MCP tools do not open browsers, launch IDEs, execute workspace commands, or write workspace files.
 - The plugin is desktop-only and local. It contains no hosted endpoint, remote state, telemetry, lifecycle hook, or public-directory credentials.

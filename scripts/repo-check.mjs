@@ -45,9 +45,9 @@ const writePipeline = await read("src/board/write/commit.ts");
 const boardIndex = await read("src/board/index.ts");
 /*
  * Tools are registered from one module per tool. Read them together so guards
- * can still assert the four-tool contract without knowing the file split.
+ * can still assert the three-tool contract without knowing the file split.
  */
-const toolModules = ["getBoard", "showBoard", "drawBoard", "scanProject"].map(
+const toolModules = ["getBoard", "showBoard", "drawBoard"].map(
   (name) => `src/board/mcp/tools/register${name[0].toUpperCase()}${name.slice(1)}Tool.ts`,
 );
 const tools = (await Promise.all([
@@ -104,7 +104,9 @@ const http = [
   await read("src/board/http/server.ts"),
   await read("src/board/http/routes.ts"),
 ].join("\n");
-const scanner = await read("src/board/project/scan.ts");
+const boardStorage = await read("src/infra/board-storage.ts");
+const templates = await read("src/board/http/templates.ts");
+const configSource = await read("src/infra/config.ts");
 const boardStore = await read("src/board/state/store.ts");
 const mutex = await read("src/board/state/mutex.ts");
 const launchKit = await read("docs/LAUNCH_KIT.md");
@@ -136,7 +138,7 @@ const submission = await read("docs/SUBMISSION.md");
 const experienceAudit = await read("docs/EXPERIENCE_AUDIT.md");
 const submissionScript = await read("scripts/build-submission.mjs");
 const config = await read("src/infra/config.ts");
-const projectWorkspace = await read("src/infra/project-workspace.ts");
+
 const version = await read("src/infra/version.ts");
 const setupScript = await read("scripts/setup-codex.mjs");
 const store = await read("src/board/state/store.ts");
@@ -382,7 +384,10 @@ check(
   "the board client example pins a preview port instead of asking the OS for a free one",
 );
 check(version.includes("__DOODLE_PLUGIN_VERSION__"), "bundled server cannot report the injected version");
-check(projectWorkspace.includes("CODEX_PROJECT_ROOT"), "plugin-safe workspace resolution is missing");
+check(boardStorage.includes("CODEX_PROJECT_ROOT") && boardStorage.includes("boardStorageRoot") && !boardStorage.includes("DOODLE_WORKSPACE_ROOT") && !boardStorage.includes("AI_DRAW_WORKSPACE_ROOT"), "board storage resolution reads context-building configuration");
+check(!configSource.includes("workspaceRoot") && !configSource.includes("cwd:"), "runtime config retains a project-access root");
+check(!templates.includes("process.cwd()") && !templates.includes("config.cwd") && !templates.includes("readFile(config.cwd"), "canvas asset lookup reads paths from the host workspace");
+check(!(await exists("src/board/project")) && !(await exists("src/board/mcp/tools/registerScanProjectTool.ts")), "project-reading implementation remains in the runtime source");
 check(packageJson.name === "doodle-mcp", "npm package name is not doodle-mcp");
 check(packageJson.mcpName === serverJson.name && serverJson.name === "io.github.2648782102/doodle-mcp", "package.json mcpName and server.json name do not match");
 check(serverJson.version === packageJson.version && serverJson.packages?.[0]?.version === packageJson.version && serverJson.packages?.[0]?.identifier === packageJson.name, "server.json version or package identifier is out of sync with package.json");
@@ -399,12 +404,12 @@ check(!packageJson.scripts["ui:shots"] && !packageJson.scripts["github:sync"], "
 check(Object.keys(packageJson.dependencies).sort().join(",") === "@excalidraw/excalidraw,@modelcontextprotocol/ext-apps,@modelcontextprotocol/sdk,express,react,react-dom,ws,zod", "runtime dependencies do not match the Excalidraw-only experiment");
 check(packageJson.devDependencies.esbuild, "esbuild is missing for the MCP Apps browser bundle");
 check(packageJson.overrides?.["@hono/node-server"] && packageJson.overrides?.hono && packageJson.overrides?.["fast-uri"], "transitive security overrides are missing");
-check(server.includes("registerBoardTools") && server.includes("TOOL_COUNT = 4"), "server.ts is not the four-tool board composition root");
+check(server.includes("registerBoardTools") && server.includes("TOOL_COUNT = 3"), "server.ts is not the three-tool board composition root");
 check(server.includes('name: "doodle-mcp"'), "MCP server identity is not Doodle");
 check(!buildScript.includes('fs.rm(path.join(root, "dist")'), "build.mjs deletes tsc output");
 check(buildScript.includes("pruneCompiledFiles"), "build.mjs does not prune stale compiled artifacts");
 check(buildScript.indexOf("await pruneCompiledFiles(distDir, expected);") < buildScript.indexOf("await fs.mkdir(targetDir, { recursive: true });"), "build.mjs creates the template target before pruning empty dist directories");
-check(instructions.includes("get_board") && instructions.includes("show_board") && instructions.includes("scan_project is optional"), "MCP instructions do not describe the canvas data and render tools");
+check(instructions.includes("get_board") && instructions.includes("show_board") && instructions.includes("three drawing tools") && instructions.includes("Doodle only reads and writes visual board state") && !instructions.includes("scan_project") && !instructions.includes("DIAGRAM_DRAFT_JSON"), "MCP instructions do not describe the drawing-only boundary");
 check(instructions.includes("First use") && instructions.includes("FIRST_USE"), "MCP instructions do not include the first-use path");
 check(instructions.includes("PANEL_URL") && !instructions.includes("reply_on_board"), "MCP instructions do not describe the local panel URL correctly");
 check(instructions.includes("Doodle is"), "MCP instructions do not introduce Doodle");
@@ -419,7 +424,7 @@ check(instructions.includes("draw_board.diagram") && instructions.includes("neve
  * each concern has a home, no module regrows into a monolith, and the public
  * barrels stay thin.
  */
-for (const group of ["model", "diagram", "layout", "mcp", "canvas", "http", "state", "write", "view", "project", "client"]) {
+for (const group of ["model", "diagram", "layout", "mcp", "canvas", "http", "state", "write", "view", "client"]) {
   check(
     sourceFiles.some((name) => name.startsWith(`${group}${path.sep}`) || name.startsWith(`${group}/`)),
     `src/board is missing the ${group} module group`,
@@ -440,7 +445,7 @@ const RINGS = [
   [/^errors\.ts$/, 0], [/^model\//, 0],
   [/^diagram\//, 1], [/^layout\//, 1], [/^canvas\//, 1], [/^svg\//, 1],
   [/^view\//, 1], [/^client\//, 1],
-  [/^state\//, 2], [/^library\//, 2], [/^project\//, 2],
+  [/^state\//, 2], [/^library\//, 2],
   [/^write\//, 3],
   [/^mcp\//, 4], [/^http\//, 4],
 ];
@@ -491,7 +496,7 @@ check(
   "the monolithic tools.ts is back; tools must stay in mcp/tools/",
 );
 check(!boardIndex.includes("preview-server") && !boardIndex.includes("session-store"), "board index re-exports legacy infrastructure");
-check((tools.match(/server\.registerTool\(/g) ?? []).length === 4 && !tools.includes("server.tool("), "tools.ts does not register exactly four annotated MCP tools");
+check((tools.match(/server\.registerTool\(/g) ?? []).length === 3 && !tools.includes("server.tool("), "tools.ts does not register exactly three annotated MCP tools");
 check(tools.includes("readOnlyHint: true") && tools.includes("destructiveHint: true") && tools.includes("openWorldHint: false"), "tool annotations are incomplete");
 check(tools.includes("registerAppResource") && tools.includes('"ui://doodle/board/excalidraw/v1.html"'), "Excalidraw MCP App canvas resource is missing");
 check(tools.includes('"show_board"') && tools.includes('"get_board"'), "canvas render and data tools are not separated");
@@ -631,11 +636,6 @@ check(
   "an empty diagram rejects with bare prose again instead of naming both routes forward",
 );
 check(
-  (await read("src/board/project/scan.ts")).includes("SCAN_RANGE_OUT_OF_RANGE")
-    && !/Math\.max\(minimum, Math\.min\(maximum/.test(await read("src/board/project/scan.ts")),
-  "scan_project clamps its range bounds again instead of rejecting an explicit out-of-range value",
-);
-check(
   (await read("src/board/library/store.ts")).includes("BOARD_NOT_FOUND")
     && (await read("src/board/library/store.ts")).includes("LAST_BOARD"),
   "a library action names no ids on an unknown board, or refuses the last board without saying why",
@@ -747,7 +747,7 @@ check(
   "diagram row limit is too small for a long sequence, or the diagram guide is missing",
 );
 check(!http.includes('"/api/board/scene"') && !excalidrawApp.includes("loadScene()"), "a second persisted Excalidraw scene source remains");
-check(tools.includes('"scan_project"') && tools.includes("Use draw_board to visualize"), "scan_project is not a read-only board-context tool");
+check(tools.includes('"draw_board"') && !tools.includes("scan_project") && (tools.match(/server\.registerTool\(/g) ?? []).length === 3, "MCP tool set exceeds the three shared-board tools");
 check(boardTypes.includes("signedWidth") && boardTypes.includes("signedHeight"), "board types lost signed directed-arrow deltas");
 check(boardTypes.includes("boardVisualDigest") && boardTypes.includes("startItemId") && boardTypes.includes("variant"), "board types lost visual-expression fields or deterministic visual digest");
 check(excalidrawApp.includes("excalidraw") && canvasAdapter.includes("boardOpacityToExcalidraw"), "canvas opacity is not converted between Board v1 (0-1) and Excalidraw (0-100)");
@@ -908,7 +908,7 @@ check((await read("src/board/http/templates.ts")).includes("excalidrawTemplateCa
 check(http.includes("canvasSnapshot") && http.includes("notes: _legacyNotes"), "HTTP canvas API still exposes the retired message feed");
 check(http.includes('"/api/board/batch"') && http.includes('"/api/board/replace"'), "HTTP board API lost batch or replacement operations");
 check(http.includes("boardVisualDigest(board)") && http.includes("capabilities:"), "HTTP board API lost AI visual language");
-check(http.includes('"/api/board/project"') && !http.includes('"/project"'), "project scan is outside the authenticated board API namespace");
+check(!http.includes("/api/board/project") && !http.includes("scanProject"), "HTTP server still exposes a project-scanning API");
 check(!http.includes("/workbench") && !http.includes("/api/collab"), "board HTTP server still exposes workbench routes");
 check(store.includes("AsyncMutex") && store.includes("replaceIfRevision") && store.includes("BoardRevisionConflictError"), "board store lost serialized revision-safe writes");
 check(store.includes("new AsyncMutex(this.file)") && mutex.includes('fs.open(this.lockFile, "wx")'), "board store lost its cross-process write lock");
@@ -916,11 +916,6 @@ check(boardLibrary.includes("class BoardLibrary") && boardLibrary.includes('".do
 check(tools.includes("libraryAction") && tools.includes("ctx.library.apply"), "draw_board lost board-library actions");
 check(http.includes('"/api/board/library"') && excalidrawTemplate.includes("Doodle · Excalidraw Canvas"), "board library HTTP or Excalidraw-only UI surface is missing");
 check(tools.includes("replaceIfRevision") && tools.includes("BoardRevisionConflictError"), "draw_board does not use revision-checked writes");
-check(scanner.includes("readOnly: true") && scanner.includes('writes: "none"'), "project scan lost its read-only safety boundary");
-check(tools.includes("projectDiagramDraft") && tools.includes("DIAGRAM_DRAFT_JSON"), "scan_project does not return a ready-to-draw diagram draft");
-check(scanner.includes("workspaceName") && !scanner.includes("workspaceRoot:"), "project scan exposes an absolute workspace root");
-check(scanner.includes("isPrivateEntry") && !scanner.includes('relative.includes("/.env")'), "project scan does not filter private path segments");
-check(scanner.includes("SENSITIVE_VALUE") && scanner.includes("containsSecret") && scanner.includes("isPrivateEntry"), "project scan lost conservative evidence redaction");
 check(await exists("package-lock.json"), "package-lock.json is missing");
 check(await exists("LICENSE") && (await read("LICENSE")).includes("Doodle contributors"), "LICENSE does not credit Doodle contributors");
 check(await exists("README.en.md") && await exists("ROADMAP.md") && await exists("RELEASING.md") && await exists("VERSIONING.md"), "open-source root documentation is incomplete");

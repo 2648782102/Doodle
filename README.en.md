@@ -28,7 +28,7 @@ AI draws with draw_board  ──▶  You edit / sketch / annotate directly on Ex
 AI reads HANDOFF delta    ◀──  Final state syncs to chat context (or click "通知 Agent")
 ```
 
-There are two entry points: **direct MCP / `npx`** (any host, no clone) and the **Codex plugin** (recommended for Codex users, one command). Host capability has three layers: the four tools always work; MCP Apps hosts show the same canvas beside the chat; hosts with `updateModelContext` / `sendMessage` add automatic final-state sync and a short notification. When a host cannot render the canvas, `PANEL_URL` from `get_board` is the local fallback page.
+There are two entry points: **direct MCP / `npx`** (any host, no clone) and the **Codex plugin** (recommended for Codex users, one command). Host capability has three layers: the three drawing tools always work; MCP Apps hosts show the same canvas beside the chat; hosts with `updateModelContext` / `sendMessage` add automatic final-state sync and a short notification. When a host cannot render the canvas, `PANEL_URL` from `get_board` is the local fallback page.
 
 Since `0.8.0` the legacy DOM canvas is gone and **Excalidraw is the only human-facing canvas**. Board v1 remains the sole persisted state and the AI-authoritative contract; Excalidraw elements are derived from it on every render, with no second canvas state.
 
@@ -37,7 +37,7 @@ Since `0.8.0` the legacy DOM canvas is gone and **Excalidraw is the only human-f
 Most "diagram MCPs" only work one way: the AI generates a static picture or dumps shapes, and if something is wrong, you are back to typing paragraphs to fix it. Doodle connects human edits back into the agent loop:
 
 - **True two-way `HANDOFF` sync**: When you drag, rename, or cross something out on the board, Doodle computes what *you* changed (ignoring the AI's own previous writes) and syncs the final state back to the agent.
-- **Only 4 focused tools**: `get_board`, `show_board`, `draw_board`, and `scan_project`. Minimal context window overhead compared to 20+ tool servers.
+- **3 drawing-focused tools**: `get_board` reads the shared board, `show_board` presents it, and `draw_board` lets the person and AI draw together. Doodle provides shared drawing for people and AI; it does not read files outside the board.
 - **Zero-config & 100% local-first**: Runs via `npx -y doodle-mcp` with **no API keys, no cloud accounts, and no telemetry**. Board state stays in local `.doodle/board.json`.
 - **Works in any MCP client**: Renders inline in MCP Apps hosts (Codex, Claude Desktop, Cursor, VS Code), and automatically provides a local browser `PANEL_URL` fallback for terminal/text-only hosts.
 - **Powered by Excalidraw (`0.8.0+`)**: Full hand-drawn rendering, freehand ink & stroke eraser, multi-select, image paste (`Ctrl/⌘+V`), local editable board library (`图库`), and PNG/JPG/SVG snapshot exports.
@@ -47,7 +47,7 @@ Most "diagram MCPs" only work one way: the AI generates a static picture or dump
 | Feature | **Doodle (`doodle-mcp`)** | Typical Diagram MCPs |
 |---|---|---|
 | **Interaction model** | **Two-way** (AI draws + human edits sync back via `HANDOFF` & `updateModelContext`) | Mostly one-way (AI outputs diagram; human edits require screenshots or re-prompting) |
-| **MCP tool surface** | **4 tools** (low prompt & token overhead) | Often 15–26+ tools |
+| **MCP tool surface** | **3 tools** (low prompt & token overhead) | Often 15–26+ tools |
 | **Setup & API keys** | **`npx -y doodle-mcp`**, zero config, no API keys | Often requires API keys, Docker, or cloning |
 | **Fallback for CLI hosts** | Built-in local Excalidraw `PANEL_URL` server | Usually UI-less or fails without webview |
 | **License & status** | **MIT License**, actively maintained | Varies (some lack a license file or are archived) |
@@ -149,34 +149,31 @@ npm run doodle
 
 Starts the local board and opens your browser, printing the address and a few gestures. Closing the terminal stops it. A dismissible card explains the basics on a first, empty board.
 
-## Four tools
+## Three drawing tools
 
 | Tool | Annotations | Purpose |
 |---|---|---|
 | `get_board` | Read-only | Reads the shared canvas. The first read returns the full guide, later reads stay concise; `since_revision` returns only changed objects plus `HANDOFF` (what the person changed, never the agent's own writes). Read-only, the default first step. |
 | `show_board` | Read-only | Opens the interactive canvas beside the conversation and includes `PANEL_URL` in its reply so text-only hosts can open the local board. Use it when the user wants to see or edit the board. |
 | `draw_board` | Write (destructive) | The write surface: add, precise updates, removals, deterministic layout, connected lines, variants/roles/styles/z-order, and `library` actions. `diagram` appends one diagram from semantic nodes and edges; `replace: true` redraws the whole board. |
-| `scan_project` | Read-only | Optional read-only project scan returning bounded relative paths, `file:line` evidence, and a `DIAGRAM_DRAFT_JSON` draft. It never writes files and never draws. |
-
-`show_board` and `scan_project` create no library, change no session, and grant no code-change authority.
+`show_board` presents the shared board.
 
 ## Install and configure
 
 **Codex plugin** — `npm run setup:codex` invokes the Codex CLI only when you run it (`npm install` → `npm run build` → `codex plugin marketplace add` → `codex plugin add doodle@doodle`). Repeating it is safe; `--dry-run` previews the commands. The plugin wraps the same self-contained stdio server and depends on neither `dist/` nor absolute paths. `npm run build:submission` produces the review ZIP; public plugin-directory publication still requires OpenAI-side eligibility and review — see [docs/SUBMISSION.md](docs/SUBMISSION.md).
 
-**Direct MCP stdio** — published installs use `npx -y doodle-mcp`; a local checkout can use `node dist/index.js` after `npm run build`. The server picks a free loopback port, an isolated state directory, and the launched workspace by default; set `DOODLE_WORKSPACE_ROOT` only when the host starts outside the project that `scan_project` should inspect.
+**Direct MCP stdio** — published installs use `npx -y doodle-mcp`; a local checkout can use `node dist/index.js` after `npm run build`. The server picks a free loopback port and a local board-state directory by default. Its tools read, present, and draw on the shared board.
 
-> `0.9.2` is published to npm and `latest` points at `0.9.2`; `npx -y doodle-mcp` starts the four tools directly. The Codex plugin is also available through `npm run setup:codex` above.
+> `0.9.2` is published to npm and `latest` points at `0.9.2`; the npm release does not yet include this boundary update. The repository now provides three drawing tools. The Codex plugin is also available through `npm run setup:codex` above.
 
 | Variable | Default | Meaning |
 |---|---|---|
 | `PREVIEW_PORT` | free port | Fixed local board HTTP port; unset or `0` picks one |
 | `PREVIEW_HOST` | `127.0.0.1` | Local bind address |
 | `OUTPUT_DIR` | plugin data / `.doodle-data` / `./output` | Board state directory |
-| `DOODLE_WORKSPACE_ROOT` | package root | Workspace `scan_project` inspects |
 | `LOG_LEVEL` | `info` | stderr log level |
 
-State lives in `.doodle/board.json` under that directory (version 1, independent, ignore it in Git). `AI_DRAW_WORKSPACE_ROOT` and the old `output/.ai-draw/board.json` remain read-only compatibility entries.
+State lives in `.doodle/board.json` under that directory (version 1, independent, ignore it in Git). The old `output/.ai-draw/board.json` remains a read-only compatibility entry.
 
 `PANEL_URL` belongs to the current MCP server process and stops resolving when the host exits — that is its normal lifetime. For a preview independent of a conversation, run `npm run preview:board` (board HTTP only, no tools, no background service; stop with `Ctrl+C`).
 
@@ -189,7 +186,7 @@ npm run doctor
 npm run preview:board
 ```
 
-Adding or removing an MCP tool, protocol field, plugin packaging step, or safety boundary requires updating `AGENTS.md`, the architecture and decision records, tests, examples, CI, and both offline guards together. All four tools carry explicit MCP annotations: `get_board`, `show_board`, and `scan_project` are read-only, non-destructive, and local-scope; `draw_board` is a destructive local write.
+Adding or removing an MCP tool, protocol field, plugin packaging step, or safety boundary requires updating `AGENTS.md`, the architecture and decision records, tests, examples, CI, and both offline guards together. All three tools carry explicit MCP annotations: `get_board` and `show_board` are read-only, non-destructive, and local-scope; `draw_board` is a destructive local write.
 
 ## Documentation
 

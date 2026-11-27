@@ -10,14 +10,11 @@
 import fs from "node:fs/promises";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
-import type { AppConfig } from "../../infra/config.js";
 
 const sourceDir = path.dirname(fileURLToPath(import.meta.url));
 
-export function excalidrawTemplateCandidates(config: AppConfig): string[] {
+export function excalidrawTemplateCandidates(): string[] {
   return [
-    path.resolve(config.cwd, "server", "infra", "templates", "excalidraw.html"),
-    path.resolve(config.cwd, "infra", "templates", "excalidraw.html"),
     path.resolve(sourceDir, "infra", "templates", "excalidraw.html"),
     path.resolve(sourceDir, "../../../../infra/templates/excalidraw.html"),
     path.resolve(sourceDir, "../../../../src/infra/templates/excalidraw.html"),
@@ -27,10 +24,8 @@ export function excalidrawTemplateCandidates(config: AppConfig): string[] {
   ];
 }
 
-export function assetCandidates(config: AppConfig): string[] {
+export function assetCandidates(): string[] {
   return [
-    path.resolve(config.cwd, "server", "infra", "templates", "excalidraw"),
-    path.resolve(config.cwd, "infra", "templates", "excalidraw"),
     path.resolve(sourceDir, "infra", "templates", "excalidraw"),
     path.resolve(sourceDir, "../../../../infra/templates/excalidraw"),
     path.resolve(sourceDir, "../../../../src/infra/templates/excalidraw"),
@@ -40,7 +35,7 @@ export function assetCandidates(config: AppConfig): string[] {
   ];
 }
 
-export async function readTemplate(config: AppConfig): Promise<string | undefined> {
+export async function readTemplate(): Promise<string | undefined> {
   /*
    * Revalidate the template with one `stat`, then reuse the text.
    *
@@ -50,7 +45,7 @@ export async function readTemplate(config: AppConfig): Promise<string | undefine
    * loop intact — editing the template still shows up on the next request —
    * while removing the redundant I/O from the steady state.
    */
-  const resolved = await resolveTemplate(config);
+  const resolved = await resolveTemplate();
   if (!resolved) return undefined;
   const cached = templateCache.get(resolved.path);
   if (cached && cached.mtimeMs === resolved.mtimeMs && cached.size === resolved.size) {
@@ -70,9 +65,9 @@ export async function readTemplate(config: AppConfig): Promise<string | undefine
  * deliberately not cached: a stale worker would pin every future load to old
  * fetch logic.
  */
-export async function readAsset(config: AppConfig, name: string): Promise<string | undefined> {
+export async function readAsset(name: string): Promise<string | undefined> {
   const pathname = path.basename(name);
-  const candidates = excalidrawTemplateCandidates(config).map((file) => path.join(path.dirname(file), pathname));
+  const candidates = excalidrawTemplateCandidates().map((file) => path.join(path.dirname(file), pathname));
   const found = await findExisting(candidates);
   if (!found) return undefined;
   return fs.readFile(found, "utf8").catch(() => undefined);
@@ -86,8 +81,8 @@ interface ResolvedTemplate {
 
 const templateCache = new Map<string, { mtimeMs: number; size: number; text: string }>();
 
-async function resolveTemplate(config: AppConfig): Promise<ResolvedTemplate | undefined> {
-  const candidates = excalidrawTemplateCandidates(config);
+async function resolveTemplate(): Promise<ResolvedTemplate | undefined> {
+  const candidates = excalidrawTemplateCandidates();
   /*
    * Remember which candidate won, so the steady state costs one `stat`
    * instead of one per candidate (seven at the time of writing). The memory is

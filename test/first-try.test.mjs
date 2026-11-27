@@ -45,7 +45,6 @@ async function withClient(callback) {
       PREVIEW_PORT: String(await freePort()),
       LOG_LEVEL: "error",
       OUTPUT_DIR: tempDir,
-      DOODLE_WORKSPACE_ROOT: process.cwd(),
     },
   });
   const client = new Client({ name: "doodle-first-try", version: "1.0.0" });
@@ -252,7 +251,6 @@ describe("first-try repair contract", () => {
         PREVIEW_PORT: String(await freePort()),
         LOG_LEVEL: "error",
         OUTPUT_DIR: outputDir,
-        DOODLE_WORKSPACE_ROOT: process.cwd(),
       },
     });
     const client = new Client({ name: "doodle-replace", version: "1.0.0" });
@@ -301,7 +299,6 @@ describe("first-try repair contract", () => {
         PREVIEW_PORT: String(await freePort()),
         LOG_LEVEL: "error",
         OUTPUT_DIR: outputDir,
-        DOODLE_WORKSPACE_ROOT: process.cwd(),
       },
     });
     const client = new Client({ name: "doodle-size-hint", version: "1.0.0" });
@@ -333,7 +330,6 @@ describe("first-try repair contract", () => {
           PREVIEW_PORT: String(await freePort()),
           LOG_LEVEL: "error",
           OUTPUT_DIR: small,
-          DOODLE_WORKSPACE_ROOT: process.cwd(),
         },
       });
       const smallClient = new Client({ name: "doodle-size-hint-small", version: "1.0.0" });
@@ -544,8 +540,6 @@ describe("first-try repair contract", () => {
       });
 
       const cases = [
-        ["scan_project", { max_depth: 99 }, "SCAN_RANGE_OUT_OF_RANGE", "max_depth"],
-        ["scan_project", { max_files: 0 }, "SCAN_RANGE_OUT_OF_RANGE", "max_files"],
         ["get_board", { since_revision: -1 }, "INVALID_SINCE_REVISION", "since_revision"],
         ["get_board", { view: "ultra" }, "INVALID_VIEW", "view"],
         ["draw_board", { library: { type: "switch", id: "ghost" } }, "BOARD_NOT_FOUND", "library.id"],
@@ -650,7 +644,6 @@ describe("first-try repair contract", () => {
         PREVIEW_PORT: String(await freePort()),
         LOG_LEVEL: "error",
         OUTPUT_DIR: outputDir,
-        DOODLE_WORKSPACE_ROOT: process.cwd(),
       },
     });
     const client = new Client({ name: "doodle-mime-dup", version: "1.0.0" });
@@ -698,7 +691,6 @@ describe("first-try repair contract", () => {
         PREVIEW_PORT: String(await freePort()),
         LOG_LEVEL: "error",
         OUTPUT_DIR: outputDir,
-        DOODLE_WORKSPACE_ROOT: process.cwd(),
       },
     });
     const client = new Client({ name: "doodle-limits", version: "1.0.0" });

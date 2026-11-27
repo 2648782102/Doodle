@@ -18,7 +18,7 @@ Token counts use `js-tiktoken` `o200k_base` over serialized MCP payloads. The me
 | MCP App resource bytes | 4,156 B | 768,241 B | -764,085 B |
 | Standalone HTML bytes | 4,204 B | 95,845 B | -91,641 B |
 
-The AI authoring payload is unchanged because both branches keep the same four MCP tools and version 1 Board v1 object contract. The Excalidraw branch is slightly more expensive in ordinary tool text (+261 tokens) because it exposes one extra schema field (`scene`) and reports a single `canvasEngine` capability, but it is dramatically cheaper for MCP App resource delivery because the resource is a small HTML shell that loads self-hosted JS instead of inlining the whole DOM app.
+The AI authoring payload is unchanged because both branches keep the same MCP tool surface of that time and version 1 Board v1 object contract. The Excalidraw branch is slightly more expensive in ordinary tool text (+261 tokens) because it exposes one extra schema field (`scene`) and reports a single `canvasEngine` capability, but it is dramatically cheaper for MCP App resource delivery because the resource is a small HTML shell that loads self-hosted JS instead of inlining the whole DOM app.
 
 ## Visual comparison
 

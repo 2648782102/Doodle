@@ -21,13 +21,6 @@
       },
       "environmentVariables": [
         {
-          "name": "DOODLE_WORKSPACE_ROOT",
-          "description": "Optional workspace path scoped for read-only scan_project inspection.",
-          "isRequired": false,
-          "format": "filepath",
-          "isSecret": false
-        },
-        {
           "name": "OUTPUT_DIR",
           "description": "Optional directory where .doodle/board.json and saved boards are persisted.",
           "isRequired": false,

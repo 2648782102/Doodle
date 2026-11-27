@@ -1,10 +1,9 @@
 /**
  * Local-only boundary checks for the HTTP and WebSocket preview server.
  *
- * The standalone preview serves `panelToken` on `GET /` and read-only project
- * excerpts on `GET /api/board/project`, so a remote page reaching the loopback
- * port through DNS rebinding or a cross-site WebSocket must be rejected at the
- * edge before any route runs.
+ * The standalone preview serves `panelToken` on `GET /`. A remote page reaching
+ * the loopback port through DNS rebinding or a cross-site WebSocket must be
+ * rejected at the edge before any route runs.
  */
 
 import path from "node:path";

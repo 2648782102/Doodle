@@ -1,4 +1,6 @@
-# Architecture Discussion First-Session Implementation Plan
+# Architecture Discussion First-Session Implementation Plan (Retired)
+
+> Historical plan superseded on 2026-11-27 by [the drawing-only implementation plan](2026-11-27-doodle-drawing-only.md). Its scanner-related steps document prior work and must not be treated as current product requirements.
 
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 

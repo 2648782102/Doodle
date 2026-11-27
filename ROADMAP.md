@@ -5,12 +5,11 @@ Doodle is a simple shared infinite board. The roadmap protects that boundary rat
 ## Shipped baseline — 0.8.0
 
 - One version 1 board state shared by MCP tools and the local human canvas.
-- Four tools: `get_board`, `show_board`, `draw_board`, and optional `scan_project`.
+- Three drawing tools: `get_board`, `show_board`, and `draw_board`.
 - Notes, text, rectangles, ellipses, directed arrows, and object authors. Persisted messages remain only for old-state compatibility.
 - One canvas UI that works as an optional MCP App beside the agent conversation and as a standalone local fallback, with click-to-place and drag-to-size drawing, directional arrows, pan/zoom gestures, local viewport memory, inline text editing, delete, and fit-to-content.
-- Read-only project scanning with bounded relative paths and `file:line` evidence.
 - Clean MCP stdio, stderr-only logs, minimal runtime dependencies, and offline repository guards.
-- A desktop-only Codex plugin with one compatibility manifest, one bundled stdio server, a repository marketplace, plugin-safe data/workspace resolution, an optional loopback port, and a plugin guard in `npm run check` and CI.
+- A desktop-only Codex plugin with one compatibility manifest, one bundled stdio server, a repository marketplace, plugin-safe board-data directory resolution, an optional loopback port, and a plugin guard in `npm run check` and CI.
 - Explicit MCP tool annotations, published privacy/support/terms pages, a versioned submission ZIP, and documented public-directory eligibility gates.
 - An idempotent publish workflow that creates the GitHub Release and attaches the submission ZIP after the full check.
 - A one-command `npm run setup:codex` install path, one first-use prompt, zero-configuration direct MCP examples, `FIRST_USE` / `NEXT_STEPS` agent guidance, and a dismissible canvas `?` help popover.
@@ -20,13 +19,12 @@ Doodle is a simple shared infinite board. The roadmap protects that boundary rat
 
 ## Near-term work
 
-- Run a small developer pilot of the evidence-grounded architecture discussion path; record direct canvas corrections, next-turn reflection, and any retyping in chat in `docs/EXPERIENCE_AUDIT.md`.
-- Keep the copyable scenario in `examples/architecture-discussion.md` accurate as the pilot identifies concrete friction; do not infer dependencies from directory structure.
+- Run a small developer pilot of the host-supplied architecture drawing path; record direct canvas corrections, next-turn reflection, and any retyping in chat in `docs/EXPERIENCE_AUDIT.md`.
+- Keep the copyable scenario in `examples/architecture-discussion.md` accurate as the pilot identifies concrete friction; the host agent supplies repository understanding; Doodle only draws and receives edits.
 - Improve drawing ergonomics without adding tools or workflow state: clearer selection, more predictable arrow endpoints, and keyboard/accessibility polish.
 - Improve agent-facing guidance with concrete, tested layout conventions for architecture sketches.
-- Keep project scan evidence bounded, private-path safe, and useful without making structure the product.
-- Strengthen tests around atomic board persistence, HTTP authorization, MCP instructions, and package contents.
-- Measure whether first-session canvas visibility and host reload remain friction points, without changing the four-tool protocol or adding hosted infrastructure.
+- - Strengthen tests around atomic board persistence, HTTP authorization, MCP instructions, and package contents.
+- Measure whether first-session canvas visibility and host reload remain friction points, without expanding the three-tool drawing protocol or adding hosted infrastructure.
 - Verify the final-state context and notification path in each MCP Apps host that advertises `updateModelContext` and `sendMessage`; keep the standalone `get_board` fallback honest.
 
 ## Explicit non-goals

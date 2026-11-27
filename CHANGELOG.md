@@ -1,8 +1,8 @@
 ## Unreleased
 
-### Added
+### Removed
 
-- **Evidence-grounded architecture discussion**: MCP and Codex guidance plus a copyable bilingual scenario now lead from a bounded `scan_project` through a shared architecture diagram, direct human corrections, `HANDOFF`, and precise AI continuation. Dependency arrows require source evidence; uncertain relationships remain questions. A real-MCP integration test proves the loop without changing repository files. Real developer pilot validation remains pending.
+- Removed repository scanning from the product. Doodle now exposes only the shared-board tools `get_board`, `show_board`, and `draw_board`; project understanding must come from the host conversation or the host agent's own capabilities, and Doodle is used to draw and revise it together.
 
 ## 0.9.2 — Release closure
 

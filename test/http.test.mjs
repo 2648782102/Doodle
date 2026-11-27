@@ -30,8 +30,6 @@ const preview = new BoardHttpServer(board, {
   previewHost: "127.0.0.1",
   previewPort: port,
   outputDir: path.join(tempDir, "output"),
-  workspaceRoot: tempDir,
-  cwd: tempDir,
 }, revisions);
 await preview.start();
 
@@ -41,6 +39,31 @@ afterAll(async () => {
 });
 
 describe("board HTTP surface", () => {
+  it("serves packaged canvas assets without reading files from the workspace", async () => {
+    const workspace = path.join(tempDir, "workspace-template");
+    const workspaceTemplate = path.join(workspace, "infra", "templates", "excalidraw.html");
+    await fs.mkdir(path.dirname(workspaceTemplate), { recursive: true });
+    await fs.writeFile(workspaceTemplate, "<html>workspace-only-template</html>", "utf8");
+
+    const localBoard = new BoardStore(path.join(workspace, "output"));
+    await localBoard.init();
+    const localServer = new BoardHttpServer(localBoard, {
+      previewHost: "127.0.0.1",
+      previewPort: await freePort(),
+      outputDir: path.join(workspace, "output"),
+    }, new BoardRevisionCache());
+
+    try {
+      await localServer.start();
+      const html = await fetch(localServer.panelUrl).then((response) => response.text());
+      expect(html).toContain("Doodle · Excalidraw Canvas");
+      expect(html).not.toContain("workspace-only-template");
+    } finally {
+      await localServer.stop();
+      await fs.rm(workspace, { recursive: true, force: true });
+    }
+  });
+
   it("serves the human board and the read-only board API", async () => {
     const html = await fetch(base).then((response) => response.text());
     expect(preview.panelUrl).toBe(`${base}/`);
@@ -321,8 +344,6 @@ describe("board HTTP surface", () => {
       previewHost: "127.0.0.1",
       previewPort: null,
       outputDir: path.join(tempDir, "dynamic"),
-      workspaceRoot: tempDir,
-      cwd: tempDir,
     });
     try {
       await dynamicPreview.start();
@@ -476,16 +497,32 @@ describe("board HTTP surface", () => {
     expect(revisions.get(created.board.revision).items.some((item) => item.text === "from browser")).toBe(true);
   });
 
-  it("exposes read-only project context without project writes", async () => {
-    await fs.writeFile(path.join(tempDir, "README.md"), "# Local test\n", "utf8");
-    const project = await fetch(`${base}/api/board/project`).then((response) => response.json());
-    expect(project).toMatchObject({ version: 1, readOnly: true, writes: "none" });
-    expect(project).not.toHaveProperty("workspaceRoot");
-    expect(JSON.stringify(project)).not.toContain(tempDir);
-    expect(project.files.map((file) => file.path)).toContain("README.md");
-    expect(await fetch(`${base}/api/board/project/text`).then((response) => response.text())).toContain("README.md");
+  it("does not expose retired workspace-reading routes", async () => {
+    const marker = "Doodle must not read this project file";
+    const workspace = path.join(tempDir, "route-workspace");
+    const workspaceOutput = path.join(workspace, "output");
+    await fs.mkdir(workspaceOutput, { recursive: true });
+    await fs.writeFile(path.join(workspace, "README.md"), marker, "utf8");
+
+    const workspaceBoard = new BoardStore(workspaceOutput);
+    await workspaceBoard.init();
+    const workspaceServer = new BoardHttpServer(workspaceBoard, {
+      previewHost: "127.0.0.1",
+      previewPort: await freePort(),
+      outputDir: workspaceOutput,
+    }, new BoardRevisionCache());
+
+    try {
+      await workspaceServer.start();
+      for (const endpoint of ["/api/board/project", "/api/board/project/text"]) {
+        const response = await fetch(`${workspaceServer.panelUrl}${endpoint.slice(1)}`);
+        expect(response.status).toBe(404);
+        expect(await response.text()).not.toContain(marker);
+      }
+    } finally {
+      await workspaceServer.stop();
+    }
     const current = await board.snapshot();
-    expect(current.items.some((item) => item.text === "README.md")).toBe(false);
     expect(addBoardItem(current, { type: "text", x: 0, y: 0, text: "manual only" }).items.length).toBe(current.items.length + 1);
   });
 });
@@ -593,8 +630,6 @@ describe("object-level conflict handling", () => {
       previewHost: "127.0.0.1",
       previewPort: isolatedPort,
       outputDir: path.join(isolatedDir, "output"),
-      workspaceRoot: isolatedDir,
-      cwd: isolatedDir,
     }, new BoardRevisionCache());
     await isolatedServer.start();
     try {
@@ -639,14 +674,6 @@ describe("object-level conflict handling", () => {
 });
 
 describe("HTTP and WebSocket security boundaries", () => {
-  it("returns structured 400 on invalid project scan bounds", async () => {
-    const response = await fetch(`${base}/api/board/project?max_depth=99`);
-    expect(response.status).toBe(400);
-    const body = await response.json();
-    expect(body.code).toBe("SCAN_RANGE_OUT_OF_RANGE");
-    expect(body.path).toBe("max_depth");
-  });
-
   it("rejects sibling-prefix path traversal and cross-origin writes or WebSockets", async () => {
     const { isPathWithinRoot } = await import("../dist/board/http/security.js");
     expect(isPathWithinRoot("/tmp/templates/excalidraw", "/tmp/templates/excalidraw/index.css")).toBe(true);

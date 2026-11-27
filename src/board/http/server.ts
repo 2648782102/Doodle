@@ -80,7 +80,7 @@ export class BoardHttpServer {
 
   private async serveBoard(res: express.Response): Promise<void> {
     res.set("Cache-Control", "no-store, max-age=0");
-    const template = await readTemplate(this.config);
+    const template = await readTemplate();
     if (!template) return void res.status(500).send("Excalidraw template not found");
     res.type("html").send(fillTemplate(template, {
       assetVersion: this.assetVersion,
@@ -91,7 +91,7 @@ export class BoardHttpServer {
 
   async getAppHtml(bundle?: string): Promise<string> {
     if (bundle !== undefined) this.appBundle = bundle;
-    const template = await readTemplate(this.config);
+    const template = await readTemplate();
     if (!template) throw new Error("Excalidraw template not found");
     return fillTemplate(template, {
       assetVersion: this.assetVersion,

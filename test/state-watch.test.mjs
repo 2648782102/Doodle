@@ -71,8 +71,6 @@ describe("cross-process board state watch", () => {
       previewHost: "127.0.0.1",
       previewPort: port,
       outputDir,
-      workspaceRoot: tempDir,
-      cwd: tempDir,
     });
     await preview.start();
 

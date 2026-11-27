@@ -7,7 +7,7 @@ Doodle is a local-first shared infinite canvas. The repository builds two distri
 ```text
 src/
 ├── index.ts                    MCP stdio and HTTP lifecycle
-├── server.ts                   composition root; four tools
+├── server.ts                   composition root; three drawing tools
 ├── board/
 │   ├── model/                  ring 0 — Board v1, no I/O and no transport
 │   │   ├── types.ts            persisted shapes and tool inputs (types only)
@@ -48,16 +48,13 @@ src/
 │   ├── library/                ring 2 — named board snapshots
 │   │   ├── schema.ts           index shape and strict validation
 │   │   └── store.ts            atomic persistence under a mutex
-│   ├── project/                ring 2 — read-only project context
-│   │   ├── scan.ts             bounded workspace path/evidence scan
-│   │   └── diagram.ts          ready-to-draw draft from a scan
 │   ├── write/                  ring 3 — the one write pipeline
 │   │   ├── commit.ts           shared MCP/HTTP commit, merge, and guard
 │   │   └── conflict.ts         object-level conflict resolution and 409 payload
 │   ├── mcp/                    ring 4 — tool surface
 │   │   ├── context.ts          what a tool receives from the running server
 │   │   ├── instructions.ts     MCP initialization guidance for agents
-│   │   ├── schemas.ts          input schemas for the four tools
+│   │   ├── schemas.ts          input schemas for the three tools
 │   │   ├── presentation.ts     response projection and agent payloads
 │   │   ├── tools.ts            composition only
 │   │   └── tools/              one module per tool
@@ -71,10 +68,9 @@ src/
 │   ├── library.ts              public barrel over library/
 │   └── index.ts                board module entrypoint (composition surface)
 ├── infra/
-│   ├── config.ts               PREVIEW_HOST / PREVIEW_PORT / OUTPUT_DIR / workspace
+│   ├── config.ts               PREVIEW_HOST / PREVIEW_PORT / OUTPUT_DIR
+│   ├── board-storage.ts        plugin-safe board data directory resolution
 │   ├── logger.ts               stderr-only logger
-│   ├── project-workspace.ts    plugin-safe workspace resolution
-│   ├── workspace.ts            DOODLE_WORKSPACE_ROOT resolution
 │   ├── version.ts              package version read
 │   └── templates/
 │       ├── excalidraw.html     Excalidraw-only standalone and embedded canvas
@@ -101,6 +97,10 @@ scripts/plugin-check.mjs        validates plugin manifests, skill, marketplace, 
 
 There is no `src/domain/` workbench model, Mermaid renderer, session store, proposal store, or legacy panel template in `0.8.0`. The plugin uses only the supported Codex compatibility layout; generated `.doodle-plugin/` output is ignored.
 
+The server persists the shared board and its optional saved snapshots. It does
+not inspect a host repository or read files to supply drawing context; project
+understanding is supplied by the host conversation or the host agent.
+
 ## Layering rules
 
 Dependencies point inward, and the rule is enforced as a *direction*, not a file
@@ -112,7 +112,7 @@ import graph and fails on the first outward edge.
 |---|---|---|---|
 | 0 kernel | `model/`, `errors.ts` | kernel | Board v1 shapes, limits, validation, pure mutation, fingerprinting, diffing |
 | 1 derive | `diagram/`, `layout/`, `canvas/`, `svg/`, `view/`, `client/` | kernel, derive | Pure projections of a board: placement, Excalidraw/SVG rendering, agent/handoff views, browser viewport memory |
-| 2 state | `state/`, `library/`, `project/` | kernel, derive, state | Anything that touches disk or process memory: store, mutex, image files, revision cache, file watcher, saved-board library, read-only project scan |
+| 2 state | `state/`, `library/` | kernel, derive, state | Anything that touches disk or process memory: store, mutex, image files, revision cache, file watcher, saved-board library |
 | 3 app | `write/` | rings 0–2 | The one write pipeline and object-level conflict resolution shared by every entry point |
 | 4 transport | `mcp/`, `http/` | rings 0–3 | The two front doors: the MCP tool surface and the local HTTP + WebSocket canvas |
 
@@ -174,16 +174,15 @@ surface instead of a toast: it names the objects and offers `载入最新` or
 
 ## MCP surface
 
-Both runtime paths register exactly four tools:
+Both runtime paths register exactly three drawing-board tools:
 
 | Tool | Effect | Output |
 |---|---|---|
 | `get_board` | Reads one shared version 1 board | progressive `FIRST_USE` / `NEXT_STEPS` or `NEXT`, `BOARD_JSON`, `PANEL_URL`, structured board snapshot; drawing guide on an empty board |
 | `show_board` | Returns the optional MCP App resource beside the conversation | initial structured board snapshot and interactive UI |
 | `draw_board` | Adds items, applies precise updates/removals, arranges objects, generates one complete semantic diagram, and can reject stale app edits by expected revision | revision, counts, authoritative structured snapshot |
-| `scan_project` | Reads bounded project paths and evidence | `PROJECT_JSON` and `PROJECT_TEXT` |
 
-All tools are registered through the MCP SDK config API with explicit annotations: `get_board`, `show_board`, and `scan_project` are read-only, non-destructive, and local-scope; `draw_board` is destructive because it can remove or overwrite visual objects. These values are integration-tested and guarded by the offline repository checks.
+Doodle only reads and writes shared board state. All tools are registered through the MCP SDK config API with explicit annotations: `get_board` and `show_board` are read-only, non-destructive, and local-scope; `draw_board` is destructive because it can remove or overwrite visual objects. These values are integration-tested and guarded by the offline repository checks.
 
 The optional canvas resource uses `text/html;profile=mcp-app` and is attached to `show_board` and to successful `draw_board` results. `show_board` remains the explicit render tool; the write result also advertises the canvas so compatible hosts automatically show the board after an AI drawing. The app calls `get_board` and `draw_board` through the host bridge, refreshes at a low rate while visible, and sends the revision it has rendered so a concurrent model edit cannot be overwritten. This keeps browser HTTP credentials inside the standalone page while the embedded canvas uses the host's authenticated MCP connection. Text-only hosts retain the complete tool workflow and should call `show_board` after drawing when they support it.
 
@@ -218,15 +217,9 @@ The HTTP server binds to `127.0.0.1` by default and a free loopback port when `P
 | `POST /api/board/items` | Human-confirmed object creation |
 | `PATCH /api/board/items/:id` | Human-confirmed object update |
 | `DELETE /api/board/items/:id` | Human-confirmed object deletion |
-| `GET /api/board/project` | Bounded read-only project structure JSON |
-| `GET /api/board/project/text` | Plain-text projection of the same scan |
 | `WS /ws` | `board_updated` revision broadcasts |
 
 Non-GET `/api/board/*` requests require the random `X-AI-Draw-Token` injected into the HTML and `confirmedBy: "human"`. The human canvas also sends `If-Match-Revision` equal to its last read board revision; a conflict returns HTTP 409. Legacy clients without the revision header are serialized against the latest state. Oversized JSON returns HTTP 413. The token exists only in the local browser session and never enters persisted state.
-
-## Read-only project scan
-
-`scan_project` walks the configured workspace root with bounded depth and entry count, skips common generated/private directories, ignores dot-private files including `.env`, and reads only small text files for at most five evidence lines per file and 40 total. Candidate lines containing common secret names or credential formats are omitted. Paths are workspace-relative. It returns no file contents beyond short evidence excerpts, no absolute workspace path, and no write capability.
 
 The canvas supports click-to-place defaults, drag-to-size shapes, directional drag-to-draw arrows, immediate freehand ink with continuous drawing, freehand-only drag-to-erase, image paste, double-click-to-create notes, marquee multi-select, batch move/delete/group/layout, undo/redo, arrow-key nudging, alignment snapping, Space or middle-button panning, wheel panning, and Ctrl/Command-wheel zoom. A `图库` drawer saves, lists, switches, renames, duplicates, deletes, imports, and exports editable version 1 board snapshots; in MCP Apps it uses the same `draw_board.library` protocol as text-only hosts. The drawer overlays the canvas rather than changing Excalidraw's padding, hides its launcher while open, gives the named-board list the only scroll region, and keeps action and share rows fixed so they cannot be covered by entries. The Doodle top bar also yields while an Excalidraw dropdown or modal is open, because those native layers start in the same top-left area and own their own click targets. Hover and active styles change color, border, or shadow only; geometry-changing transforms are rejected by the offline guard because they overlap neighbouring controls. One palette covers both Doodle chrome and native Excalidraw chrome: warm paper and pine green in light mode, green-tinted charcoal and pale mint in dark mode. The template remaps Excalidraw's design variables (primary, surface, island, border, input, button, and shadow tokens) instead of leaving its upstream violet defaults next to Doodle's accent; offline guards reject a reintroduced `#6965db` primary or missing dark mapping. The canvas is a closed local surface for outbound navigation: a custom main menu exposes local search, help, and one project GitHub link; native social links, help-header links, the materials-library browse destination, arbitrary web embeds, and Excalidraw AI/Mermaid generation entries are hidden; object links and anchor clicks are allowed only for the Doodle repository and otherwise prevented by both the capture listener and `onLinkOpen`. Text editing is available through double-click, the `编辑` button, or `Enter` for a selected text-bearing object; creation returns to the select tool except for pen and eraser, which stay active for repeated strokes. Pointer cancellation discards an in-progress drawing. Dragging arrows uses their bounds so negative endpoint deltas do not make them jump. Extended version 1 fields include `title`, `shape`, `points`, `src`, `mime`, `groupId`, `emphasis`, `variant`, `role`, `z`, `style`, `startItemId`, and `endItemId`. Connected arrows resolve their endpoints from bound object edges. In MCP Apps hosts, a small `展开` control appears when fullscreen is available.
 
@@ -234,20 +227,17 @@ The canvas supports click-to-place defaults, drag-to-size shapes, directional dr
 
 `src/board/view/agent-view.ts` separates what the agent needs from what only the canvas needs: board items keep `scene` fidelity on disk, while agent payloads replace it with a `canvasFidelity` marker and add a stable summary. `src/board/state/revision-cache.ts` keeps the last few boards in memory so `get_board.since_revision` can answer with a delta; `src/board/view/handoff.ts` attributes the human share of that delta (`added`, `edited`, `removed`) so the agent never reviews its own writes. `src/board/types.ts` derives `boardVisualDigest()` from final board objects: bounded reading order, group counts, connection labels/endpoints, focus markers, freehand/image counts. `get_board`, `show_board`, and HTTP `GET /api/board` also return `capabilities` and recipe names. These are deterministic visual summaries for agents, not operation logs, interpretations, or project-write authority. `resolveDiagramLayout()` is the shared deterministic source for semantic diagrams and `diagramToBoardItems()` writes ordinary version 1 objects; no native Excalidraw scene is persisted alongside the board.
 
-Project scanning does not modify the board. If the AI wants to show structure, it calls `draw_board` with a layout derived from the scan result.
-
 ## Safety model
 
 - stdout is reserved for MCP JSON-RPC; all logs go to stderr.
 - The preview server defaults to `127.0.0.1`; use `PREVIEW_HOST` only for explicit local configuration.
 - The board is visual context, never an authorization channel.
 - Board mutations acquire a cross-process lock, read current state inside the lock, and persist with a unique temporary file plus atomic rename.
-- Project-scan evidence filters common credential lines and is capped at 40 lines total.
-- `scan_project` never writes files; board writes never write project files.
-- Offline guards in `scripts/repo-check.mjs` verify the four-tool surface, optional MCP App registration, dependency setup, plugin packaging, docs alignment, arrow contract, HTTP authentication, and read-only scan boundary. `scripts/plugin-check.mjs` validates the plugin identity, marketplace, skill, bundle template paths, generated runtime, and desktop-only flag. `scripts/build.mjs` prunes stale compiled files, copies the canvas template, and bundles the embedded App.
+- Doodle reads and writes board state only.
+- Offline guards in `scripts/repo-check.mjs` verify the three-tool surface, absence of filesystem-reading tools and routes, optional MCP App registration, dependency setup, plugin packaging, docs alignment, arrow contract, and HTTP authentication. `scripts/plugin-check.mjs` validates the plugin identity, marketplace, skill, bundle template paths, generated runtime, and desktop-only flag. `scripts/build.mjs` prunes stale compiled files, copies the canvas template, and bundles the embedded App.
 - Offline guards also verify that the bundled App uses `updateModelContext` / `sendMessage`, that the shared template exposes the notification button, and that the context builder is a final-state delta rather than an operation log.
 - `npm run check` runs lint, build, plugin build, tests, example syntax, offline guards, plugin guard, doctor, and package dry-run.
 
 ## Compatibility
 
-Existing version 1 `.ai-draw/board.json` files under the configured output directory remain readable, including their notes. `AI_DRAW_WORKSPACE_ROOT` remains a legacy alias for `DOODLE_WORKSPACE_ROOT`. Explicit `OUTPUT_DIR`, plugin data, and workspace-local `.doodle-data` all point at the same board-state layout. `CODEX_PROJECT_ROOT`/`PWD` help the plugin find the launched workspace without exposing plugin-internal paths. The removed `0.3.x` workbench, 29-tool catalogue, session proposals, Mermaid diagram library, and VS Code extension remain only as historical records under `docs/archive/adr-legacy/`.
+Existing version 1 `.ai-draw/board.json` files under the configured output directory remain readable, including their notes. Explicit `OUTPUT_DIR`, plugin data, and a local `.doodle-data` directory all point at the same board-state layout. `CODEX_PROJECT_ROOT`/`PWD` may select the board-data directory. That metadata supplies a destination for board persistence; it does not grant access to surrounding files. The removed `0.3.x` workbench, 29-tool catalogue, session proposals, Mermaid diagram library, and VS Code extension remain only as historical records under `docs/archive/adr-legacy/`.

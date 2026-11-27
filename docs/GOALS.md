@@ -1,5 +1,7 @@
 # 目标与验收记录
 
+> 本文按交付当时的产品状态记录历史。目标 10 已重新确立当前边界：Doodle 只提供 AI 与人的共同绘画能力。较早目标中“四个 MCP 工具”等内容描述的是当时版本，不能当作当前工具面；当前契约以 [PRODUCT_DIRECTION.md](PRODUCT_DIRECTION.md) 为准。
+
 这里记录 Doodle 每一个已交付目标的目标、验收标准与实测结果。**它不是产品介绍**——想知道画板是什么、怎么用，看 [PRODUCT_DIRECTION.md](PRODUCT_DIRECTION.md) 和根目录的 [README](../README.md)。
 
 阅读顺序建议：先看下面的「通用红线」，那是所有目标共享的约束；再按时间找你在意的那个目标。
@@ -23,7 +25,7 @@
 
 所有目标共享以下约束，各目标的正文不再重复：
 
-- 不加第五个 MCP 工具，不做第二套会话模型、第二份持久状态或第二套画布引擎。
+- 当前 MCP 只提供 `get_board`、`show_board`、`draw_board` 三个工具；不做第二套会话模型、第二份持久状态或第二套画布引擎。
 - 画板对象只是视觉上下文，永远不获得项目写入权限，也不构成审批凭据。
 - 不新增任何会自动打开浏览器、IDE 或外部应用的工具副作用。
 - 不做托管服务、多用户、账号、CDN 资源或遥测。
@@ -46,7 +48,7 @@ get_board → draw_board.diagram → Board v1 → Excalidraw 投影
 
 ### 验收
 
-- 恰好四个 MCP 工具、一份 version 1 状态格式。
+- 当时版本的四个 MCP 工具、一份 version 1 状态格式。（这是 0.8.0 发布时的历史验收；当前工具面以目标 10 为准。）
 - `draw_board.diagram` 接受有界的语义节点/边，默认在现有对象旁追加一张确定性图；`replace: true` 才清空重画。混合多种写入、重复节点 ID、未知边端点必须被拒绝。
 - `layout.mode: "architecture"` 能对现有连接对象重排，标签有界、连线坐标稳定。
 - Excalidraw 每次渲染都从 Board v1 派生，不存在独立的 scene 文件或 scene 端点；可选 `scene` 元数据只用于保留人手编辑的保真度。
@@ -74,7 +76,7 @@ get_board → draw_board.diagram → Board v1 → Excalidraw 投影
 - `capabilities` 固定 `role` / `emphasis` 的语义，不只是外观。
 - `get_board` 支持分级读取 `summary` / `structure` / `detail` / `full`；降级只减 token，不改变权威状态。
 
-**实测**：七项全部在四个工具内交付，`npm run check` 通过，端到端 MCP 会话走完六个检查点，未修改任何 UI 文件。
+**实测**：七项全部在当时的 MCP 工具内交付，`npm run check` 通过，端到端 MCP 会话走完六个检查点，未修改任何 UI 文件。
 
 ---
 
@@ -82,7 +84,7 @@ get_board → draw_board.diagram → Board v1 → Excalidraw 投影
 
 ### 目标
 
-从"AI 能放对象"走到"AI 能用四个工具表达和修订视觉想法，并且人能自然看懂、自然重塑"。保持一张 version 1 画板、四个工具和本地图库。
+从"AI 能放对象"走到"AI 能用 MCP 工具表达和修订视觉想法，并且人能自然看懂、自然重塑"。保持一张 version 1 画板、共享绘画工具和本地图库。
 
 ### 验收
 
@@ -110,7 +112,7 @@ get_board → draw_board.diagram → Board v1 → Excalidraw 投影
 
 ### 目标
 
-用 `@excalidraw/excalidraw` 作为人类面向的无限画布，同时保住四个 MCP 工具、version 1 `BOARD_JSON`、本地图库、终态上下文同步，以及标准页 / MCP App 双通道。
+用 `@excalidraw/excalidraw` 作为人类面向的无限画布，同时保住当时的四个 MCP 工具、version 1 `BOARD_JSON`、本地图库、终态上下文同步，以及标准页 / MCP App 双通道。当前工具面以目标 10 为准。
 
 ```text
 BoardStore / MCP 工具 / HTTP API / BoardLibrary
@@ -149,10 +151,10 @@ BoardStore / MCP 工具 / HTTP API / BoardLibrary
 
 ### 目标
 
-保持**一张简单的共享无限画板**，同时把它打包成可一键安装的本地 Codex 插件。插件包裹的是同一个四工具 MCP stdio 服务；MCP Apps 渲染仍然只是可选的宿主增强，不是第二个产品，也不是纯文本宿主的硬性要求。
+保持**一张简单的共享无限画板**，同时把它打包成可一键安装的本地 Codex 插件。插件包裹同一个 MCP stdio 服务；MCP Apps 渲染仍然只是可选的宿主增强，不是第二个产品，也不是纯文本宿主的硬性要求。
 
 ```text
-一键安装 → 新会话 → 首句提示 → 插件清单 → 内置 stdio MCP 服务 → 四个工具 → 一张本地画布
+一键安装 → 新会话 → 首句提示 → 插件清单 → 内置 stdio MCP 服务 → 三个绘画工具 → 一张本地画布
 ```
 
 ### 边界
@@ -164,11 +166,10 @@ BoardStore / MCP 工具 / HTTP API / BoardLibrary
 - 插件清单使用 `.codex-plugin/plugin.json` + `.mcp.json`，入口指向 `${PLUGIN_ROOT}/server/index.mjs`；仓库内 marketplace 指向生成的 `.doodle-plugin/doodle`。
 - `npm run setup:codex` 一条命令完成：按需装依赖、构建插件、注册本地 marketplace、安装 `doodle@doodle`、打印首句提示；重复执行安全，`--dry-run` 只预览命令。
 - 全新检出可一条命令安装，不依赖手写绝对路径；直接 MCP 配置是零配置片段。
-- 两条路径都只暴露 `get_board`、`show_board`、`draw_board`、`scan_project`。
+- 两条路径都只暴露 `get_board`、`show_board`、`draw_board` 三个绘画工具。
 - `get_board` 返回渐进式引导、`BOARD_JSON` 和活动的 loopback `PANEL_URL`，且**不打开浏览器**。
 - 插件使用隔离的可写状态目录和空闲 loopback 端口；`OUTPUT_DIR` / `PREVIEW_PORT` 仍可显式覆盖。
 - `show_board` 仍是显式渲染工具；成功的 `draw_board` 也会附带画布资源，让兼容宿主自动显示。纯文本宿主全程可用。
-- `scan_project` 保持有界、只读、工作区相对路径、脱敏。
 - `npm run check` 通过，CI 跑同一套插件守卫与 setup dry-run，并构建带版本号的提交 ZIP。
 - `git status` 只有预期的已跟踪改动，没有生成的运行时、提交 ZIP 或私有画板状态。
 
@@ -182,7 +183,7 @@ BoardStore / MCP 工具 / HTTP API / BoardLibrary
 
 ### 目标
 
-让**重复读同一张画板变得又便宜又稳定**，同时不削弱人类画布、四工具契约和 version 1 兼容性。
+让**重复读同一张画板变得又便宜又稳定**，同时不削弱人类画布、当时的四工具契约和 version 1 兼容性。
 
 ```text
 首次读  → 足够画出正确结果的结构
@@ -220,7 +221,7 @@ BoardStore / MCP 工具 / HTTP API / BoardLibrary
 
 - **`diagram.mode` 表达的不再只有依赖图**：`flow`（默认，按边分层）、`timeline`、`compare`、`matrix`。只有 `flow` 读边来决定位置；显式 `row` / `column` 永远优先，作者写的顺序不会被悄悄打乱。
 - **`HANDOFF` 告诉 AI 人改了什么**：只报告人类来源的变更（item 现在是 `human`，或人类 item 消失），AI 永不被要求复审自己上一次写入。每条最多 12 条改动，`omitted` 计数其余；没有人类改动时给一行明确说明，而不是沉默。
-- **`scan_project` 顺带返回 `DIAGRAM_DRAFT_JSON`**：同一份顶层结构已经成形为 `draw_board.diagram` 的入参，ID 稳定，最多 12 个节点，并标注为建议。省掉"扫完再画"的第二次往返；它本身仍然只读。
+- **已移除的历史功能**：早期版本曾提供 `scan_project` 和 `DIAGRAM_DRAFT_JSON`；项目读取能力已于 2026-11-27 从 Doodle 中移除。
 
 ---
 
@@ -261,7 +262,7 @@ BoardStore / MCP 工具 / HTTP API / BoardLibrary
 
 不是"画板还能做什么"，而是：**为什么有人会打开 Doodle，而不是一张便利贴、一张餐巾纸、或干脆让 AI 用文字回？**
 
-功能层面它已经完整：四个工具、图库、图形作者能力、导出、三种外观、可用的 MCP App。但它还**不顺手**。要配置才能用的画板，不会成为你身边那张纸。
+功能层面它已经完整：三个绘画工具、图库、图形作者能力、导出、三种外观、可用的 MCP App。但它还**不顺手**。要配置才能用的画板，不会成为你身边那张纸。
 
 当时的摩擦有七步：
 
@@ -305,9 +306,9 @@ clone → npm install → npm run build → 起预览或 MCP 宿主
 - **状态安全**：会把非空画板清空的写入改为 409 拒绝——"画板突然变空"几乎总是客户端 bug（当时就是画布在挂载前写了一个空场景）。按 id 主动删除不受影响，新画板首次写入也不受影响。
 - **手势审计**：在真实画布里检查四条高频路径（建便签、拖形状、拖箭头、手绘），发现的唯一缺陷就是恢复相机把人留在空处，已修复。
 
-**2026-11-15 — agent 读意图，而不是读 diff**
+**2026-11-15 — agent 读意图，而不是读 diff（历史工具面）**
 
-字段级增量回答"什么变了"，但回答不了"人想干什么"，agent 只好猜。`HANDOFF` 增加 `HANDOFF_READINGS`：每条人类改动一行，归类为改标签、移动、缩放、改样式、新增、删除，各带一条有界建议；`NEXT` 以最显著的那条开头。
+当时，字段级增量回答"什么变了"，但回答不了"人想干什么"，agent 只好猜。`HANDOFF` 增加 `HANDOFF_READINGS`：每条人类改动一行，归类为改标签、移动、缩放、改样式、新增、删除，各带一条有界建议；`NEXT` 以最显著的那条开头。该工具面记录为版本历史；当前 Doodle 只提供三项绘画工具。
 
 端到端验证：把便签从「开始」改成「从需求评审开始」，输出 `把「开始」改成了「从需求评审开始」，这是含义上的修正`，并建议同步周边标签。
 
@@ -315,7 +316,7 @@ clone → npm install → npm run build → 起预览或 MCP 宿主
 
 真实浏览器复现了两个叠加的首次体验缺陷：快捷键面板的自动打开条件写反，让 560px 面板压在 520px 欢迎卡上、之后再也不出现；欢迎卡只在点击「开始画」时隐藏，人直接画或 AI 先画第一个对象时，卡片会一直盖住刚画出的内容。现在两张浮层按「空板欢迎卡 → 关卡后下次弹一次快捷键 → 之后安静」的顺序交接，任意一方画出第一个对象都会让卡片退场并记住已读。
 
-证据：独立空板的浏览器契约覆盖完整交接序列、人画穿卡片与 AI 先画两条路径；真实 MCP 会话走完 AI 画 → 人改 → AI 读 HANDOFF 的回路；`npm run check` 与 Node 20 最低版本 smoke 均通过。后续 0.9.1/0.9.2 补丁继续修复发布链和主题状态写回；0.9.2 已发布到 npm 与 GitHub Release，干净 `npx -y doodle-mcp` 启动验证四工具、`FIRST_USE` 与 `PANEL_URL`。
+证据：独立空板的浏览器契约覆盖完整交接序列、人画穿卡片与 AI 先画两条路径；真实 MCP 会话走完 AI 画 → 人改 → AI 读 HANDOFF 的回路；`npm run check` 与 Node 20 最低版本 smoke 均通过。后续 0.9.1/0.9.2 补丁继续修复发布链和主题状态写回；0.9.2 已发布到 npm 与 GitHub Release，当时的干净 `npx -y doodle-mcp` 启动验证了四工具、`FIRST_USE` 与 `PANEL_URL`。当前产品边界见目标 10。
 
 ---
 
@@ -369,23 +370,22 @@ Doodle 的价值在于 AI 不用人纠语法就能在画板上表达意图。**�
 
 ---
 
-## 10. 首轮架构讨论
+## 10. 首轮架构讨论：宿主理解，Doodle 绘画
 
 ### 目标
 
-让开发者能用一句话开始讨论当前仓库的架构，在共享画板上直接修正 AI 的草图，并让 AI 根据这些修正继续讨论，而不需要把视觉反馈重新输入聊天。
+让 AI 与人在 Doodle 共享画板上呈现草图、接收彼此的直接修正，并依据这些修正继续讨论。Doodle 只提供共享绘画能力。
 
 ### 验收
 
-- 内置 MCP 指导和 Codex 插件 skill 描述完整的 `get_board` → `scan_project` → `draw_board.diagram` → 人类修正 → `HANDOFF` → 精确续画流程。
-- AI 把扫描路径与 `file:line` 证据当作有界素材；目录草图不被误当成运行时架构；import 证据只确认 import 关系，不擅自称为运行时调用；没有证据的关系标成待讨论问题。
-- 真实 MCP 集成测试使用临时仓库验证四工具保持不变、源文件只读、证据支持的依赖箭头、人类改名/移动/删除/新增的 HANDOFF，以及 AI 后续写入保留人的意图。
-- 提供中英文首句和宿主无关的使用说明，含纯文本/独立页面的 `get_board.since_revision` 回读办法。
-- 自动化验收通过后，用户试点仍需覆盖：新仓库理解、纠正错误依赖、补充缺失模块或约束；记录能否直接在画布表达、AI 下一轮是否正确反映、是否仍需在聊天里重述。试点开始前不宣称用户价值已验证。
+- MCP 与 Codex 插件清楚说明：Doodle 只读取、展示和修改共享画板。
+- 真实 MCP 集成测试覆盖三项绘画工具、初始绘图、人类修正通过 HANDOFF 返回，以及 AI 保留人的改动继续绘画。
+- 中英文示例说明共同创作架构图的方式，并通过纯文本或独立页面的 `get_board.since_revision` 回读画布变化。
+- 仓库读取代码和接口已从运行时移除。
 
-**工程验收（2026-11-27）**：真实 MCP server 集成测试覆盖有证据的 server→board import、无证据 UI 模块不连线、人类改标/移动/删线/新增待确认便签、HANDOFF 回读与 AI 精确续写；fixture 源文件前后字节不变。完整仓库验收结果见本轮记录。
+**工程验收（2026-11-27）**：以真实 MCP 测试覆盖三工具契约、共同绘画、人工更正与 HANDOFF。仓库读取能力已从运行时代码和产品接口移除。
 
-**用户试点：待完成**。自动化 MCP 测试不替代真实开发者的视觉可读性与省时反馈。
+**用户试点：待完成**。自动化测试不替代真实开发者对视觉可读性、省时效果与协作体验的反馈。
 
 ---
 

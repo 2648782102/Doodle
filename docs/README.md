@@ -8,12 +8,12 @@
 
 | 文档 | 用途 |
 |---|---|
-| [`../README.md`](../README.md) | 产品概览、30 秒上手、四个工具、安装与配置 |
+| [`../README.md`](../README.md) | 产品概览、30 秒上手、三个绘图工具、安装与配置 |
 | [`../README.en.md`](../README.en.md) | 英文快速上手 |
 | [`FAQ.md`](FAQ.md) | 插件目录、隐私、本地状态、支持渠道 |
 | [`TROUBLESHOOTING.md`](TROUBLESHOOTING.md) | 首次自检与常见故障 |
 | [`../examples/README.md`](../examples/README.md) | MCP 配置片段与最小客户端 |
-| [`../examples/architecture-discussion.md`](../examples/architecture-discussion.md) | 用有界扫描证据画架构图、在人类修改后继续讨论的中英文示例 |
+| [`../examples/architecture-discussion.md`](../examples/architecture-discussion.md) | 由宿主 coding agent 提供项目理解，在 Doodle 上共同绘制和修正架构图的中英文示例 |
 
 ## 产品与设计
 

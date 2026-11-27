@@ -1,5 +1,5 @@
 /**
- * Input schemas for the four MCP tools.
+ * Input schemas for the three drawing-board MCP tools.
  *
  * Descriptions are written for a model, not a human: each field says when to
  * use it and which sibling field to use instead.

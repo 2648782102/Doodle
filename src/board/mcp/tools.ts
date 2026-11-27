@@ -13,7 +13,6 @@ import type { BoardToolContext } from "./context.js";
 import { APP_RESOURCE_URI } from "./context.js";
 import { registerDrawBoardTool } from "./tools/registerDrawBoardTool.js";
 import { registerGetBoardTool } from "./tools/registerGetBoardTool.js";
-import { registerScanProjectTool } from "./tools/registerScanProjectTool.js";
 import { registerShowBoardTool } from "./tools/registerShowBoardTool.js";
 
 export function registerBoardTools(server: McpServer, ctx: BoardToolContext): void {
@@ -37,5 +36,4 @@ export function registerBoardTools(server: McpServer, ctx: BoardToolContext): vo
   registerGetBoardTool(server, ctx, state);
   registerShowBoardTool(server, ctx, state);
   registerDrawBoardTool(server, ctx);
-  registerScanProjectTool(server, ctx);
 }

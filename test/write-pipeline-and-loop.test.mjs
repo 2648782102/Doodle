@@ -250,8 +250,6 @@ describe("end-to-end bidirectional loop (observable latency & full edit cycle)",
       previewHost: "127.0.0.1",
       previewPort: port,
       outputDir: path.join(dir, "output"),
-      workspaceRoot: dir,
-      cwd: dir,
     }, revisions);
     await server.start();
 

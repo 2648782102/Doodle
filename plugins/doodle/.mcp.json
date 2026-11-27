@@ -8,10 +8,8 @@
         "LOG_LEVEL": "info"
       },
       "env_vars": [
-        "AI_DRAW_WORKSPACE_ROOT",
         "CLAUDE_PLUGIN_DATA",
         "CODEX_PROJECT_ROOT",
-        "DOODLE_WORKSPACE_ROOT",
         "HOME",
         "LANG",
         "LOG_LEVEL",

@@ -1,4 +1,6 @@
-# Architecture Discussion First-Session Design
+# Architecture Discussion First-Session Design (Retired)
+
+> Historical proposal superseded on 2026-11-27 by [the drawing-only design](2026-11-27-doodle-drawing-only-design.md). The scanner workflow described below is not part of the current product.
 
 ## Intent
 

@@ -9,7 +9,6 @@
 import fs from "node:fs/promises";
 import path from "node:path";
 import type express from "express";
-import type { AppConfig } from "../../infra/config.js";
 import { assetCandidates, findExisting } from "./templates.js";
 import type { BoardLibrary } from "../library.js";
 import type { BoardStore } from "../state/store.js";
@@ -41,9 +40,8 @@ export async function serveAsset(
   request: express.Request,
   response: express.Response,
   next: express.NextFunction,
-  config: AppConfig,
 ): Promise<void> {
-  const assetRoot = await findExisting(assetCandidates(config));
+  const assetRoot = await findExisting(assetCandidates());
   if (!assetRoot) return void response.status(404).send("Excalidraw assets not found");
   const relative = request.path === "/" ? "index.html" : request.path.replace(/^\/+/, "");
   const target = path.resolve(assetRoot, relative);

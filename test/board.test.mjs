@@ -22,7 +22,6 @@ import {
 } from "../dist/board/types.js";
 import { BoardStore } from "../dist/board/state/store.js";
 import { BoardRevisionConflictError } from "../dist/board/errors.js";
-import { scanProject } from "../dist/board/project/scan.js";
 
 describe("simple shared board", () => {
   it("keeps a bounded version 1 canvas independent of project state", () => {
@@ -258,7 +257,7 @@ describe("simple shared board", () => {
     const items = diagramToBoardItems({
       title: "可读性",
       nodes: [
-        { id: "a", label: "A", detail: "get / show / draw / scan" },
+        { id: "a", label: "A", detail: "get / show / draw" },
         { id: "b", label: "B", detail: "PANEL_URL" },
       ],
       edges: [{ from: "a", to: "b", label: "HTTP" }],
@@ -600,29 +599,5 @@ describe("simple shared board", () => {
       { type: "rect", x: 10, y: 10, text: "defaults" },
     ]);
     expect(board.items[0]).toMatchObject({ w: 180, h: 120, author: "human" });
-  });
-});
-
-describe("read-only project scan", () => {
-  it("returns bounded relative paths and evidence without writing files", async () => {
-    const workspace = await fs.mkdtemp(path.join(os.tmpdir(), "doodle-scan-"));
-    try {
-      await fs.mkdir(path.join(workspace, "src"));
-      await fs.writeFile(path.join(workspace, "README.md"), "# Demo\n", "utf8");
-      await fs.writeFile(path.join(workspace, "src", "main.ts"), "export function main() {}\n", "utf8");
-      await fs.writeFile(path.join(workspace, ".env"), "SECRET=never-export\n", "utf8");
-      await fs.writeFile(path.join(workspace, "src", "config.ts"), "export const apiKey = 'sk-live-abcdef123456';\n", "utf8");
-      const snapshot = await scanProject(workspace, { maxDepth: 2, maxFiles: 20 });
-      expect(snapshot).toMatchObject({ version: 1, readOnly: true, writes: "none" });
-      expect(snapshot.files.map((file) => file.path)).toContain("README.md");
-      expect(snapshot.files.map((file) => file.path)).toContain("src/main.ts");
-      expect(snapshot.files.map((file) => file.path)).not.toContain(".env");
-      expect(snapshot.evidence.some((item) => item.path === "src/main.ts" && item.kind === "definition")).toBe(true);
-      expect(JSON.stringify(snapshot)).not.toContain("never-export");
-      expect(JSON.stringify(snapshot)).not.toContain("sk-live-abcdef123456");
-      expect(snapshot.evidence.some((item) => item.excerpt.includes("apiKey"))).toBe(false);
-    } finally {
-      await fs.rm(workspace, { recursive: true, force: true });
-    }
   });
 });

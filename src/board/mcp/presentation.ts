@@ -306,7 +306,7 @@ export function boardGuidance(): string {
     "- `library.export` is editable JSON only. PNG/JPG/SVG sharing snapshots exist in the human canvas: 图库 → 分享快照 → 导出 PNG / JPG / SVG. When a person asks for an image file, point them there instead of saying Doodle cannot export images.",
     "- Read visualDigest and capabilities to understand the current drawing; use recipes for flow, compare, cluster, emphasis, and image annotation.",
     "- The MCP App displays this canvas beside the agent chat in compatible hosts; board tools do not open a browser or grant project-write authority.",
-    "- scan_project is optional read-only structure context; draw its result with draw_board if useful.",
+    "- Doodle reads and writes shared board data only.",
   ].join("\n");
 }
 

@@ -5,9 +5,9 @@ Thanks for helping keep Doodle small, predictable, and useful inside an agent.
 ## Ground rules
 
 - The shared infinite canvas is the product. Do not make project structure, a dashboard, a chat app, or an approval workflow the main subject again.
-- Keep the MCP tool surface at four tools unless `docs/DECISIONS.md` records an explicit change. Keep the shared canvas UI optional so tools remain usable in text-only hosts, and keep the plugin as a distribution layer around the same server.
+- Keep the MCP surface to the three drawing tools `get_board`, `show_board`, and `draw_board`. Keep the shared canvas UI optional so tools remain usable in text-only hosts, and keep the plugin as a distribution layer around the same server.
 - Keep normal MCP calls free of browser, IDE, editor, and project-write side effects.
-- Keep `SimpleBoard` versioned, bounded, and independent of project files.
+- Keep `SimpleBoard` versioned and bounded. Doodle reads and writes board state; host repository context stays outside the product.
 - stdout is reserved for MCP JSON-RPC; logs go to stderr.
 
 ## Setup
@@ -45,7 +45,7 @@ Two things are intentionally still global, so do not expect worktree isolation t
 
 ## Protocol and safety changes
 
-A change to an MCP tool schema, the version 1 board state, the HTTP API, project scanning, the embedded host context bridge, or a security boundary must update all of these together:
+A change to an MCP tool schema, the version 1 board state, the HTTP API, the embedded host context bridge, or a security boundary must update all of these together:
 
 - `AGENTS.md`, `README.md`, and `README.en.md`
 - `docs/PRODUCT_DIRECTION.md`, `docs/GOALS.md`, `docs/ARCHITECTURE.md`, and `docs/DECISIONS.md`

@@ -4,9 +4,9 @@ This is the current operating manual for AI coding agents. Humans should read `R
 
 ## Product
 
-`doodle-mcp` is a local-first **two-way shared infinite board**. A person and an AI both place notes, text, rectangles, ellipses, directed arrows, freehand strokes, and images on one canvas to express intent; each side can read and continue what the other drew. MCP stdio is the AI's normal access channel inside an agent; the repository also builds an installable desktop-only Codex plugin around the same four-tool MCP server. Compatible MCP Apps hosts may show the interactive canvas beside the existing agent conversation as an optional enhancement and attach the board's final-state delta to that conversation's model context. Conversation stays in the host chat; the standalone local page is a fallback, never a side effect of a normal tool call.
+`doodle-mcp` is a local-first **two-way shared infinite board**. A person and an AI both place notes, text, rectangles, ellipses, directed arrows, freehand strokes, and images on one canvas to express intent; each side can read and continue what the other drew. MCP stdio is the AI's normal access channel inside an agent; the repository also builds an installable desktop-only Codex plugin around the same three-tool MCP server. Compatible MCP Apps hosts may show the interactive canvas beside the existing agent conversation as an optional enhancement and attach the board's final-state delta to that conversation's model context. Conversation stays in the host chat; the standalone local page is a fallback, never a side effect of a normal tool call.
 
-The board is the product. Project structure is only one optional subject that can be drawn. A local board library stores editable named version 1 snapshots and lets a person save or switch the active board; it is not PNG export, a diagram asset catalogue, or a second session model. There is no proposal workflow, approval grant, code-change authority, or workbench.
+The board is the product. Doodle reads and writes shared board state only; it does not inspect repositories or read project files. AI and people express and revise visual ideas together on the same canvas. A local board library stores editable named version 1 snapshots and lets a person save or switch the active board; it is not PNG export, a diagram asset catalogue, or a second session model. There is no proposal workflow, approval grant, code-change authority, or workbench.
 
 Default two-way loop:
 
@@ -18,10 +18,10 @@ AI: reads with get_board or current model context → continues in chat or draws
 
 Install and first-use experience:
 
-- Product story is one kernel, two entry points, three capability layers: one shared board; Codex plugin or direct MCP; four tools always, optional embedded canvas, optional context sync and notification. Project structure is optional source material only.
+- Product story is one kernel, two entry points, three capability layers: one shared board; Codex plugin or direct MCP; three drawing tools always, optional embedded canvas, optional context sync and notification.
 - `npm run setup:codex` is the one-command Codex install path. It runs `npm install` when needed, builds the self-contained plugin, adds the repository marketplace, installs `doodle@doodle`, and prints one first prompt. It never runs as a hidden side effect of validation.
 - Official OpenAI documentation distinguishes local marketplaces from the public plugin directory; installed plugin skills and MCP tools are used in a new session. See [Package your plugin](https://developers.openai.com/plugins/build/plugins) and [Developer commands](https://learn.chatgpt.com/docs/developer-commands).
-- Direct MCP examples use zero-configuration `npx -y doodle-mcp`; `DOODLE_WORKSPACE_ROOT` and other environment variables are optional overrides, not installation prerequisites.
+- Direct MCP examples use zero-configuration `npx -y doodle-mcp`; environment variables are optional overrides, not installation prerequisites.
 - `PANEL_URL` names the board directory's canvas server, not a particular process. The address is recorded in `<outputDir>/.doodle/live.json` with its pid, so a second MCP session against the same board *adopts* the live one instead of opening another random port; the record is refreshed when a library switch moves the active board and removed by the process that owns it. The page at that URL stays openable after a session ends, because the canvas keeps a local copy (`board-cache.ts`) and a service worker serves the shell. `npm run preview:board` is the explicit terminal-owned HTTP-only preview; it registers no MCP tools and installs no background service.
 - `get_board` uses progressive guidance: an empty board returns `FIRST_USE` / `NEXT_STEPS` and the drawing guide; a board with objects returns a concise `NEXT`. It always retains `BOARD_JSON`, `PANEL_URL`, the structured snapshot, and version 1 board state.
 - A `since_revision` from a *different* board must fall back to a full read. `BoardRevisionCache` is keyed by revision alone, so a library switch followed by a delta compared two unrelated boards: the new board's every object read as added and the old board's every object as removed, which describes a change nobody made. `registerGetBoardTool` drops `previous` when `cached.id !== current.id` and the reply says the revision belonged to another board.
@@ -29,16 +29,15 @@ Install and first-use experience:
 - The canvas exposes a dismissible `?` shortcut panel with creation, multi-select, undo/redo, image paste, and navigation gestures. It is opened by the capsule's `?` button or the `?` key, closes on Escape and on any click outside it, and refuses to fire `?` while a text element, input, or IME composition has focus. It is UI state only, never board state or permission: opening it is remembered in browser storage under its own `doodle-shortcuts-seen` key, so it introduces itself exactly once — after the first-use card is dismissed, never over it — and never on a phone, where it is a bottom sheet above the toolbar opened only on demand. The first-use card likewise retires when the person draws straight through it or the agent draws the first object, not only through its button; drawing over a tutorial is never the expected first gesture. The library is a modal surface, so it owns Escape and `?` while open: the shortcut panel stands down, and the drawer announces `doodle-library-open` so a popover it covers is shut rather than reappearing when it closes. If the control that opened the drawer has been hidden by the time it closes, focus falls back to the library toggle instead of `<body>`.
 - In MCP Apps hosts that advertise `updateModelContext`, the embedded canvas publishes the current final board snapshot and a delta from the last published snapshot. This is final state, not an operation log, and it does not trigger a model turn. A `通知 Agent` button appears only when `sendMessage` is also supported; it sends one short user message in the host's existing conversation. Neither path creates a Doodle chat, session, or message feed. `get_board` remains authoritative; a standalone `PANEL_URL` page has no bridge to the current host session.
 
-Shared visual context is anchored to objects, coordinates, text, and authors. Either side may add or revise objects. `scan_project` may provide bounded read-only project context; it does not draw, change the board, write files, or authorize code changes. `get_board` also reports `PANEL_URL`, the active local human-facing address; mention it when a person asks where to look or when the host cannot render an embedded canvas.
+Shared visual context is anchored to objects, coordinates, text, and authors. Either side may add or revise objects. Doodle reads and writes board state only; `get_board` also reports `PANEL_URL`, the active local human-facing address; mention it when a person asks where to look or when the host cannot render an embedded canvas.
 
-## Four MCP tools
+## Three drawing tools
 
 | Tool | Use |
 |---|---|
 | `get_board` | Read progressive guidance, `BOARD_JSON`: object IDs, coordinates, authors, `PANEL_URL`, and the drawing guide once per process. Pass `since_revision` for a delta plus `HANDOFF` (human-attributed changes only). Canvas fidelity metadata is returned only with `include_canvas_fidelity: true`, which the canvas uses to rebuild its scene. Read-only. |
 | `show_board` | Render the optional MCP App canvas in compatible hosts when the user asks to see or edit the board. Its text reply always includes `PANEL_URL`, so a text-only host can open the local board without a second `get_board` call. |
 | `draw_board` | Add items, precise updates/removals, deterministic layout, visual-expression fields, local board-library actions, and `diagram` for one complete semantic diagram. Use `remove_ids` only when clearing old objects before a deliberate full redraw. |
-| `scan_project` | Optional bounded read-only project paths and `file:line` evidence. Visualize the result with `draw_board` only when useful. |
 
 Drawing contract:
 
@@ -61,7 +60,7 @@ Drawing contract:
 ```text
 src/
 ├── index.ts                    MCP stdio and HTTP lifecycle
-├── server.ts                   composition root; registers four tools
+├── server.ts                   composition root; registers three tools
 ├── board/
 │   ├── model/                  ring 0: Board v1 types, limits, validate, board, digest, diff, clock
 │   ├── errors.ts               ring 0: validation, revision-conflict, empty-write errors
@@ -73,7 +72,6 @@ src/
 │   ├── client/viewport-memory.ts  ring 1: per-board camera in browser storage
 │   ├── state/                  ring 2: store, mutex, image-store, revision-cache, state-watch
 │   ├── library/                ring 2: schema and atomic snapshot persistence
-│   ├── project/                ring 2: bounded read-only scan and draft diagram
 │   ├── write/                  ring 3: shared commit pipeline and object-level conflict resolution
 │   ├── mcp/                    ring 4: context, instructions, schemas, presentation, tools composition
 │   ├── mcp/tools/              one module per MCP tool
@@ -85,8 +83,7 @@ src/
 ├── infra/
 │   ├── config.ts               environment configuration
 │   ├── logger.ts               stderr-only logger
-│   ├── project-workspace.ts    plugin-safe workspace resolution
-│   ├── workspace.ts            DOODLE_WORKSPACE_ROOT resolution
+│   ├── board-storage.ts        default board-data root selection
 │   ├── version.ts              package version lookup
 │   └── templates/
 │       ├── excalidraw.html     Excalidraw-only standalone and embedded canvas
@@ -116,13 +113,13 @@ docs/                           product, architecture, decisions, and maintenanc
 
 - Every Excalidraw internal Doodle's CSS targets is declared in `src/infra/templates/upstream-contract.ts` with what it is used for. `scripts/repo-check.mjs` fails on an undeclared `.App-*` / `.ToolIcon*` / `.Island*` / other listed namespace selector, and on a declared one the stylesheet stopped using. The table is the triage list for an upgrade that renames something; the browser contract suite is the half that proves the elements still exist.
 - `CanvasEngine` (`canvas/engine.ts`) is the named seam between Board v1 and whichever canvas draws it. `excalidrawEngine` is the only implementation and must stay that way — a second engine means two maintenance paths, which 0.8.0 already rejected. The interface exists so a future swap is a new implementation rather than a client rewrite.
-- `boardToSvg` (`svg/render.ts`) is a read-only projection, exposed at `GET /api/board.svg` and advertised as `capabilities.svgPreview`. It never persists, never bumps a revision, and is not a fifth output format: Board v1 stays authoritative. Connector labels paint a plate behind themselves, or the arrow cuts through the text.
+- `boardToSvg` (`svg/render.ts`) is a read-only projection, exposed at `GET /api/board.svg` and advertised as `capabilities.svgPreview`. It never persists or bumps a revision; Board v1 stays authoritative. Connector labels paint a plate behind themselves, or the arrow cuts through the text.
 - `GET /api/board/library/:id.svg` renders one saved board for a library row, from the same `boardToSvg`. The `id` is required: defaulting to the active board would make a row's picture depend on which row happened to be active when the request fired. It reads through `library.readForPreview`, never `apply`, because `apply` saves the active board as a side effect and opening the drawer must not write. The client requests it with `loading="lazy"` and hides the `<img>` on error, so a row degrades to the text-only layout; embedded hosts skip the picture entirely because they have no page routes.
 - `DOODLE_CANVAS_FONTS=system` (or `npm run build:system-fonts`) drops Xiaolai, taking `dist` from ~19 MB to ~6.8 MB with Chinese falling back to the system font. Nothing in Board v1 changes. The default keeps the handwriting face, because a local board fetches only the unicode-ranges it needs over loopback.
 - `src/board` has five rings and a module may import only from its own ring or inward, never outward. `scripts/repo-check.mjs` walks the real import graph and fails on the first outward edge.
   - ring 0 kernel: `model/`, `errors.ts` — Board v1 shapes, limits, validation, pure mutation, fingerprinting, diffing.
   - ring 1 derive: `diagram/`, `layout/`, `canvas/`, `svg/`, `view/`, `client/` — pure projections of a board.
-  - ring 2 state: `state/`, `library/`, `project/` — anything that touches disk or process memory.
+  - ring 2 state: `state/`, `library/` — anything that touches disk or process memory.
   - ring 3 app: `write/` — the shared write pipeline and object-level conflict resolution.
   - ring 4 transport: `mcp/`, `http/` — the MCP tool surface and the local HTTP + WebSocket canvas.
   Add code to the ring that owns the concern rather than to whichever file is convenient. The two edges this rule caught before the restructure were `write/` importing `http/conflict.ts` and `mcp/context.ts` importing the concrete `BoardHttpServer`; both are now impossible to reintroduce without failing the guard.
@@ -145,7 +142,7 @@ docs/                           product, architecture, decisions, and maintenanc
 - AI-facing output is part of the contract. `get_board` must keep `diagnosis`, `BOARD_JSON`, and `PANEL_URL`; rejected writes must include `ERROR_JSON` with `code/path/expected/fix`; successful `draw_board` writes must include `CHANGE_JSON` and structured `change`. `diagram.recipe` is authoring sugar over the existing deterministic layout, never a second renderer. `view` only reduces tokens and must never change the authoritative revision or board state.
 - MCP input schemas describe **shape only**; every numeric and length *bound* and every user-written *enum* lives in `model/`. The SDK validates `inputSchema` before the handler runs and reports a failure as bare `MCP error -32602`, so a bound or enum left in the schema answers a model with prose on the path it hits first. `scripts/repo-check.mjs` fails if `z.string().max(...)`, `z.array(...).max(...)`, `z.enum(...)`, or `z.discriminatedUnion(...)` returns to `schemas.ts`. For enums, the model layer's `INVALID_ITEM_TYPE`, `INVALID_ROLE`, `INVALID_EMPHASIS`, `INVALID_RECIPE`, and `UNKNOWN_LIBRARY_ACTION` errors carry the accepted values and a fix. The one deliberate exception is a wrong JSON type (`text: 42`), which only the SDK can catch; its message already names the field and expected type, so it is repairable without a duplicate validation layer.
 - `capabilities.limits` publishes every bound the model will be checked against, and the drawing guide restates the ones that shape a first attempt. Knowing a bound up front is cheaper than any repair, so keep the table in sync with `model/limits.ts` when a limit changes.
-- The rule covers the read and library surfaces too, not only writes. `scan_project` used to clamp `max_depth` / `max_files` with `Math.max`/`Math.min` while the schema rejected out-of-range values with bare prose; both are `SCAN_RANGE_OUT_OF_RANGE` now, and `get_board` handles `since_revision` / `view` the same way. A library action naming an unknown board returns `BOARD_NOT_FOUND` with the ids that exist. "It is only a read" is not a reason to leave a rejection unrepairable — the model still has to guess what the field accepts.
+- The rule covers the read and library surfaces too, not only writes. `get_board` handles `since_revision` / `view` through repairable model errors. A library action naming an unknown board returns `BOARD_NOT_FOUND` with the ids that exist. "It is only a read" is not a reason to leave a rejection unrepairable — the model still has to guess what the field accepts.
 - A delta read uses the same compact projections. It answers "what changed", so `compactDiagnosis` replaces the per-object `diagnosis`: at 80 objects the full enumeration was 1.4 KB on a reply whose changed-objects array was 135 B. `compactDigest` / `compactDiagnosis` in `presentation.ts` are the one place both the graded view and the delta path project through.
 - `view: "summary"` must stay flat as the board grows. It is a status check, so `visualDigest.readingOrder` and `diagnosis.isolated` — both of which enumerate every object — are reduced to counts; the ids live in `structure` and `detail`. Shipping them made a summary read 13 KB at 60 objects and grow linearly, which defeats the only reason the view exists.
 - The `BOARD_JSON` text copy is byte-identical to `structuredContent`, so only `view: "full"` carries it. Graded views emit `BOARD_VIEW_<LEVEL>` plus a byte count and leave the data to `structuredContent`, which every MCP client receives regardless; keeping both made `detail` cost 24.5 KB against 11 KB of actual payload. `full` is the documented text-only contract and must keep the complete copy.
@@ -202,8 +199,7 @@ docs/                           product, architecture, decisions, and maintenanc
 - A rejected board write must never repaint the canvas from the server. Keep the person's local drawing, refresh only `activeSnapshot.revision` so a retry can succeed, and surface the failure through the `#doodleSyncBanner` element. Silent reload-on-error is what made lost work look like a broken board.
 - The HTTP surface returns the same structured rejection as the MCP tools. `BoardValidationError` also carries a `code`, so `(error as NodeJS.ErrnoException).code` classified it as a filesystem failure and answered 500 "Unable to persist board changes" for a bad colour. Check the class before the errno, and return `code` / `path` / `expected` / `fix` with status 400. A client mistake must never read as a server error.
 - Do not gate canvas edits on element counts. `sceneReady` latches on the first non-empty scene; comparing `elements.length` to `activeSnapshot.items.length` assumed one element per board object, which is false for bound labels, frames, and standalone text. That gate kept `sceneReady` false forever on a healthy board, so every human edit was discarded while the save endpoint returned 200.
-- The human canvas is a closed local surface: its main menu may link only to `https://github.com/2648782102/Doodle`. Native Excalidraw Socials, help-header links, the materials-library browse link, arbitrary web embeds, and AI/Mermaid generation entries are removed. Canvas object links open only when they target the project repository; other links are prevented at pointer-click and `onLinkOpen`.
-- `scan_project` returns workspace-relative paths and short evidence only; it skips dot-private paths, `.env`-like files, generated directories, large text, and common credential lines, with at most 40 evidence lines total.
+- The human canvas is a closed local surface: its main menu may link only to `https://github.com/2648782102/Doodle`. Native Excalidraw Socials, help-header links, the materials-library browse link, arbitrary web embeds, and AI/Mermaid generation entries are removed. Canvas object links open only when they target the Doodle repository; other links are prevented at pointer-click and `onLinkOpen`.
 - Board mutations are serialized across processes with a filesystem lock and atomic rename; stale snapshot replacement is rejected.
 - Board library mutations use their own local lock and atomic JSON files under `OUTPUT_DIR/.doodle/boards/`; the active `board.json` remains authoritative for the current MCP session.
 - Board objects are visual context. The embedded UI calls only the normal canvas read/write tools; it never becomes project-write authority. Code changes remain a separate, explicitly reviewed coding-agent action.
@@ -215,7 +211,7 @@ docs/                           product, architecture, decisions, and maintenanc
 - The cream sheet maps the lighting into a narrow band (slope 0.17 around 0.87); the night sheet needs a much wider one (slope 0.6 around 0.4) because only its valleys can move — there is no headroom above the charcoal. Do not switch the night sheet to `screen`: on charcoal a screen near the sheet's own value washes the whole pane grey. Keep every chrome pane, menu, and drawer on the same `--paper-relief` so the stock matches.
 - Paper has one light source, upper-left: the relief's `azimuth="225"` (SVG clockwise from east) and the paired inner bevels (`inset 1px 1px` light, `inset -1px -1px` warm shade) plus a bottom lip must agree. Surfaces sit at two heights — `--paper-shadow-card` for resting chrome, `--paper-shadow-lifted` for the drawer and menus — because a single shared shadow flattens the desk. Paper typography uses the UI font: the handwriting faces ship only Latin glyphs, so a Chinese interface cannot read as handwriting without a 200-shard font dependency.
 - The plugin package uses one Codex-compatible `.codex-plugin/plugin.json` and `.mcp.json` layout; portable Agent Plugins manifests are not mixed into the same package.
-- `OUTPUT_DIR` is the explicit board state directory. Without it, plugin data is preferred; direct MCP launches may use workspace-local `.doodle-data`. `DOODLE_WORKSPACE_ROOT` still controls bounded `scan_project` context.
+- `OUTPUT_DIR` is the explicit board state directory. Without it, plugin data is preferred; direct MCP launches may use local `.doodle-data`. Host-provided path metadata may select the default board-state directory; Doodle uses that path only for its board data and does not inspect surrounding files.
 - `scripts/build-plugin.mjs` bundles the same source into `.doodle-plugin/doodle/server/index.mjs` with its board template, MCP App bundle, and package-version constant. Generated `.doodle-plugin/` output is never committed.
 
 ## Validation

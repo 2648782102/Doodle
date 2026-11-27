@@ -5,10 +5,10 @@ These examples are small, zero-configuration, and contain no secrets or absolute
 - `mcp-config/codex.toml` — zero-config Codex MCP stdio snippet using the published npm CLI.
 - `mcp-config/cursor.json` — zero-config Cursor MCP stdio snippet.
 - `mcp-config/stdio.json` — generic zero-config stdio shape.
-- `board-client.mjs` — a minimal MCP client that lists the four board tools, reads `BOARD_JSON`, `PANEL_URL`, `capabilities`, `visualDigest`, and the editable board library index, opens the optional canvas UI, and draws one note.
-- `architecture-discussion.md` — a copyable bilingual first prompt and the evidence-grounded scan → diagram → human correction → agent handoff workflow.
+- `board-client.mjs` — a minimal MCP client that lists the three board tools, reads `BOARD_JSON`, `PANEL_URL`, `capabilities`, `visualDigest`, and the editable board library index, opens the optional canvas UI, and draws one note.
+- `architecture-discussion.md` — a copyable bilingual prompt where the host coding agent inspects its own repository, then uses Doodle only to draw, receive human corrections, and continue the discussion.
 
-The stdio snippets start the published package with `npx -y doodle-mcp`. The server chooses plugin data or workspace-local `.doodle-data` for board state, a free loopback port for the fallback page, and the launched workspace for bounded project scans. Set `DOODLE_WORKSPACE_ROOT` only when the host starts the MCP server outside the project you want to scan; `OUTPUT_DIR`, `PREVIEW_HOST`, `PREVIEW_PORT`, and `LOG_LEVEL` remain optional overrides.
+The stdio snippets start the published package with `npx -y doodle-mcp`. The server chooses plugin data or workspace-local `.doodle-data` for board state and a free loopback port for the fallback page. Doodle reads board state only; `OUTPUT_DIR`, `PREVIEW_HOST`, `PREVIEW_PORT`, and `LOG_LEVEL` remain optional overrides.
 
 For a Codex plugin install from a repository checkout, run `npm run setup:codex` instead. It builds the ignored `.doodle-plugin/doodle/` package, adds the repository marketplace, installs the plugin, and prints the first prompt. The plugin is desktop-only; public plugin directory submission is separate and described in `../docs/SUBMISSION.md`.
 

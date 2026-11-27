@@ -4,9 +4,9 @@
 
 No. The repository provides a local/repo marketplace for desktop installation. Public directory publication requires a separate approved local-MCP submission, verified developer or business identity, ZIP package, policy attestations, and review.
 
-## Does Doodle upload my board or project files?
+## Does Doodle read or upload project files?
 
-No hosted upload is part of the product. Board state stays on the local machine. `get_board` and `scan_project` return their results to the connected agent host as part of the active MCP conversation; they do not call a Doodle backend. See [PRIVACY.md](../PRIVACY.md).
+No hosted upload is part of the product. Board state stays on the local machine. Doodle does not inspect project files; its tools return board data to the connected agent host as part of the active MCP conversation and do not call a Doodle backend. See [PRIVACY.md](../PRIVACY.md).
 
 ## How does the AI learn about my canvas edits?
 
@@ -14,7 +14,7 @@ In an MCP Apps host that supports `updateModelContext`, the embedded canvas publ
 
 ## Why is `show_board` separate from `get_board`?
 
-`get_board` is the data tool for every MCP host and now also leads with `FIRST_USE` / `NEXT_STEPS`. `show_board` is an optional render tool for hosts that support MCP Apps. Text-only hosts retain the complete four-tool workflow: `show_board` prints `PANEL_URL` in its own reply, and `get_board` reports the same address, so either tool gives a human-facing local fallback without a second call.
+`get_board` is the data tool for every MCP host and now also leads with `FIRST_USE` / `NEXT_STEPS`. `show_board` is an optional render tool for hosts that support MCP Apps. Text-only hosts retain the complete three-tool workflow: `show_board` prints `PANEL_URL` in its own reply, and `get_board` reports the same address, so either tool gives a human-facing local fallback without a second call.
 
 ## What do I say after installing?
 

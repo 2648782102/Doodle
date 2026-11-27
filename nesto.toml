@@ -27,7 +27,6 @@ library = ["src/board/library/**", "src/board/library.ts"]
 persistence = ["src/board/state/**", "src/board/errors.ts"]
 write = ["src/board/write/**"]
 derive = ["src/board/view/**", "src/board/svg/**", "src/board/client/**"]
-project = ["src/board/project/**"]
 chrome = [
   "src/infra/templates/excalidraw.html",
   "src/infra/templates/excalidraw-app.tsx",

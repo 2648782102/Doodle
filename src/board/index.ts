@@ -4,7 +4,6 @@ export * from "./state/mutex.js";
 export * from "./state/store.js";
 export * from "./library.js";
 export * from "./excalidraw-adapter.js";
-export * from "./project/scan.js";
 export * from "./mcp/instructions.js";
 export * from "./mcp/tools.js";
 export * from "./view/agent-view.js";

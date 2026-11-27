@@ -11,7 +11,7 @@ import { ensureOutputDirWritable, loadRuntimeConfig } from "./infra/config.js";
 import { logger } from "./infra/logger.js";
 import { SERVER_VERSION } from "./infra/version.js";
 
-const TOOL_COUNT = 4;
+const TOOL_COUNT = 3;
 
 export async function createServer() {
   const config = await loadRuntimeConfig();

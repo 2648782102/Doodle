@@ -17,9 +17,9 @@ Doodle keeps one thing from each category and discards the rest:
 - from whiteboards: an infinite canvas with simple free placement;
 - from MCP apps: agent-native JSON tools and optionally rendered UI with no mandatory browser window;
 - from plugin ecosystems: a one-step local install path without changing the product or tool contract;
-- from project visualizers: optional read-only structure context.
+- from project visualizers: a reminder that repository understanding can be useful context, while reading a repository is outside this product.
 
-The product is not the diagram, the hosted board, the approval workflow, or the repository scanner. It is the shared canvas that lets a person and an AI point at the same visual context.
+The product is not the diagram, the hosted board, the approval workflow, or a repository visualizer. It is the shared canvas that lets a person and an AI point at the same visual context.
 
 ## Design lessons
 

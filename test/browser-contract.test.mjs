@@ -72,7 +72,6 @@ async function startBoard(outputDir = tempDir) {
       PREVIEW_PORT: String(await freePort()),
       LOG_LEVEL: "error",
       OUTPUT_DIR: outputDir,
-      DOODLE_WORKSPACE_ROOT: process.cwd(),
     },
   });
   const client = new Client({ name: "doodle-browser-contract", version: "1.0.0" });

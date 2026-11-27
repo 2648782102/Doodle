@@ -9,13 +9,9 @@ function isPluginInternalPath(candidate: string): boolean {
     || candidate.includes(`${path.sep}.codex${path.sep}plugins${path.sep}`);
 }
 
-export function projectWorkspace(): string {
-  const candidates = [
-    process.env.DOODLE_WORKSPACE_ROOT?.trim(),
-    process.env.AI_DRAW_WORKSPACE_ROOT?.trim(),
-    process.env.CODEX_PROJECT_ROOT?.trim(),
-    process.env.PWD?.trim(),
-  ];
+/** Resolve a host-provided directory for local board data; never reads its contents. */
+export function boardStorageRoot(): string {
+  const candidates = [process.env.CODEX_PROJECT_ROOT?.trim(), process.env.PWD?.trim()];
   for (const candidate of candidates) {
     if (!candidate) continue;
     const resolved = path.resolve(candidate);
