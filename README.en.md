@@ -197,6 +197,7 @@ The full index is [docs/README.md](docs/README.md). The frequently opened ones:
 
 | Topic | Document |
 |---|---|
+| Discuss a repository's architecture on the board | [examples/architecture-discussion.md](examples/architecture-discussion.md) |
 | Product definition and boundaries | [docs/PRODUCT_DIRECTION.md](docs/PRODUCT_DIRECTION.md) |
 | How to make the AI draw well | [docs/DIAGRAM_GUIDE.md](docs/DIAGRAM_GUIDE.md) |
 | Source layout, HTTP, and safety model | [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) |

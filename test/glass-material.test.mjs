@@ -3,7 +3,8 @@ import { readFile } from "node:fs/promises";
 import path from "node:path";
 
 const root = path.resolve(import.meta.dirname, "..");
-const template = await readFile(path.join(root, "src", "infra", "templates", "excalidraw.html"), "utf8");
+const template = (await readFile(path.join(root, "src", "infra", "templates", "excalidraw.html"), "utf8"))
+  .replace(/\r\n/g, "\n");
 /*
  * The material spans two modules: `liquid-glass.ts` owns the per-pane lifecycle
  * and `liquid-glass-maps.ts` owns the geometry, the maps, and the filter graph.

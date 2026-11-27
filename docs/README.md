@@ -13,6 +13,7 @@
 | [`FAQ.md`](FAQ.md) | 插件目录、隐私、本地状态、支持渠道 |
 | [`TROUBLESHOOTING.md`](TROUBLESHOOTING.md) | 首次自检与常见故障 |
 | [`../examples/README.md`](../examples/README.md) | MCP 配置片段与最小客户端 |
+| [`../examples/architecture-discussion.md`](../examples/architecture-discussion.md) | 用有界扫描证据画架构图、在人类修改后继续讨论的中英文示例 |
 
 ## 产品与设计
 

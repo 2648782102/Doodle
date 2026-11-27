@@ -5,7 +5,7 @@ import path from "node:path";
 
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
 const read = (relative) => readFileSync(path.join(root, relative), "utf8");
-const template = read("src/infra/templates/excalidraw.html");
+const template = read("src/infra/templates/excalidraw.html").replace(/\r\n/g, "\n");
 const module = read("src/infra/templates/client/shortcuts.ts");
 const app = read("src/infra/templates/excalidraw-app.tsx");
 

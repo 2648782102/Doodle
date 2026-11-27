@@ -197,6 +197,7 @@ npm run preview:board
 
 | 想了解 | 看这里 |
 |---|---|
+| 用画板讨论仓库架构 | [examples/architecture-discussion.md](examples/architecture-discussion.md) |
 | 产品定义与边界 | [docs/PRODUCT_DIRECTION.md](docs/PRODUCT_DIRECTION.md) |
 | 怎么让 AI 画好图 | [docs/DIAGRAM_GUIDE.md](docs/DIAGRAM_GUIDE.md) |
 | 源码结构、HTTP 与安全模型 | [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) |

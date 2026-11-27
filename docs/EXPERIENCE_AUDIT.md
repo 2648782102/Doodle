@@ -24,6 +24,26 @@ Verified working:
 - Stale browser writes correctly returned HTTP 409 with a board revision conflict.
 - A fresh server created a new isolated board and reported a loopback `PANEL_URL`.
 
+## Architecture discussion first-session acceptance
+
+Automated engineering evidence (2026-11-27): the architecture discussion MCP integration test starts the real stdio server against a temporary fixture workspace, confirms the unchanged four-tool surface, scans bounded relative paths and explicit import evidence, draws only the supported server → board relationship, and verifies that an unconnected UI module is not asserted as a dependency. A human-attributed correction (rename, move, removed arrow, and a new “relationship TBD” note) is returned through `HANDOFF`; an AI continuation preserves those edits and adds a precise follow-up. Fixture source files are byte-for-byte unchanged.
+
+Post-review verification (2026-11-27): `npm run check` passed with 41 test files / 503 tests, TypeScript lint/build, repository and plugin guards, Codex setup dry-run, submission build, doctor, and npm pack dry-run. `npm run test:browser` passed 11/11; the focused architecture/MCP contract run passed 34/34; `npm ci` left package manifests and the lockfile unchanged. The install reported 11 dependency audit findings (3 low, 8 high); dependencies were not changed in this work.
+
+This establishes the tool contract only. It does not establish visual legibility, reduced explanation time, or product-market fit.
+
+### Real developer pilot: pending
+
+Run the linked [architecture discussion example](../examples/architecture-discussion.md) with developers who did not build Doodle. For each task, record whether the person could make the correction directly on the board, whether the agent reflected it accurately on the next turn, and whether the correction had to be retyped in chat:
+
+| Task | Direct board correction | Correct next-turn reflection | Retyped in chat | Notes |
+|---|---|---|---|---|
+| Understand a new repository | Pending | Pending | Pending | |
+| Correct a wrong dependency | Pending | Pending | Pending | |
+| Add a missing module or constraint | Pending | Pending | Pending | |
+
+Do not mark the pilot complete from automated MCP or browser tests; update this table only after real sessions.
+
 Observed friction, ordered by user harm:
 
 | ID | Priority | Status | Problem | Evidence | Acceptance |

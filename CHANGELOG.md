@@ -1,3 +1,9 @@
+## Unreleased
+
+### Added
+
+- **Evidence-grounded architecture discussion**: MCP and Codex guidance plus a copyable bilingual scenario now lead from a bounded `scan_project` through a shared architecture diagram, direct human corrections, `HANDOFF`, and precise AI continuation. Dependency arrows require source evidence; uncertain relationships remain questions. A real-MCP integration test proves the loop without changing repository files. Real developer pilot validation remains pending.
+
 ## 0.9.2 — Release closure
 
 ### Fixed

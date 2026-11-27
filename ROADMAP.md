@@ -20,6 +20,8 @@ Doodle is a simple shared infinite board. The roadmap protects that boundary rat
 
 ## Near-term work
 
+- Run a small developer pilot of the evidence-grounded architecture discussion path; record direct canvas corrections, next-turn reflection, and any retyping in chat in `docs/EXPERIENCE_AUDIT.md`.
+- Keep the copyable scenario in `examples/architecture-discussion.md` accurate as the pilot identifies concrete friction; do not infer dependencies from directory structure.
 - Improve drawing ergonomics without adding tools or workflow state: clearer selection, more predictable arrow endpoints, and keyboard/accessibility polish.
 - Improve agent-facing guidance with concrete, tested layout conventions for architecture sketches.
 - Keep project scan evidence bounded, private-path safe, and useful without making structure the product.

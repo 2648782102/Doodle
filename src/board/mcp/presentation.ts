@@ -197,7 +197,7 @@ export function boardRecipes(): string {
     "- Emphasis: set emphasis: focus, optionally circle it with stroke, and add a short title/note.",
     "- Image annotation: place a bounded image, nearby text/note, and connected arrows or strokes; do not overwrite the image.",
     "- Prefer updates and deterministic layout over clearing a whole board. Connected lines follow bound objects.",
-    "- Architecture: create short labelled nodes with connected lines, then call layout.mode: \"architecture\"; it moves selected objects by connection direction without changing their text.",
+    "- Architecture: create short labelled nodes with connected lines; only use layout.mode: \"architecture\" when reflow is needed, pass layout.ids to select only the objects that may move, and never move human-positioned objects unless asked.",
     "- Diagram: use draw_board.diagram with semantic nodes/edges for complex diagrams; it adds bounded labels and connected arrows beside existing objects, or clears the board only with replace: true.",
     "- Diagram modes: flow (default) derives columns from edges; timeline, compare, and matrix use your explicit column/row, so an ordered explanation is never silently reordered.",
   ].join("\n");
