@@ -3,6 +3,7 @@ import os from "node:os";
 import path from "node:path";
 import { describe, expect, it } from "vitest";
 import { BoardLibrary } from "../dist/board/library.js";
+import { MAX_BOARD_NAME, normalizeName } from "../dist/board/library.js";
 import { addBoardItem, createEmptyBoard, touchBoard } from "../dist/board/types.js";
 
 describe("local board library", () => {
@@ -144,5 +145,31 @@ describe("local board library", () => {
     } finally {
       await fs.rm(outputDir, { recursive: true, force: true });
     }
+  });
+  it("cuts an over-long name at a character, never through one", () => {
+    /*
+     * `slice(0, MAX)` counts UTF-16 code units, so a name whose code unit 80
+     * lands inside an astral character (an emoji, a rare CJK ideograph) kept the
+     * high surrogate and dropped the low one. The stored name then ended in a
+     * lone surrogate, which renders as a replacement glyph: the person sees
+     * their board renamed to mojibake, and the file holds an escape no other
+     * reader can turn back into the character they typed.
+     */
+    const emoji = "\u{1F3A8}";
+    const overLong = "a".repeat(MAX_BOARD_NAME - 1) + emoji;
+    const cut = normalizeName(overLong, "fallback");
+    expect(cut.length).toBeLessThanOrEqual(MAX_BOARD_NAME);
+    const lastUnit = cut.charCodeAt(cut.length - 1);
+    expect(lastUnit >= 0xd800 && lastUnit <= 0xdbff, "the cut left half a character").toBe(false);
+    expect(cut.endsWith(emoji), "the whole character should have gone, not half of it").toBe(false);
+    expect(cut).toBe("a".repeat(MAX_BOARD_NAME - 1));
+  });
+
+  it("keeps a name that fits, and trims it", () => {
+    expect(normalizeName("  画板  ", "fallback")).toBe("画板");
+    expect(normalizeName("", "fallback")).toBe("fallback");
+    expect(normalizeName(undefined, "fallback")).toBe("fallback");
+    const exactly = "画".repeat(MAX_BOARD_NAME);
+    expect(normalizeName(exactly, "fallback")).toBe(exactly);
   });
 });

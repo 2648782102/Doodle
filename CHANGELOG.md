@@ -2,6 +2,7 @@
 
 ### Fixed
 
+- Renaming a board to something longer than 80 characters no longer cuts the last character in half. `normalizeName` used `slice(0, 80)`, which counts UTF-16 code units, so a name whose 80th unit fell inside an emoji or a rare ideograph kept the high surrogate and dropped the low one; the row then showed a replacement glyph instead of the text that was typed. The cut now falls between characters, dropping the over-long one whole.
 - A library row whose `updatedAt` is ahead of this browser's clock no longer reads "刚刚". The label clamped a negative difference to zero, so a board copied from a machine whose clock ran fast, or opened from a shared folder by a drifted one, sat at the top of the list claiming it had just been edited. It now says `5 分钟后` / `2 天后`, and past a week falls back to the same `YYYY/M/D` date the past side already uses.
 
 ## 0.9.2 — Release closure
