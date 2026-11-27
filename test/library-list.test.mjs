@@ -55,6 +55,25 @@ describe("board library list", () => {
     expect(relativeTime("2025-12-01T12:00:00.000Z", now)).toBe("2025/12/1");
   });
 
+  it("names a timestamp ahead of the clock instead of calling it 刚刚", () => {
+    /*
+     * A row saved on another machine can carry an `updatedAt` ahead of this
+     * one: a clock that drifted, a shared library folder, or a board copied
+     * from a laptop set a few minutes fast. Clamping the difference to zero
+     * made every such row read "刚刚", so a board dated next month sat at the
+     * top of the list claiming it had just been edited.
+     */
+    const now = Date.parse("2026-01-01T12:00:00.000Z");
+    expect(relativeTime("2026-01-01T12:00:20.000Z", now)).toBe("刚刚");
+    expect(relativeTime("2026-01-01T12:05:00.000Z", now)).toBe("5 分钟后");
+    expect(relativeTime("2026-01-01T12:30:00.000Z", now)).toBe("30 分钟后");
+    expect(relativeTime("2026-01-01T15:00:00.000Z", now)).toBe("3 小时后");
+    expect(relativeTime("2026-01-03T12:00:00.000Z", now)).toBe("2 天后");
+    // Past a week ahead, the calendar date is the honest label, the same rule
+    // the past side already follows.
+    expect(relativeTime("2026-02-01T12:00:00.000Z", now)).toBe("2026/2/1");
+  });
+
   it("replaces the raw revision counter with something a person can read", () => {
     const now = Date.parse("2026-01-01T12:00:00.000Z");
     const text = describeEntry(entry("a", "Board", { itemCount: 8, revision: 586, updatedAt: "2026-01-01T11:00:00.000Z" }), now);

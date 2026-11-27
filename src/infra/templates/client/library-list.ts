@@ -80,15 +80,32 @@ const DAY = 24 * HOUR;
  * usefully described as "0 分钟前". Days stop at a week, where the calendar date
  * becomes the more useful label. An unparseable timestamp returns an empty
  * string rather than "Invalid Date" leaking into the panel.
+ *
+ * A timestamp ahead of this clock is named as such rather than clamped to
+ * "刚刚". A row's `updatedAt` comes from the file, and files travel: a board
+ * copied from a laptop whose clock runs fast, or opened from a shared folder by
+ * a machine that drifted, is genuinely in the future. Clamping it made such a
+ * row claim it had just been edited, which is the one thing this label exists
+ * to report honestly.
  */
 export function relativeTime(iso: string | undefined, now: number = Date.now()): string {
   const time = Date.parse(iso ?? "");
   if (!Number.isFinite(time)) return "";
+  const ahead = time - now;
+  if (ahead >= 7 * DAY) return calendarDate(time);
+  if (ahead >= DAY) return `${Math.floor(ahead / DAY)} 天后`;
+  if (ahead >= HOUR) return `${Math.floor(ahead / HOUR)} 小时后`;
+  if (ahead >= MINUTE) return `${Math.floor(ahead / MINUTE)} 分钟后`;
   const elapsed = Math.max(0, now - time);
   if (elapsed < MINUTE) return "刚刚";
   if (elapsed < HOUR) return `${Math.floor(elapsed / MINUTE)} 分钟前`;
   if (elapsed < DAY) return `${Math.floor(elapsed / HOUR)} 小时前`;
   if (elapsed < 7 * DAY) return `${Math.floor(elapsed / DAY)} 天前`;
+  return calendarDate(time);
+}
+
+/** The `YYYY/M/D` label both sides of the clock fall back to past a week. */
+function calendarDate(time: number): string {
   const date = new Date(time);
   return `${date.getFullYear()}/${date.getMonth() + 1}/${date.getDate()}`;
 }
