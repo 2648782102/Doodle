@@ -58,8 +58,28 @@ export function safeId(value: string): string {
 }
 
 export function normalizeName(value: unknown, fallback: string): string {
-  const name = typeof value === "string" ? value.trim().slice(0, MAX_BOARD_NAME) : "";
+  const name = typeof value === "string" ? cutAtCharacter(value.trim(), MAX_BOARD_NAME) : "";
   return name || fallback;
+}
+
+/**
+ * The first `limit` characters of `text`, counted as a reader counts them.
+ *
+ * `slice` counts UTF-16 code units, so a limit that lands inside an astral
+ * character (an emoji, a rare ideograph) keeps its high surrogate and drops the
+ * low one. The result is half a character: it renders as a replacement glyph and
+ * no other reader can turn it back into what was typed. Cutting by code point
+ * and dropping a whole character is the honest overflow, and the stored name
+ * still never exceeds the limit `slice` was there to enforce.
+ */
+function cutAtCharacter(text: string, limit: number): string {
+  if (text.length <= limit) return text;
+  let out = "";
+  for (const character of text) {
+    if (out.length + character.length > limit) break;
+    out += character;
+  }
+  return out;
 }
 
 export function entryFromBoard(board: SimpleBoard, name: string, active: boolean): BoardLibraryEntry {
